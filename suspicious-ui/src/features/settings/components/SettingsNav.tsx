@@ -2,7 +2,6 @@ import * as React from "react";
 import { Box, List, ListItemButton, ListItemText, TextField, Typography, useMediaQuery } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
-import { flatten, readableOnTint } from "@/shared/lib/contrast";
 import { useAccent } from "@/features/settings/useAccent";
 import { GROUPS, type SectionKey } from "@/features/settings/components/sections";
 import { SoftCard } from "@/features/settings/components/cards";
@@ -30,9 +29,6 @@ export function SettingsNav({ active, unsaved, onNavigate }: SettingsNavProps) {
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
   const labelId = React.useId();
   const accent = useAccent();
-  const paper = theme.palette.background.paper;
-  // Accent text on its own 10% tint: the raw accent is under 4.5:1 in several themes.
-  const activeText = readableOnTint(flatten(theme.palette.primary.main, paper), flatten(theme.palette.primary.main, paper), 0.1, [paper]);
 
   if (!isDesktop) {
     return (
@@ -97,7 +93,7 @@ export function SettingsNav({ active, unsaved, onNavigate }: SettingsNavProps) {
                     <ListItemText
                       primary={s.title}
                       slotProps={{
-                        primary: { sx: { color: isActive ? activeText : undefined, fontWeight: isActive ? 700 : 500 } },
+                        primary: { sx: { color: isActive ? accent.text : undefined, fontWeight: isActive ? 700 : 500 } },
                       }}
                     />
                     {unsaved.has(s.key) && (

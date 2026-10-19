@@ -19,6 +19,7 @@ vi.mock("../connectors", () => ({
     { id: 1, event: "case_finalised", case_id: 7, status: "success", error: "", duration_ms: 12, attempt: 1, created_at: "2026-10-19T08:00:00Z" },
   ]),
 }));
+import { ConfirmDialog } from "../ConfirmDialog";
 import { ConnectorDetail } from "../ConnectorDetail";
 import { EditableListPanel } from "../EditableListPanel";
 import { ScoringTable } from "../ScoringTable";
@@ -66,6 +67,27 @@ describe.each(NAMES)("accent used as text or mark in the %s theme", (name) => {
     const primary = flatten(palette.primary.main, palette.background.paper);
     const row = composite(primary, 0.08, palette.background.paper);
     expect(contrastRatio(getComputedStyle(box).color, row)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("text and outlined buttons are readable: dialog Cancel, Import file, Test connection", async () => {
+    const palette = setTheme();
+    const paper = palette.background.paper;
+    const { unmount } = renderWithProviders(<ConfirmDialog open title="t" body="b" confirmLabel="Go" onConfirm={vi.fn()} onCancel={vi.fn()} />);
+    expect(contrastRatio(getComputedStyle(await screen.findByRole("button", { name: "Cancel" })).color, paper), "Cancel").toBeGreaterThanOrEqual(4.5);
+    unmount();
+    const list = renderWithProviders(<EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="x" />);
+    expect(contrastRatio(getComputedStyle(await screen.findByRole("button", { name: "Import file" })).color, paper), "Import file").toBeGreaterThanOrEqual(4.5);
+    list.unmount();
+    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=configuration" });
+    expect(contrastRatio(getComputedStyle(await screen.findByRole("button", { name: "Test connection" })).color, paper), "Test connection").toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the deliveries table header is readable on the theme's header tint", async () => {
+    const palette = setTheme();
+    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=deliveries" });
+    const head = await screen.findByRole("columnheader", { name: "Status" });
+    const tint = composite(palette.text.primary, palette.mode === "dark" ? 0.03 : 0.025, palette.background.paper);
+    expect(contrastRatio(getComputedStyle(head).color, tint)).toBeGreaterThanOrEqual(4.5);
   });
 
   it("slider track and thumb 3:1 on the card", async () => {

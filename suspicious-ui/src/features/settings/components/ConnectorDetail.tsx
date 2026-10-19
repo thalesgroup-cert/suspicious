@@ -266,6 +266,7 @@ export function ConnectorDetail({
                       </Button>
                       <Button
                         variant="outlined"
+                        sx={{ color: accent.text }}
                         onClick={() => test.mutate()}
                         disabled={test.isPending}
                         aria-describedby={draft ? testHintId : undefined}

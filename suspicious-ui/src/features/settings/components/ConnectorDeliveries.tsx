@@ -15,7 +15,10 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router";
+
+import { composite, ensureContrast, flatten } from "@/shared/lib/contrast";
 
 import { StatusLabel, type StatusTone } from "@/features/settings/components/StatusLabel";
 import { useAccent } from "@/features/settings/useAccent";
@@ -41,6 +44,10 @@ const caseLink = (d: ConnectorDelivery, color: string) =>
 
 export function ConnectorDeliveries({ name }: { name: string }) {
   const accent = useAccent();
+  const theme = useTheme();
+  // The theme paints the header text.secondary on a faint text.primary tint; in graphite that is under 4.5:1.
+  const headBg = composite(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.03 : 0.025, theme.palette.background.paper);
+  const headText = ensureContrast(flatten(theme.palette.text.secondary, headBg), headBg, 4.5);
   const [failedOnly, setFailedOnly] = useState(false);
   const query = useQuery({
     queryKey: ["connector-deliveries", name],
@@ -70,7 +77,7 @@ export function ConnectorDeliveries({ name }: { name: string }) {
         )}
         <Button
           size="small"
-          sx={{ ml: "auto" }}
+          sx={{ ml: "auto", ...(failedOnly ? {} : { color: accent.text }) }}
           variant={failedOnly ? "contained" : "outlined"}
           aria-pressed={failedOnly}
           onClick={() => setFailedOnly((v) => !v)}
@@ -91,7 +98,7 @@ export function ConnectorDeliveries({ name }: { name: string }) {
               <TableRow>
                 {["Event", "Case", "Status", "Time", "Error"].map((h) => (
                   // On a phone Time and Case fold into the Event cell: five columns would need sideways scrolling to reach Status and Error.
-                  <TableCell key={h} component="th" scope="col" sx={h === "Time" || h === "Case" ? wideOnly : undefined}>{h}</TableCell>
+                  <TableCell key={h} component="th" scope="col" sx={{ color: headText, ...(h === "Time" || h === "Case" ? wideOnly : {}) }}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>

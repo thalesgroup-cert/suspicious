@@ -20,6 +20,7 @@ export function useAccent(): { text: string; mark: string } {
       composite(accent, 0.07, background.default),
     ];
     const push = (min: number) => surfaces.reduce((out, bg) => ensureContrast(out, bg, min), accent);
-    return { text: push(4.5), mark: push(3) };
+    // A little over the thresholds: the card and shell are translucent, so the colour behind a label is an estimate to about 0.2:1.
+    return { text: push(4.7), mark: push(3.2) };
   }, [background.paper, background.default, action.hover, primary.main, mode]);
 }

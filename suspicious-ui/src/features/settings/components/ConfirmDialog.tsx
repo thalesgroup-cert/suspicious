@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useAccent } from "@/features/settings/useAccent";
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 
 export type ConfirmDialogProps = {
@@ -21,6 +22,7 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const id = React.useId();
+  const accent = useAccent();
   return (
     <Dialog open={open} onClose={onCancel} aria-labelledby={`${id}-title`} aria-describedby={`${id}-body`}>
       {/* div, not the default h2: a modal title must not add a second h2 to the page outline. */}
@@ -32,7 +34,7 @@ export function ConfirmDialog({
       </DialogContent>
       <DialogActions>
         {/* Destructive dialogs start on Cancel so a stray Enter cannot delete. */}
-        <Button onClick={onCancel} autoFocus={destructive}>
+        <Button onClick={onCancel} autoFocus={destructive} sx={{ color: accent.text }}>
           Cancel
         </Button>
         <Button

@@ -6,6 +6,7 @@ import { ConfigFieldInput, SECRET_MASK } from "@/features/settings/components/co
 import { dottedGet } from "@/features/settings/components/configHelpers";
 import type { ConfigField, Connector } from "@/features/settings/components/connectors";
 import { groupFields, type FieldGroup } from "@/features/settings/connectorConfig";
+import { useAccent } from "@/features/settings/useAccent";
 
 type Props = {
   connector: Connector;
@@ -18,6 +19,7 @@ type Props = {
 
 function Group({ group, config, saved, errors, onChange }: Omit<Props, "connector"> & { group: FieldGroup }) {
   const regionId = useId();
+  const accent = useAccent();
   // null = the user has not chosen, so edits and server errors keep optional fields in view.
   const [chosen, setChosen] = useState<boolean | null>(null);
   const hasEdit = (f: ConfigField) => JSON.stringify(dottedGet(config, f.key)) !== JSON.stringify(dottedGet(saved, f.key));
@@ -53,7 +55,7 @@ function Group({ group, config, saved, errors, onChange }: Omit<Props, "connecto
               aria-controls={regionId}
               onClick={() => setChosen(!open)}
               endIcon={<ExpandMore sx={{ transform: open ? "rotate(180deg)" : "none" }} />}
-              sx={{ alignSelf: "flex-start" }}
+              sx={{ alignSelf: "flex-start", color: accent.text }}
             >
               {open ? "Hide" : "Show"} optional settings ({group.optional.length})
             </Button>

@@ -110,7 +110,7 @@ const ListItemRow = React.memo(function ListItemRow({
       <IconButton
         size="small"
         sx={{ gridArea: "copy" }}
-        title="Copy value"
+        title="Copy entry"
         aria-label={`Copy ${item.value}`}
         onClick={async () => {
           try {
@@ -183,7 +183,7 @@ function AddBar({
         multiline
         maxRows={3}
         fullWidth
-        slotProps={{ htmlInput: { "aria-label": `Add values to ${title}` } }}
+        slotProps={{ htmlInput: { "aria-label": `Add entries to ${title}` } }}
         helperText="Enter, comma or space separated. Ctrl+Enter to submit"
         sx={{
           "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.4 },
@@ -294,6 +294,7 @@ export function EditableListPanel({
 }) {
   const qc = useQueryClient();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  const accent = useAccent();
 
   const [filter, setFilter] = React.useState("");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -324,15 +325,13 @@ export function EditableListPanel({
       const dupes    = (res?.duplicates ?? []) as string[];
       const watchers = (res?.watcher_conflicts ?? []) as string[];
 
-      // ── Success: items created ───────────────────────────────────────
       if (created > 0) {
         enqueueSnackbar(
-          `${created} value${created !== 1 ? "s" : ""} added.`,
+          `${created} ${created === 1 ? "entry" : "entries"} added.`,
           { variant: "success" }
         );
       }
 
-      // ── Warning: already in this list ────────────────────────────────
       if (dupes.length > 0) {
         const preview = dupes.slice(0, 3).join(", ");
         const extra   = dupes.length > 3 ? ` +${dupes.length - 3} more` : "";
@@ -342,7 +341,6 @@ export function EditableListPanel({
         );
       }
 
-      // ── Info: already in paired Watcher list ─────────────────────────
       if (watchers.length > 0) {
         const preview = watchers.slice(0, 3).join(", ");
         const extra   = watchers.length > 3 ? ` +${watchers.length - 3} more` : "";
@@ -352,12 +350,11 @@ export function EditableListPanel({
         );
       }
 
-      // ── Nothing happened ─────────────────────────────────────────────
       if (created === 0 && dupes.length === 0 && watchers.length === 0) {
-        enqueueSnackbar("No values were added.", { variant: "info" });
+        enqueueSnackbar("No entries were added.", { variant: "info" });
       }
     },
-    onError: () => enqueueSnackbar("Failed to add values.", { variant: "error" }),
+    onError: () => enqueueSnackbar("Failed to add entries.", { variant: "error" }),
   });
 
   async function undoRemove(value: string, key: SnackbarKey) {
@@ -399,7 +396,7 @@ export function EditableListPanel({
         ),
       });
     },
-    onError: () => { enqueueSnackbar("Failed to remove item.", { variant: "error" }); setDeletingId(null); },
+    onError: () => { enqueueSnackbar("Failed to remove entry.", { variant: "error" }); setDeletingId(null); },
   });
 
   const importMutation = useMutation({
@@ -509,7 +506,7 @@ export function EditableListPanel({
           onClick={() => fileInput.current?.click()}
           startIcon={importMutation.isPending ? <CircularProgress size={13} /> : <FileUploadOutlined />}
           disabled={importMutation.isPending}
-          sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 600 }}
+          sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 600, color: accent.text }}
         >
           Import file
           <input

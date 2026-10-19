@@ -41,7 +41,7 @@ vi.mock("../connectors", () => ({
 
 describe("ConnectorsPanel", () => {
   // This project's Vitest browser-mode default viewport is mobile-sized
-  // (~414px wide), below MUI's md breakpoint — these tests exercise the
+  // (~414px wide), below MUI's md breakpoint, so these tests exercise the
   // desktop two-pane path, so force a desktop viewport before each render.
   beforeEach(async () => {
     await page.viewport(1280, 800);
@@ -52,7 +52,7 @@ describe("ConnectorsPanel", () => {
     // The connector is selected on first render now (from the URL or the first one), so its name is in the list and the detail header.
     await waitFor(() => expect(screen.getAllByText("misp").length).toBeGreaterThan(0));
     // Version chip lives in ConnectorDetail, which mounts only after the
-    // auto-select effect fires — an extra render pass after "misp" is
+    // auto-select effect fires, an extra render pass after "misp" is
     // already visible in the list, so this needs an async find, not getBy.
     expect((await screen.findAllByText(/1\.0\.0/)).length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("connector-logo").length).toBeGreaterThan(0);
@@ -77,12 +77,12 @@ describe("ConnectorsPanel", () => {
     renderWithProviders(<ConnectorsPanel />);
     // The connector is selected on first render now (from the URL or the first one), so its name is in the list and the detail header.
     await waitFor(() => expect(screen.getAllByText("misp").length).toBeGreaterThan(0));
-    // Don't assert "Connected" is absent — on desktop the auto-selected
+    // Don't assert "Connected" is absent: on desktop the auto-selected
     // connector's own ConnectorDetail status label legitimately renders
     // that word (this fixture's connector has status: "connected"). The
     // fixture has exactly one connector and it's connected, so "Incomplete"
     // and "Disabled" (which a real KPI tile would render regardless of
-    // count) should never appear anywhere — that's what actually confirms
+    // count) should never appear anywhere, which is what actually confirms
     // the KPI tiles are gone.
     expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
     expect(screen.queryByText("Disabled")).not.toBeInTheDocument();

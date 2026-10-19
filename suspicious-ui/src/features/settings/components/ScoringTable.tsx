@@ -378,7 +378,7 @@ export function ScoringTable() {
             : "No unsaved changes"}
         </Typography>
         {modified.length ? (
-          <Button size="small" startIcon={<RestoreOutlined />} onClick={resetAll} sx={{ textTransform: "none" }}>
+          <Button size="small" startIcon={<RestoreOutlined />} onClick={resetAll} sx={{ textTransform: "none", color: accent.text }}>
             Reset to saved
           </Button>
         ) : null}
