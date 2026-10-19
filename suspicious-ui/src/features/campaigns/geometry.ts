@@ -224,6 +224,16 @@ export function pointRadius(count: number): number {
   return Math.min(0.05, Math.max(0.018, 0.15 / Math.cbrt(Math.max(1, count))));
 }
 
+/** World radius that spans `pixels` on screen for something `distance` from a camera with a vertical field of view of `fovDeg` on a canvas `heightPx` tall. */
+export function pixelRadius(pixels: number, distance: number, fovDeg: number, heightPx: number): number {
+  return heightPx > 0 ? (pixels * 2 * distance * Math.tan((fovDeg * Math.PI) / 360)) / heightPx : 0;
+}
+
+/** Sphere segments (around, from pole to pole): a few thousand marks only a few pixels wide do not need the roundness of a handful of large ones, and the triangle count is what a weak GPU feels. */
+export function sphereDetail(count: number): [number, number] {
+  return count <= 400 ? [12, 8] : count <= 2000 ? [8, 6] : [6, 4];
+}
+
 /**
  * Linear fog range for a camera `distance` from the middle of a cloud of scene radius `radius`: clear at the
  * nearest point, `maxFog` (0..1) of the way to the background at the farthest.
@@ -233,7 +243,14 @@ export function fogRange(distance: number, radius: number, maxFog: number): { ne
   return { near, far: near + (distance + radius - near) / maxFog };
 }
 
-/** How far the camera starts from a cloud normalised into the box -1..1 (the box fits a 45 degree view with some margin). */
-export const FIT_DISTANCE = 4.6;
+/** How far the camera starts from a cloud normalised into the box -1..1 (the box's corners just fit a 45 degree view; the cloud itself rarely reaches them). */
+export const FIT_DISTANCE = 3.7;
+
+/** The starting distance for a canvas of this width/height: the view angle is fixed vertically, so a narrow (phone) canvas needs to be farther away to fit the cloud's width. */
+export function fitDistance(aspect: number): number {
+  return Number.isFinite(aspect) && aspect > 0 ? FIT_DISTANCE / Math.min(1, aspect) : FIT_DISTANCE;
+}
+
 /** Where the camera starts: turned a little round and above the cloud, so the third component shows up as depth rather than being edge-on. */
-export const INITIAL_POSITION: Vec3 = orbitBy([0, 0, FIT_DISTANCE], [0, 0, 0], 0.6, -0.35);
+export const initialPosition = (distance: number): Vec3 => orbitBy([0, 0, distance], [0, 0, 0], 0.6, -0.35);
+export const INITIAL_POSITION: Vec3 = initialPosition(FIT_DISTANCE);

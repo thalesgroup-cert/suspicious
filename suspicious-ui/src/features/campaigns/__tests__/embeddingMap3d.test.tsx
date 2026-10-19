@@ -89,6 +89,11 @@ describe("EmbeddingMap3D: accessible wrapper", () => {
     expect(fireEvent.keyDown(g, { key: "a" })).toBe(true);
   });
 
+  it("states the real range of each axis as text, since the canvas shows a normalised box", () => {
+    renderMap();
+    expect(screen.getByText("Axis ranges: PC1 1.00 to 5.00, PC2 0.50 to 2.50, PC3 -1.67 to -0.33.")).toBeInTheDocument();
+  });
+
   it("has a Reset view button that is safe before the scene exists", async () => {
     const user = userEvent.setup();
     renderMap();

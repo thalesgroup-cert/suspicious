@@ -4,7 +4,7 @@ import { decomposeColor, rgbToHex } from "@mui/material/styles";
 
 import type { PcaPoint } from "@/features/campaigns/api";
 import { plural } from "@/features/dashboard/format";
-import { ensureContrast } from "@/shared/lib/contrast";
+import { composite, contrastRatio, ensureContrast } from "@/shared/lib/contrast";
 import { NO_DATE, recencyRamp } from "./geometry";
 import { SERIES, classKey, classLabel, type SeriesKey } from "./utils";
 
@@ -33,6 +33,26 @@ const channels = (c: string) => decomposeColor(c).values.slice(0, 3);
 export function ageColour(t: number, old: string, newest: string): string {
   const [a, b] = [channels(old), channels(newest)];
   return rgbToHex(`rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`);
+}
+
+/** `fg` faded toward `bg` until it is only just `min`:1 against it (unchanged if it is already at or below that). */
+function fadeToContrast(fg: string, bg: string, min: number): string {
+  if (contrastRatio(fg, bg) <= min) return fg;
+  let best = fg;
+  for (let a = 0.98; a > 0; a -= 0.02) {
+    const c = composite(fg, a, bg);
+    if (contrastRatio(c, bg) < min) break;
+    best = c;
+  }
+  return best;
+}
+
+/**
+ * The two ends of the age ramp: the theme's muted text colour faded to the faintest a mark may be (3:1), up to
+ * its primary colour at 7:1. Both ends differ in lightness, so the order reads without hue; two dark colours of similar lightness would not.
+ */
+export function ageEnds(background: string, muted: string, primary: string): { old: string; newest: string } {
+  return { old: fadeToContrast(muted, background, 3), newest: ensureContrast(primary, background, 7) };
 }
 
 export type ColourContext = {

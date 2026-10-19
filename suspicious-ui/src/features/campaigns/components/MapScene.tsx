@@ -1,9 +1,9 @@
 import * as React from "react";
 import { OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { BackSide, BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Matrix4, Quaternion, Vector3, type Fog, type InstancedMesh } from "three";
+import { BackSide, BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Matrix4, Quaternion, Vector3, type Fog, type InstancedMesh, type PerspectiveCamera } from "three";
 
-import { FIT_DISTANCE, INITIAL_POSITION, depthScale, fogRange, orbitBy, pointRadius, zoomBy, type Vec3 } from "@/features/campaigns/geometry";
+import { FIT_DISTANCE, depthScale, fitDistance, fogRange, initialPosition, orbitBy, pixelRadius, pointRadius, sphereDetail, zoomBy, type Vec3 } from "@/features/campaigns/geometry";
 
 /** What the keyboard and the Reset view button drive; the page-side handler is in mapSupport.ts. */
 export type SceneApi = {
@@ -46,10 +46,13 @@ const MAX_FOG = 0.45;
 // A hidden point shrinks to nothing visible but keeps a non-degenerate matrix, so the ray test never meets a singular one.
 const HIDDEN = 1e-5;
 const FOCUS_MS = 260;
-const SELECTED = 1.9;
-const NEIGHBOUR = 1.45;
+const SELECTED = 2.6;
+const NEIGHBOUR = 1.6;
 const HOVERED = 1.5;
-const DIM = 0.55;
+const DIM = 0.4;
+
+// How far, in pixels, from a mark's centre the pointer still picks it (a finger is coarser than a mouse).
+const pickPixels = () => (window.matchMedia?.("(pointer: coarse)").matches ? 14 : 7);
 
 const vec = (v: Vector3): Vec3 => [v.x, v.y, v.z];
 
@@ -57,11 +60,14 @@ const vec = (v: Vector3): Vec3 => [v.x, v.y, v.z];
 function Points({ positions, colours, visible, selected, neighbours, hovered, paint, onHover, onPick }: SceneProps) {
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
+  const height = useThree((s) => s.size.height);
   const controls = useThree((s) => s.controls) as (EventTarget & { target: Vector3 }) | null;
   const main = React.useRef<InstancedMesh>(null);
+  const picks = React.useRef<InstancedMesh>(null);
   const rings = React.useRef<InstancedMesh>(null);
   const n = positions.length;
   const radius = pointRadius(n);
+  const detail = sphereDetail(n);
   // Reused between updates: allocating per point on every camera move would make the garbage collector the bottleneck.
   const scratchRef = React.useRef<{ m: Matrix4; c: Color; dist: Float32Array } | null>(null);
   const scratch = () => {
@@ -136,7 +142,18 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
       m.setMatrixAt(i, matrix.makeScale(s, s, s).setPosition(p[0], p[1], p[2]));
     }
     m.instanceMatrix.needsUpdate = true;
-    m.boundingSphere = null; // the ray test would otherwise use the first sphere ever computed
+    // The picking spheres are invisible and at least PICK_PX wide on screen, so a few-pixel mark is still easy to hit.
+    const p = picks.current;
+    if (p) {
+      const fov = (camera as PerspectiveCamera).fov;
+      for (let i = 0; i < n; i++) {
+        const s = visible[i] ? Math.max(scaleOf[i], pixelRadius(pickPixels(), dist[i], fov, height)) : HIDDEN;
+        const q = positions[i];
+        p.setMatrixAt(i, matrix.makeScale(s, s, s).setPosition(q[0], q[1], q[2]));
+      }
+      p.instanceMatrix.needsUpdate = true;
+      p.boundingSphere = null; // the ray test would otherwise use the first sphere ever computed
+    }
     const r = rings.current;
     if (r) {
       marked.forEach((k, j) => {
@@ -149,7 +166,7 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
     }
     invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- scratch only wraps a ref
-  }, [camera, controls, n, visible, positions, radius, boosts, marked, invalidate]);
+  }, [camera, controls, n, visible, positions, radius, boosts, marked, height, invalidate]);
 
   React.useLayoutEffect(() => {
     applyColours();
@@ -166,9 +183,13 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
   if (!n) return null;
   return (
     <>
+      <instancedMesh key={n} ref={main} args={[undefined, undefined, n]} frustumCulled={false} raycast={() => null}>
+        <sphereGeometry args={[1, ...detail]} />
+        <meshBasicMaterial />
+      </instancedMesh>
       <instancedMesh
-        key={n}
-        ref={main}
+        key={`pick-${n}`}
+        ref={picks}
         args={[undefined, undefined, n]}
         frustumCulled={false}
         onPointerMove={(e) => {
@@ -189,8 +210,8 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
           onPick(e.instanceId);
         }}
       >
-        <sphereGeometry args={[1, 12, 8]} />
-        <meshBasicMaterial />
+        <sphereGeometry args={[1, 6, 4]} />
+        <meshBasicMaterial visible={false} />
       </instancedMesh>
       {marked.length ? (
         <instancedMesh key={`ring-${marked.length}`} ref={rings} args={[undefined, undefined, marked.length]} frustumCulled={false} raycast={() => null}>
@@ -209,11 +230,11 @@ function CloudMesh({ cloud }: { cloud: Cloud }) {
     <group position={cloud.centre} quaternion={rotation} scale={cloud.radii}>
       <mesh>
         <sphereGeometry args={[1, 28, 18]} />
-        <meshBasicMaterial color={cloud.colour} transparent opacity={0.1} depthWrite={false} side={DoubleSide} />
+        <meshBasicMaterial color={cloud.colour} transparent opacity={0.08} depthWrite={false} side={DoubleSide} />
       </mesh>
       <mesh>
-        <sphereGeometry args={[1, 16, 10]} />
-        <meshBasicMaterial color={cloud.colour} wireframe transparent opacity={0.18} depthWrite={false} />
+        <sphereGeometry args={[1, 14, 8]} />
+        <meshBasicMaterial color={cloud.colour} wireframe transparent opacity={0.14} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -236,7 +257,11 @@ function Axes({ axes, paint, labelRefs }: Pick<SceneProps, "axes" | "paint" | "l
       if (!el) return;
       tip.set(...a.to).project(camera);
       el.style.visibility = tip.z < 1 ? "visible" : "hidden";
-      el.style.transform = `translate(${(tip.x * 0.5 + 0.5) * size.width}px, ${(-tip.y * 0.5 + 0.5) * size.height}px) translate(6px, -50%)`;
+      // Beside the line's end, but kept inside the canvas (the overflow is hidden, so a label past the edge would be cut).
+      const [w, h] = [el.offsetWidth, el.offsetHeight];
+      const x = Math.min(Math.max(4, (tip.x * 0.5 + 0.5) * size.width + 6), size.width - w - 4);
+      const y = Math.min(Math.max(h / 2 + 4, (-tip.y * 0.5 + 0.5) * size.height), size.height - h / 2 - 4);
+      el.style.transform = `translate(${x}px, ${y}px) translateY(-50%)`;
     });
   });
 
@@ -277,15 +302,33 @@ function Rig({ focus, consumeSkip, apiRef, reducedMotion, fitKey }: Pick<ScenePr
   const controls = React.useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const target = React.useRef<Vec3 | null>(null);
 
+  // The starting view fits the cloud to the canvas. It is redone for a new sample, or when the canvas gets its size, but not
+  // under a user who has already moved the camera (a window resize must not undo that).
+  const size = useThree((s) => s.size);
+  const moved = React.useRef(false);
+  const fitted = React.useRef<unknown>(null);
   React.useEffect(() => {
     const c = controls.current;
     if (!c) return;
-    camera.position.set(...INITIAL_POSITION);
+    const onStart = () => {
+      moved.current = true;
+    };
+    c.addEventListener("start", onStart);
+    return () => c.removeEventListener("start", onStart);
+  }, []);
+  React.useEffect(() => {
+    const c = controls.current;
+    if (!c) return;
+    if (fitted.current !== fitKey) {
+      fitted.current = fitKey;
+      moved.current = false;
+    } else if (moved.current) return;
+    camera.position.set(...initialPosition(fitDistance(size.width / size.height)));
     c.target.set(0, 0, 0);
     c.update();
     c.saveState(); // what "Reset view" returns to
     invalidate();
-  }, [fitKey, camera, invalidate]);
+  }, [fitKey, size.width, size.height, camera, invalidate]);
 
   React.useEffect(() => {
     apiRef.current = {

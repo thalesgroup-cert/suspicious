@@ -6,11 +6,16 @@ import {
   categoryEllipsoid,
   axisSegments,
   depthScale,
+  FIT_DISTANCE,
+  fitDistance,
   fogRange,
+  initialPosition,
   nearest,
   normalise,
   orbitBy,
+  pixelRadius,
   pointRadius,
+  sphereDetail,
   recencyRamp,
   toData,
   toScene,
@@ -321,5 +326,59 @@ describe("fogRange", () => {
 
   it("never starts behind the camera", () => {
     expect(fogRange(1, 1.75, 0.45).near).toBeGreaterThan(0);
+  });
+});
+
+describe("fitDistance", () => {
+  it("is the base distance for a canvas at least as wide as it is tall, and farther for a narrow one", () => {
+    expect(fitDistance(1.6)).toBe(FIT_DISTANCE);
+    expect(fitDistance(1)).toBe(FIT_DISTANCE);
+    expect(fitDistance(0.5)).toBeCloseTo(FIT_DISTANCE * 2, 9);
+  });
+
+  it("falls back to the base distance before the canvas has a size", () => {
+    expect(fitDistance(0)).toBe(FIT_DISTANCE);
+    expect(fitDistance(NaN)).toBe(FIT_DISTANCE);
+    expect(fitDistance(Infinity)).toBe(FIT_DISTANCE);
+  });
+});
+
+describe("initialPosition", () => {
+  it("looks at the middle from the given distance, a little round and above", () => {
+    const p = initialPosition(5);
+    expect(norm(p)).toBeCloseTo(5, 9);
+    expect(p[1]).toBeGreaterThan(0);
+    expect(p[0]).toBeGreaterThan(0);
+    expect(p[2]).toBeGreaterThan(0);
+  });
+});
+
+describe("sphereDetail", () => {
+  it("uses fewer triangles as the sample grows, and always at least a rough sphere", () => {
+    const tris = (n: number) => {
+      const [w, h] = sphereDetail(n);
+      return w * h * 2;
+    };
+    expect(tris(0)).toBe(tris(400));
+    expect(tris(401)).toBeLessThan(tris(400));
+    expect(tris(2001)).toBeLessThan(tris(2000));
+    for (const n of [0, 1, 400, 2000, 5000, 1e6]) {
+      const [w, h] = sphereDetail(n);
+      expect(w).toBeGreaterThanOrEqual(3);
+      expect(h).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
+describe("pixelRadius", () => {
+  it("is the world size that covers the given pixels", () => {
+    // at 90 degrees the view is 2 * distance tall: 100 px of a 200 px canvas, 5 away, is 5 world units
+    expect(pixelRadius(100, 5, 90, 200)).toBeCloseTo(5, 9);
+    expect(pixelRadius(7, 10, 45, 460)).toBeCloseTo((7 * 2 * 10 * Math.tan(Math.PI / 8)) / 460, 12);
+  });
+
+  it("grows with distance and is 0 for a canvas with no height", () => {
+    expect(pixelRadius(7, 8, 45, 400)).toBeGreaterThan(pixelRadius(7, 4, 45, 400));
+    expect(pixelRadius(7, 8, 45, 0)).toBe(0);
   });
 });

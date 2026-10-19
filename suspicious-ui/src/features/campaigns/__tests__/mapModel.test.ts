@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { PcaPoint } from "@/features/campaigns/api";
 import { contrastRatio } from "@/shared/lib/contrast";
-import { ageColour, campaignPalette, mapCaption, mapDescription, pointColours, uniqueDates, visibleMask, type ColourContext } from "../mapModel";
+import { ageColour, ageEnds, campaignPalette, mapCaption, mapDescription, pointColours, uniqueDates, visibleMask, type ColourContext } from "../mapModel";
 
 const pt = (label: string, id: string | null, date: string | null): PcaPoint => ({
   x: 0, y: 0, z: 0, label, suspicious_case_id: id, mail_subject: null, sourceRefs: [], date,
@@ -38,6 +38,25 @@ describe("ageColour", () => {
     expect(ageColour(0, "#000000", "#ff8040")).toBe("#000000");
     expect(ageColour(1, "#000000", "#ff8040")).toBe("#ff8040");
     expect(ageColour(0.5, "#000000", "#ff8040")).toBe("#804020");
+  });
+});
+
+describe("ageEnds", () => {
+  it.each([
+    ["light", "#ffffff", "#475569", "#2563eb"],
+    ["dark", "#0b1220", "#a8b3c4", "#60a5fa"],
+    ["paper", "#f4efe4", "#5c5546", "#9a3412"],
+  ])("makes the ramp visible against the %s canvas, with ends easy to tell apart", (_n, bg, muted, primary) => {
+    const { old, newest } = ageEnds(bg, muted, primary);
+    // the old end is as faint as a mark may be (3:1), the new end clearly strong
+    expect(contrastRatio(old, bg)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(old, bg)).toBeLessThan(3.5);
+    expect(contrastRatio(newest, bg)).toBeGreaterThanOrEqual(7);
+    expect(contrastRatio(old, newest)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps a muted colour that is already at or below 3:1 as it is", () => {
+    expect(ageEnds("#ffffff", "#aaaaaa", "#2563eb").old).toBe("#aaaaaa");
   });
 });
 

@@ -20,6 +20,7 @@ import {
   type Vec3,
 } from "@/features/campaigns/geometry";
 import {
+  ageEnds,
   campaignPalette,
   mapDescription,
   pointColours,
@@ -116,8 +117,8 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
   const campaignOf = React.useMemo(() => caseIdToCampaign(ranked), [ranked]);
   const campaignColours = React.useMemo(() => campaignPalette(bg), [bg]);
   const neutral = React.useMemo(() => ensureContrast(flatten(theme.palette.text.secondary, bg), bg, 3), [bg, theme.palette.text.secondary]);
-  const ageEnds = React.useMemo(
-    () => ({ old: ensureContrast(flatten(theme.palette.text.secondary, bg), bg, 3), newest: ensureContrast(theme.palette.primary.main, bg, 3) }),
+  const ends = React.useMemo(
+    () => ageEnds(bg, flatten(theme.palette.text.secondary, bg), theme.palette.primary.main),
     [bg, theme.palette.text.secondary, theme.palette.primary.main]
   );
   const noDate = React.useMemo(() => ensureContrast(NO_DATE_COLOUR, bg, 3), [bg]);
@@ -128,9 +129,9 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
         campaignOf,
         campaignColours,
         neutral,
-        age: { min: dates[0] ?? "", max: dates[last] ?? "", old: ageEnds.old, newest: ageEnds.newest, none: noDate },
+        age: { min: dates[0] ?? "", max: dates[last] ?? "", old: ends.old, newest: ends.newest, none: noDate },
       }),
-    [points, mode, classColors, campaignOf, campaignColours, neutral, dates, last, ageEnds, noDate]
+    [points, mode, classColors, campaignOf, campaignColours, neutral, dates, last, ends, noDate]
   );
   const inMap = React.useMemo(() => {
     const n = ranked.map(() => 0);
@@ -180,8 +181,9 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
   }, [selected, selectedKey, positions]);
 
   const axes = React.useMemo(() => (box3 ? axisSegments(box3).map((s) => ({ from: toScene(s.from, norm), to: toScene(s.to, norm) })) : []), [box3, norm]);
-  const range = (i: number) => (box3 ? `${box3.min[i].toFixed(2)} to ${box3.max[i].toFixed(2)}` : "");
-  const axisLabels = [0, 1, 2].map((i) => `PC${i + 1}${explainedVariance[i] === undefined ? "" : ` ${Math.round(explainedVariance[i] * 100)}%`} (${range(i)})`);
+  const axisLabels = [0, 1, 2].map((i) => `PC${i + 1}${explainedVariance[i] === undefined ? "" : ` ${Math.round(explainedVariance[i] * 100)}%`}`);
+  // The real values behind the normalised box, as text: on the canvas they would crowd the labels.
+  const ranges = box3 ? `Axis ranges: ${[0, 1, 2].map((i) => `PC${i + 1} ${box3.min[i].toFixed(2)} to ${box3.max[i].toFixed(2)}`).join(", ")}.` : null;
 
   // ---- events
   const onHover = React.useCallback((index: number | null, clientX = 0, clientY = 0) => {
@@ -303,13 +305,18 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
           e.preventDefault();
           keyRegion.current?.focus();
         }}
+        // Visually hidden until it has focus. (In sx a bare 1 is 100%, not 1px: that once made the page scroll sideways on a phone.)
         sx={{
           position: "absolute",
-          width: 1,
-          height: 1,
+          width: "1px",
+          height: "1px",
+          m: "-1px",
+          p: 0,
           overflow: "hidden",
           clip: "rect(0 0 0 0)",
-          "&:focus": { position: "static", width: "auto", height: "auto", clip: "auto", display: "inline-block", mb: 0.5 },
+          whiteSpace: "nowrap",
+          color: "primary.main",
+          "&:focus": { position: "static", width: "auto", height: "auto", m: 0, clip: "auto", overflow: "visible", display: "inline-block", mb: 0.5 },
         }}
       >
         Skip map
@@ -388,10 +395,15 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
 
       <Box ref={keyRegion} id={ids.key} role="group" aria-label="Map key" tabIndex={-1} sx={{ mt: 1 }}>
         {mode === "campaign" ? <CampaignLegend campaigns={ranked} colours={campaignColours} neutral={neutral} inMap={inMap} /> : null}
-        {mode === "age" ? <AgeLegend oldest={dates[0] ?? null} newest={dates[last] ?? null} from={ageEnds.old} to={ageEnds.newest} none={noDate} hasUndated={undated > 0} /> : null}
+        {mode === "age" ? <AgeLegend oldest={dates[0] ?? null} newest={dates[last] ?? null} from={ends.old} to={ends.newest} none={noDate} hasUndated={undated > 0} /> : null}
         {clouds.length ? (
           <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>
             Shaded clouds: 2 standard deviations around each category&apos;s average position, computed from the points shown.
+          </Typography>
+        ) : null}
+        {ranges ? (
+          <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>
+            {ranges}
           </Typography>
         ) : null}
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>

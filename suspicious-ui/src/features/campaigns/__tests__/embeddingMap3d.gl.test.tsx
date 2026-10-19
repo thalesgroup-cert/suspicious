@@ -5,6 +5,7 @@ import { BufferGeometry } from "three";
 import { renderWithProviders } from "@/test/utils";
 import { stubMatchMedia } from "@/test/matchMedia";
 import type { PcaPoint } from "@/features/campaigns/api";
+import EmbeddingMap from "../components/EmbeddingMap";
 import EmbeddingMap3D from "../components/EmbeddingMap3D";
 import { detectWebGL } from "../mapSupport";
 
@@ -73,5 +74,19 @@ describe.skipIf(!detectWebGL())("EmbeddingMap3D with a real WebGL canvas", () =>
     await waitFor(() => expect(document.querySelector("canvas")).not.toBeNull());
     await frames();
     expect(problems(errors)).toEqual([]);
+  });
+
+  it("hands over to the 2D map, with a message, when the WebGL context is lost", async () => {
+    stubMatchMedia();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    renderWithProviders(<EmbeddingMap points={sample(30)} explainedVariance={[0.3, 0.2, 0.1]} sampleLimit={1500} selectedCaseIds={[]} onSelectCases={() => {}} />);
+    await waitFor(() => expect(document.querySelector("canvas")).not.toBeNull());
+    await frames();
+    act(() => {
+      document.querySelector("canvas")!.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    });
+    expect(await screen.findByText("3D view unavailable, showing the 2D map.")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Embedding map/ })).toBeInTheDocument();
+    expect(document.querySelector("canvas")).toBeNull();
   });
 });
