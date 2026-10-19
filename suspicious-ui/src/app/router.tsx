@@ -83,7 +83,7 @@ export const router = createBrowserRouter([
 
       // ── Admin (Admin / CERT) ───────────────────────────────────────────
       {
-        path: "settings",
+        path: "settings/:section?",
         element: (
           <ProtectedRoute requireGroups={ADMIN}>
             <S><SettingsPage /></S>
