@@ -165,3 +165,7 @@ Deferred:
 - Contrast in shared components and theme definitions, listed in `settings-contrast-2026-10.tsv` and not changed: outlined field borders (MUI `notchedOutline` in `themes.ts`, 1.3 to 2.9:1 in 17 themes), switch thumb and track (MUI Switch palette, 1.0 to 2.9:1 in all 18 themes), input placeholders (MUI default opacity, 2.6 to 4.5:1 in 9 themes), the sidebar avatar initial (2.8 to 4.3:1 in 5 themes), and contained button labels where the theme's `contrastText` is under 4.5:1 on its fill (3.0 to 3.8:1 in 6 themes; `mkLight`/`mkDark` cannot set `primary.contrastText`, as noted under the Home cycle).
 - The sweep does not cover snackbar variants, focus indicators, or hover states other than the bulk bar.
 
+
+## Follow-ups raised during the Settings cycle (2026-10-20)
+- Allow/deny list tables: `user` FK is CASCADE, so deleting a user deletes the entries they added with no `ListChangeLog` row. Change to `SET_NULL` (nullable `user`, check readers of `.user`) in its own migration, then log removals made by the cascade or keep the entries.
+- Allow-list / campaign / MISP / scoring majority rule: approved design in `docs/plans/2026-10-20-allowlist-launch-misp-scoring-design.md`; implement on a new branch from main.
