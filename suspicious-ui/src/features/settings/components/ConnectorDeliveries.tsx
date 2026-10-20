@@ -27,7 +27,10 @@ import { DELIVERY_STATUS_LABEL } from "@/features/settings/labels";
 
 export const DELIVERY_LIMIT = 10;
 const LONG_ERROR = 80;
-const wideOnly = { display: { xs: "none", md: "table-cell" } } as const;
+// The detail pane is about 520px wide at 1440 and the page is 390px on a phone, so the fold follows the table's own width, not the viewport.
+const WIDE = "@container (min-width: 720px)";
+const wideOnly = { display: "none", [WIDE]: { display: "table-cell" } } as const;
+const foldedIn = { display: "block", [WIDE]: { display: "none" } } as const;
 const when = (d: ConnectorDelivery) => new Date(d.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 const hidden = {
   position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
@@ -91,7 +94,7 @@ export function ConnectorDeliveries({ name }: { name: string }) {
         </Typography>
       ) : (
         // Focusable so a keyboard user can scroll the table sideways on a phone.
-        <TableContainer tabIndex={0} role="region" aria-label="Deliveries table" sx={{ overflowX: "auto" }}>
+        <TableContainer tabIndex={0} role="region" aria-label="Deliveries table" sx={{ overflowX: "auto", containerType: "inline-size" }}>
           <Table size="small" sx={{ "& th, & td": { px: { xs: 0.75, sm: 2 } } }}>
             <Box component="caption" sx={hidden}>Recent deliveries</Box>
             <TableHead>
@@ -107,10 +110,10 @@ export function ConnectorDeliveries({ name }: { name: string }) {
                 <TableRow key={d.id}>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>
                     {d.event}
-                    <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "block", md: "none" } }}>
+                    <Typography variant="caption" color="text.secondary" sx={foldedIn}>
                       {when(d)}
                     </Typography>
-                    <Box sx={{ display: { xs: "block", md: "none" } }}>{caseLink(d, accent.text)}</Box>
+                    <Box sx={foldedIn}>{caseLink(d, accent.text)}</Box>
                   </TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap", ...wideOnly }}>
                     {caseLink(d, accent.text) ?? <Typography variant="body2" color="text.secondary">None</Typography>}
@@ -119,7 +122,7 @@ export function ConnectorDeliveries({ name }: { name: string }) {
                     <StatusLabel size="small" tone={TONE[d.status] ?? "neutral"} label={DELIVERY_STATUS_LABEL[d.status] ?? d.status} />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap", ...wideOnly }}>{when(d)}</TableCell>
-                  <TableCell sx={{ minWidth: { md: 180 }, maxWidth: 280 }}>
+                  <TableCell sx={{ maxWidth: 280 }}>
                     {d.error && (
                       // The text stays whole in the DOM (assistive tech reads it all); only the view is clamped.
                       <Box
