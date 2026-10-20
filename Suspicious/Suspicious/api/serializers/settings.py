@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from settings.models import EmailFeederState
+from settings.models import EmailFeederState, ListChangeLog
 from profiles.models import CISOProfile
 from cortex_job.models import Analyzer
 
@@ -13,6 +13,13 @@ class SettingsListItemSerializer(serializers.Serializer):
     id = serializers.CharField()
     value = serializers.CharField()
     created_at = serializers.DateTimeField()
+    added_by = serializers.CharField(allow_null=True)
+
+
+class ListChangeLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListChangeLog
+        fields = ["id", "value", "action", "username", "created_at"]
 
 
 class SettingsListBulkCreateSerializer(serializers.Serializer):

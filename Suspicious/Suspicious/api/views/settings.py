@@ -14,6 +14,7 @@ from api.serializers.settings import (
     CISOUserSerializer,
     EmailFeederStateSerializer,
     EmailFeederStateUpdateSerializer,
+    ListChangeLogSerializer,
     SettingsListBulkCreateSerializer,
 )
 from api.utils.settings_service import SettingsListSectionService
@@ -88,8 +89,23 @@ class SettingsListItemDeleteView(generics.GenericAPIView):
         if section in READ_ONLY_SECTIONS:
             raise ValidationError({"detail": f"Section '{section}' is read-only."})
 
-        deleted_id = SettingsListSectionService.delete_item(section, item_id)
+        deleted_id = SettingsListSectionService.delete_item(section, item_id, request.user)
         return Response({"deleted": deleted_id})
+
+
+class SettingsListHistoryView(generics.ListAPIView):
+    """
+    GET /api/settings/list/<section>/history/   (paginated, newest first)
+
+    Who added / removed entries. 400 for unknown or read-only sections.
+    """
+
+    permission_classes = [IsAdminOrCERT]
+    serializer_class = ListChangeLogSerializer
+    pagination_class = SettingsPagination
+
+    def get_queryset(self):
+        return SettingsListSectionService.history(self.kwargs["section"])
 
 
 class EmailFeederSettingsView(generics.RetrieveUpdateAPIView):

@@ -209,3 +209,30 @@ class RuntimeConfig(models.Model):
         super().delete(*args, **kwargs)
         from settings.config import invalidate_cache
         invalidate_cache(key)
+
+
+class ListChangeLog(models.Model):
+    """Append-only audit trail for the editable Settings allow/deny lists.
+
+    Rows are written by ``SettingsListSectionService`` only (never edited), so
+    "who removed X and when" survives the deletion of the list row itself.
+    ``username`` is a snapshot kept when the user account is later deleted.
+    History starts when this table is deployed; earlier changes are not known.
+    """
+
+    ACTION_CHOICES = (("added", "added"), ("removed", "removed"))
+
+    section = models.CharField(max_length=40)
+    value = models.CharField(max_length=512)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    username = models.CharField(max_length=150, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["section", "-created_at"], name="listchangelog_sec_created")]
+
+    def __str__(self):
+        return f"{self.action} {self.section}:{self.value}"

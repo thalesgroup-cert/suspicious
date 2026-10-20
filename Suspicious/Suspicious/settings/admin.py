@@ -14,6 +14,7 @@ from .models import (
     CampaignDomainAllowList,
     AllowListFile,
     AllowListFiletype,
+    ListChangeLog,
     RuntimeConfig,
 )
 from domain_process.models import Domain
@@ -335,3 +336,21 @@ class RuntimeConfigAdmin(admin.ModelAdmin):
     list_filter = ("scope",)
     search_fields = ("key",)
     ordering = ("scope", "key")
+
+
+# ListChangeLog (append-only audit trail: read-only in admin)
+@admin.register(ListChangeLog)
+class ListChangeLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "section", "action", "value", "username")
+    list_filter = ("section", "action")
+    search_fields = ("value", "username")
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

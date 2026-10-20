@@ -47,6 +47,7 @@ from api.views.settings import (
     AnalyzerSettingsDetailView,
     AnalyzerSettingsListView,
     EmailFeederSettingsView,
+    SettingsListHistoryView,
     SettingsListItemDeleteView,
     SettingsListView,
 )
@@ -134,6 +135,7 @@ urlpatterns = [
          SubmissionUrlAnalyzeView.as_view(), name="submission-url-analyze"),
 
     path("settings/list/<str:section>/", SettingsListView.as_view(), name="settings-list"),
+    path("settings/list/<str:section>/history/", SettingsListHistoryView.as_view(), name="settings-list-history"),
     path("settings/list/<str:section>/<int:item_id>/", SettingsListItemDeleteView.as_view(), name="settings-list-delete"),
     path("settings/email-feeder/", EmailFeederSettingsView.as_view(), name="settings-email-feeder"),
     path("feeder/health/", FeederHealthView.as_view(), name="feeder-health"),

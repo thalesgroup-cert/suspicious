@@ -22,6 +22,7 @@ from settings.models import (
     DenyListDomain,
     WatcherLegitDomain,
     WatcherMonitoredDomain,
+    ListChangeLog,
 )
 
 User = get_user_model()
@@ -71,19 +72,19 @@ class ListSectionConfig:
 # Queryset factories (unchanged)
 
 def _domain_list_queryset(model: Type[Model]) -> QuerySet:
-    return model.objects.select_related("domain").order_by("-creation_date")
+    return model.objects.select_related("domain", "user").order_by("-creation_date")
 
 
 def _hash_list_queryset() -> QuerySet:
-    return AllowListFile.objects.select_related("linked_file_hash").order_by("-creation_date")
+    return AllowListFile.objects.select_related("linked_file_hash", "user").order_by("-creation_date")
 
 
 def _ip_list_queryset() -> QuerySet:
-    return AllowListIp.objects.select_related("ip").order_by("-creation_date")
+    return AllowListIp.objects.select_related("ip", "user").order_by("-creation_date")
 
 
 def _filetype_queryset() -> QuerySet:
-    return AllowListFiletype.objects.order_by("-creation_date")
+    return AllowListFiletype.objects.select_related("user").order_by("-creation_date")
 
 
 def _ciso_queryset() -> QuerySet:
@@ -420,14 +421,39 @@ class SettingsListSectionService:
     @classmethod
     def list_items(cls, section: str) -> list[dict[str, Any]]:
         config = cls.get_config(section)
+        # Only editable sections record who added a row. Read-only ones (Watcher,
+        # ciso_users) either have no `user` or it is the subject, not the author.
+        track_user = config.bulk_create_handler is not None
         return [
             {
                 "id": str(obj.id),
                 "value": config.value_getter(obj),
                 "created_at": getattr(obj, config.created_at_attr, None),
+                "added_by": obj.user.username if track_user and obj.user else None,
             }
             for obj in config.get_queryset()
         ]
+
+    @classmethod
+    def history(cls, section: str) -> QuerySet:
+        """Audit rows for an editable section, newest first."""
+        config = cls.get_config(section)
+        if config.bulk_create_handler is None:
+            raise ValidationError({"section": "This section has no change history."})
+        return ListChangeLog.objects.filter(section=section).order_by("-created_at", "-id")
+
+    @staticmethod
+    def _log(section: str, action: str, values: list[str], user: User) -> None:
+        ListChangeLog.objects.bulk_create(
+            ListChangeLog(
+                section=section,
+                value=v,
+                action=action,
+                user=user,
+                username=user.get_username(),
+            )
+            for v in values
+        )
 
     @classmethod
     @transaction.atomic
@@ -454,17 +480,27 @@ class SettingsListSectionService:
         if config.bulk_create_handler is None:
             raise ValidationError({"section": "This section does not support creation."})
 
-        return config.bulk_create_handler(values, user)
+        result = config.bulk_create_handler(values, user)
+        # `created` holds row IDs; log the values the list shows for them.
+        if result["created"]:
+            created = config.get_queryset().filter(id__in=result["created"])
+            cls._log(section, "added", [config.value_getter(o) for o in created], user)
+        return result
 
     @classmethod
-    def delete_item(cls, section: str, item_id: str) -> str:
+    @transaction.atomic
+    def delete_item(cls, section: str, item_id: str, user: User) -> str:
         config = cls.get_config(section)
 
         if not config.allow_delete:
             raise ValidationError({"section": "This section does not support deletion."})
 
-        deleted, _ = config.model.objects.filter(id=item_id).delete()
-        if deleted == 0:
+        obj = config.get_queryset().filter(id=item_id).first()
+        if obj is None:
             raise NotFound("Not found.")
+
+        value = config.value_getter(obj)
+        obj.delete()
+        cls._log(section, "removed", [value], user)
 
         return str(item_id)
