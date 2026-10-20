@@ -1,9 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "@vitest/browser/context";
 
 import { renderWithProviders } from "@/test/utils";
+import { themes } from "@/styles/themes";
+import { contrastRatio, flatten } from "@/shared/lib/contrast";
 import { ConnectorGallery } from "../ConnectorGallery";
 import type { Connector } from "../connectors";
 
@@ -278,5 +280,18 @@ describe("loading, error and load errors", () => {
   it("surfaces a connector that failed to load as a warning", () => {
     renderGallery({ loadErrors: { watcher: "timeout" } });
     expect(screen.getByText(/Connector watcher failed to load: timeout/)).toBeInTheDocument();
+  });
+});
+
+describe("selected status chip", () => {
+  afterEach(() => localStorage.removeItem("suspicious.theme"));
+
+  // The inverted pill used text.primary over paper; in spring those two are a dark pair, which left the label at 1.6:1.
+  it.each(Object.keys(themes) as (keyof typeof themes)[])("keeps its label readable in the %s theme", (name) => {
+    localStorage.setItem("suspicious.theme", name);
+    renderGallery();
+    const chip = screen.getByRole("button", { name: /^All\s*5$/ });
+    const fill = flatten(getComputedStyle(chip).backgroundColor, themes[name].palette.background.paper);
+    expect(contrastRatio(flatten(getComputedStyle(chip).color, fill), fill)).toBeGreaterThanOrEqual(4.5);
   });
 });

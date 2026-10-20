@@ -7,6 +7,7 @@ import { EmptyList } from "@/features/settings/components/cards";
 import { ConnectorTile } from "@/features/settings/components/ConnectorTile";
 import type { Connector } from "@/features/settings/components/connectors";
 import { filterConnectors, groupByCategory, statusCounts, type StatusFilter } from "@/features/settings/connectorFilter";
+import { contrastRatio, flatten } from "@/shared/lib/contrast";
 import { useMuted } from "@/features/settings/useMuted";
 
 const CHIPS: { value: StatusFilter; label: string }[] = [
@@ -66,6 +67,11 @@ export function ConnectorGallery({
 }) {
   const theme = useTheme();
   const muted = useMuted();
+  // The selected pill is the text colour as a fill. Its label is whichever of white and black reads better on it, not paper:
+  // in some themes (spring) text.primary and paper are both dark, which left the label at 1.6:1.
+  const { common, background, text } = theme.palette;
+  const fill = flatten(text.primary, background.paper);
+  const pill = { fill, label: contrastRatio(fill, common.white) >= contrastRatio(fill, common.black) ? common.white : common.black };
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [grouped, setGrouped] = useState(false);
@@ -140,11 +146,12 @@ export function ConnectorGallery({
                   </>
                 }
                 variant={selected ? "filled" : "outlined"}
-                sx={
-                  selected
-                    ? { bgcolor: "text.primary", color: "background.paper", "&:hover": { bgcolor: "text.primary" }, "&.Mui-focusVisible": { bgcolor: "text.primary" } }
-                    : { color: "text.primary", borderColor: "divider" }
-                }
+                // &&&: some themes (spring) colour chips by nth-of-type with a rule of higher specificity than a plain sx.
+                sx={{
+                  "&&&": selected
+                    ? { bgcolor: pill.fill, color: pill.label, "&:hover": { bgcolor: pill.fill } }
+                    : { bgcolor: "transparent", color: "text.primary", borderColor: "divider" },
+                }}
               />
             );
           })}
