@@ -14,7 +14,8 @@ export function ListHistory({ section }: { section: EditableListSection }) {
   const [open, setOpen] = React.useState(false);
   const regionId = React.useId();
   const q = useListHistory(section, open);
-  const events = q.data?.pages.flatMap((p) => p.results) ?? [];
+  // New events shift the pages, so a refetch or Load more can repeat one: keep one entry per id (unique React keys).
+  const events = [...new Map((q.data?.pages.flatMap((p) => p.results) ?? []).map((e) => [e.id, e])).values()];
 
   return (
     <Box>

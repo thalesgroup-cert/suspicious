@@ -19,12 +19,12 @@ const PURPOSES: Record<string, string> = {
 describe("list purpose sentence", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  // The backend also unions campaign domains into the deny-listed set, so no sentence is the honest one.
-  it("states no purpose for the campaign domains list", async () => {
+  it("states the simulation purpose for the campaign domains list", async () => {
     const section = SECTIONS.find((s) => s.key === "campaign_domains_allow")!;
     renderWithProviders(<SectionContent section={section} />);
-    expect(await screen.findByText("No entries yet. Paste values above or import a file.")).toBeInTheDocument();
-    expect(screen.queryByText(/campaign detection/i)).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Authorised phishing simulations: still scored Dangerous, never shared to MISP."),
+    ).toBeInTheDocument();
   });
 
   for (const [key, sentence] of Object.entries(PURPOSES)) {
@@ -32,6 +32,7 @@ describe("list purpose sentence", () => {
       const section = SECTIONS.find((s) => s.key === key)!;
       renderWithProviders(<SectionContent section={section} />);
       expect(await screen.findByText(sentence)).toBeInTheDocument();
+      expect(screen.queryByText(/Authorised phishing simulations/)).not.toBeInTheDocument();
       // The page already renders the h2; the panel must not add a second one.
       expect(screen.queryAllByRole("heading", { level: 2 })).toHaveLength(0);
     });

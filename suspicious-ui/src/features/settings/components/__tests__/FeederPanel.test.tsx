@@ -26,6 +26,22 @@ describe("FeederPanel", () => {
     vi.mocked(setFeederStatus).mockResolvedValue({ enabled: false } as never);
   });
 
+  it("shows an error with Retry, not Disabled, when the status cannot be loaded", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getFeederStatus).mockRejectedValueOnce(new Error("boom"));
+    renderWithProviders(<FeederPanel />);
+
+    expect(await screen.findByText("Could not load the email feeder status.")).toBeInTheDocument();
+    expect(screen.queryByText("Disabled")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Email feeder" })).not.toBeInTheDocument();
+
+    vi.mocked(getFeederStatus).mockResolvedValue({ enabled: true } as never);
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    const sw = await screen.findByRole("switch", { name: "Email feeder" });
+    await waitFor(() => expect(sw).toBeChecked());
+    expect(screen.queryByText("Could not load the email feeder status.")).not.toBeInTheDocument();
+  });
+
   it("asks before turning the feeder off and leaves it on on Cancel", async () => {
     const user = userEvent.setup();
     vi.mocked(getFeederStatus).mockResolvedValue({ enabled: true } as never);

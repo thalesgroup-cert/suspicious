@@ -192,4 +192,20 @@ describe("EditableListPanel history", () => {
     ]);
     expect(times[0].textContent).not.toBe(times[1].textContent);
   });
+
+  it("shows an event once when pages overlap", async () => {
+    const user = userEvent.setup();
+    mockHistory
+      .mockResolvedValueOnce(page([ev(3, "added", "three.com", "alice"), ev(2, "added", "two.com", "alice")], "next"))
+      .mockResolvedValueOnce(page([ev(2, "added", "two.com", "alice"), ev(1, "added", "one.com", "alice")]));
+    panel();
+    await screen.findByText("evil.com");
+    await user.click(historyButton());
+    await screen.findByText("three.com");
+    await user.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByText("one.com");
+
+    expect(screen.getAllByText("two.com")).toHaveLength(1);
+    expect(within(screen.getByRole("list", { name: "Change history" })).getAllByRole("listitem")).toHaveLength(3);
+  });
 });

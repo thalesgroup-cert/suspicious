@@ -38,14 +38,16 @@ export type SectionMeta = {
 
 /**
  * One sentence per list on what it does, taken from the backend: allow_list.py and case_handler.py
- * (allowlists skip analysis), artifacts.py (denylist marks a domain dangerous). Absent key means no honest one-liner:
- * campaign domains skip campaign detection but are also unioned into the deny-listed set (case_score_calculation.py).
+ * (allowlists skip analysis), artifacts.py (denylist marks a domain dangerous). Campaign domains are authorised
+ * phishing simulations: they are also unioned into the deny-listed set (case_score_calculation.py), so they are still
+ * scored Dangerous, and they are never shared to MISP.
  */
 const LIST_PURPOSE: Partial<Record<SectionKey, string>> = {
   domains_allow: "URLs on these domains are treated as safe and skip analysis.",
   domains_deny: "A domain on this list is marked dangerous when it appears in a submitted email.",
   emails_files_allow: "Files with these hashes are treated as safe and skip analysis.",
   filetypes_allow: "Files of these types are treated as safe and skip analysis.",
+  campaign_domains_allow: "Authorised phishing simulations: still scored Dangerous, never shared to MISP.",
 };
 
 export function SectionContent({ section }: { section: SectionMeta }) {

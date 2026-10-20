@@ -54,6 +54,8 @@ export function ConnectorTile({
     mutationFn: (enabled: boolean) => setConnectorEnabled(name, enabled),
     onSuccess: (c) => {
       queryClient.invalidateQueries({ queryKey: ["connectors"] });
+      // The investigation page decides whether to offer "Push to TheHive" from this cache.
+      queryClient.invalidateQueries({ queryKey: ["enabledConnectors"] });
       enqueueSnackbar(c.enabled ? `${c.name} enabled.` : `${c.name} disabled.`, { variant: c.enabled ? "success" : "info" });
     },
     onError: () => enqueueSnackbar("Failed to update connector.", { variant: "error" }),

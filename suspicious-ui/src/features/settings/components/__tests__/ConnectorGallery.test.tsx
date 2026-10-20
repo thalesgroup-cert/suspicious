@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "@vitest/browser/context";
 
-import { renderWithProviders } from "@/test/utils";
+import { createTestQueryClient, renderWithProviders } from "@/test/utils";
 import { themes } from "@/styles/themes";
 import { contrastRatio, flatten } from "@/shared/lib/contrast";
 import { ConnectorGallery } from "../ConnectorGallery";
@@ -119,6 +119,20 @@ describe("tiles", () => {
 });
 
 describe("enable switch", () => {
+  it("refreshes the connectors list and the enabled-connectors cache once it is saved", async () => {
+    const queryClient = createTestQueryClient();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const { setConnectorEnabled } = await import("../connectors");
+    vi.mocked(setConnectorEnabled).mockResolvedValueOnce({ name: "misp", enabled: false } as never);
+    renderWithProviders(
+      <ConnectorGallery connectors={LIST} loadErrors={{}} loading={false} error={false} onRetry={vi.fn()} onConfigure={vi.fn()} />,
+      { queryClient },
+    );
+    await userEvent.click(screen.getByRole("switch", { name: "Enable misp" }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: ["enabledConnectors"] }));
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["connectors"] });
+  });
+
   it("saves at once", async () => {
     const { setConnectorEnabled } = await import("../connectors");
     renderGallery();

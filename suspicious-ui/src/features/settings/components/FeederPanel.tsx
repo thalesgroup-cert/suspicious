@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Box, Stack, Switch, Typography } from "@mui/material";
+import { Alert, Box, Button, Stack, Switch, Typography } from "@mui/material";
 import { PowerSettingsNewOutlined } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -68,6 +68,8 @@ export function FeederPanel() {
   }
   if (!health?.online && health?.error) facts.push({ key: "Reason", value: health.error });
 
+  // An unknown status must not read as "Disabled": the error state replaces the switch and the label.
+  const statusError = statusQuery.isError;
   const enabled = statusQuery.data?.enabled ?? false;
   const pending = statusQuery.isLoading || toggleMutation.isPending;
 
@@ -125,21 +127,31 @@ export function FeederPanel() {
             </Box>
           </Stack>
 
-          <Switch
+          {statusError ? null : <Switch
             checked={enabled}
             onChange={(e) => (e.target.checked ? toggleMutation.mutate(true) : setConfirmOff(true))}
             disabled={pending}
             color="success"
             sx={{ flexShrink: 0 }}
             slotProps={{ input: { "aria-label": "Email feeder", ref: switchInput } }}
-          />
+          />}
         </Stack>
 
         <Stack direction="row" sx={{ px: 2.5, pb: 2, columnGap: 3, rowGap: 0.5, flexWrap: "wrap" }}>
-          <StatusLabel
-            tone={statusQuery.isLoading ? "neutral" : enabled ? "ok" : "neutral"}
-            label={statusQuery.isLoading ? "Loading" : enabled ? "Enabled" : "Disabled"}
-          />
+          {statusError ? (
+            <Alert
+              severity="error"
+              sx={{ flex: "1 1 100%" }}
+              action={<Button color="inherit" size="small" onClick={() => statusQuery.refetch()}>Retry</Button>}
+            >
+              Could not load the email feeder status.
+            </Alert>
+          ) : (
+            <StatusLabel
+              tone={statusQuery.isLoading ? "neutral" : enabled ? "ok" : "neutral"}
+              label={statusQuery.isLoading ? "Loading" : enabled ? "Enabled" : "Disabled"}
+            />
+          )}
           <StatusLabel tone={healthLabel.tone} label={healthLabel.label} />
         </Stack>
 
