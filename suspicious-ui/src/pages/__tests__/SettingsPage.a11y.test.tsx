@@ -315,6 +315,21 @@ describe("SettingsPage: structure for assistive technology", () => {
       await waitFor(() => expect(row).toHaveFocus(), T);
     });
 
+    it("a long unbroken health detail wraps inside the connector card instead of running off it", async () => {
+      const misp = connectors[0];
+      const before = { ...misp };
+      Object.assign(misp, { last_health_ok: false, last_health_detail: "HTTPSConnectionPool(host=" + "x".repeat(160) + ")" });
+      try {
+        await page.viewport(390, 800);
+        stubMatchMedia({ phone: true });
+        await open("connectors?connector=misp");
+        const caption = await screen.findByText(/^Last checked/);
+        expect(caption.scrollWidth).toBeLessThanOrEqual(caption.clientWidth);
+      } finally {
+        Object.assign(misp, before);
+      }
+    });
+
     it("a deep link to a connector does not grab focus on load", async () => {
       await page.viewport(390, 800);
       stubMatchMedia({ phone: true });
@@ -322,6 +337,12 @@ describe("SettingsPage: structure for assistive technology", () => {
       await screen.findByRole("heading", { level: 3, name: "misp" });
       expect(document.activeElement).toBe(document.body);
     });
+  });
+
+  it("keeps the deliveries Error column wide enough to read, scrolling the table sideways instead of crushing it", async () => {
+    await open("connectors?connector=misp&tab=deliveries");
+    const cell = (await screen.findByRole("cell", { name: "boom" })) as HTMLElement;
+    expect(cell.getBoundingClientRect().width).toBeGreaterThanOrEqual(160);
   });
 
   // The Refresh button sits straight on the shell, whose glow is up to 7% primary over the page colour.

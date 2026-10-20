@@ -173,7 +173,7 @@ export function ConnectorDetail({
             <Chip size="small" label={connector.version} variant="outlined" />
             <StatusLabel tone={status.tone} label={status.label} />
           </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25, overflowWrap: "anywhere" }}>
             {checked}
           </Typography>
           {hasDraft && tab !== "configuration" && (
