@@ -43,11 +43,21 @@ Response (HTTP 201 Created):
  "case_id": 4521, "id": 4521, "message": "Submission accepted."}
 ```
 
+Add `"external_ref": "your-reference"` to any submit call (a form field for a file) to make the call safe to repeat: submitting the same reference again returns the original case, with HTTP 200 and `"reused": true`, before anything is stored or analysed. The reference is scoped to your account, accepts letters, digits and `. _ : @ / + = # -` (255 characters at most), and should be unique per artifact. It is echoed in the response, in `/api/submissions/` rows and in the ticket, and `GET /api/submissions/?external_ref=...` finds the case again.
+
 If the indicator is on an allow list, no case is created: the answer is HTTP 200 with `accepted: true`, `case_id: null` and the message "Submission accepted (allowlisted, no case created)." Validation problems return HTTP 400 with `{"status": "error", "code": "...", "detail": "..."}`.
 
 ## 3. Wait for the verdict
 
-Poll the case until its `status` is `DONE` (statuses: `NEW`, `IN_PROGRESS`, `DONE`, `CHALLENGED`):
+The lightest way to wait, and it works for the account that submitted the case, is the compact verdict:
+
+```bash
+curl -H "Authorization: Token $TOKEN" "$HOST/api/submissions/4521/verdict/"
+```
+
+Poll until `"done": true`. Until then `result` is `null` (the case holds a placeholder verdict while it is analysed). Once done it carries `result`, `score`, `confidence`, `ai_classification`, `analysis_health` and `observables` (a verdict per indicator). A challenged case counts as done. An account sees the cases it submitted; an investigator sees every case.
+
+For the full case, poll `/api/investigations/<id>/` until its `status` is `DONE` (statuses: `NEW`, `IN_PROGRESS`, `DONE`, `CHALLENGED`):
 
 ```bash
 curl -H "Authorization: Token $TOKEN" "$HOST/api/investigations/4521/"
@@ -73,13 +83,25 @@ returns one flat payload meant to be copied into a ticket:
 
 To create or update the matching **TheHive** alert from that payload, send `POST` to the same URL. It answers `{"status": "created" or "updated", "alert_id": "...", "alert_url": "..."}`. It needs the TheHive connector to be enabled and configured (409 otherwise), and it records who pushed in the alert and in the audit log.
 
-## 5. Human-readable report
+## 5. Look up what is already known
+
+```bash
+curl -H "Authorization: Token $TOKEN" "$HOST/api/lookup/?type=url&value=hxxps://evil[.]example/login"
+```
+
+returns the verdict Suspicious already holds for a `url`, `ip`, `domain` or `hash`, without creating a case: `{"known": true, "verdict": "malicious", "score": 9.0, "confidence": 0.8, "last_analyzed": "..."}`. `"known": false` means nothing is on file, so submit it. Defanged input is accepted. Verdicts are `malicious`, `suspicious`, `safe` or `inconclusive`. Investigator accounts only.
+
+## 6. Human-readable report
 
 `GET /api/cases/4521/report/` returns the case report as HTML (with screenshots), and `GET /api/cases/4521/report.md` returns the same verdict, explanation and per-indicator evidence as Markdown, for a ticket, a wiki page or a chat message. Both are downloads. In the web UI they are the **Full report** and **Markdown** buttons on a case. Text taken from outside (indicators, analyzer evidence, the reporter's words) is escaped in the Markdown, so it cannot create links or headings.
 
+## Cortex XSOAR
+
+A ready-made integration pack lives in the repository at `integrations/xsoar/Packs/Suspicious`. It wraps the calls above as playbook commands: submit with built-in polling (a playbook task that waits for the verdict), `suspicious-get-verdict`, `-get-ticket`, `-get-report`, `-challenge`, and the `url`, `ip`, `domain` and `file` reputation commands that return DBot scores. Setup, the account each command needs and playbook recipes are in the pack's README.
+
 ## Limits and good practice
 
-- **Rate limit:** 3000 requests per hour per user. Polling every 15 seconds uses 240 an hour per open case.
+- **Rate limit:** 3000 requests per hour per user. Polling every 15 seconds uses 240 an hour per open case; every 60 seconds, 60.
 - **Use one account per automation,** so its activity is visible and its key can be revoked on its own.
-- **Idempotency:** submitting the same indicator again reuses the earlier analysis where possible but still creates a new case.
+- **Idempotency:** submitting the same indicator again reuses the earlier analysis where possible but still creates a new case. Send an `external_ref` to get the original case back instead.
 - **Errors:** 401 means a missing or expired token, 403 a missing permission (not an investigator), 429 the rate limit.

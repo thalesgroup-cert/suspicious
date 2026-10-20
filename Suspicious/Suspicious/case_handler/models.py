@@ -96,6 +96,13 @@ class Case(models.Model):
     thehive_alert_id = models.CharField(
         max_length=64, blank=True, default="", verbose_name="TheHive Alert ID",
     )
+    # Caller-supplied reference from an automation (e.g. a SOAR incident id).
+    # Scoped to the reporter: re-submitting the same reference returns the
+    # original case instead of creating a duplicate.
+    external_ref = models.CharField(
+        max_length=255, blank=True, default="", db_index=True,
+        verbose_name="External Reference",
+    )
     is_allowlisted = models.BooleanField(default=False, verbose_name="Is Allowlisted")
     is_denylisted = models.BooleanField(default=False, verbose_name="Is Denylisted")
     list_reason = models.TextField(
