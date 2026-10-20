@@ -148,7 +148,7 @@ export function ConnectorTile({
             {test.pending ? "Testing..." : "Test"}
             <Box component="span" sx={visuallyHidden}>{" "}{name}</Box>
           </Button>
-          <Button size="small" variant="contained" disableElevation onClick={() => onConfigure(name)}>
+          <Button size="small" variant="contained" disableElevation data-configure={name} onClick={() => onConfigure(name)}>
             Configure
             <Box component="span" sx={visuallyHidden}>{" "}{name}</Box>
           </Button>

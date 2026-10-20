@@ -171,6 +171,18 @@ describe("tabs", () => {
   });
 });
 
+describe("unsaved notice outside Configuration", () => {
+  it("is a button that takes you back to the Configuration tab with the draft intact", async () => {
+    const { router } = renderDetail("configuration");
+    await userEvent.type(await screen.findByLabelText(/^URL/), "x");
+    await userEvent.click(screen.getByRole("tab", { name: "Deliveries" }));
+    await userEvent.click(screen.getByRole("button", { name: "Unsaved changes in Configuration" }));
+    expect(router!.state.location.search).toBe("?tab=configuration");
+    expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
+    expect((await screen.findByLabelText(/^URL/) as HTMLInputElement).value).toBe("x");
+  });
+});
+
 describe("overview", () => {
   it("lists events, schedules, author, version and a safe documentation link", () => {
     renderDetail("overview");

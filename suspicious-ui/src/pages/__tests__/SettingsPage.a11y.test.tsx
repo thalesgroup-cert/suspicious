@@ -337,12 +337,15 @@ describe("SettingsPage: structure for assistive technology", () => {
       }
     });
 
-    it("a deep link to a connector does not grab focus on load", async () => {
+    it("a deep link to a connector puts focus inside the drawer (a modal dialog takes focus), and closing puts it on that connector's Configure button", async () => {
+      const user = userEvent.setup();
       await page.viewport(390, 800);
       stubMatchMedia({ phone: true });
       await open("connectors?connector=misp");
-      await screen.findByRole("dialog", { name: "misp" });
-      expect(document.activeElement).toBe(document.body);
+      const dialog = await screen.findByRole("dialog", { name: "misp" });
+      await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true), T);
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Configure misp" })).toHaveFocus(), T);
     });
   });
 

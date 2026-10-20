@@ -27,7 +27,7 @@ export function ConnectorsPanel() {
   const onDirtyChange = useCallback((d: boolean) => setDirty(d), []);
   // Bumped on every open so a drawer that is still sliding out never hands its draft to the next one.
   const [opens, setOpens] = useState(0);
-  // A deep link opens the drawer on load; that must not pull focus away from the page. Any later open comes from a click.
+  // A deep link opens the drawer with no Configure button to hand focus back to, so on close focus goes to that connector's button.
   const [deepLinked, setDeepLinked] = useState(() => params.get("connector") !== null);
   // `from` is kept so the dialog title stays right while it fades out.
   const [pending, setPending] = useState<{ to: string; from: string; open: boolean } | null>(null);
@@ -65,9 +65,14 @@ export function ConnectorsPanel() {
           key={`${shown.name}:${opens}`}
           connector={shown}
           open={selected !== null}
-          disableAutoFocus={deepLinked}
           onClose={() => setConnector(null)}
-          onExited={() => setHeld(null)}
+          onExited={() => {
+            if (deepLinked) {
+              document.querySelector<HTMLElement>(`[data-configure="${CSS.escape(shown.name)}"]`)?.focus();
+              setDeepLinked(false);
+            }
+            setHeld(null);
+          }}
           onDirtyChange={onDirtyChange}
         />
       )}

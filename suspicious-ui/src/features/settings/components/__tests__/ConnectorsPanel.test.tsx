@@ -167,11 +167,19 @@ describe("focus", () => {
     expect(button).toHaveFocus();
   });
 
-  it("does not take focus when a deep link opens the drawer on first load", async () => {
+  it("takes focus when a deep link opens the drawer on first load (a modal dialog must, APG)", async () => {
     setup("?connector=misp");
-    await drawer("misp");
-    await new Promise((r) => setTimeout(r, 150));
-    expect(document.activeElement).toBe(document.body);
+    const dialog = await drawer("misp");
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+  });
+
+  it("closes a deep-linked drawer with Esc and puts focus on that connector's Configure button, there being no opener", async () => {
+    setup("?connector=misp");
+    const dialog = await drawer("misp");
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(dialogs()).toHaveLength(0));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Configure misp" })).toHaveFocus());
   });
 });
 

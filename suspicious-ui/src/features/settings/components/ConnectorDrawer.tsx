@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Box, Button, Chip, CircularProgress, Drawer, IconButton, Stack, Tab, Tabs, Typography, useMediaQuery } from "@mui/material";
@@ -41,7 +41,6 @@ export function ConnectorDrawer({
   onClose,
   onExited,
   onDirtyChange,
-  disableAutoFocus = false,
 }: {
   connector: Connector;
   open?: boolean;
@@ -51,8 +50,6 @@ export function ConnectorDrawer({
   onExited?: () => void;
   /** Lets the parent guard switching connector, which would otherwise drop the draft. */
   onDirtyChange?: (dirty: boolean) => void;
-  /** A deep link opens the drawer on load; the page then keeps focus instead of having it taken. */
-  disableAutoFocus?: boolean;
 }) {
   const queryClient = useQueryClient();
   const theme = useTheme();
@@ -110,22 +107,14 @@ export function ConnectorDrawer({
     return () => onDirtyChange?.(false);
   }, [hasDraft, onDirtyChange]);
 
-  const requestClose = () => (hasDraft ? setConfirmClose(true) : onClose());
+  // replace: moving between tabs is not a page the Back button should walk through.
+  const selectTab = (value: TabValue) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", value);
+    setParams(next, { replace: true });
+  };
 
-  // After a deep link the page keeps focus (disableAutoFocus), and the modal only hears Esc from inside itself.
-  // While focus is on the page body, Esc still has to close the drawer. A confirm dialog on top holds focus itself.
-  const closeRef = useRef(requestClose);
-  useEffect(() => {
-    closeRef.current = requestClose;
-  });
-  useEffect(() => {
-    if (!open || !disableAutoFocus) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && document.activeElement === document.body) closeRef.current();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, disableAutoFocus]);
+  const requestClose = () => (hasDraft ? setConfirmClose(true) : onClose());
 
   const saved = configQuery.data ?? {};
   const config = draft ?? saved;
@@ -162,7 +151,6 @@ export function ConnectorDrawer({
         open={open}
         onClose={requestClose}
         slotProps={{
-          root: { disableAutoFocus, disableRestoreFocus: disableAutoFocus },
           transition: { onExited },
           paper: {
             role: "dialog",
@@ -209,9 +197,14 @@ export function ConnectorDrawer({
                 {checked}
               </Typography>
               {hasDraft && tab !== "configuration" && (
-                <Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.25 }}>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => selectTab("configuration")}
+                  sx={{ color: accent.text, textDecoration: "underline", p: 0, minWidth: 0, mt: 0.25, justifyContent: "flex-start", "&:hover": { textDecoration: "underline" } }}
+                >
                   Unsaved changes in Configuration
-                </Typography>
+                </Button>
               )}
             </Box>
             <IconButton aria-label={`Close ${connector.name}`} onClick={requestClose} edge="end" sx={{ mt: -0.5 }}>
@@ -221,12 +214,7 @@ export function ConnectorDrawer({
 
           <Tabs
             value={tab}
-            onChange={(_e, value: TabValue) => {
-              // replace: moving between tabs is not a page the Back button should walk through.
-              const next = new URLSearchParams(params);
-              next.set("tab", value);
-              setParams(next, { replace: true });
-            }}
+            onChange={(_e, value: TabValue) => selectTab(value)}
             variant="scrollable"
             scrollButtons="auto"
             aria-label="Connector sections"
