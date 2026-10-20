@@ -1,6 +1,6 @@
 # Allow-lists, campaign domains and MISP: launch, push and scoring rules
 
-Status: draft for approval (nothing implemented). Origin: user requests of 2026-10-20.
+Status: APPROVED 2026-10-20 (weighted vote, strict majority); not implemented yet. Origin: user requests of 2026-10-20.
 
 ## 1. What each list means (user decisions)
 
@@ -53,5 +53,5 @@ False-positive guard: the dissent is always recorded in the verdict and shown in
 - Majority: AI Dangerous with 3 safe plus a whitelist → Safe (rule, reason names the dissenter); exactly half → not overridden; AI Dangerous with 1 safe plus a whitelist where weights make safe < half → Dangerous; no whitelist signals → identical to today (golden cases).
 
 ## 6. Open points
-- Weighted count (above) vs plain count of analyzers. Recommendation: weighted, consistent with the Scoring panel.
-- Exactly half does not override (strict majority).
+- Decided: weighted, consistent with the Scoring panel.
+- Decided: exactly half does not override (strict majority).
