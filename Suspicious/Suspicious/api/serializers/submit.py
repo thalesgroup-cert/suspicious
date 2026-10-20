@@ -1,4 +1,5 @@
 import ipaddress
+import re
 import socket
 import zipfile as _zipfile
 from urllib.parse import urlparse
@@ -8,6 +9,10 @@ from rest_framework import serializers
 
 
 DEFAULT_CONTEXT_MAX_LENGTH = 2000
+EXTERNAL_REF_MAX_LENGTH = 255
+# Printable, no whitespace: an automation's own identifier (a SOAR incident id,
+# a ticket key, a hash), never free text.
+EXTERNAL_REF_PATTERN = re.compile(r"^[A-Za-z0-9._:@/+=#-]+$")
 DEFAULT_OTHER_MAX_LENGTH = 255
 DEFAULT_URL_MAX_LENGTH = 2048
 DEFAULT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
@@ -126,7 +131,22 @@ def _check_no_ssrf_ip(url: str) -> None:
             raise ValueError("URL resolves to a private or reserved address.")
 
 
-class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
+class ExternalRefMixin(serializers.Serializer):
+    external_ref = serializers.RegexField(
+        EXTERNAL_REF_PATTERN,
+        required=False,
+        allow_blank=True,
+        max_length=EXTERNAL_REF_MAX_LENGTH,
+        help_text=(
+            "Your own reference for this submission (for example a SOAR incident id). "
+            "Submitting the same value again returns the original case instead of "
+            "creating a duplicate, so make it unique per artifact."
+        ),
+        error_messages={"invalid": "Only letters, digits and . _ : @ / + = # - are allowed."},
+    )
+
+
+class SubmitUrlSerializer(OptionalContextMixin, ExternalRefMixin, serializers.Serializer):
     url = serializers.URLField(
         required=True,
         max_length=getattr(settings, "SUBMIT_URL_MAX_LENGTH", DEFAULT_URL_MAX_LENGTH),
@@ -148,7 +168,7 @@ class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
         return value
 
 
-class SubmitOtherSerializer(OptionalContextMixin, serializers.Serializer):
+class SubmitOtherSerializer(OptionalContextMixin, ExternalRefMixin, serializers.Serializer):
     value = serializers.CharField(
         required=True,
         max_length=getattr(settings, "SUBMIT_OTHER_MAX_LENGTH", DEFAULT_OTHER_MAX_LENGTH),
@@ -216,7 +236,7 @@ def _check_zip_bomb(uploaded_file) -> None:
         uploaded_file.seek(0)
 
 
-class SubmitFileSerializer(OptionalContextMixin, serializers.Serializer):
+class SubmitFileSerializer(OptionalContextMixin, ExternalRefMixin, serializers.Serializer):
     file = serializers.FileField(required=True)
 
     def validate_file(self, uploaded_file):
@@ -238,7 +258,7 @@ class SubmitFileSerializer(OptionalContextMixin, serializers.Serializer):
         return uploaded_file
 
 
-class SubmitIndicatorsSerializer(OptionalContextMixin, serializers.Serializer):
+class SubmitIndicatorsSerializer(OptionalContextMixin, ExternalRefMixin, serializers.Serializer):
     # Cap the blob well above the 100-indicator limit (checked in the view
     # after parsing) so a multi-MB body can't be refanged + validated line by
     # line before the count check runs. 100 * a generous per-URL max.

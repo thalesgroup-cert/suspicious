@@ -63,6 +63,7 @@ from api.views.submissions import (
     SubmissionDetailsView,
     SubmissionListView,
     SubmissionTicketView,
+    SubmissionVerdictView,
 )
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
 from api.views.cortex_webhook import CortexWebhookView
@@ -75,6 +76,7 @@ from api.views.connectors import (
     ConnectorTestView,
     EnabledConnectorsView,
 )
+from api.views.lookup import ObservableLookupView
 from api.views.url_analysis import SubmissionUrlAnalyzeView
 
 urlpatterns = [
@@ -126,6 +128,8 @@ urlpatterns = [
     path("submissions/<int:submission_id>/", SubmissionDetailsView.as_view(), name="submission-details"),
     path("submissions/<int:submission_id>/challenge/", SubmissionChallengeView.as_view(), name="submission-challenge"),
     path("submissions/<int:submission_id>/ticket/", SubmissionTicketView.as_view(), name="submission-ticket"),
+    path("submissions/<int:submission_id>/verdict/", SubmissionVerdictView.as_view(), name="submission-verdict"),
+    path("lookup/", ObservableLookupView.as_view(), name="observable-lookup"),
     path("submissions/<int:submission_id>/urls/<int:url_id>/analyze/",
          SubmissionUrlAnalyzeView.as_view(), name="submission-url-analyze"),
 

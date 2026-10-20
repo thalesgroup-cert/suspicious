@@ -17,6 +17,7 @@ from api.serializers.submit import (
 )
 from api.utils.indicators import expand_wrappers, parse_indicators
 from case_handler.case_utils.case_handler import CaseHandler
+from case_handler.models import Case
 from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.forms import UploadFileForm, UploadOtherForm, UploadURLForm
 from tasp.tasks import dispatch_case_analysis
@@ -34,6 +35,7 @@ def _build_submission_response(
     accepted: bool = True,
     result_type: str = "case",
     http_status: int = status.HTTP_201_CREATED,
+    reused: bool = False,
 ):
     case_id = getattr(case, "id", None)
     payload = {
@@ -43,9 +45,33 @@ def _build_submission_response(
         "result_type": result_type,
         "case_id": case_id,
         "id": case_id,
+        "external_ref": getattr(case, "external_ref", "") or "",
+        "reused": reused,
         "message": message,
     }
     return Response(payload, status=http_status)
+
+
+def existing_case_for_ref(user, external_ref: str):
+    """The caller's earlier case for this external_ref, or None.
+
+    Scoped to the reporter so one account cannot probe another's references.
+    Checked before any file is stored or analyzer queued, so a replayed
+    automation step costs one indexed read.
+    """
+    if not external_ref:
+        return None
+    return Case.objects.filter(reporter=user, external_ref=external_ref).order_by("id").first()
+
+
+def _reused_response(case, submission_type: str):
+    return _build_submission_response(
+        message="Existing submission returned for this external_ref.",
+        submission_type=submission_type,
+        case=case,
+        http_status=status.HTTP_200_OK,
+        reused=True,
+    )
 
 
 def _error_response(
@@ -65,7 +91,7 @@ def _error_response(
     return Response(payload, status=http_status)
 
 
-def process_case(request, file_form, url_form, other_form):
+def process_case(request, file_form, url_form, other_form, external_ref=""):
     handler = CaseHandler(request, file_form, url_form, other_form)
     results = handler.validate_forms()
     case = handler.handle_case(
@@ -76,6 +102,7 @@ def process_case(request, file_form, url_form, other_form):
         hash_inst=results.get("hash_instance"),
         allow_listed=results.get("allow_listed"),
         allow_reason=results.get("allow_reason", ""),
+        external_ref=external_ref,
     )
     if case is not None:
         handler.dispatch_pending(case)
@@ -124,9 +151,16 @@ class BaseSubmitView(APIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        external_ref = serializer.validated_data.get("external_ref") or ""
+        existing = existing_case_for_ref(request.user, external_ref)
+        if existing is not None:
+            return _reused_response(existing, self.submission_type)
+
         try:
             file_form, url_form, other_form = self.build_forms(serializer.validated_data)
-            case, results = process_case(request, file_form, url_form, other_form)
+            case, results = process_case(
+                request, file_form, url_form, other_form, external_ref=external_ref,
+            )
             return self.handle_success(case, results)
         except serializers.ValidationError:
             raise
@@ -211,6 +245,11 @@ class SubmitIndicatorsView(APIView):
         ser = SubmitIndicatorsSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
 
+        external_ref = ser.validated_data.get("external_ref") or ""
+        existing = existing_case_for_ref(request.user, external_ref)
+        if existing is not None:
+            return _reused_response(existing, "indicators")
+
         parsed = parse_indicators(ser.validated_data["indicators"])
         # Unwrap SafeLinks / URLDefense links so the real target also becomes an
         # observable: before the cap + SSRF checks below, so the unwrapped
@@ -292,6 +331,7 @@ class SubmitIndicatorsView(APIView):
 
                 case = CaseCreator(request.user).create_case(
                     description=context, reporter_context=context,
+                    external_ref=external_ref,
                     observable_group_instance=group,
                 )
                 if case is None:
@@ -319,6 +359,8 @@ class SubmitIndicatorsView(APIView):
                 "observable_count": len(valid),
                 "accepted": True,
                 "skipped": skipped,
+                "external_ref": case.external_ref,
+                "reused": False,
             },
             status=status.HTTP_201_CREATED,
         )

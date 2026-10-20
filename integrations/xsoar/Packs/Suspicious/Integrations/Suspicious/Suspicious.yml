@@ -1,0 +1,564 @@
+category: Forensics & Malware Analysis
+sectionorder:
+- Connect
+- Collect
+commonfields:
+  id: Suspicious
+  version: -1
+configuration:
+- display: Server URL
+  name: url
+  type: 0
+  required: true
+  section: Connect
+  additionalinfo: Base URL of your Suspicious instance, for example https://suspicious.example.com.
+- displaypassword: API token
+  name: credentials
+  type: 9
+  hiddenusername: true
+  required: true
+  section: Connect
+  additionalinfo: A Suspicious API key. Create it in the Django admin under Profiles, API Keys, for the account this integration runs as.
+- display: Trust any certificate (not secure)
+  name: insecure
+  type: 8
+  required: false
+  section: Connect
+  advanced: true
+- display: Use system proxy settings
+  name: proxy
+  type: 8
+  required: false
+  section: Connect
+  advanced: true
+- display: Source Reliability
+  name: integration_reliability
+  type: 15
+  required: false
+  section: Collect
+  defaultvalue: B - Usually reliable
+  additionalinfo: Reliability of the source providing the intelligence data.
+  options:
+  - A+ - 3rd party enrichment
+  - A - Completely reliable
+  - B - Usually reliable
+  - C - Fairly reliable
+  - D - Not usually reliable
+  - E - Unreliable
+  - F - Reliability cannot be judged
+- display: Submit unknown indicators from reputation commands
+  name: submit_unknown
+  type: 8
+  required: false
+  section: Collect
+  advanced: true
+  additionalinfo: When the url, ip, domain or file command finds no verdict on file, submit the value to Suspicious for analysis. Off by default, because an enrichment of many indicators then creates many cases.
+description: Submit URLs, IPs, domains, hashes, files and emails to Suspicious from a playbook, wait for the verdict, and enrich indicators with what Suspicious already knows.
+display: Suspicious
+name: Suspicious
+script:
+  commands:
+  - name: suspicious-submit-url
+    description: Submits a URL for analysis. With polling on, waits for the verdict.
+    polling: true
+    arguments:
+    - name: url
+      required: true
+      description: The URL to analyse. Defanged forms (hxxp, [.]) are accepted.
+    - name: context
+      description: Free-text note shown on the case, for example the ticket that triggered the submission.
+    - name: external_ref
+      description: Your reference for this submission. Submitting the same reference again returns the original case. Defaults to a value derived from the incident and the URL.
+    - name: force_new
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'false'
+      description: Skip the automatic reference so the URL is analysed again, even inside the same incident.
+    - name: polling
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'true'
+      description: Wait for the verdict using the built-in polling.
+    - name: hide_polling_output
+      hidden: true
+      description: Internal argument used by the polling process.
+    - name: case_id
+      hidden: true
+      description: Internal argument used by the polling process.
+    outputs:
+    - contextPath: Suspicious.Submission.case_id
+      description: Id of the case Suspicious created, or of the earlier case it returned.
+      type: Number
+    - contextPath: Suspicious.Submission.external_ref
+      description: The reference stored with the case.
+      type: String
+    - contextPath: Suspicious.Submission.reused
+      description: True when an earlier case with the same external_ref was returned.
+      type: Boolean
+    - contextPath: Suspicious.Verdict.case_id
+      description: Case id.
+      type: Number
+    - contextPath: Suspicious.Verdict.done
+      description: True once the verdict is final.
+      type: Boolean
+    - contextPath: Suspicious.Verdict.result
+      description: Case verdict (SAFE, INCONCLUSIVE, SUSPICIOUS, DANGEROUS, ALLOW_LISTED, FAILURE).
+      type: String
+    - contextPath: Suspicious.Verdict.dbot_score
+      description: The verdict as a DBot score (0 unknown, 1 good, 2 suspicious, 3 bad).
+      type: Number
+    - contextPath: Suspicious.Verdict.score
+      description: Aggregated risk score.
+      type: Number
+    - contextPath: Suspicious.Verdict.confidence
+      description: Confidence of the verdict.
+      type: Number
+    - contextPath: Suspicious.Verdict.ai_classification
+      description: Threat category assigned by the classifier.
+      type: String
+    - contextPath: Suspicious.Verdict.analysis_health.failed
+      description: Number of analyzers that failed. A non-zero value lowers confidence in the verdict.
+      type: Number
+    - contextPath: Suspicious.Verdict.observables
+      description: Per-observable verdicts of the case.
+      type: Unknown
+    - contextPath: DBotScore.Indicator
+      description: The indicator that was scored.
+      type: String
+    - contextPath: DBotScore.Type
+      description: The indicator type.
+      type: String
+    - contextPath: DBotScore.Vendor
+      description: The vendor used to calculate the score.
+      type: String
+    - contextPath: DBotScore.Score
+      description: The actual score.
+      type: Number
+    - contextPath: DBotScore.Reliability
+      description: Reliability of the source providing the intelligence data.
+      type: String
+  - name: suspicious-submit-other
+    description: Submits an IP address or a file hash for analysis. With polling on, waits for the verdict.
+    polling: true
+    arguments:
+    - name: value
+      required: true
+      description: An IP address or an MD5, SHA-1 or SHA-256 hash.
+    - name: context
+      description: Free-text note shown on the case.
+    - name: external_ref
+      description: Your reference for this submission. Submitting the same reference again returns the original case. Defaults to a value derived from the incident and the value.
+    - name: force_new
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'false'
+      description: Skip the automatic reference so the value is analysed again, even inside the same incident.
+    - name: polling
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'true'
+      description: Wait for the verdict using the built-in polling.
+    - name: hide_polling_output
+      hidden: true
+      description: Internal argument used by the polling process.
+    - name: case_id
+      hidden: true
+      description: Internal argument used by the polling process.
+    outputs:
+    - contextPath: Suspicious.Submission.case_id
+      description: Id of the case Suspicious created, or of the earlier case it returned.
+      type: Number
+    - contextPath: Suspicious.Verdict.case_id
+      description: Case id.
+      type: Number
+    - contextPath: Suspicious.Verdict.done
+      description: True once the verdict is final.
+      type: Boolean
+    - contextPath: Suspicious.Verdict.result
+      description: Case verdict.
+      type: String
+    - contextPath: Suspicious.Verdict.dbot_score
+      description: The verdict as a DBot score (0 unknown, 1 good, 2 suspicious, 3 bad).
+      type: Number
+  - name: suspicious-submit-indicators
+    description: Submits a list of URLs, IPs, domains and hashes as one case, with a verdict per indicator. With polling on, waits for the verdict.
+    polling: true
+    arguments:
+    - name: indicators
+      required: true
+      isArray: true
+      description: Indicators separated by commas, spaces or new lines. At most 100.
+    - name: context
+      description: Free-text note shown on the case.
+    - name: external_ref
+      description: Your reference for this submission. Submitting the same reference again returns the original case. Defaults to a value derived from the incident and the list.
+    - name: force_new
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'false'
+      description: Skip the automatic reference so the list is analysed again, even inside the same incident.
+    - name: polling
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'true'
+      description: Wait for the verdict using the built-in polling.
+    - name: hide_polling_output
+      hidden: true
+      description: Internal argument used by the polling process.
+    - name: case_id
+      hidden: true
+      description: Internal argument used by the polling process.
+    outputs:
+    - contextPath: Suspicious.Submission.case_id
+      description: Id of the case Suspicious created, or of the earlier case it returned.
+      type: Number
+    - contextPath: Suspicious.Submission.observable_count
+      description: Number of indicators accepted.
+      type: Number
+    - contextPath: Suspicious.Submission.skipped
+      description: Lines that were not valid indicators.
+      type: Unknown
+    - contextPath: Suspicious.Verdict.case_id
+      description: Case id.
+      type: Number
+    - contextPath: Suspicious.Verdict.done
+      description: True once the verdict is final.
+      type: Boolean
+    - contextPath: Suspicious.Verdict.result
+      description: Case verdict.
+      type: String
+    - contextPath: Suspicious.Verdict.dbot_score
+      description: The verdict as a DBot score (0 unknown, 1 good, 2 suspicious, 3 bad).
+      type: Number
+    - contextPath: Suspicious.Verdict.observables
+      description: Per-observable verdicts of the case.
+      type: Unknown
+  - name: suspicious-submit-file
+    description: Submits a file or an email (.eml, .msg) from the War Room for analysis. With polling on, waits for the verdict.
+    polling: true
+    arguments:
+    - name: entry_id
+      required: true
+      description: War Room entry id of the file. For a phishing report, the original .eml.
+    - name: file_name
+      description: Name to give the file. Defaults to the name in the War Room.
+    - name: context
+      description: Free-text note shown on the case.
+    - name: external_ref
+      description: Your reference for this submission. Submitting the same reference again returns the original case. Defaults to a value derived from the incident and the file content.
+    - name: force_new
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'false'
+      description: Skip the automatic reference so the file is analysed again, even inside the same incident.
+    - name: polling
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'true'
+      description: Wait for the verdict using the built-in polling.
+    - name: hide_polling_output
+      hidden: true
+      description: Internal argument used by the polling process.
+    - name: case_id
+      hidden: true
+      description: Internal argument used by the polling process.
+    outputs:
+    - contextPath: Suspicious.Submission.case_id
+      description: Id of the case Suspicious created, or of the earlier case it returned.
+      type: Number
+    - contextPath: Suspicious.Verdict.case_id
+      description: Case id.
+      type: Number
+    - contextPath: Suspicious.Verdict.done
+      description: True once the verdict is final.
+      type: Boolean
+    - contextPath: Suspicious.Verdict.result
+      description: Case verdict.
+      type: String
+    - contextPath: Suspicious.Verdict.dbot_score
+      description: The verdict as a DBot score (0 unknown, 1 good, 2 suspicious, 3 bad).
+      type: Number
+    - contextPath: Suspicious.Verdict.observables
+      description: Per-observable verdicts of the case (URLs, IPs, domains and hashes found in an email).
+      type: Unknown
+  - name: suspicious-get-verdict
+    description: Gets the status and, once final, the verdict of a case. With polling on, waits until it is final.
+    polling: true
+    arguments:
+    - name: case_id
+      required: true
+      description: Id of the case, from a submit command.
+    - name: polling
+      auto: PREDEFINED
+      predefined:
+      - 'true'
+      - 'false'
+      defaultValue: 'false'
+      description: Wait for the verdict using the built-in polling.
+    - name: hide_polling_output
+      hidden: true
+      description: Internal argument used by the polling process.
+    outputs:
+    - contextPath: Suspicious.Verdict.case_id
+      description: Case id.
+      type: Number
+    - contextPath: Suspicious.Verdict.status
+      description: Case status (NEW, IN_PROGRESS, DONE, CHALLENGED).
+      type: String
+    - contextPath: Suspicious.Verdict.done
+      description: True once the verdict is final.
+      type: Boolean
+    - contextPath: Suspicious.Verdict.result
+      description: Case verdict. Empty until done.
+      type: String
+    - contextPath: Suspicious.Verdict.dbot_score
+      description: The verdict as a DBot score (0 unknown, 1 good, 2 suspicious, 3 bad). Set once done.
+      type: Number
+    - contextPath: Suspicious.Verdict.score
+      description: Aggregated risk score.
+      type: Number
+    - contextPath: Suspicious.Verdict.confidence
+      description: Confidence of the verdict.
+      type: Number
+    - contextPath: Suspicious.Verdict.external_ref
+      description: The reference stored with the case.
+      type: String
+    - contextPath: Suspicious.Verdict.observables
+      description: Per-observable verdicts of the case.
+      type: Unknown
+  - name: suspicious-get-ticket
+    description: Gets the ticket-ready payload of a case (verdict, rationale, observables, recommended action). Needs an investigator account.
+    arguments:
+    - name: case_id
+      required: true
+      description: Id of the case.
+    outputs:
+    - contextPath: Suspicious.Ticket.case_id
+      description: Case id.
+      type: Number
+    - contextPath: Suspicious.Ticket.title
+      description: Suggested ticket title.
+      type: String
+    - contextPath: Suspicious.Ticket.verdict
+      description: Verdict, score, severity and rationale.
+      type: Unknown
+    - contextPath: Suspicious.Ticket.observables
+      description: Observables with their verdict.
+      type: Unknown
+    - contextPath: Suspicious.Ticket.recommended_action
+      description: What Suspicious recommends doing about the verdict.
+      type: String
+  - name: suspicious-get-report
+    description: Downloads the case report as a file.
+    arguments:
+    - name: case_id
+      required: true
+      description: Id of the case.
+    - name: format
+      auto: PREDEFINED
+      predefined:
+      - markdown
+      - html
+      defaultValue: markdown
+      description: Report format.
+  - name: suspicious-challenge
+    description: Challenges the verdict of a case. An analyst reviews the proposed verdict. Only the account that submitted the case can challenge it.
+    arguments:
+    - name: case_id
+      required: true
+      description: Id of the case.
+    - name: proposed_result
+      required: true
+      auto: PREDEFINED
+      predefined:
+      - Safe
+      - Dangerous
+      description: The verdict you believe is right.
+    - name: reason
+      description: Why the verdict is wrong.
+  - name: url
+    description: Returns the verdict Suspicious already holds for URLs. Needs an investigator account.
+    arguments:
+    - name: url
+      required: true
+      default: true
+      isArray: true
+      description: URLs to look up.
+    outputs:
+    - contextPath: Suspicious.Lookup.value
+      description: The value that was looked up.
+      type: String
+    - contextPath: Suspicious.Lookup.known
+      description: True when Suspicious holds a verdict.
+      type: Boolean
+    - contextPath: Suspicious.Lookup.verdict
+      description: malicious, suspicious, safe or inconclusive.
+      type: String
+    - contextPath: Suspicious.Lookup.score
+      description: Risk score of the observable.
+      type: Number
+    - contextPath: URL.Data
+      description: The URL.
+      type: String
+    - contextPath: DBotScore.Indicator
+      description: The indicator that was scored.
+      type: String
+    - contextPath: DBotScore.Type
+      description: The indicator type.
+      type: String
+    - contextPath: DBotScore.Vendor
+      description: The vendor used to calculate the score.
+      type: String
+    - contextPath: DBotScore.Score
+      description: The actual score.
+      type: Number
+    - contextPath: DBotScore.Reliability
+      description: Reliability of the source providing the intelligence data.
+      type: String
+  - name: ip
+    description: Returns the verdict Suspicious already holds for IP addresses. Needs an investigator account.
+    arguments:
+    - name: ip
+      required: true
+      default: true
+      isArray: true
+      description: IP addresses to look up.
+    outputs:
+    - contextPath: Suspicious.Lookup.value
+      description: The value that was looked up.
+      type: String
+    - contextPath: Suspicious.Lookup.known
+      description: True when Suspicious holds a verdict.
+      type: Boolean
+    - contextPath: Suspicious.Lookup.verdict
+      description: malicious, suspicious, safe or inconclusive.
+      type: String
+    - contextPath: Suspicious.Lookup.score
+      description: Risk score of the observable.
+      type: Number
+    - contextPath: IP.Address
+      description: The IP address.
+      type: String
+    - contextPath: DBotScore.Indicator
+      description: The indicator that was scored.
+      type: String
+    - contextPath: DBotScore.Type
+      description: The indicator type.
+      type: String
+    - contextPath: DBotScore.Vendor
+      description: The vendor used to calculate the score.
+      type: String
+    - contextPath: DBotScore.Score
+      description: The actual score.
+      type: Number
+    - contextPath: DBotScore.Reliability
+      description: Reliability of the source providing the intelligence data.
+      type: String
+  - name: domain
+    description: Returns the verdict Suspicious already holds for domains. Needs an investigator account.
+    arguments:
+    - name: domain
+      required: true
+      default: true
+      isArray: true
+      description: Domains to look up.
+    outputs:
+    - contextPath: Suspicious.Lookup.value
+      description: The value that was looked up.
+      type: String
+    - contextPath: Suspicious.Lookup.known
+      description: True when Suspicious holds a verdict.
+      type: Boolean
+    - contextPath: Suspicious.Lookup.verdict
+      description: malicious, suspicious, safe or inconclusive.
+      type: String
+    - contextPath: Suspicious.Lookup.score
+      description: Risk score of the observable.
+      type: Number
+    - contextPath: Domain.Name
+      description: The domain.
+      type: String
+    - contextPath: DBotScore.Indicator
+      description: The indicator that was scored.
+      type: String
+    - contextPath: DBotScore.Type
+      description: The indicator type.
+      type: String
+    - contextPath: DBotScore.Vendor
+      description: The vendor used to calculate the score.
+      type: String
+    - contextPath: DBotScore.Score
+      description: The actual score.
+      type: Number
+    - contextPath: DBotScore.Reliability
+      description: Reliability of the source providing the intelligence data.
+      type: String
+  - name: file
+    description: Returns the verdict Suspicious already holds for file hashes (MD5, SHA-1, SHA-256). Needs an investigator account.
+    arguments:
+    - name: file
+      required: true
+      default: true
+      isArray: true
+      description: File hashes to look up.
+    outputs:
+    - contextPath: Suspicious.Lookup.value
+      description: The value that was looked up.
+      type: String
+    - contextPath: Suspicious.Lookup.known
+      description: True when Suspicious holds a verdict.
+      type: Boolean
+    - contextPath: Suspicious.Lookup.verdict
+      description: malicious, suspicious, safe or inconclusive.
+      type: String
+    - contextPath: Suspicious.Lookup.score
+      description: Risk score of the observable.
+      type: Number
+    - contextPath: File.MD5
+      description: The MD5 hash.
+      type: String
+    - contextPath: File.SHA1
+      description: The SHA-1 hash.
+      type: String
+    - contextPath: File.SHA256
+      description: The SHA-256 hash.
+      type: String
+    - contextPath: DBotScore.Indicator
+      description: The indicator that was scored.
+      type: String
+    - contextPath: DBotScore.Type
+      description: The indicator type.
+      type: String
+    - contextPath: DBotScore.Vendor
+      description: The vendor used to calculate the score.
+      type: String
+    - contextPath: DBotScore.Score
+      description: The actual score.
+      type: Number
+    - contextPath: DBotScore.Reliability
+      description: Reliability of the source providing the intelligence data.
+      type: String
+  dockerimage: demisto/python3:3.12.14.13919218
+  runonce: false
+  script: '-'
+  subtype: python3
+  type: python
+fromversion: 6.5.0
+tests:
+- No tests (auto formatted)

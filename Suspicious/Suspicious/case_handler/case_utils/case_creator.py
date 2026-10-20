@@ -55,7 +55,7 @@ class CaseCreator:
     def __init__(self, user):
         self.user = user
 
-    def create_case(self, description=None, reporter_context="", **kwargs):
+    def create_case(self, description=None, reporter_context="", external_ref="", **kwargs):
         """
         Create a new case with the given parameters.
 
@@ -81,6 +81,7 @@ class CaseCreator:
         case = Case(
             description=description or casestr,
             reporter_context=reporter_context,
+            external_ref=external_ref or "",
             creation_date=timezone.now(),
             analysis_done=False,
             results="Inconclusive",

@@ -18,6 +18,8 @@ from api.permissions.submissions import (
 )
 from api.serializers.challenge import SubmissionChallengeSerializer
 from api.serializers.submissions import (
+    normalize_case_result,
+    normalize_case_status,
     AdminSubmissionDetailsSerializer,
     SubmissionDetailsSerializer,
     SubmissionListSerializer,
@@ -96,6 +98,10 @@ class SubmissionListView(ListAPIView):
         if self._is_truthy(mine):
             queryset = queryset.filter(reporter=self.request.user)
 
+        external_ref = (self.request.query_params.get("external_ref") or "").strip()
+        if external_ref:
+            queryset = queryset.filter(external_ref=external_ref)
+
         search = (self.request.query_params.get("search") or "").strip()
         if search:
             id_q = Q(pk=int(search)) if search.isdigit() else Q()
@@ -139,6 +145,8 @@ class SubmissionListView(ListAPIView):
             OpenApiParameter(name="search", type=str, location=OpenApiParameter.QUERY, required=False,
                 description="Case-insensitive substring match across id, description, reporter, "
                             "mail subject, file path, url/ip/hash."),
+            OpenApiParameter(name="external_ref", type=str, location=OpenApiParameter.QUERY, required=False,
+                description="Exact match on the external_ref given at submission time."),
             OpenApiParameter(name="ordering", type=str, location=OpenApiParameter.QUERY, required=False,
                 enum=["created_at", "-created_at", "id", "-id", "status", "-status", "result", "-result"],
                 description="Ordering field."),
@@ -279,6 +287,7 @@ def build_ticket(case) -> dict:
     result = str(case.results)
     return {
         "case_id": case.id,
+        "external_ref": case.external_ref,
         "generated_at": timezone.now().isoformat(),
         "title": f"Suspicious case #{case.id}: {result}",
         "verdict": {
@@ -303,6 +312,63 @@ def build_ticket(case) -> dict:
             result, _RECOMMENDED_ACTION["Inconclusive"]
         ),
     }
+
+
+def build_verdict(case) -> dict:
+    """Compact poll payload for an automation waiting on a case.
+
+    ``done`` is the one field a poller needs: while it is false ``result`` is
+    null, because ``Case.results`` holds a placeholder until scoring finishes.
+    Per-observable verdicts and analysis health are added only once done, so a
+    poll in flight stays one indexed read.
+    """
+    from case_handler.lifecycle import LifecycleState
+    from score_process.scoring.health import analysis_health
+
+    done = case.lifecycle_state in (LifecycleState.FINALIZED, LifecycleState.CONTESTED)
+    body = {
+        "case_id": case.id,
+        "external_ref": case.external_ref,
+        "status": normalize_case_status(case.status),
+        "done": done,
+        "created_at": case.creation_date.isoformat() if case.creation_date else None,
+        "finalized_at": case.finalized_at.isoformat() if case.finalized_at else None,
+        "result": None,
+        "score": None,
+        "confidence": None,
+        "ai_classification": None,
+        "is_allowlisted": case.is_allowlisted,
+    }
+    if not done:
+        return body
+
+    from connectors.contrib.thehive.phishing import ticket_observables
+
+    body.update(
+        result=normalize_case_result(case.results),
+        score=case.final_score,
+        confidence=case.final_confidence,
+        ai_classification=case.category_ai or case.results_ai,
+        analysis_health=analysis_health(case_analyzer_reports(case)),
+        observables=ticket_observables(case),
+    )
+    return body
+
+
+class SubmissionVerdictView(APIView):
+    """Poll target for automations: status, ``done`` and, once done, the verdict.
+    Open to the reporter (the account that submitted) and to investigators."""
+
+    permission_classes = [IsAuthenticated, CanAccessSubmission]
+
+    @extend_schema(summary="Compact verdict for a submission (poll until done)")
+    def get(self, request, submission_id: int):
+        queryset = Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
+        if not user_has_submission_elevated_access(request.user):
+            queryset = queryset.filter(reporter=request.user)
+        case = get_object_or_404(queryset, pk=submission_id)
+        self.check_object_permissions(request, case)
+        return Response(build_verdict(case))
 
 
 class SubmissionTicketView(APIView):

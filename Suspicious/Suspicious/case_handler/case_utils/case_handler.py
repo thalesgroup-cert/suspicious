@@ -181,6 +181,7 @@ class CaseHandler:
         allow_listed=False,
         allow_reason="",
         mail_inst=None,
+        external_ref="",
     ):
         """
         Create a case in the system using user and provided instances.
@@ -209,7 +210,10 @@ class CaseHandler:
         if self.other_form.is_valid():
             description = self.other_form.cleaned_data.get("context") or description
         try:
-            case = CaseCreator(self.request.user).create_case(description=description, reporter_context=description, **ctx)
+            case = CaseCreator(self.request.user).create_case(
+                description=description, reporter_context=description,
+                external_ref=external_ref, **ctx,
+            )
             logger.info("Case created: %s", case)
             return case
         except Exception:

@@ -1,0 +1,25 @@
+{
+    "name": "Suspicious",
+    "description": "Submit URLs, IPs, domains, hashes, files and phishing emails to Suspicious from a playbook, wait for the verdict, and enrich indicators with what Suspicious already knows.",
+    "support": "community",
+    "currentVersion": "1.0.0",
+    "author": "Thales Group CERT",
+    "url": "https://github.com/thalesgroup-cert/suspicious",
+    "email": "",
+    "categories": [
+        "Forensics & Malware Analysis"
+    ],
+    "tags": [],
+    "useCases": [
+        "Phishing"
+    ],
+    "keywords": [
+        "Suspicious",
+        "phishing",
+        "email analysis",
+        "threat analysis"
+    ],
+    "marketplaces": [
+        "xsoar"
+    ]
+}

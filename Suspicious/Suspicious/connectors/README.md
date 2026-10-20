@@ -129,6 +129,7 @@ connectors/
 | `smtp_notify` | Notifications | `case_created`, `case_finalised`, `case_modified` | **on** | Emails the reporter: acknowledgement on creation, review mail when an analyst changes the verdict, final result on completion. A failed send raises and the framework retries it. Challenge-workflow notifications are separate and wired directly (`tasp/services/challenge.py`), not through this connector |
 | `chromadb` | Maintenance | scheduled (daily) | **on** | Vector-store cleanup, not case-event-driven |
 | `elastic_siem` | SIEM | `case_finalised`, `case_modified` | off | Indexes one ECS document per case (verdict, score, mail subject/sender, IOCs) into an operator-supplied Elasticsearch; see `elastic_siem` below |
+| `xsoar` | SOAR | `case_finalised` | off | Opens one Cortex XSOAR incident per finalised case at or above `min_verdict`; see `xsoar` below |
 | `watcher` | Threat Intelligence | scheduled (every 300s) | off | Reconciles the allow/deny domain lists against the Watcher service — moved here from `tasp`; see `tasp/README.md` |
 | `ai_narration` | AI | `case_finalised` | off | See below — the one connector with an extra, hardcoded data-governance allowlist on its automatic path |
 | `template` | — | — | — | Not a real connector; copy this directory to start a new one |
@@ -228,6 +229,31 @@ Only cases whose latest ledger row is `failed`/`skipped` (and older than `--min-
 default 300s) are re-emitted; connectors deduplicate, so repeating it is safe.
 
 ---
+
+### `xsoar`
+
+Opens a Cortex XSOAR incident when a case is finalised, so a SOC that works in
+XSOAR hears about cases that started in Suspicious (a user's phishing report, an
+analyst's manual submission). Design: `docs/specs/2026-10-20-xsoar-connector-design.md`.
+The reverse direction, a playbook submitting to Suspicious, is the pack in
+`integrations/xsoar`.
+
+- **What is sent.** One incident per case: name, severity (1 to 4 from the
+  verdict), a Markdown summary (verdict, rationale, recommended action, up to 25
+  observables defanged, link to the case), labels, and the full ticket as raw
+  JSON. Never sent: mail bodies, headers, attachments.
+- **Which cases.** At or above `min_verdict` (default `Suspicious`). Cases an
+  XSOAR playbook submitted are skipped: their `external_ref` starts with
+  `skip_ref_prefix` (default `xsoar:`, what the pack generates). If your
+  playbooks pass their own `external_ref`, start it with that prefix or change
+  the setting, otherwise each such case comes back as a second incident.
+- **Once only.** `ConnectorLink` records the incident id per case, so a replayed
+  `case_finalised` opens nothing. A failed push rolls back and is retried by the
+  framework. A verdict an analyst changes later is not pushed.
+- **Setup.** XSOAR 6: set `url` and `api_key`. XSOAR 8: also set `api_key_id`,
+  and use the API FQDN as `url`. Set `incident_type` to the type your playbook
+  listens on. Enable the connector and use **Test connection**: the key needs
+  read access to incidents for that check, pushing needs only create.
 
 ### `elastic_siem`
 
