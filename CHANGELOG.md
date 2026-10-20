@@ -88,6 +88,26 @@ management moving to HashiCorp Vault.
   `create`/`update` on `suspicious/data/integrations/*`, so UI secret editing
   works without a manual policy edit.
 
+#### Automation / SOAR API
+- **`external_ref` on every submit endpoint** — the caller's own reference (for
+  example a SOAR incident id). Re-submitting the same reference returns the
+  original case (HTTP 200, `reused: true`) before any file is stored or
+  analyzer queued, so a replayed playbook step cannot create duplicate cases.
+  Scoped to the reporter; stored on `Case.external_ref` (migration
+  `case_handler.0032`); echoed in the submission list/detail rows and the
+  ticket payload; filterable with `?external_ref=` on `/api/submissions/`.
+- **`GET /api/submissions/<id>/verdict/`** — a compact poll target for
+  automations. `done` is true once the verdict is final; `result` stays null
+  until then. Open to the reporting account, so an automation no longer needs
+  the investigator role just to wait for a result.
+- **`GET /api/lookup/?type=&value=`** — the verdict already on file for a URL,
+  IP, domain or hash, without creating a case (investigators only). Powers
+  reputation-style enrichment.
+- **Cortex XSOAR pack** (`integrations/xsoar/Packs/Suspicious`) — submit
+  commands with built-in polling, `suspicious-get-verdict/ticket/report`,
+  `suspicious-challenge`, and the `url`/`ip`/`domain`/`file` reputation
+  commands returning DBot scores.
+
 #### CI/CD
 - CI consolidated onto a single matrix workflow (ruff, Django suite, feeder
   pytest, UI lint/typecheck/vitest-browser/build, docker build matrix) and a

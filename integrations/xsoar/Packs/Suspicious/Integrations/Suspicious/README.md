@@ -1,5 +1,5 @@
 Submit URLs, IPs, domains, hashes, files and emails to Suspicious from a playbook, wait for the verdict, and enrich indicators with what Suspicious already knows.
-This integration was integrated and tested with version xx of Suspicious.
+Needs a Suspicious release that includes the `external_ref` submit field, `GET /api/submissions/<id>/verdict/` and `GET /api/lookup/`. See the [pack README](../../README.md) for setup, accounts and playbook recipes.
 
 ## Configure Suspicious in Cortex
 
