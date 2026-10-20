@@ -130,6 +130,46 @@ One ungrouped run of 9+ fields (ai_narration mixes Ollama, OpenAI, Anthropic and
 
 Plan tasks 5-8 (panel pattern + logos, connectors, lists + CISO, feeder + scoring polish) are inserted before polish; the old Task 5 is now Task 9.
 
+## Amendment 2: connector gallery with a configuration drawer (user, 2026-10-20)
+
+User: the Task 6 connectors page "is still not good and too bulky"; inspire from the Watcher connectors page (blocks with modals), research official materials, "something gorgeous"; then "go with recommendations" and "for AI summary a short configuration with a switch on the provider instead of a long list of inputs".
+
+### Research
+
+- **Watcher** (thalesgroup-cert/Watcher, `frontend/src/components/Connectors/Dashboard.js`): KPI cards (Total, Configured, Incomplete, Disabled); search + status/health/category filters and a "group by category" toggle; one card per connector (72 px logo, name, version, status + health badges, inline test result that clears after 10 s, footer Edit / Test); a large edit modal (label, "sensitive" and "Manually set / From .env" tags, reveal eye, reset-to-default, raw key, Save disabled until dirty).
+- **IBM Carbon, tile** (carbondesignsystem.com/components/tile/usage): a base tile may hold buttons in its footer; a clickable tile must not hold nested controls; tiles are flat, no drop shadows; do not mix variants in one group.
+- **IBM Carbon, modal** (carbondesignsystem.com/components/modal/usage): modals for short tasks; go up a size when the body scrolls too much, to a full page when the largest size is not enough; only the body scrolls, header and footer fixed; focus lands on the first input and is trapped; validate on blur, keep the modal open on errors. Carbon forms: more than 5 inputs belong in a side panel or page.
+- **NN/g, modal vs nonmodal** (nngroup.com/articles/modal-nonmodal-dialog): modals for critical or short exchanges; long forms and decisions that need the content behind them are a poor fit.
+- Material 3 cards: the page returned no content; not cited.
+
+### Decisions (user: "go with recommendations")
+
+1. Configure opens a **right-side drawer** (full screen below md), not a centred modal: ai_narration alone has 14 fields, Carbon sends more than 5 inputs to a side panel, NN/g reserves modals for short exchanges, and the drawer keeps the gallery visible.
+2. A **filter bar with status chips and counts** replaces Watcher-style KPI cards (the status strip above already shows counts).
+3. ai_narration gets a **provider switch** (below) instead of one long list.
+
+### Design
+
+**Gallery** (replaces the Task 6 master-detail list; the list + detail components are deleted, their tabs move into the drawer):
+- Filter bar: search (name, category, description), status chips with live counts (All, Connected, Incomplete, Unhealthy, Disabled; a chip is a toggle button with `aria-pressed`, counts from the fetched connectors), "Group by category" toggle (off by default; when on, category headings are `h3`).
+- Grid: CSS grid `repeat(auto-fill, minmax(280px, 1fr))` (about 3 to 4 columns at 1440, 1 on phone); skeleton tiles while loading; "No connectors match" empty state with a Clear filters button.
+- Tile (a base tile: a flat card with a divider border, no drop shadow, small hover lift disabled under `prefers-reduced-motion`): `ConnectorLogo` (48 px) with a soft glow behind it from the connector's accent colour and a small status ring (the ring is decorative; the status is the `StatusLabel` word), name (h3-level label), category, two-line cleaned description, `StatusLabel` (state; plus "Unhealthy"), footer: enable switch ("Enable <name>", instant save), **Test** button (spinner while running), primary **Configure** button. The tile body is not a click target. The Test result is an inline `role="status"` block on the tile (icon + text, "Tested the saved configuration", dismissible, no auto-dismiss).
+- Accent colours: a documented per-connector brand accent in `logos/logos.ts` (`accent`), used only for the glow behind the logo (a branding exception like the white logo surface; recorded in `LOGOS.md`); neutral/theme primary for connectors without a brand.
+
+**Drawer** (`ConnectorDrawer`, MUI `Drawer anchor="right"`, 600 px on desktop, full screen below md; opened by `?connector=<name>` so deep links and refresh work; unknown name opens nothing; Esc, the close button and the backdrop ask the existing discard `ConfirmDialog` when a draft exists):
+- Header: `ConnectorLogo`, name (h2 of the dialog), version, `StatusLabel`, "Last checked <relative>: <detail>".
+- Tabs (existing Overview / Configuration / Deliveries with `?tab=`), footer `ActionBar` (Save changes, Test connection; after a successful save an inline "Saved. Run a test now?" action).
+- Setup checklist for Incomplete connectors (top of Configuration): "N of M required settings missing" computed from the saved config (a required field is missing when its saved value is empty; a set secret counts as present), each item a button that focuses its field.
+
+**ai_narration provider switch** (frontend presentation layer in `connectorPresentation.ts`, keyed by connector name; every other connector keeps the generic grouped form):
+- Facts from the backend (`connectors/contrib/ai_narration/connector.py`, `select.py`): the automatic `case_finalised` path allows only `ollama` and `openai_compatible` (`AUTO_PROVIDERS`); an empty `narration_provider` means `ollama`; `openai`, `anthropic` and `gemini` keys are used only by manual runs (`manage.py test_ai_narration`).
+- UI: a segmented control "Provider used when narration runs automatically" with two options, **Ollama** and **OpenAI-compatible**, bound to the `narration_provider` field (the raw input is hidden; the key stays in the helper text). Only the selected provider's fields are shown: Ollama (`ollama_url`, `ollama_model`) or OpenAI-compatible (`openai_compatible_base_url`, `openai_compatible_api_key`, `openai_compatible_model`). The non-selected provider's saved values are kept untouched (hidden, never cleared). An unset or unknown saved value shows the Ollama segment selected with the note "Not set: Ollama is used" (unknown value: "Unknown provider '<value>' is saved; pick one to replace it"). Below, a collapsed disclosure "Manual-run providers (OpenAI, Anthropic, Gemini)" with the note "These keys are used only by manual runs (manage.py test_ai_narration), not when a case is finalised." containing those six fields.
+- The checklist and the unsaved-draft logic include the switch (changing the segment is a draft change).
+
+### Tasks affected
+
+Plan Task 10 (after Task 9) implements this amendment. The Task 6 list/detail components are removed; Task 9's connectors contrast results are re-checked in Task 10.
+
 ## Global constraints
 
 - Frontend only except the weight-sum guard (backend, small, additive, tested). Admin/CERT access unchanged; no new endpoints; no data model change.
