@@ -164,6 +164,32 @@ jobs:
         # tests; `unittest discover` silently skips the latter.
         run: python -m pytest tests -v
 
+  analyzers-test:
+    needs: changes
+    if: >
+      needs.changes.outputs.analyzers == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Analyzers/AIMailAnalyzer
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      # CPU wheel first (the default PyPI torch drags in ~3 GB of CUDA
+      # libraries); requirements-inference.txt then sees torch already satisfied.
+      - name: Install analyzer deps
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-inference.txt pytest httpx
+      # Client tests, inference-server tests (real ResNetMLP checkpoints + a fake
+      # sentence-transformer, real FastAPI app) and mail_analysis tests.
+      - name: pytest
+        run: python -m pytest tests -v
+
   frontend:
     needs: changes
     if: >

@@ -183,7 +183,12 @@ jobs:
           python-version: "3.12"
       - run: pip install pip-audit
       - name: pip-audit Analyzers/AIMailAnalyzer
-        run: pip-audit -r Analyzers/AIMailAnalyzer/requirements.txt --strict
+        # -inference pulls in requirements.txt via `-r`; -client is the Cortex
+        # one-shot client image's own (separate, tiny) dependency set.
+        run: >-
+          pip-audit --strict
+          -r Analyzers/AIMailAnalyzer/requirements-inference.txt
+          -r Analyzers/AIMailAnalyzer/requirements-client.txt
 
   npm-audit:
     needs: changes
