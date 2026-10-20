@@ -159,7 +159,7 @@ describe("ScoringTable", () => {
     fireEvent.change(num("Alpha"), { target: { value: "0" } });
     await user.click(screen.getByRole("button", { name: "Save all" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "At least one active analyzer needs a weight above 0, otherwise no case can be scored.",
+      "At least one active analyzer needs a weight above 0. Zeroing every analyzer that handles one kind of evidence (for example all file analyzers) makes that evidence score as Safe.",
     );
     expect(updateAnalyzerWeight).not.toHaveBeenCalled();
   });

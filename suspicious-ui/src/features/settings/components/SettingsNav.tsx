@@ -5,22 +5,13 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { useAccent } from "@/features/settings/useAccent";
 import { GROUPS, type SectionKey } from "@/features/settings/components/sections";
 import { SoftCard } from "@/features/settings/components/cards";
+import { visuallyHidden } from "@/features/settings/components/a11y";
 
 export type SettingsNavProps = {
   active: SectionKey;
   unsaved: ReadonlySet<SectionKey>;
   onNavigate(key: SectionKey): void;
 };
-
-/** Screen-reader-only text for the unsaved dot, which colour and shape alone cannot convey. */
-const visuallyHidden = {
-  position: "absolute",
-  width: "1px",
-  height: "1px",
-  overflow: "hidden",
-  clip: "rect(0 0 0 0)",
-  whiteSpace: "nowrap",
-} as const;
 
 const href = (key: SectionKey) => `/settings/${key}`;
 

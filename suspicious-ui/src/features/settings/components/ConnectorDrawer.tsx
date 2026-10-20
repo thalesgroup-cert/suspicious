@@ -6,7 +6,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import CloseOutlined from "@mui/icons-material/CloseOutlined";
 
 import { ensureContrast, flatten } from "@/shared/lib/contrast";
-import { ActionBar } from "@/features/settings/components/PanelSection";
+import { ActionBar } from "@/features/settings/components/ActionBar";
 import { useReportUnsaved } from "@/features/settings/unsaved";
 import { useAccent } from "@/features/settings/useAccent";
 import { useMuted } from "@/features/settings/useMuted";

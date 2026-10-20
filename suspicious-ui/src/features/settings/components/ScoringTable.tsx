@@ -24,7 +24,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { listAnalyzers, updateAnalyzerWeight, type Analyzer } from "@/features/settings/api";
 import { runBatch, summarise } from "@/features/settings/batch";
-import { ActionBar } from "@/features/settings/components/PanelSection";
+import { ActionBar } from "@/features/settings/components/ActionBar";
+import { visuallyHidden } from "@/features/settings/components/a11y";
 import { useReportUnsaved } from "@/features/settings/unsaved";
 import { useAccent } from "@/features/settings/useAccent";
 import {
@@ -92,12 +93,9 @@ function serverMessage(error: unknown): string {
   return "";
 }
 
-const visuallyHidden = {
-  position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
-} as const;
-
+// The guard only covers the total; scoring divides per kind of evidence, so zeroing all analyzers of one kind (e.g. file) scores it Safe.
 const ZERO_TOTAL_MESSAGE =
-  "At least one active analyzer needs a weight above 0, otherwise no case can be scored.";
+  "At least one active analyzer needs a weight above 0. Zeroing every analyzer that handles one kind of evidence (for example all file analyzers) makes that evidence score as Safe.";
 
 /**
  * Text is kept only while it still means the current draft, so a Reset or a
