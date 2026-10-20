@@ -39,3 +39,24 @@ class ConnectorDelivery(models.Model):
             models.Index(fields=["connector", "-created_at"]),
             models.Index(fields=["case_id"]),
         ]
+
+
+class ConnectorLink(models.Model):
+    """The object a connector created in the remote system for a case (an XSOAR
+    incident id, ...). One per (connector, case): lets a connector tell that it
+    already pushed a case, so a repeated ``case_finalised`` does not push twice.
+    A connector writes the row in the same transaction as the remote call, so a
+    failed push leaves no row and the framework's retry starts clean."""
+    connector = models.CharField(max_length=100)
+    case_id = models.IntegerField()
+    remote_id = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["connector", "case_id"], name="connector_link_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.connector}: case {self.case_id} -> {self.remote_id or '(pending)'}"

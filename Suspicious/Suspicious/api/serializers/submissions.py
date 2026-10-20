@@ -214,6 +214,7 @@ class BaseSubmissionSerializer(serializers.ModelSerializer):
             "type",
             "result",
             "mail_preview_url",
+            "external_ref",
         ]
 
     @extend_schema_field(serializers.CharField(allow_null=True, read_only=True))

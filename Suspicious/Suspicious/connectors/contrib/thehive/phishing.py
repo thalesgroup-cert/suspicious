@@ -59,6 +59,12 @@ _IOC_LEVEL_TO_VERDICT = {
 }
 
 
+def ioc_level_to_verdict(level) -> str:
+    """Ticket verdict word (malicious / suspicious / safe / inconclusive) for a
+    persisted observable ``ioc_level``."""
+    return _IOC_LEVEL_TO_VERDICT.get(level, "inconclusive")
+
+
 def _case_observables(case):
     """(inst, data_type, value) for every distinct IOC-road observable of a case
     (mail/file/observable-group alike), skipping targets with no printable value."""
@@ -88,7 +94,7 @@ def ticket_observables(case):
         {
             "dataType": _THEHIVE_DATATYPE.get(data_type, "other"),
             "data": value,
-            "verdict": _IOC_LEVEL_TO_VERDICT.get(getattr(inst, "ioc_level", "info"), "inconclusive"),
+            "verdict": ioc_level_to_verdict(getattr(inst, "ioc_level", "info")),
             "score": getattr(inst, "ioc_score", None),
             "confidence": getattr(inst, "ioc_confidence", None),
             "tags": [f"suspicious:case:{case.id}"],

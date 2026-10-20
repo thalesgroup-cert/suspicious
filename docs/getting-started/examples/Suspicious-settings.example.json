@@ -127,6 +127,18 @@
             "timeout_seconds": 10,
             "create_index": true,
             "ui_base_url": "https://suspicious.meridian.example"
+        },
+        "xsoar": {
+            "url": "https://xsoar.meridian.example",
+            "api_key": "",
+            "api_key_id": "",
+            "incident_type": "Phishing",
+            "min_verdict": "Suspicious",
+            "create_investigation": true,
+            "skip_ref_prefix": "xsoar:",
+            "verify_tls": true,
+            "timeout_seconds": 10,
+            "ui_base_url": "https://suspicious.meridian.example"
         }
     },
     "authentication": {

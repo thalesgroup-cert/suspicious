@@ -1,0 +1,6 @@
+extend = "../../ruff.toml"
+
+[lint]
+# XSOAR integrations pull the platform helpers (BaseClient, CommandResults,
+# return_results, ...) in with a star import by design.
+extend-ignore = ["F403", "F405"]
