@@ -329,9 +329,12 @@ describe("configuration", () => {
     const bar = save.closest("[data-panel-actions]")!;
     expect(bar).toContainElement(screen.getByRole("button", { name: "Test connection" }));
     await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
-    const result = await screen.findByRole("alert");
+    // One always-mounted polite status holds the result (a test result is not a blocking error, so no role=alert).
+    const result = screen.getByRole("status");
+    await waitFor(() => expect(result).toHaveTextContent("OK: reachable"));
     expect(result).toHaveTextContent("Tested the saved configuration");
-    expect(result).toHaveTextContent("OK: reachable");
+    expect(result.querySelector("[aria-live], [role=alert], [role=status]")).toBeNull();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(bar).toContainElement(result);
   });
 });

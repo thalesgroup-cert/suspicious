@@ -34,8 +34,11 @@ export function ConnectorsPanel() {
 
   const setConnector = (name: string | null) => {
     const next = new URLSearchParams(params);
-    if (name === null) next.delete("connector");
-    else next.set("connector", name);
+    // Closing drops the tab too: the next Configure opens on Overview.
+    if (name === null) {
+      next.delete("connector");
+      next.delete("tab");
+    } else next.set("connector", name);
     // replace: opening or closing a drawer is not a page the Back button should walk through.
     setParams(next, { replace: true });
   };

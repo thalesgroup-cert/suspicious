@@ -149,7 +149,7 @@ describe("ConnectorDrawer", () => {
       });
       renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("Connection refused by host");
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Connection refused by host"));
     });
 
     it("reads the detail from an `error` field too", async () => {
@@ -157,7 +157,7 @@ describe("ConnectorDrawer", () => {
       vi.mocked(testConnector).mockRejectedValueOnce({ response: { data: { error: "Bad token" } } });
       renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("Bad token");
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Bad token"));
     });
 
     it("falls back to a generic message when a thrown error carries no detail", async () => {
@@ -165,7 +165,7 @@ describe("ConnectorDrawer", () => {
       vi.mocked(testConnector).mockRejectedValueOnce(new Error("Network Error"));
       renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("Connection test failed.");
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Connection test failed."));
     });
 
     it("adds the HTTP status to the generic failure message when there is one", async () => {
@@ -173,7 +173,7 @@ describe("ConnectorDrawer", () => {
       vi.mocked(testConnector).mockRejectedValueOnce({ response: { status: 502, data: {} } });
       renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("Connection test failed (HTTP 502).");
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Connection test failed (HTTP 502)."));
     });
 
     it("says the test checks the saved configuration while a draft exists", async () => {
@@ -203,7 +203,7 @@ describe("ConnectorDrawer", () => {
       vi.mocked(testConnector).mockResolvedValueOnce({ ok: false, detail: "401 from MISP" });
       renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("Failed: 401 from MISP");
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Failed: 401 from MISP"));
     });
 
     it("clears an earlier failure when the next test succeeds", async () => {

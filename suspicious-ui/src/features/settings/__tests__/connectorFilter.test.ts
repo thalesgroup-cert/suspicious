@@ -60,6 +60,12 @@ describe("filterConnectors", () => {
     expect(filterConnectors(LIST, { q: "", status: "unhealthy" }).map((c) => c.name)).not.toContain("watcher");
   });
 
+  it("decides Unhealthy by the status tone, so an enabled connector with a failed check is unhealthy whatever its label", () => {
+    const failing = make("x", { status: "partial", last_health_ok: false });
+    expect(filterConnectors([failing], { q: "", status: "unhealthy" })).toHaveLength(1);
+    expect(filterConnectors([failing], { q: "", status: "incomplete" })).toHaveLength(0);
+  });
+
   it("combines the query and the status", () => {
     expect(filterConnectors(LIST, { q: "intelligence", status: "disabled" }).map((c) => c.name)).toEqual(["watcher"]);
     expect(filterConnectors(LIST, { q: "intelligence", status: "incomplete" })).toEqual([]);

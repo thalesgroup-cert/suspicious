@@ -6,6 +6,7 @@ import SearchOutlined from "@mui/icons-material/SearchOutlined";
 import { EmptyList } from "@/features/settings/components/cards";
 import { ConnectorTile } from "@/features/settings/components/ConnectorTile";
 import type { Connector } from "@/features/settings/components/connectors";
+import type { TestResult } from "@/features/settings/components/useConnectorTest";
 import { filterConnectors, groupByCategory, statusCounts, type StatusFilter } from "@/features/settings/connectorFilter";
 import { contrastRatio, flatten } from "@/shared/lib/contrast";
 import { useMuted } from "@/features/settings/useMuted";
@@ -75,6 +76,9 @@ export function ConnectorGallery({
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [grouped, setGrouped] = useState(false);
+  // Test results live here, above the filter, so they survive a tile being filtered out or regrouped.
+  const [results, setResults] = useState<Record<string, TestResult | null>>({});
+  const setResult = (name: string, r: TestResult | null) => setResults((prev) => ({ ...prev, [name]: r }));
 
   if (loading) {
     return (
@@ -112,7 +116,9 @@ export function ConnectorGallery({
   const counts = statusCounts(connectors);
   const shown = filterConnectors(connectors, { q, status });
   const filtered = q.trim() !== "" || status !== "all";
-  const tile = (c: Connector, level: 3 | 4) => <ConnectorTile key={c.name} connector={c} headingLevel={level} onConfigure={onConfigure} />;
+  const tile = (c: Connector, level: 3 | 4) => (
+    <ConnectorTile key={c.name} connector={c} headingLevel={level} testResult={results[c.name] ?? null} onTestResult={setResult} onConfigure={onConfigure} />
+  );
 
   return (
     <Stack spacing={2.5}>

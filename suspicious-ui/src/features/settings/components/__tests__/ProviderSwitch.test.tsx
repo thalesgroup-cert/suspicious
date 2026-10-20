@@ -107,6 +107,8 @@ describe("provider switch", () => {
       ollama_model: "qwen",
       openai_compatible_base_url: "https://gw.example/v1",
     });
+    // A stored secret that was not retyped is left out of the payload so the server keeps it.
+    expect(vi.mocked(putConnectorConfig).mock.calls.at(-1)![1]).not.toHaveProperty("openai_compatible_api_key");
   });
 
   it("keeps what was typed for a provider when switching away and back", async () => {

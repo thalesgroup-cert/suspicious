@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Box, Button, CircularProgress, IconButton, Stack, Switch, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import CheckCircle from "@mui/icons-material/CheckCircle";
 import CloseOutlined from "@mui/icons-material/CloseOutlined";
 import ErrorOutlined from "@mui/icons-material/ErrorOutlined";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 import { useSnackbar } from "notistack";
 
 import { relativeTime } from "@/features/settings/connectorConfig";
@@ -14,7 +16,7 @@ import { visuallyHidden } from "@/features/settings/components/a11y";
 import { ConnectorMark } from "@/features/settings/components/ConnectorMark";
 import { StatusLabel, connectorStatus } from "@/features/settings/components/StatusLabel";
 import { setConnectorEnabled, type Connector } from "@/features/settings/components/connectors";
-import { useConnectorTest } from "@/features/settings/components/useConnectorTest";
+import { useConnectorTest, type TestResult } from "@/features/settings/components/useConnectorTest";
 import { useToneColor } from "@/features/settings/components/useToneColor";
 
 const CLAMP = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" } as const;
@@ -26,9 +28,14 @@ const CLAMP = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "ve
 export function ConnectorTile({
   connector,
   headingLevel = 3,
+  testResult,
+  onTestResult,
   onConfigure,
 }: {
   connector: Connector;
+  /** Held by the gallery, not here: a filter or the grouping can unmount this tile while its result is still wanted. */
+  testResult: TestResult | null;
+  onTestResult: (name: string, result: TestResult | null) => void;
   /** 3 when the grid sits straight under the section heading, 4 under a category heading. */
   headingLevel?: 3 | 4;
   onConfigure: (name: string) => void;
@@ -41,7 +48,7 @@ export function ConnectorTile({
   const { enqueueSnackbar } = useSnackbar();
   const { name } = connector;
   const status = connectorStatus(connector);
-  const test = useConnectorTest(name);
+  const test = useConnectorTest(name, { result: testResult, set: (r) => onTestResult(name, r) });
 
   const toggle = useMutation({
     mutationFn: (enabled: boolean) => setConnectorEnabled(name, enabled),
@@ -103,28 +110,9 @@ export function ConnectorTile({
           </Stack>
         </Box>
 
-        {/* The wrapper is always present so a screen reader sees the status block being added to a live region. */}
-        <Box aria-live="polite">
-          {test.result && (
-            <Stack
-              role="status"
-              direction="row"
-              spacing={1}
-              sx={{ alignItems: "flex-start", p: 1, border: 1, borderColor: border, borderRadius: 1, bgcolor: alpha(theme.palette.text.primary, 0.03) }}
-            >
-              <ResultIcon ok={test.result.ok} color={toneColor(test.result.ok ? "ok" : "danger", 3)} />
-              <Typography
-                variant="caption"
-                title={test.result.text}
-                sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", display: "-webkit-box", overflow: "hidden" }}
-              >
-                Tested the saved configuration: {test.result.text}
-              </Typography>
-              <IconButton size="small" aria-label={`Dismiss test result for ${name}`} onClick={test.dismiss} sx={{ m: -0.5 }}>
-                <CloseOutlined sx={{ fontSize: 16 }} />
-              </IconButton>
-            </Stack>
-          )}
+        {/* The one live region of the tile: always mounted and empty until a result arrives, so a screen reader hears it fill. */}
+        <Box role="status">
+          {test.result && <ResultBlock name={name} result={test.result} onDismiss={test.dismiss} />}
         </Box>
 
         <Stack direction="row" spacing={1} sx={{ mt: "auto", pt: 1.5, borderTop: 1, borderColor: border, alignItems: "center" }}>
@@ -154,6 +142,53 @@ export function ConnectorTile({
           </Button>
         </Stack>
       </Box>
+    </Box>
+  );
+}
+
+// Long enough that the four-line clamp is likely to cut it; the full text is always in the DOM and the button only lifts the clamp.
+const LONG_RESULT = 150;
+
+function ResultBlock({ name, result, onDismiss }: { name: string; result: TestResult; onDismiss: () => void }) {
+  const theme = useTheme();
+  const toneColor = useToneColor();
+  const [expanded, setExpanded] = useState(false);
+  const text = `Tested the saved configuration: ${result.text}`;
+  return (
+    <Box sx={{ p: 1, border: 1, borderColor: "divider", borderRadius: 1, bgcolor: alpha(theme.palette.text.primary, 0.03) }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
+        <ResultIcon ok={result.ok} color={toneColor(result.ok ? "ok" : "danger", 3)} />
+        <Typography
+          variant="caption"
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            overflowWrap: "anywhere",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: expanded ? "none" : 4,
+            overflow: expanded ? "visible" : "hidden",
+          }}
+        >
+          {text}
+        </Typography>
+        <IconButton size="small" aria-label={`Dismiss test result for ${name}`} onClick={onDismiss} sx={{ m: -0.5 }}>
+          <CloseOutlined sx={{ fontSize: 16 }} />
+        </IconButton>
+      </Stack>
+      {text.length > LONG_RESULT && (
+        <Button
+          size="small"
+          variant="text"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+          endIcon={<ExpandMore sx={{ transform: expanded ? "rotate(180deg)" : "none" }} />}
+          sx={{ mt: 0.5, ml: 3, p: 0, minWidth: 0, color: "text.primary", textDecoration: "underline" }}
+        >
+          Show full result
+          <Box component="span" sx={visuallyHidden}>{" "}for {name}</Box>
+        </Button>
+      )}
     </Box>
   );
 }

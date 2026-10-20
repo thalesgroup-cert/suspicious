@@ -122,8 +122,21 @@ describe("after saving", () => {
     const row = await save();
     await userEvent.click(within(row.closest("[data-saved-row]") as HTMLElement).getByRole("button", { name: "Test now" }));
     expect(testConnector).toHaveBeenCalledWith("misp");
-    expect(await screen.findByRole("alert")).toHaveTextContent("OK: reachable");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("OK: reachable"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText("Saved. Run a test now?")).not.toBeInTheDocument();
+  });
+
+  it("is announced through the one status region, which exists before the row does", async () => {
+    open();
+    const region = await screen.findByRole("status");
+    expect(region).toBeEmptyDOMElement();
+    const { putConnectorConfig } = await import("../connectors");
+    vi.mocked(putConnectorConfig).mockResolvedValueOnce({ url: "https://x", api_key: "********", name: "n" });
+    await userEvent.type(screen.getByLabelText(/^URL/), "https://x");
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(region).toHaveTextContent("Saved. Run a test now?"));
+    expect(screen.getAllByRole("status")).toHaveLength(1);
   });
 
   it("can be dismissed", async () => {

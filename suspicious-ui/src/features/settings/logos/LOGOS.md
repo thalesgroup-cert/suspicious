@@ -16,7 +16,7 @@ revision. Confirm brand usage before the final merge.
 
 ## Glow accents (branding exception)
 
-The connector gallery draws a soft, blurred glow behind each logo tile at 22% opacity (32% on dark themes). The glow is
+The connector gallery draws a soft, blurred glow behind each logo tile at 30% opacity (40% on dark themes) with an 8 px blur. The glow is
 decoration, never text or a status mark, so it is exempt from the theme palette and contrast rules, like the white logo surface.
 `accent` in `logos.ts` holds one colour per logo, taken from the logo itself. `smtp_notify` and `ai_narration` have no brand and
 use the theme primary at the same opacity.

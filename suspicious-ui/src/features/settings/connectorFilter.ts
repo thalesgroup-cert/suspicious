@@ -6,9 +6,9 @@ type StatusKey = Exclude<StatusFilter, "all">;
 
 /** The same decision the StatusLabel makes, so a chip count always matches the words on the tiles. */
 function statusKey(c: Connector): StatusKey {
-  const { tone, label } = connectorStatus(c);
+  const { tone } = connectorStatus(c);
   if (tone === "neutral") return "disabled";
-  if (label === "Unhealthy") return "unhealthy";
+  if (tone === "danger") return "unhealthy";
   return tone === "ok" ? "connected" : "incomplete";
 }
 

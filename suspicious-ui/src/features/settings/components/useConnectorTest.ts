@@ -6,17 +6,22 @@ import { testConnector } from "@/features/settings/components/connectors";
 export type TestResult = { ok: boolean; text: string };
 
 /** A rejected request (4xx/5xx, network) must not vanish: say what went wrong, with the HTTP status when there is one. */
-export function testFailureMessage(err: unknown): string {
+function testFailureMessage(err: unknown): string {
   const response = (err as { response?: { status?: number; data?: { detail?: unknown; error?: unknown } } }).response;
   const message = response?.data?.detail ?? response?.data?.error;
   if (typeof message === "string" && message) return message;
   return response?.status ? `Connection test failed (HTTP ${response.status}).` : "Connection test failed.";
 }
 
-/** One connector's connection test and its latest result; shared by the tile and the drawer so both word it the same way. */
-export function useConnectorTest(name: string) {
+/**
+ * One connector's connection test and its latest result; shared by the tile and the drawer so both word it the same way.
+ * Pass `store` to keep the result somewhere that outlives the caller (the gallery does, so a tile that a filter removes and brings back still shows it).
+ */
+export function useConnectorTest(name: string, store?: { result: TestResult | null; set: (r: TestResult | null) => void }) {
   const queryClient = useQueryClient();
-  const [result, setResult] = useState<TestResult | null>(null);
+  const [own, setOwn] = useState<TestResult | null>(null);
+  const result = store ? store.result : own;
+  const setResult = store ? store.set : setOwn;
   const mutation = useMutation({
     mutationFn: () => {
       setResult(null);

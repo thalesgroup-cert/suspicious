@@ -142,19 +142,23 @@ describe("enable switch", () => {
 });
 
 describe("Test on a tile", () => {
+  // The result sits in one always-mounted polite status per tile, so a screen reader hears it appear.
+  const statusOf = (name: string) => within(tileOf(name)).getByRole("status");
+
   it("shows a spinner while running, then an inline status with the saved-configuration wording", async () => {
     const { testConnector } = await import("../connectors");
     let resolve!: (v: { ok: boolean; detail: string }) => void;
     vi.mocked(testConnector).mockReturnValueOnce(new Promise((r) => { resolve = r; }));
     renderGallery();
     const tile = tileOf("misp");
+    expect(statusOf("misp")).toBeEmptyDOMElement();
     await userEvent.click(within(tile).getByRole("button", { name: "Test misp" }));
     const busy = await within(tile).findByRole("button", { name: /^Testing/ });
     expect(busy).toHaveTextContent("Testing...");
     expect(busy.querySelector("[role=progressbar]")).not.toBeNull();
     resolve({ ok: true, detail: "reachable" });
-    const result = await within(tile).findByRole("status");
-    expect(result).toHaveTextContent("Tested the saved configuration: OK: reachable");
+    await waitFor(() => expect(statusOf("misp")).toHaveTextContent("Tested the saved configuration: OK: reachable"));
+    expect(statusOf("misp").querySelector("[aria-live], [role=alert], [role=status]")).toBeNull();
     expect(within(tile).getByRole("button", { name: "Test misp" })).toBeInTheDocument();
   });
 
@@ -163,7 +167,7 @@ describe("Test on a tile", () => {
     vi.mocked(testConnector).mockRejectedValueOnce({ response: { status: 502, data: {} } });
     renderGallery();
     await userEvent.click(within(tileOf("misp")).getByRole("button", { name: "Test misp" }));
-    expect(await within(tileOf("misp")).findByRole("status")).toHaveTextContent("Connection test failed (HTTP 502).");
+    await waitFor(() => expect(statusOf("misp")).toHaveTextContent("Connection test failed (HTTP 502)."));
     vi.mocked(testConnector).mockResolvedValueOnce({ ok: false, detail: "401 from MISP" });
     await userEvent.click(within(tileOf("misp")).getByRole("button", { name: "Test misp" }));
     expect(await within(tileOf("misp")).findByText(/Failed: 401 from MISP/)).toBeInTheDocument();
@@ -173,10 +177,51 @@ describe("Test on a tile", () => {
   it("can be dismissed and does not leak to other tiles", async () => {
     renderGallery();
     await userEvent.click(within(tileOf("misp")).getByRole("button", { name: "Test misp" }));
-    const result = await within(tileOf("misp")).findByRole("status");
-    expect(within(tileOf("thehive")).queryByRole("status")).not.toBeInTheDocument();
-    await userEvent.click(within(result).getByRole("button", { name: "Dismiss test result for misp" }));
-    expect(within(tileOf("misp")).queryByRole("status")).not.toBeInTheDocument();
+    await waitFor(() => expect(statusOf("misp")).toHaveTextContent("reachable"));
+    expect(statusOf("thehive")).toBeEmptyDOMElement();
+    await userEvent.click(within(statusOf("misp")).getByRole("button", { name: "Dismiss test result for misp" }));
+    expect(statusOf("misp")).toBeEmptyDOMElement();
+  });
+
+  it("is kept when the filter or the grouping takes the tile off the screen and brings it back", async () => {
+    renderGallery();
+    await userEvent.click(screen.getByRole("button", { name: /^Connected/ }));
+    await userEvent.click(within(tileOf("misp")).getByRole("button", { name: "Test misp" }));
+    await waitFor(() => expect(statusOf("misp")).toHaveTextContent("reachable"));
+    // misp leaves the list (the status chip changes), then returns.
+    await userEvent.click(screen.getByRole("button", { name: /^Disabled/ }));
+    expect(screen.queryByRole("heading", { name: "misp" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Connected/ }));
+    expect(statusOf("misp")).toHaveTextContent("Tested the saved configuration: OK: reachable");
+    // Grouping rebuilds the tiles under category headings.
+    await userEvent.click(screen.getByRole("switch", { name: "Group by category" }));
+    expect(statusOf("misp")).toHaveTextContent("OK: reachable");
+    // Dismissing clears it for good.
+    await userEvent.click(within(statusOf("misp")).getByRole("button", { name: "Dismiss test result for misp" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Group by category" }));
+    expect(statusOf("misp")).toBeEmptyDOMElement();
+  });
+
+  it("keeps a long result readable: clamped, with a Show full result button that expands it", async () => {
+    const { testConnector } = await import("../connectors");
+    const long = "HTTPSConnectionPool(host='misp.example', port=443): " + "x".repeat(260);
+    vi.mocked(testConnector).mockResolvedValueOnce({ ok: false, detail: long });
+    renderGallery();
+    await userEvent.click(within(tileOf("misp")).getByRole("button", { name: "Test misp" }));
+    const more = await within(tileOf("misp")).findByRole("button", { name: "Show full result for misp" });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    const text = within(statusOf("misp")).getByText(/^Tested the saved configuration/);
+    expect(getComputedStyle(text).webkitLineClamp).toBe("4");
+    await userEvent.click(more);
+    expect(within(tileOf("misp")).getByRole("button", { name: "Show full result for misp" })).toHaveAttribute("aria-expanded", "true");
+    expect(getComputedStyle(text).webkitLineClamp).toBe("none");
+  });
+
+  it("offers no expand button for a short result", async () => {
+    renderGallery();
+    await userEvent.click(within(tileOf("misp")).getByRole("button", { name: "Test misp" }));
+    await waitFor(() => expect(statusOf("misp")).toHaveTextContent("reachable"));
+    expect(within(tileOf("misp")).queryByRole("button", { name: /Show full result/ })).not.toBeInTheDocument();
   });
 });
 

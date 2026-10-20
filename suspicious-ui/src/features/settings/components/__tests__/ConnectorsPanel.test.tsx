@@ -81,13 +81,15 @@ describe("the drawer follows the URL", () => {
     expect(window.history.length).toBe(length);
   });
 
-  it.each(["button", "escape", "backdrop"])("closing by %s removes the connector from the URL, keeping the rest", async (how) => {
+  it.each(["button", "escape", "backdrop"])("closing by %s removes the connector and the tab from the URL, keeping the rest", async (how) => {
     const { router } = setup("?connector=misp&tab=overview&x=1");
     const dialog = await drawer("misp");
     if (how === "button") await userEvent.click(within(dialog).getByRole("button", { name: "Close misp" }));
     else if (how === "escape") await userEvent.keyboard("{Escape}");
     else await userEvent.click(document.querySelector(".MuiBackdrop-root")!);
     await waitFor(() => expect(connectorParam(router)).toBeNull());
+    // The next Configure opens on Overview, so the tab goes with the connector.
+    expect(new URLSearchParams(router!.state.location.search).has("tab")).toBe(false);
     expect(new URLSearchParams(router!.state.location.search).get("x")).toBe("1");
     await waitFor(() => expect(dialogs()).toHaveLength(0));
   });
@@ -121,6 +123,10 @@ describe("with an unsaved draft", () => {
     await userEvent.click(within(await confirm()).getByRole("button", { name: "Discard" }));
     await waitFor(() => expect(connectorParam(router)).toBeNull());
     await userEvent.click(await configure("misp"));
+    // Closing dropped the tab with the connector, so the drawer opens on Overview again.
+    const dialog = await drawer("misp");
+    expect(within(dialog).getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(within(dialog).getByRole("tab", { name: "Configuration" }));
     expect(((await screen.findByLabelText("API Key")) as HTMLInputElement).value).toBe("");
   });
 

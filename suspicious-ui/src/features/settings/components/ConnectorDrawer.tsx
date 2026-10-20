@@ -279,43 +279,46 @@ export function ConnectorDrawer({
 
         {showFooter && (
           <ActionBar sx={{ display: "block", flexShrink: 0, px: { xs: 2, sm: 3 }, pb: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}>
-            {/* Inside the bar, not below it: a result under a sticky bar would sit off screen. */}
-            {test.result && (
-              <Alert sx={{ mb: 1.5 }} severity={test.result.ok ? "success" : "error"} onClose={test.dismiss}>
-                <Box component="span" sx={{ display: "block", fontWeight: 600 }}>Tested the saved configuration</Box>
-                {test.result.text}
-              </Alert>
-            )}
+            {/* Inside the bar, not below it: a result under a sticky bar would sit off screen.
+                One polite live region, always mounted and empty until something arrives; a test result is information, not a blocking error. */}
+            <Stack role="status" spacing={1.5} sx={{ "&:not(:empty)": { mb: 1.5 } }}>
+              {test.result && (
+                <Alert role="none" severity={test.result.ok ? "success" : "error"} onClose={test.dismiss}>
+                  <Box component="span" sx={{ display: "block", fontWeight: 600 }}>Tested the saved configuration</Box>
+                  {test.result.text}
+                </Alert>
+              )}
+              {savedNotice && !draft && (
+                <Alert
+                  data-saved-row
+                  role="none"
+                  severity="success"
+                  action={
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                      <Button
+                        size="small"
+                        color="inherit"
+                        onClick={() => {
+                          setSavedNotice(false);
+                          test.run();
+                        }}
+                      >
+                        Test now
+                      </Button>
+                      <IconButton size="small" color="inherit" aria-label="Dismiss saved message" onClick={() => setSavedNotice(false)}>
+                        <CloseOutlined fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  }
+                >
+                  Saved. Run a test now?
+                </Alert>
+              )}
+            </Stack>
+            {/* A failed save blocks the user, so it stays an alert. */}
             {saveError && (
               <Alert sx={{ mb: 1.5 }} severity="error" onClose={() => setSaveError(null)}>
                 {saveError}
-              </Alert>
-            )}
-            {savedNotice && !draft && (
-              <Alert
-                data-saved-row
-                role="status"
-                sx={{ mb: 1.5 }}
-                severity="success"
-                action={
-                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                    <Button
-                      size="small"
-                      color="inherit"
-                      onClick={() => {
-                        setSavedNotice(false);
-                        test.run();
-                      }}
-                    >
-                      Test now
-                    </Button>
-                    <IconButton size="small" color="inherit" aria-label="Dismiss saved message" onClick={() => setSavedNotice(false)}>
-                      <CloseOutlined fontSize="small" />
-                    </IconButton>
-                  </Stack>
-                }
-              >
-                Saved. Run a test now?
               </Alert>
             )}
             <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
