@@ -149,16 +149,18 @@ export function ConnectorGallery({
             );
           })}
         </Stack>
+      </Stack>
+
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", minHeight: 32 }}>
+        <Typography variant="caption" aria-live="polite" sx={{ color: muted }}>
+          {filtered ? `Showing ${shown.length} of ${connectors.length} connectors` : `${connectors.length} connectors`}
+        </Typography>
         <FormControlLabel
-          sx={{ ml: { sm: "auto" }, mr: 0 }}
+          sx={{ mr: 0 }}
           control={<Switch size="small" checked={grouped} onChange={(e) => setGrouped(e.target.checked)} />}
           label={<Typography variant="body2">Group by category</Typography>}
         />
       </Stack>
-
-      <Typography variant="caption" aria-live="polite" sx={{ color: muted, mt: "-12px !important" }}>
-        {filtered ? `Showing ${shown.length} of ${connectors.length} connectors` : `${connectors.length} connectors`}
-      </Typography>
 
       {shown.length === 0 ? (
         <Stack spacing={1} sx={{ alignItems: "center" }}>

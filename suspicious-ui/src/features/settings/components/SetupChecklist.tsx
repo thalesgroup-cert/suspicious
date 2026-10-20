@@ -5,16 +5,8 @@ import WarningAmber from "@mui/icons-material/WarningAmber";
 import { fieldLabel } from "@/features/settings/labels";
 import { useMuted } from "@/features/settings/useMuted";
 import type { ConfigField } from "@/features/settings/components/connectors";
+import { focusField } from "@/features/settings/components/focusField";
 import { useToneColor } from "@/features/settings/components/useToneColor";
-
-/** Scrolls to the input of a config key and focuses it. Smooth scrolling only when the user has not asked for less motion. */
-export function focusField(key: string) {
-  const el = document.querySelector<HTMLElement>(`[data-field="${CSS.escape(key)}"]`);
-  if (!el) return;
-  const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  el.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
-  el.focus({ preventScroll: true });
-}
 
 /** What is still needed before the connector counts as connected, with a button per setting that jumps to its field. */
 export function SetupChecklist({ missing, total }: { missing: ConfigField[]; total: number }) {

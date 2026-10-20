@@ -22,11 +22,11 @@ export function ConnectorMark({ name, size = 48, tone }: { name: string; size?: 
         data-testid="connector-glow"
         sx={{
           position: "absolute",
-          inset: -Math.round(size * 0.22),
+          inset: -Math.round(size * 0.3),
           borderRadius: "50%",
           background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`,
-          opacity: dark ? 0.32 : 0.22,
-          filter: "blur(6px)",
+          opacity: dark ? 0.4 : 0.3,
+          filter: "blur(8px)",
           pointerEvents: "none",
         }}
       />

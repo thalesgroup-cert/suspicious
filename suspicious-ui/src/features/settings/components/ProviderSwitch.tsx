@@ -5,6 +5,7 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import { dottedGet } from "@/features/settings/components/configHelpers";
 import type { ConfigField } from "@/features/settings/components/connectors";
 import { resolveProvider, type ProviderSwitchSpec, splitSchema } from "@/features/settings/connectorPresentation";
+import { alpha } from "@mui/material/styles";
 import { useAccent } from "@/features/settings/useAccent";
 import { useMuted } from "@/features/settings/useMuted";
 
@@ -56,7 +57,17 @@ export function ProviderSwitch({ spec, split, config, saved, errors, onChange, r
           value={selected}
           aria-labelledby={`${helpId}-label`}
           aria-describedby={helpId}
-          sx={{ "& .MuiToggleButton-root": { textTransform: "none", color: "text.primary", flex: 1 } }}
+          // Selected = accent tint, accent text and border: the grey default selected state was hard to tell from the unselected one.
+          sx={{
+            "& .MuiToggleButton-root": { textTransform: "none", color: "text.primary", flex: 1, borderColor: "divider" },
+            "& .MuiToggleButton-root.Mui-selected": {
+              color: accent.text,
+              fontWeight: 600,
+              bgcolor: alpha(accent.mark, 0.12),
+              borderColor: accent.mark,
+              "&:hover": { bgcolor: alpha(accent.mark, 0.18) },
+            },
+          }}
         >
           {spec.options.map((o) => (
             // onClick, not the group's onChange: pressing the segment that already looks selected (an unset or unknown value) must still save it.

@@ -115,7 +115,9 @@ export function ConnectorDrawer({
   // After a deep link the page keeps focus (disableAutoFocus), and the modal only hears Esc from inside itself.
   // While focus is on the page body, Esc still has to close the drawer. A confirm dialog on top holds focus itself.
   const closeRef = useRef(requestClose);
-  closeRef.current = requestClose;
+  useEffect(() => {
+    closeRef.current = requestClose;
+  });
   useEffect(() => {
     if (!open || !disableAutoFocus) return;
     const onKey = (e: KeyboardEvent) => {
