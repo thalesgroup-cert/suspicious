@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ConfigField } from "../components/connectors";
-import { groupFields, relativeTime, scheduleText } from "../connectorConfig";
+import { groupFields, missingRequired, relativeTime, scheduleText } from "../connectorConfig";
 
 const f = (key: string, required = false, type: ConfigField["type"] = "str"): ConfigField => ({
   key,
@@ -92,5 +92,35 @@ describe("relativeTime", () => {
   it("says not checked yet for null or an unparsable value", () => {
     expect(relativeTime(null, now)).toBe("not checked yet");
     expect(relativeTime("nope", now)).toBe("not checked yet");
+  });
+});
+
+describe("missingRequired", () => {
+  const schema = [f("url", true, "url"), f("api_key", true, "secret"), f("timeout", false), f("name", true)];
+
+  it("lists required fields whose saved value is empty or absent, in schema order", () => {
+    expect(missingRequired(schema, { url: "", api_key: "********" }).map((x) => x.key)).toEqual(["url", "name"]);
+  });
+
+  it("treats whitespace as empty", () => {
+    expect(missingRequired(schema, { url: "   ", api_key: "********", name: "x" }).map((x) => x.key)).toEqual(["url"]);
+  });
+
+  it("counts a stored secret (the mask) as present and an empty secret as missing", () => {
+    expect(missingRequired(schema, { url: "u", name: "n", api_key: "********" })).toEqual([]);
+    expect(missingRequired(schema, { url: "u", name: "n", api_key: "" }).map((x) => x.key)).toEqual(["api_key"]);
+  });
+
+  it("treats an absent key as missing and never lists optional fields", () => {
+    expect(missingRequired(schema, {}).map((x) => x.key)).toEqual(["url", "api_key", "name"]);
+  });
+
+  it("keeps zero and false as present values", () => {
+    expect(missingRequired([f("n", true, "int"), f("b", true, "bool")], { n: 0, b: false })).toEqual([]);
+  });
+
+  it("reads dotted keys", () => {
+    expect(missingRequired([f("smtp.host", true)], { smtp: { host: "h" } })).toEqual([]);
+    expect(missingRequired([f("smtp.host", true)], { smtp: {} }).map((x) => x.key)).toEqual(["smtp.host"]);
   });
 });

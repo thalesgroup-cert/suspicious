@@ -1,4 +1,5 @@
 import { fieldLabel } from "./labels";
+import { dottedGet } from "./components/configHelpers";
 import type { ConfigField } from "./components/connectors";
 
 export type FieldGroup = { key: string; label: string; required: ConfigField[]; optional: ConfigField[] };
@@ -47,4 +48,16 @@ export function relativeTime(iso: string | null, now: Date): string {
   if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
   return `${Math.floor(seconds / 86400)} d ago`;
+}
+
+/**
+ * Required fields with nothing saved. The config API returns the mask for a stored secret, so the mask counts as present;
+ * 0 and false are real values, only absent, null and blank text are missing.
+ */
+export function missingRequired(schema: ConfigField[], saved: Record<string, unknown>): ConfigField[] {
+  return schema.filter((f) => {
+    if (!f.required) return false;
+    const v = dottedGet(saved, f.key);
+    return v == null || (typeof v === "string" && v.trim() === "");
+  });
 }
