@@ -33,11 +33,13 @@ export function ListHistory({ section }: { section: EditableListSection }) {
         <Box id={regionId} sx={{ pt: 1 }}>
           {q.isLoading ? (
             <Box sx={{ py: 2, display: "grid", placeItems: "center" }}><CircularProgress size={20} aria-label="Loading history" /></Box>
-          ) : q.isError ? (
-            <Alert severity="error">Failed to load history.</Alert>
-          ) : events.length === 0 ? (
+          ) : null}
+          {/* Kept above the list so a failed later page does not hide the events already loaded. */}
+          {q.isError ? <Alert severity="error" sx={{ mb: events.length ? 1 : 0 }}>Failed to load history.</Alert> : null}
+          {!q.isLoading && !q.isError && events.length === 0 ? (
             <Typography variant="body2" color="text.secondary">{EMPTY}</Typography>
-          ) : (
+          ) : null}
+          {events.length > 0 ? (
             <Box component="ul" aria-label="Change history" sx={{ listStyle: "none", m: 0, p: 0, border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
               {events.map((e) => (
                 <Box
@@ -52,11 +54,11 @@ export function ListHistory({ section }: { section: EditableListSection }) {
                   <Typography component="span" sx={{ fontFamily: "monospace", fontWeight: 600, fontSize: 13.5, overflowWrap: "anywhere" }}>
                     {e.value}
                   </Typography>
-                  <EntryDate iso={e.created_at} label={e.action === "added" ? "Added" : "Removed"} by={e.username || null} />
+                  <EntryDate iso={e.created_at} label={e.action === "added" ? "Added" : "Removed"} by={e.username || null} withTime />
                 </Box>
               ))}
             </Box>
-          )}
+          ) : null}
           {q.hasNextPage ? (
             <Button size="small" onClick={() => q.fetchNextPage()} disabled={q.isFetchingNextPage} sx={{ mt: 1, textTransform: "none", fontWeight: 600 }}>
               Load more

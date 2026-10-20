@@ -2,7 +2,7 @@ import { Typography } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 
 /** "<label> <date>[ by <user>]" as a time element; nothing for a missing or unparseable timestamp so "Invalid Date" never shows. */
-export function EntryDate({ iso, label, by, sx }: { iso?: string; label: string; by?: string | null; sx?: SxProps<Theme> }) {
+export function EntryDate({ iso, label, by, withTime, sx }: { iso?: string; label: string; by?: string | null; withTime?: boolean; sx?: SxProps<Theme> }) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -15,7 +15,7 @@ export function EntryDate({ iso, label, by, sx }: { iso?: string; label: string;
       title={d.toLocaleString()}
       sx={sx}
     >
-      {label} {d.toLocaleDateString()}{by ? ` by ${by}` : ""}
+      {label} {withTime ? d.toLocaleString() : d.toLocaleDateString()}{by ? ` by ${by}` : ""}
     </Typography>
   );
 }

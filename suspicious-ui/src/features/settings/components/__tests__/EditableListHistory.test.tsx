@@ -48,8 +48,9 @@ describe("EditableListPanel authorship", () => {
     mockList.mockResolvedValue([{ id: "1", value: "evil.com", created_at: "2026-10-20T09:00:00Z", added_by: null }]);
     panel();
     const row = (await screen.findByText("evil.com")).closest("li")!;
-    expect(within(row).getByText(/^Added /)).toBeInTheDocument();
-    expect(row.textContent).not.toMatch(/by|null/);
+    const expected = `Added ${new Date("2026-10-20T09:00:00Z").toLocaleDateString()}`;
+    expect(row.querySelector("time")!.textContent).toBe(expected);
+    expect(within(row).queryByText(/\bby\b|null/)).not.toBeInTheDocument();
   });
 
   it("keeps the row control names", async () => {
@@ -152,5 +153,43 @@ describe("EditableListPanel history", () => {
     await user.click(screen.getByRole("button", { name: "Delete evil.com" }));
     await screen.findByRole("button", { name: "Undo" });
     expect(mockHistory).not.toHaveBeenCalled();
+  });
+
+  it("keeps the loaded events and shows the error above them when Load more fails", async () => {
+    const user = userEvent.setup();
+    mockHistory
+      .mockResolvedValueOnce(page([ev(2, "added", "two.com", "alice")], "next"))
+      .mockRejectedValueOnce(new Error("boom"));
+    panel();
+    await screen.findByText("evil.com");
+    await user.click(historyButton());
+    await screen.findByText("two.com");
+
+    await user.click(screen.getByRole("button", { name: "Load more" }));
+
+    const alert = await screen.findByText("Failed to load history.");
+    expect(screen.getByText("two.com")).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Change history" });
+    expect(alert.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled();
+  });
+
+  it("shows the time as well as the date so same-day events differ", async () => {
+    const user = userEvent.setup();
+    mockHistory.mockResolvedValue(page([
+      { ...ev(2, "removed", "a.com", "bob"), created_at: "2026-10-20T14:30:00Z" },
+      { ...ev(1, "added", "a.com", "alice"), created_at: "2026-10-20T09:00:00Z" },
+    ]));
+    panel();
+    await screen.findByText("evil.com");
+    await user.click(historyButton());
+
+    const list = await screen.findByRole("list", { name: "Change history" });
+    const times = [...list.querySelectorAll("time")];
+    expect(times.map((t) => t.textContent)).toEqual([
+      `Removed ${new Date("2026-10-20T14:30:00Z").toLocaleString()} by bob`,
+      `Added ${new Date("2026-10-20T09:00:00Z").toLocaleString()} by alice`,
+    ]);
+    expect(times[0].textContent).not.toBe(times[1].textContent);
   });
 });
