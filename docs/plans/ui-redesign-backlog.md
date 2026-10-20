@@ -113,7 +113,7 @@ Deferred:
 - The old Campaigns page threw React #185 on window resize (also on main, 2 of 4 runs each). That page was replaced by the Campaigns cycle below, which has no react-grid-layout; whether the crash is gone was not re-tested, it is only expected from the removed layout code.
 - `materialise_dashboard_snapshots` still runs nightly (02:00) but nothing reads the snapshot: remove or wire a reader.
 - Saved layout drops the reporters panel position when `top_reporters` is null; KPI cards leave ~40px empty space (fixed grid row height).
-- Contrast in shared components: the Dashboard itself was swept in 7 of 17 themes, the other 10 are not. The old Campaigns status chips (2.1 to 3.8:1) and metal's outlined labels (4.05:1) were measured on the replaced Campaigns page; the new page was swept in all 17 themes (see the Campaigns cycle).
+- Contrast in shared components: the Dashboard itself was swept in 7 of the 17 themes that existed then (the `lure` theme came later), the rest are not. The old Campaigns status chips (2.1 to 3.8:1) and metal's outlined labels (4.05:1) were measured on the replaced Campaigns page; the new page was swept in all 17 themes of the time (see the Campaigns cycle); the Settings cycle swept all 18, `lure` included.
 - Minor backend: stored CISO scope "AU|AU" refuses the "AU" alias; service-mailbox exclusion depends on DB collation and on `SUSPICIOUS_EMAIL` being set; reporter labels differing only in case are not disambiguated.
 
 ## Campaigns page cycle (2026-10-19)
@@ -132,7 +132,7 @@ Deferred:
 - Weekly dangerous series and country/region ranking for elevated users (as on the Dashboard); first and last seen in the campaigns table are within the selected period, not over the campaign's life.
 - `materialise_dashboard_snapshots` is still unread by this page too.
 - Unclassified and Unwanted use two blue-greys that differ mainly in lightness (about 1.4:1 between them in light); both are always labelled, but a point-shape or pattern cue in the map would separate them.
-- Contrast in shared components: the sidebar avatar initial is 2.7 to 4.35:1 in 8 themes; themed hairline dividers are decorative gradients.
+- Contrast in shared components: the sidebar avatar initial is 2.7 to 4.35:1 in 8 themes (the Settings sweep sees it again, 2.8:1 or more in 5); themed hairline dividers are decorative gradients.
 - Keyboard users reach only the first 200 messages in the point table (the cap keeps the DOM small): add a text filter or pagination.
 - `embeddingMap3d.gl.test.tsx` skips silently where the browser has no WebGL 2; CI should assert that it ran.
 - `mail-volume` still computes campaign bands that this page no longer reads (kept for old clients): keep them or stop computing them.
