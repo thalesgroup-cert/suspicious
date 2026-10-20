@@ -82,6 +82,19 @@ describe.each(NAMES)("accent used as text or mark in the %s theme", (name) => {
     expect(contrastRatio(getComputedStyle(await screen.findByRole("button", { name: "Test connection" })).color, paper), "Test connection").toBeGreaterThanOrEqual(4.5);
   });
 
+  it("Test connection stays readable while its request is running and the button is disabled", async () => {
+    const palette = setTheme();
+    const { testConnector } = await import("../connectors");
+    vi.mocked(testConnector).mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=configuration" });
+    const btn = await screen.findByRole("button", { name: "Test connection" });
+    await userEvent.click(btn);
+    await waitFor(() => expect(btn).toBeDisabled());
+    // MUI fades the colour over 250 ms; read it once settled.
+    await new Promise((r) => setTimeout(r, 400));
+    expect(contrastRatio(flatten(getComputedStyle(btn).color, palette.background.paper), palette.background.paper)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("the deliveries table header is readable on the theme's header tint", async () => {
     const palette = setTheme();
     renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=deliveries" });

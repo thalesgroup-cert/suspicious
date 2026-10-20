@@ -266,7 +266,8 @@ export function ConnectorDetail({
                       </Button>
                       <Button
                         variant="outlined"
-                        sx={{ color: accent.text }}
+                        // Disabled while the request runs; the theme's disabled grey is under 4.5:1 on paper.
+                        sx={{ color: accent.text, "&.Mui-disabled": { color: tabText } }}
                         onClick={() => test.mutate()}
                         disabled={test.isPending}
                         aria-describedby={draft ? testHintId : undefined}
