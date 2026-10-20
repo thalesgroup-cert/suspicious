@@ -50,6 +50,7 @@ const ListItemRow = React.memo(function ListItemRow({
   onDelete,
   deleting,
   deleteDisabled,
+  checkColor,
 }: {
   item: ListItem;
   selected: boolean;
@@ -59,9 +60,10 @@ const ListItemRow = React.memo(function ListItemRow({
   deleting: boolean;
   /** True while any removal or bulk run is in flight, so they never overlap. */
   deleteDisabled: boolean;
+  /** Checked-box colour, computed once by the parent so rows stay cheap and memoised. */
+  checkColor: string;
 }) {
   const theme = useTheme();
-  const accent = useAccent();
   const { enqueueSnackbar } = useSnackbar();
 
   return (
@@ -89,7 +91,7 @@ const ListItemRow = React.memo(function ListItemRow({
     >
       <Checkbox
         size="small"
-        sx={{ gridArea: "check", "&.Mui-checked": { color: accent.mark } }}
+        sx={{ gridArea: "check", "&.Mui-checked": { color: checkColor } }}
         checked={selected}
         onChange={() => onToggleSelect(item.id)}
         slotProps={{ input: { "aria-label": `Select ${item.value}` } }}
@@ -514,6 +516,8 @@ export function EditableListPanel({
             hidden
             ref={fileInput}
             type="file"
+            // The input sits inside the button: stop its programmatic click from bubbling back and firing the button again.
+            onClick={(e) => e.stopPropagation()}
             accept={fileAccept}
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -574,6 +578,7 @@ export function EditableListPanel({
                   onDelete={deleteOne}
                   deleting={deletingId === it.id && (removeMutation.isPending || bulkRunning)}
                   deleteDisabled={bulkRunning || removeMutation.isPending}
+                  checkColor={accent.mark}
                 />
               ))}
             </Box>

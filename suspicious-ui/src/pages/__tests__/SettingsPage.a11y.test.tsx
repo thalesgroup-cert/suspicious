@@ -274,16 +274,17 @@ describe("SettingsPage: structure for assistive technology", () => {
     });
   });
 
-  it("opens the file chooser from the keyboard on Import file", async () => {
+  it.each(["{Enter}", " "])("opens the file chooser once from the keyboard on Import file (key %j)", async (key) => {
     const user = userEvent.setup();
     await open("campaign_domains_allow");
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     const click = vi.spyOn(input, "click");
-    const trigger = screen.getByText("Import file").closest("[role=button], button, label") as HTMLElement;
+    const trigger = screen.getByRole("button", { name: "Import file" });
     trigger.focus();
     expect(trigger).toHaveFocus();
-    await user.keyboard("{Enter}");
-    expect(click).toHaveBeenCalled();
+    await user.keyboard(key);
+    // The input sits inside the button: its programmatic click must not bubble back and fire the button again.
+    expect(click).toHaveBeenCalledTimes(1);
   });
 
   it("names the add field of a list", async () => {
@@ -339,10 +340,26 @@ describe("SettingsPage: structure for assistive technology", () => {
     });
   });
 
-  it("keeps the deliveries Error column wide enough to read, scrolling the table sideways instead of crushing it", async () => {
-    await open("connectors?connector=misp&tab=deliveries");
-    const cell = (await screen.findByRole("cell", { name: "boom" })) as HTMLElement;
-    expect(cell.getBoundingClientRect().width).toBeGreaterThanOrEqual(100);
+  describe("deliveries table", () => {
+    it("at desktop width keeps the Error column readable; it was 79px when five columns shared a pane of about 520px", async () => {
+      await open("connectors?connector=misp&tab=deliveries");
+      const cell = (await screen.findByRole("cell", { name: "boom" })) as HTMLElement;
+      expect(cell.getBoundingClientRect().width).toBeGreaterThanOrEqual(100);
+    });
+
+    it("on a phone folds Case and Time into the Event cell so Status and Error are reachable without sideways scrolling", async () => {
+      await page.viewport(390, 800);
+      stubMatchMedia({ phone: true });
+      await open("connectors?connector=misp&tab=deliveries");
+      const region = await screen.findByRole("region", { name: "Deliveries table" });
+      const headers = within(region).getAllByRole("columnheader").map((h) => h.textContent);
+      expect(headers).toEqual(["Event", "Status", "Error"]);
+      const eventCell = within(region).getAllByRole("cell")[0];
+      expect(within(eventCell).getByRole("link", { name: /^Case #/ })).toBeVisible();
+      expect(region.scrollWidth).toBeLessThanOrEqual(region.clientWidth);
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+      expect(((await screen.findByRole("cell", { name: "boom" })) as HTMLElement).getBoundingClientRect().width).toBeGreaterThanOrEqual(90);
+    });
   });
 
   // The Refresh button sits straight on the shell, whose glow is up to 7% primary over the page colour.
