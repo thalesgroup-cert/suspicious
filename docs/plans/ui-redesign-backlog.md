@@ -9,13 +9,13 @@ Which parts of the UI no longer fit after the recent backend changes (IOC road, 
 - Dead or orphaned components in `suspicious-ui/src/features/*` and `shared/components`.
 
 ## Pages to modify
-- Pages whose data model changed: Investigation (verdict explanation, analysis health, sources), Dashboard (KPIs), Campaigns (campaign-detection connector), Settings (scoring panel, connectors, allow-lists).
+- Pages whose data model changed: Investigation (verdict explanation, analysis health, sources), Dashboard (KPIs), Campaigns (campaign-detection connector). Settings (scoring table, connectors, lists) was redone in the Settings page cycle below.
 
 ## Pages to create (candidates, to be validated)
-- Connectors status/delivery ledger and circuit-breaker view.
+- Connector circuit-breaker view. The Settings connectors panel now shows status labels and the last 10 deliveries per connector (Settings page cycle); breaker state is still not shown anywhere in the UI.
 - Analyzer health / failed-analyses overview.
 - Search page backed by Elasticsearch case search.
-- Allow-list management (domains, IPs) if not covered in Settings.
+- Allow-list management for IPs. Domains, campaign domains, file hashes and file types are managed in Settings; the backend has no IP list.
 
 ## Process
 Use `ways-of-working:start-task` per item; discuss with the user before building anything.
@@ -59,7 +59,6 @@ Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
 - Server-side paging: the fetch is page 1 with page_size 100 and filtering/paging happen client-side, so more than 100 matches are unreachable. Move filters and paging to the server.
 - Move `RecentSubmissionsList` to `shared/components` (Home imports it from features/home and it now imports features/submissions/CalmStatusChip).
 - Submissions drawer header uses the coloured StatusChip for DONE while the rows use the muted chip.
-- Submissions dropped the title avatar while Investigation and Settings keep theirs.
 - Nav drawer has no visible Close and its hamburger is covered while open.
 - Focus returns to BODY after a drawer opened by a link closes.
 - Reset shows for a column-header sort while the Filters chip and Sort select do not reflect it.
@@ -142,3 +141,27 @@ Deferred:
 - Query bounds (case id limit, limit ranges) are written in both the serializers and the service: one source.
 - Task 4 minors still open: the fog's initial `#000000` (overwritten from the theme before the first frame). The disabled point-table Select's reason is now reachable by keyboard and its colour is 4.5:1.
 - Chroma reads: every paged scan now fails closed (summary, volume, counts, PCA and neighbours return their empty, uncached payload when a page read fails); a retry or a partial-result marker for the PCA sample was not built.
+
+## Settings page cycle (2026-10-19)
+
+Shipped on `design/settings-page`: sections as URLs (`/settings/<section>`, bare path redirects) with a grouped nav and a phone picker, a status strip built from fetched data, single-entry remove with Undo, confirmations (bulk delete, feeder off, discard) that state the consequence, honest batch counts (failed rows stay selected), an unsaved-changes guard, an analyzer scoring table (shares, sort, search, weight-sum guard in the UI and in `AnalyzerSettingsDetailView.patch`), a connectors master/detail with bundled logos, Overview, Configuration and Deliveries tabs and a sticky save bar, redone lists and CISO users, and a feeder status card. The only backend change is the weight-sum guard. Contrast swept in 18 themes at 1440 and 390: `docs/plans/settings-contrast-2026-10.tsv`.
+
+Deferred:
+- `campaign_domains_allow` semantics: besides skipping campaign detection it is also unioned into the deny-listed set at scoring (`case_score_calculation.py:94-110`), which can turn a newsletter domain into a Dangerous verdict. Product decision pending; the UI gives that list no purpose sentence until it is made.
+- Allow-over-deny precedence is not stated anywhere in the UI copy.
+- Per-list empty-state copy: every list says "No entries yet. Paste values above or import a file." and none says what the list does.
+- The analyzer `tier` field (1 to 3) is accepted by `PATCH /settings/analyzers/<id>/` but cannot be edited in the UI.
+- Feeder facts: Reason shows only when offline. When `feeder_status` is "degraded" the payload's `checks` (IMAP healthy/configured, MinIO ok) are not shown.
+- Relative times ("Last poll", "Last checked") use the browser clock; a skewed client clock misstates them. The payload's `checked_at` could be the reference.
+- Test connection tests the saved configuration only (the UI says so); an endpoint that accepts a draft would let users test before saving.
+- The optional-settings disclosure resets when the tab changes, because the Configuration tab unmounts.
+- The weight-sum guard race is closed with a transaction and `select_for_update`, but the tests are sequential: nothing exercises two concurrent PATCHes.
+- Brand-logo usage needs the owner's confirmation before merge (`features/settings/logos/LOGOS.md`: Chroma favicon carries a Streamline marker, TheHive is cropped to its emblem, Elasticsearch is filled with the brand colour on a white tile).
+- Connector `description` text is cleaned in the UI (`cleanDescription`); the manifests themselves should carry final copy.
+- `InnerCard` in `features/settings/components/cards.tsx` still uses the literal `alpha("#fff", 0.025)` in dark mode.
+- Shared `FeederHealthBadge`: the dot loses its tone under themes that override `MuiChip.root` colour (cyber, metal, future, high_contrast). Settings now uses `StatusLabel`; Home still uses the badge.
+- Shared visually-hidden helper: eight local copies (Settings: ConnectorOverview, CisoUsersPanel, ConnectorDeliveries, FactList, SettingsNav, ScoringTable, plus the inline `:empty` rule in EditableListPanel; Campaigns: PointTable, EmbeddingMap3D). `@mui/utils` has one but is not a direct dependency.
+- Profile has no unsaved-changes guard; `UnsavedProvider`, `useReportUnsaved` and `ConfirmDialog` from `features/settings` could be reused there.
+- Contrast in shared components and theme definitions, listed in `settings-contrast-2026-10.tsv` and not changed: outlined field borders (MUI `notchedOutline` in `themes.ts`, 1.3 to 3:1 in 17 themes), switch thumb and track (MUI Switch palette, 1.0 to 3:1 in most themes), input placeholders (MUI default opacity, 2.6 to 4.5:1 in 8 themes), the sidebar avatar initial (2.8 to 4.4:1), and contained button labels where the theme's `contrastText` is under 4.5:1 on its fill (3.0 to 4.4:1 in about 7 themes; `mkLight`/`mkDark` cannot set `primary.contrastText`, as noted under the Home cycle).
+- The sweep does not cover snackbar variants, focus indicators, or hover states other than the bulk bar.
+
