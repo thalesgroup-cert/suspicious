@@ -366,12 +366,11 @@ export function ScoringTable() {
         </Table>
       </TableContainer>
 
-      {error ? <Alert severity="error" role="alert">{error}</Alert> : null}
-
-      {/* Mounted before any result exists so screen readers announce the text when it lands. */}
-      <Typography role="status" variant="body2" color="text.secondary">{status}</Typography>
-
       <ActionBar sx={{ alignItems: "center", px: 2, borderColor: modified.length ? "primary.main" : "divider" }}>
+        {/* Inside the sticky bar, not under the table: on a long table a message below it sits off screen. The status is mounted
+            before any result exists so screen readers announce the text when it lands. */}
+        {error ? <Alert severity="error" role="alert" sx={{ flexBasis: "100%" }}>{error}</Alert> : null}
+        <Typography role="status" variant="body2" color="text.secondary" sx={{ flexBasis: "100%", "&:empty": { position: "absolute", width: "1px", height: "1px", m: 0, overflow: "hidden", clip: "rect(0 0 0 0)" } }}>{status}</Typography>
         <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
           {modified.length
             ? `${modified.length} unsaved change${modified.length === 1 ? "" : "s"}`

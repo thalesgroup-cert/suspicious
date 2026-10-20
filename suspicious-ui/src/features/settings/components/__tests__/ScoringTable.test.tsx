@@ -164,6 +164,16 @@ describe("ScoringTable", () => {
     expect(updateAnalyzerWeight).not.toHaveBeenCalled();
   });
 
+  it("shows the refusal and the save result inside the sticky action bar, where a long table cannot push them off screen", async () => {
+    const user = await setup([A(1, "Alpha", 0.2), A(2, "Bravo", 0.3)]);
+    fireEvent.change(num("Alpha"), { target: { value: "0" } });
+    fireEvent.change(num("Bravo"), { target: { value: "0" } });
+    await user.click(screen.getByRole("button", { name: "Save all" }));
+    const bar = document.querySelector("[data-panel-actions]")!;
+    expect(bar).toContainElement(screen.getByRole("alert"));
+    expect(bar).toContainElement(screen.getByRole("status"));
+  });
+
   it("allows one analyzer at 0 while another is above 0", async () => {
     const user = await setup();
     fireEvent.change(num("Alpha"), { target: { value: "0" } });
