@@ -16,6 +16,18 @@ export type ListItem = {
   id: string;
   value: string;
   created_at?: string;
+  /** Username of whoever added the entry; null when unknown or the list is read-only. */
+  added_by?: string | null;
+};
+
+/** One add or remove recorded by the backend audit trail (starts when the feature was deployed). */
+export type ListChange = {
+  id: number;
+  value: string;
+  action: "added" | "removed";
+  /** Snapshot of the acting user's name; may be empty. */
+  username: string;
+  created_at: string;
 };
 
 export type CisoUser = {
@@ -82,7 +94,7 @@ type SectionResponseMap = {
   ciso_users: CisoUser[];
 };
 
-type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+export type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 /**
  * Fetch every page of a paginated list endpoint and return the flattened array.
@@ -123,6 +135,14 @@ export async function removeItem(
   id: string
 ) {
   const res = await api.delete(`/settings/list/${section}/${id}/`);
+  return res.data;
+}
+
+export async function fetchListHistory(
+  section: EditableListSection,
+  page: number
+): Promise<Paginated<ListChange>> {
+  const res = await api.get<Paginated<ListChange>>(`/settings/list/${section}/history/?page=${page}&page_size=20`);
   return res.data;
 }
 

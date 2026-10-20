@@ -9,6 +9,7 @@ vi.mock("@/features/settings/api", () => ({
   addItems: vi.fn(),
   removeItem: vi.fn(),
   addFromFile: vi.fn(),
+  fetchListHistory: vi.fn(),
 }));
 
 import { listItems } from "@/features/settings/api";

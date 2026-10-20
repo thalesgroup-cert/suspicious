@@ -13,6 +13,7 @@ vi.mock("@/api/client", () => ({
 import { api } from "@/api/client";
 import {
   addItems,
+  fetchListHistory,
   listItems,
   listAnalyzers,
   removeItem,
@@ -28,6 +29,15 @@ const mockDelete = vi.mocked(api.delete);
 describe("settings api helpers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("fetchListHistory(section, page) requests one page of the history endpoint", async () => {
+    const body = { count: 0, next: null, previous: null, results: [] };
+    mockGet.mockResolvedValueOnce({ data: body });
+
+    await expect(fetchListHistory("domains_allow", 2)).resolves.toEqual(body);
+
+    expect(mockGet).toHaveBeenCalledWith("/settings/list/domains_allow/history/?page=2&page_size=20");
   });
 
   it("listItems(section) pages a paginated /settings/list/<section>/", async () => {

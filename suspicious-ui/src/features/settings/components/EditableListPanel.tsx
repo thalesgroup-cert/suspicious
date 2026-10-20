@@ -38,6 +38,7 @@ import { EmptyList } from "@/features/settings/components/cards";
 import { useAccent } from "@/features/settings/useAccent";
 import { EntryDate } from "@/features/settings/components/EntryDate";
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
+import { ListHistory } from "@/features/settings/components/ListHistory";
 
 function parseMulti(input: string) {
   return input.split(/[\n,; ]+/g).map((s) => s.trim()).filter(Boolean);
@@ -70,15 +71,12 @@ const ListItemRow = React.memo(function ListItemRow({
     <Box
       component="li"
       sx={{
-        // Date sits beside the value on wide screens and under it on phones, so long lists stay dense.
         display: "grid",
         alignItems: "center",
         columnGap: 0.5,
-        gridTemplateColumns: { xs: "auto minmax(0, 1fr) auto auto", sm: "auto minmax(0, 1fr) auto auto auto" },
-        gridTemplateAreas: {
-          xs: '"check value copy del" ". date date date"',
-          sm: '"check value date copy del"',
-        },
+        gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
+        // Added-by sits on its own line under the value, on every width.
+        gridTemplateAreas: '"check value copy del" ". date date date"',
         pl: 0.5,
         pr: 1,
         py: 0.25,
@@ -106,7 +104,8 @@ const ListItemRow = React.memo(function ListItemRow({
       <EntryDate
         iso={item.created_at}
         label="Added"
-        sx={{ gridArea: "date", pb: { xs: 0.5, sm: 0 }, pr: { sm: 1 }, whiteSpace: "nowrap" }}
+        by={item.added_by}
+        sx={{ gridArea: "date", pb: 0.5, pl: 0.5 }}
       />
 
       <IconButton
@@ -585,6 +584,8 @@ export function EditableListPanel({
           </Box>
         </Box>
       )}
+
+      <ListHistory section={section} />
 
       <ConfirmDialog
         open={confirmBulk !== null}

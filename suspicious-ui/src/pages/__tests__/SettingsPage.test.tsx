@@ -22,6 +22,7 @@ vi.mock("@/features/settings/api", () => ({
   addItems: vi.fn(),
   removeItem: vi.fn(),
   addFromFile: vi.fn(),
+  fetchListHistory: vi.fn(),
   getFeederStatus: vi.fn(),
   setFeederStatus: vi.fn(),
   getFeederHealth: vi.fn(),
