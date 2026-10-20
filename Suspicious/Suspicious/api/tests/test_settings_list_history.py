@@ -129,6 +129,14 @@ class ListHistoryTests(TestCase):
         for section in ("nope", "watcher_legit_domains", "watcher_monitored_domains", "ciso_users"):
             self.assertEqual(self.ca.get(self._hist(section)).status_code, 400, section)
 
+    def test_value_over_512_chars_is_rejected_and_writes_nothing(self):
+        long_value = "a" * 600 + ".example"
+        r = self.ca.post(self._list(), {"values": [long_value]}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("512", str(r.json()))
+        self.assertEqual(AllowListDomain.objects.count(), 0)
+        self.assertEqual(ListChangeLog.objects.count(), 0)
+
     def test_read_only_lists_have_null_added_by(self):
         wd, _ = Domain.objects.get_or_create(value="w.example")
         WatcherLegitDomain.objects.create(domain=wd, watcher_id=1)

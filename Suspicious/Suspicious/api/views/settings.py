@@ -167,10 +167,12 @@ class AnalyzerSettingsDetailView(generics.UpdateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Scoring divides by the summed weight of the analyzers that ran, so an
-        # all-zero active set would raise ValueError on every case. Inactive
-        # analyzers are never scheduled and so cannot hold the sum up. The active
-        # rows are locked in pk order (one query, own row included, so two
+        # At least one active analyzer must keep a weight above 0. This guards the
+        # total over ALL active analyzers only: scoring divides per kind of
+        # evidence, so zeroing every analyzer that handles one kind (e.g. all file
+        # analyzers) is still accepted and makes that evidence score as Safe.
+        # Inactive analyzers are never scheduled and so cannot hold the sum up. The
+        # active rows are locked in pk order (one query, own row included, so two
         # concurrent updates serialise instead of deadlocking) and the check and
         # the save share one transaction, so two requests cannot each see the
         # other's old weight and together zero the sum.

@@ -15,7 +15,7 @@ Which parts of the UI no longer fit after the recent backend changes (IOC road, 
 - Connector circuit-breaker view. The Settings connectors panel now shows status labels and the last 10 deliveries per connector (Settings page cycle); breaker state is still not shown anywhere in the UI.
 - Analyzer health / failed-analyses overview.
 - Search page backed by Elasticsearch case search.
-- Allow-list management for IPs. Domains, campaign domains, file hashes and file types are managed in Settings; the backend has no IP list.
+- Allow-list management for IPs in the UI. Domains, campaign domains, file hashes and file types are managed in Settings; the backend already has the IP list (`AllowListIp`, section `ips_allow`), only the UI panel is missing.
 
 ## Process
 Use `ways-of-working:start-task` per item; discuss with the user before building anything.
@@ -169,3 +169,7 @@ Deferred:
 ## Follow-ups raised during the Settings cycle (2026-10-20)
 - Allow/deny list tables: `user` FK is CASCADE, so deleting a user deletes the entries they added with no `ListChangeLog` row. Change to `SET_NULL` (nullable `user`, check readers of `.user`) in its own migration, then log removals made by the cascade or keep the entries.
 - Allow-list / campaign / MISP / scoring majority rule: approved design in `docs/plans/2026-10-20-allowlist-launch-misp-scoring-design.md`; implement on a new branch from main.
+
+## Settings follow-ups
+
+- Per-type weight guard: the analyzer weight guard only keeps the total over all active analyzers above 0, but scoring divides per kind of evidence (`processing.py`), so zeroing every file or hash analyzer scores that evidence as Safe. A per-type guard needs a data-type field on `Analyzer` to know which analyzers handle which kind.

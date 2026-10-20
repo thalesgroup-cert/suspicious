@@ -24,7 +24,8 @@ class ListChangeLogSerializer(serializers.ModelSerializer):
 
 class SettingsListBulkCreateSerializer(serializers.Serializer):
     values = serializers.ListField(
-        child=serializers.CharField(),
+        # ListChangeLog.value is 512 chars: a longer entry would 500 the create instead of answering 400.
+        child=serializers.CharField(max_length=512),
         allow_empty=False,
     )
 
