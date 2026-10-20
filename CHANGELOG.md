@@ -107,6 +107,11 @@ management moving to HashiCorp Vault.
   commands with built-in polling, `suspicious-get-verdict/ticket/report`,
   `suspicious-challenge`, and the `url`/`ip`/`domain`/`file` reputation
   commands returning DBot scores.
+- **`xsoar` connector** — opens one Cortex XSOAR incident per finalised case at
+  or above `min_verdict` (verdict, rationale, per-observable verdicts, link to
+  the case), so cases that start in Suspicious reach the SOC. Skips cases an
+  XSOAR playbook submitted; records the incident per case in the new generic
+  `ConnectorLink` table so a replayed event opens nothing.
 
 #### CI/CD
 - CI consolidated onto a single matrix workflow (ruff, Django suite, feeder

@@ -99,6 +99,8 @@ returns the verdict Suspicious already holds for a `url`, `ip`, `domain` or `has
 
 A ready-made integration pack lives in the repository at `integrations/xsoar/Packs/Suspicious`. It wraps the calls above as playbook commands: submit with built-in polling (a playbook task that waits for the verdict), `suspicious-get-verdict`, `-get-ticket`, `-get-report`, `-challenge`, and the `url`, `ip`, `domain` and `file` reputation commands that return DBot scores. Setup, the account each command needs and playbook recipes are in the pack's README.
 
+For the other direction, Suspicious opens an XSOAR incident for each finalised case at or above a verdict you choose (default `Suspicious`) through the `xsoar` connector. Enable and configure it in Settings, Connectors; the setup is in the connectors README. Cases a playbook submitted through the pack are not pushed back.
+
 ## Limits and good practice
 
 - **Rate limit:** 3000 requests per hour per user. Polling every 15 seconds uses 240 an hour per open case; every 60 seconds, 60.
