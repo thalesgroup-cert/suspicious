@@ -119,7 +119,7 @@ export function ConnectorDeliveries({ name }: { name: string }) {
                     <StatusLabel size="small" tone={TONE[d.status] ?? "neutral"} label={DELIVERY_STATUS_LABEL[d.status] ?? d.status} />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap", ...wideOnly }}>{when(d)}</TableCell>
-                  <TableCell sx={{ minWidth: 180, maxWidth: 280 }}>
+                  <TableCell sx={{ minWidth: { md: 180 }, maxWidth: 280 }}>
                     {d.error && (
                       // The text stays whole in the DOM (assistive tech reads it all); only the view is clamped.
                       <Box
