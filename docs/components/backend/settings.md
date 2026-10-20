@@ -16,4 +16,6 @@ Editable lists (`domains_allow`, `domains_deny`, `campaign_domains_allow`, `emai
 
 The history lives in the append-only `ListChangeLog` table, not in a status flag on the list tables, so the scoring and collection code that reads them is unaffected. Duplicates and Watcher conflicts that are skipped on create write nothing. The `username` is a snapshot: it stays readable after the account is deleted (`user` becomes `NULL`).
 
+Only changes made through the Settings API are logged. Admin edits, CSV imports and code that writes the list tables directly leave no row. Deleting a user account cascades (the `user` foreign key of the six list tables is `CASCADE`) and removes the entries that user added, with no log row; the earlier `added` rows stay, with the username snapshot.
+
 Limit: history starts when this version is deployed. Additions made earlier still show `added_by`, but removals made earlier were never recorded and cannot be recovered. The table is read-only in the Django admin.

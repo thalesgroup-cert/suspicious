@@ -46,7 +46,7 @@ Maps URL patterns to views for routing HTTP requests within the app.
 Registers the models for Django admin interface.
 
 ### `ListChangeLog`
-Append-only audit trail of additions and removals on the Settings allow/deny lists. Written by `api/utils/settings_service.py` and exposed at `GET /api/settings/list/<section>/history/`; `added_by` on the list rows comes from the row's own `user`. History starts when migration `0013_listchangelog` is applied: earlier removals were not recorded. Details in `docs/components/backend/settings.md`.
+Append-only audit trail of additions and removals on the Settings allow/deny lists. Written by `api/utils/settings_service.py` and exposed at `GET /api/settings/list/<section>/history/`; `added_by` on the list rows comes from the row's own `user`. Only changes made through the Settings API are logged; deleting a user account cascades to the entries that user added (the list tables' `user` FK is `CASCADE`) without a log row. History starts when migration `0013_listchangelog` is applied: earlier removals were not recorded. Details in `docs/components/backend/settings.md`.
 
 ### `settings_utils/domain.py`
 Handles the domain

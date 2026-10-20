@@ -146,3 +146,44 @@ class ListHistoryTests(TestCase):
         small = count()
         self._add(self.cb, *[f"d{i}.example" for i in range(20)])
         self.assertEqual(count(), small)
+
+
+class OtherSectionsHistoryTests(TestCase):
+    def setUp(self):
+        self.alice = _admin("alice")
+        self.c = _client(self.alice)
+
+    def _roundtrip(self, section, posted, shown):
+        url = reverse("settings-list", kwargs={"section": section})
+        self.assertEqual(self.c.post(url, {"values": [posted]}, format="json").status_code, 201)
+        rows = self.c.get(url).json()["results"]
+        self.assertEqual([r["value"] for r in rows], [shown])
+        self.assertEqual(ListChangeLog.objects.get(section=section, action="added").value, shown)
+        self.assertEqual(rows[0]["added_by"], "alice")
+        r = self.c.delete(reverse("settings-list-delete", kwargs={"section": section, "item_id": rows[0]["id"]}))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(ListChangeLog.objects.get(section=section, action="removed").value, shown)
+
+    def test_ip_logs_the_normalised_value_the_list_shows(self):
+        self._roundtrip("ips_allow", "2001:0db8:0000:0000:0000:0000:0000:0001", "2001:db8::1")
+
+    def test_hash_section_logs_add_and_remove(self):
+        self._roundtrip("emails_files_allow", "a" * 64, "a" * 64)
+
+    def test_filetype_section_logs_add_and_remove(self):
+        self._roundtrip("filetypes_allow", "pdf", "pdf")
+
+    def test_history_query_count_constant_for_1_vs_21_events(self):
+        url = reverse("settings-list-history", kwargs={"section": "domains_allow"})
+
+        def count():
+            with CaptureQueriesContext(connection) as ctx:
+                self.assertEqual(self.c.get(url, {"page_size": 100}).status_code, 200)
+            return len(ctx)
+
+        ListChangeLog.objects.create(section="domains_allow", value="a", action="added", username="alice")
+        small = count()
+        ListChangeLog.objects.bulk_create(
+            ListChangeLog(section="domains_allow", value=f"v{i}", action="added", username="alice") for i in range(20)
+        )
+        self.assertEqual(count(), small)
