@@ -6,7 +6,7 @@ import { Link } from "react-router";
 
 import { renderWithProviders } from "@/test/utils";
 import { UnsavedProvider, useUnsavedKeys } from "@/features/settings/unsaved";
-import { ConnectorDetail } from "../ConnectorDetail";
+import { ConnectorDrawer } from "../ConnectorDrawer";
 import type { Connector } from "../connectors";
 
 vi.mock("../connectors", async (importOriginal) => {
@@ -52,16 +52,18 @@ const CONNECTOR: Connector = {
 type Tab = "overview" | "configuration" | "deliveries";
 
 // The active tab lives in the URL, so a test picks its tab by path.
-function renderDetail(tab: Tab, props: Partial<React.ComponentProps<typeof ConnectorDetail>> = {}) {
-  return renderWithProviders(<ConnectorDetail connector={CONNECTOR} {...props} />, {
+function renderDetail(tab: Tab, props: Partial<React.ComponentProps<typeof ConnectorDrawer>> = {}) {
+  return renderWithProviders(<ConnectorDrawer connector={CONNECTOR} onClose={vi.fn()} {...props} />, {
     initialPath: `/settings/connectors?tab=${tab}`,
   });
 }
 
-describe("ConnectorDetail", () => {
+describe("ConnectorDrawer", () => {
   it("renders connector identity and config fields", async () => {
     renderDetail("configuration");
-    expect(screen.getByRole("heading", { level: 3, name: "misp" })).toBeInTheDocument();
+    // The drawer is a dialog whose title is the connector name.
+    const dialog = screen.getByRole("dialog", { name: "misp" });
+    expect(within(dialog).getByRole("heading", { level: 2, name: "misp" })).toBeInTheDocument();
     expect(await screen.findByLabelText("API Key")).toBeInTheDocument();
   });
 
@@ -94,12 +96,14 @@ describe("ConnectorDetail", () => {
     expect(screen.queryByLabelText("API Key")).not.toBeInTheDocument();
   });
 
-  it("shows a back button only when onBack is provided", () => {
-    renderDetail("overview", { onBack: vi.fn() });
-    expect(screen.getByLabelText("Back to connector list")).toBeInTheDocument();
+  it("has a close button named after the connector and asks to close when it is pressed", async () => {
+    const onClose = vi.fn();
+    renderDetail("overview", { onClose });
+    await userEvent.click(screen.getByRole("button", { name: "Close misp" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("omits the back button when onBack is not provided", () => {
+  it("has no back button: the drawer closes instead of swapping places with a list", () => {
     renderDetail("overview");
     expect(screen.queryByLabelText("Back to connector list")).not.toBeInTheDocument();
   });
@@ -304,11 +308,12 @@ describe("ConnectorDetail", () => {
     });
   });
 
-  it("has a heading outline without skipped levels: the connector name is the only h3, groups are legends", async () => {
+  it("has a heading outline without skipped levels: the title is the dialog's own h2, groups are legends", async () => {
     renderWithProviders(
       <>
         <h2>Connectors</h2>
-        <ConnectorDetail
+        <ConnectorDrawer
+          onClose={vi.fn()}
           connector={{
             ...CONNECTOR,
             config_schema: [
@@ -321,12 +326,11 @@ describe("ConnectorDetail", () => {
       { initialPath: "/settings/connectors?tab=configuration" },
     );
     await screen.findByLabelText("Ollama URL");
-    const levels = screen.getAllByRole("heading").map((h) => [Number(h.tagName[1]), h.textContent]);
-    expect(levels).toEqual([
-      [2, "Connectors"],
-      [3, "misp"],
-    ]);
-    expect(screen.getByRole("group", { name: "Ollama" })).toBeInTheDocument();
+    // The dialog is a separate modal subtree: it is its own region, and the page behind it is hidden from assistive technology.
+    const dialog = screen.getByRole("dialog", { name: "misp" });
+    const levels = within(dialog).getAllByRole("heading").map((h) => [Number(h.tagName[1]), h.textContent]);
+    expect(levels).toEqual([[2, "misp"]]);
+    expect(within(dialog).getByRole("group", { name: "Ollama" })).toBeInTheDocument();
   });
 
   describe("unsaved draft", () => {
@@ -338,7 +342,7 @@ describe("ConnectorDetail", () => {
         <UnsavedProvider>
           <Keys />
           <Link to="/elsewhere">Leave</Link>
-          <ConnectorDetail connector={CONNECTOR} />
+          <ConnectorDrawer connector={CONNECTOR} onClose={vi.fn()} />
         </UnsavedProvider>,
         { routePath: "*", initialPath: "/settings/connectors?tab=configuration" },
       );
@@ -365,8 +369,8 @@ describe("ConnectorDetail", () => {
     it("asks before leaving with a draft and stays when cancelled", async () => {
       const { router } = setup();
       await userEvent.type(await screen.findByLabelText("API Key"), "x");
-      await userEvent.click(screen.getByRole("link", { name: "Leave" }));
-      const dialog = await screen.findByRole("dialog");
+      await userEvent.click(screen.getByRole("link", { name: "Leave", hidden: true }));
+      const dialog = await screen.findByRole("dialog", { name: "Discard unsaved changes?" });
       expect(within(dialog).getByText("Discard unsaved changes?")).toBeInTheDocument();
       await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
       expect(router!.state.location.pathname).toBe("/settings/connectors");

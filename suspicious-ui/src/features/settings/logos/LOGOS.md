@@ -23,8 +23,8 @@ use the theme primary at the same opacity.
 
 | Connector | Accent | Source |
 |---|---|---|
-| `thehive` | `#F0D030` | Dominant colour of `thehive-logo.png` (the yellow bee, sampled from the pixels). |
-| `misp` | `#2FA1DB` | The blue fill (`fill:#2fa1db`) in `misp-logo.svg`; the grey `#5f6062` wordmark is neutral. |
-| `chromadb` | `#FF6446` | The `#ff6446` fill in `chroma-logo.svg` (the file also uses `#ffde2d` and `#327eff`). |
-| `watcher` | `#1F5FA0` | Dominant colour of `watcher-logo.png` (the blue disc, sampled from the pixels). |
-| `case_search` | `#005571` | The brand colour already set in `elasticsearch-logo.svg` (Simple Icons data). |
+| thehive | `#F0D030` | Dominant colour of `thehive-logo.png` (the yellow bee, sampled from the pixels). |
+| misp | `#2FA1DB` | The blue fill (`fill:#2fa1db`) in `misp-logo.svg`; the grey `#5f6062` wordmark is neutral. |
+| chromadb | `#FF6446` | The `#ff6446` fill in `chroma-logo.svg` (the file also uses `#ffde2d` and `#327eff`). |
+| watcher | `#1F5FA0` | Dominant colour of `watcher-logo.png` (the blue disc, sampled from the pixels). |
+| case_search | `#005571` | The brand colour already set in `elasticsearch-logo.svg` (Simple Icons data). |

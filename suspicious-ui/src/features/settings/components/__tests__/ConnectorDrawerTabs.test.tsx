@@ -6,7 +6,8 @@ import { page } from "@vitest/browser/context";
 import { renderWithProviders } from "@/test/utils";
 import { themes } from "@/styles/themes";
 import { contrastRatio, flatten } from "@/shared/lib/contrast";
-import { ConnectorDetail } from "../ConnectorDetail";
+import { ConnectorDrawer } from "../ConnectorDrawer";
+import { ConnectorDeliveries } from "../ConnectorDeliveries";
 import type { ConfigField, Connector, ConnectorDelivery } from "../connectors";
 
 vi.mock("../connectors", async (importOriginal) => {
@@ -52,7 +53,7 @@ const CONNECTOR: Connector = {
 type Tab = "overview" | "configuration" | "deliveries";
 function renderDetail(tab: Tab | string | null, connector: Connector = CONNECTOR, props = {}) {
   const query = tab === null ? "" : `?tab=${tab}`;
-  return renderWithProviders(<ConnectorDetail connector={connector} {...props} />, {
+  return renderWithProviders(<ConnectorDrawer connector={connector} onClose={vi.fn()} {...props} />, {
     initialPath: `/settings/connectors${query}`,
     routePath: "*",
   });
@@ -206,9 +207,10 @@ describe("overview", () => {
 });
 
 describe("configuration", () => {
+  // Not named ai_narration: that connector has its own provider switch (ProviderSwitch.test.tsx); this is the generic grouping.
   const AI: Connector = {
     ...CONNECTOR,
-    name: "ai_narration",
+    name: "narrator",
     config_schema: [
       field("ollama_url", { type: "url" }),
       field("ollama_model"),
@@ -355,7 +357,8 @@ describe("deliveries", () => {
       delivery(2, { status: "failed", error: "HTTP 500 from MISP" }),
       delivery(3, { status: "skipped" }),
     ]);
-    renderDetail("deliveries");
+    // The drawer is 600px wide, under the 720px container breakpoint, so it shows the folded layout (below); the five columns need the table on its own.
+    renderWithProviders(<ConnectorDeliveries name="misp" />);
     const table = await screen.findByRole("table", { name: /deliveries/i });
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Event", "Case", "Status", "Time", "Error",
@@ -370,6 +373,15 @@ describe("deliveries", () => {
     expect(within(table).getAllByRole("row")).toHaveLength(2);
     expect(within(table).queryByText("Delivered")).not.toBeInTheDocument();
     expect(within(table).getByText("Failed")).toBeInTheDocument();
+  });
+
+  it("folds Case and Time into the Event cell inside the 600px drawer", async () => {
+    const { listDeliveries } = await import("../connectors");
+    vi.mocked(listDeliveries).mockResolvedValueOnce([delivery(1)]);
+    renderDetail("deliveries");
+    const table = await screen.findByRole("table", { name: /deliveries/i });
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Event", "Status", "Error"]);
+    expect(within(within(table).getAllByRole("cell")[0]).getByRole("link", { name: "Case #1" })).toBeVisible();
   });
 
   it("says when no delivery failed", async () => {

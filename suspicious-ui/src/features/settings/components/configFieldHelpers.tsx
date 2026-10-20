@@ -69,6 +69,8 @@ export function ConfigFieldInput({
         sx={topLabelSx(accent.text)}
         slotProps={{
           inputLabel: { shrink: true },
+          // data-field lets the setup checklist find the input by its config key.
+          htmlInput: { "data-field": field.key },
           input: {
             // Beside the box, not in the helper text, so a screen reader meets it with the field.
             endAdornment: (
@@ -87,7 +89,7 @@ export function ConfigFieldInput({
         <Switch
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
-          slotProps={{ input: { "aria-label": label } }}
+          slotProps={{ input: { "aria-label": label, "data-field": field.key } as object }}
         />
         <Box>
           <Typography variant="body2">{label}</Typography>
@@ -109,7 +111,7 @@ export function ConfigFieldInput({
       error={Boolean(error)}
       helperText={<Help text={field.help} fieldKey={field.key} error={error} />}
       sx={topLabelSx(accent.text)}
-      slotProps={{ inputLabel: { shrink: true } }}
+      slotProps={{ inputLabel: { shrink: true }, htmlInput: { "data-field": field.key } }}
       onChange={(e) =>
         onChange(field.type === "int" ? Number(e.target.value) : e.target.value)
       }

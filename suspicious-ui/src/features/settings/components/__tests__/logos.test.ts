@@ -31,6 +31,13 @@ describe("bundled connector logos", () => {
     for (const r of rows) expect(names.has(r), r).toBe(true);
   });
 
+  it("records every glow accent as a hex colour in LOGOS.md, with its connector", () => {
+    for (const [name, l] of Object.entries(CONNECTOR_LOGOS)) {
+      expect(l.accent, name).toMatch(/^#[0-9A-F]{6}$/);
+      expect(provenance, name).toMatch(new RegExp(`^\\| ${name} \\| \`${l.accent}\` \\|`, "m"));
+    }
+  });
+
   it("keeps every file at most 20 kB", async () => {
     for (const url of Object.values(files)) {
       const buf = await (await fetch(url)).arrayBuffer();

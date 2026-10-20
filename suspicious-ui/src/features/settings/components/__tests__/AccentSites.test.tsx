@@ -20,7 +20,7 @@ vi.mock("../connectors", () => ({
   ]),
 }));
 import { ConfirmDialog } from "../ConfirmDialog";
-import { ConnectorDetail } from "../ConnectorDetail";
+import { ConnectorDrawer } from "../ConnectorDrawer";
 import { EditableListPanel } from "../EditableListPanel";
 import { ScoringTable } from "../ScoringTable";
 import type { Connector } from "../connectors";
@@ -42,7 +42,7 @@ describe.each(NAMES)("accent used as text or mark in the %s theme", (name) => {
 
   it("connector tabs: selected label 4.5:1, indicator 3:1, unselected label 4.5:1", async () => {
     const palette = setTheme();
-    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=overview" });
+    renderWithProviders(<ConnectorDrawer connector={conn} onClose={() => undefined} />, { initialPath: "/settings/connectors?tab=overview" });
     const paper = palette.background.paper;
     const selected = screen.getByRole("tab", { name: "Overview" });
     const other = screen.getByRole("tab", { name: "Deliveries" });
@@ -54,7 +54,7 @@ describe.each(NAMES)("accent used as text or mark in the %s theme", (name) => {
 
   it("documentation and case links are readable as text", async () => {
     const palette = setTheme();
-    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=overview" });
+    renderWithProviders(<ConnectorDrawer connector={conn} onClose={() => undefined} />, { initialPath: "/settings/connectors?tab=overview" });
     const docs = await screen.findByRole("link", { name: /docs\.example/ });
     expect(contrastRatio(getComputedStyle(docs).color, palette.background.paper)).toBeGreaterThanOrEqual(4.5);
   });
@@ -78,7 +78,7 @@ describe.each(NAMES)("accent used as text or mark in the %s theme", (name) => {
     const list = renderWithProviders(<EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="x" />);
     expect(contrastRatio(getComputedStyle(await screen.findByRole("button", { name: "Import file" })).color, paper), "Import file").toBeGreaterThanOrEqual(4.5);
     list.unmount();
-    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=configuration" });
+    renderWithProviders(<ConnectorDrawer connector={conn} onClose={() => undefined} />, { initialPath: "/settings/connectors?tab=configuration" });
     expect(contrastRatio(getComputedStyle(await screen.findByRole("button", { name: "Test connection" })).color, paper), "Test connection").toBeGreaterThanOrEqual(4.5);
   });
 
@@ -86,7 +86,7 @@ describe.each(NAMES)("accent used as text or mark in the %s theme", (name) => {
     const palette = setTheme();
     const { testConnector } = await import("../connectors");
     vi.mocked(testConnector).mockReturnValue(new Promise(() => {}));
-    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=configuration" });
+    renderWithProviders(<ConnectorDrawer connector={conn} onClose={() => undefined} />, { initialPath: "/settings/connectors?tab=configuration" });
     const btn = await screen.findByRole("button", { name: "Test connection" });
     await userEvent.click(btn);
     await waitFor(() => expect(btn).toBeDisabled());
@@ -97,7 +97,7 @@ describe.each(NAMES)("accent used as text or mark in the %s theme", (name) => {
 
   it("the deliveries table header is readable on the theme's header tint", async () => {
     const palette = setTheme();
-    renderWithProviders(<ConnectorDetail connector={conn} />, { initialPath: "/settings/connectors?tab=deliveries" });
+    renderWithProviders(<ConnectorDrawer connector={conn} onClose={() => undefined} />, { initialPath: "/settings/connectors?tab=deliveries" });
     const head = await screen.findByRole("columnheader", { name: "Status" });
     const tint = composite(palette.text.primary, palette.mode === "dark" ? 0.03 : 0.025, palette.background.paper);
     expect(contrastRatio(getComputedStyle(head).color, tint)).toBeGreaterThanOrEqual(4.5);

@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "@vitest/browser/context";
@@ -40,51 +40,41 @@ vi.mock("../connectors", () => ({
 }));
 
 describe("ConnectorsPanel", () => {
-  // This project's Vitest browser-mode default viewport is mobile-sized
-  // (~414px wide), below MUI's md breakpoint, so these tests exercise the
-  // desktop two-pane path, so force a desktop viewport before each render.
+  // Vitest's browser default viewport is mobile-sized (~414px); the gallery is the same at any width but the drawer is not.
   beforeEach(async () => {
     await page.viewport(1280, 800);
   });
 
-  it("renders discovered connectors in the list with version and toggle", async () => {
+  it("renders a discovered connector as a tile with logo, name, category, status and enable switch", async () => {
     renderWithProviders(<ConnectorsPanel />);
-    // The connector is selected on first render now (from the URL or the first one), so its name is in the list and the detail header.
-    await waitFor(() => expect(screen.getAllByText("misp").length).toBeGreaterThan(0));
-    // Version chip lives in ConnectorDetail, which mounts only after the
-    // auto-select effect fires, an extra render pass after "misp" is
-    // already visible in the list, so this needs an async find, not getBy.
-    expect((await screen.findAllByText(/1\.0\.0/)).length).toBeGreaterThan(0);
-    expect(screen.getAllByTestId("connector-logo").length).toBeGreaterThan(0);
-    expect(screen.getByRole("switch", { name: "Enable misp" })).toBeChecked();
+    const heading = await screen.findByRole("heading", { level: 3, name: "misp" });
+    const tile = heading.closest("li")!;
+    expect(within(tile).getByTestId("connector-logo")).toBeInTheDocument();
+    expect(within(tile).getByText("Threat Intelligence")).toBeInTheDocument();
+    expect(within(tile).getByText("Connected")).toBeInTheDocument();
+    expect(within(tile).getByRole("switch", { name: "Enable misp" })).toBeChecked();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("groups the connector under its category heading", async () => {
-    renderWithProviders(<ConnectorsPanel />);
-    await waitFor(() => expect(screen.getByText("Threat Intelligence")).toBeInTheDocument());
-  });
-
-  it("auto-selects the first connector on desktop and shows its editable fields", async () => {
+  it("opens the configuration drawer from Configure and shows the version and the editable fields", async () => {
     renderWithProviders(<ConnectorsPanel />, { initialPath: "/settings/connectors?tab=configuration" });
+    await userEvent.click(await screen.findByRole("button", { name: "Configure misp" }));
+    const dialog = await screen.findByRole("dialog", { name: "misp" });
+    expect(within(dialog).getAllByText("1.0.0").length).toBeGreaterThan(0);
     // The API key is optional in this fixture, so it sits behind the group's disclosure.
-    await userEvent.click(await screen.findByRole("button", { name: "Show optional settings (1)" }));
-    const input = (await screen.findByLabelText("API Key")) as HTMLInputElement;
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Show optional settings/ }));
+    const input = (await within(dialog).findByLabelText("API Key")) as HTMLInputElement;
     expect(input).not.toBeDisabled();
     expect(input.type).toBe("password");
   });
 
-  it("does not render KPI count tiles", async () => {
+  it("filters with status chips, not count tiles: each chip is a toggle button and the counts add up", async () => {
     renderWithProviders(<ConnectorsPanel />);
-    // The connector is selected on first render now (from the URL or the first one), so its name is in the list and the detail header.
-    await waitFor(() => expect(screen.getAllByText("misp").length).toBeGreaterThan(0));
-    // Don't assert "Connected" is absent: on desktop the auto-selected
-    // connector's own ConnectorDetail status label legitimately renders
-    // that word (this fixture's connector has status: "connected"). The
-    // fixture has exactly one connector and it's connected, so "Incomplete"
-    // and "Disabled" (which a real KPI tile would render regardless of
-    // count) should never appear anywhere, which is what actually confirms
-    // the KPI tiles are gone.
-    expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
-    expect(screen.queryByText("Disabled")).not.toBeInTheDocument();
+    await screen.findByRole("heading", { level: 3, name: "misp" });
+    expect(screen.getByRole("button", { name: /^All\s*1$/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Connected\s*1$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Incomplete\s*0$/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Disabled/ }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 3, name: "misp" })).not.toBeInTheDocument());
   });
 });

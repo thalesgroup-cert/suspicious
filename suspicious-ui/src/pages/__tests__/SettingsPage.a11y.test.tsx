@@ -96,6 +96,7 @@ const SECTIONS: [string, string][] = [
   ["ciso_users", "CISO users"],
   ["email_feeder", "Email feeder"],
   ["scoring", "Analyzer scoring"],
+  ["connectors", "Connectors"],
   ["connectors?connector=misp&tab=overview", "Connectors"],
   ["connectors?connector=misp&tab=configuration", "Connectors"],
   ["connectors?connector=misp&tab=deliveries", "Connectors"],
@@ -135,13 +136,18 @@ describe("SettingsPage: structure for assistive technology", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   describe.each(SECTIONS)("section %s", (path, title) => {
-    it("has one h1, exactly one h2 (the section's), and no heading level skipped", async () => {
+    it("has one h1, exactly one h2 (the section's), and no heading level skipped; an open drawer is its own region with one h2", async () => {
       await open(path);
-      const headings = screen.getAllByRole("heading").map((h) => ({ level: Number(h.tagName[1]), name: h.textContent }));
+      // hidden: an open drawer is modal, so the page behind it is aria-hidden and would otherwise vanish from the query.
+      const all = screen.getAllByRole("heading", { hidden: true });
+      const info = (h: HTMLElement) => ({ level: Number(h.tagName[1]), name: h.textContent });
+      const headings = all.filter((h) => !h.closest("[role=dialog]")).map(info);
       expect(headings.filter((h) => h.level === 1)).toEqual([{ level: 1, name: "Settings" }]);
       expect(headings[0].level).toBe(1);
       expect(headings.filter((h) => h.level === 2)).toEqual([{ level: 2, name: title }]);
       headings.slice(1).forEach((h, i) => expect(h.level - headings[i].level, `${headings[i].name} -> ${h.name}`).toBeLessThanOrEqual(1));
+      const inDialog = all.filter((h) => h.closest("[role=dialog]")).map(info);
+      expect(inDialog).toEqual(path.includes("connector=") ? [{ level: 2, name: "misp" }] : []);
     });
 
     it("names every region, landmark, table and tab panel once", async () => {
@@ -260,17 +266,16 @@ describe("SettingsPage: structure for assistive technology", () => {
       expect(link).toHaveFocus();
     });
 
-    it("switching connector with a draft: Cancel returns focus to the connector row that was used", async () => {
+    it("closing the connector drawer with a draft: Cancel returns focus to the Close button that was used", async () => {
       const user = userEvent.setup();
       await open("connectors?connector=misp&tab=configuration");
       await user.type((await screen.findAllByRole("textbox"))[0], "x");
-      const row = screen.getByRole("button", { name: /thehive/ });
-      await user.click(row);
-      const dialog = await screen.findByRole("dialog");
+      const close = screen.getByRole("button", { name: "Close misp" });
+      await user.click(close);
+      const dialog = await screen.findByRole("dialog", { name: "Discard unsaved changes to misp?" });
       await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), T);
-      expect(document.activeElement, document.activeElement?.outerHTML.slice(0, 120)).not.toBe(document.body);
-      expect(row.contains(document.activeElement) || document.activeElement === row).toBe(true);
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: /Discard/ })).not.toBeInTheDocument(), T);
+      expect(close).toHaveFocus();
     });
   });
 
@@ -292,31 +297,32 @@ describe("SettingsPage: structure for assistive technology", () => {
     expect(screen.getByRole("textbox", { name: /add/i })).toBeInTheDocument();
   });
 
-  describe("on a phone the connector list and detail swap places, so focus follows", () => {
+  describe("on a phone the connector drawer fills the screen, so focus follows it", () => {
     async function phone() {
       await page.viewport(390, 800);
       stubMatchMedia({ phone: true });
       await open("connectors");
     }
 
-    it("opening a connector from the list moves focus to its heading", async () => {
+    it("opening a connector moves focus into the drawer", async () => {
       const user = userEvent.setup();
       await phone();
-      await user.click(screen.getByRole("button", { name: /misp/ }));
-      const heading = await screen.findByRole("heading", { level: 3, name: "misp" });
-      await waitFor(() => expect(heading).toHaveFocus(), T);
+      await user.click(screen.getByRole("button", { name: "Configure misp" }));
+      const dialog = await screen.findByRole("dialog", { name: "misp" });
+      await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true), T);
+      expect(dialog.getBoundingClientRect().width).toBe(390);
     });
 
-    it("Back to the list moves focus to the connector that was open", async () => {
+    it("closing the drawer moves focus back to the Configure button that opened it", async () => {
       const user = userEvent.setup();
       await phone();
-      await user.click(screen.getByRole("button", { name: /misp/ }));
-      await user.click(await screen.findByRole("button", { name: "Back to connector list" }));
-      const row = await screen.findByRole("button", { name: /misp/ });
-      await waitFor(() => expect(row).toHaveFocus(), T);
+      const button = screen.getByRole("button", { name: "Configure misp" });
+      await user.click(button);
+      await user.click(await screen.findByRole("button", { name: "Close misp" }));
+      await waitFor(() => expect(button).toHaveFocus(), T);
     });
 
-    it("a long unbroken health detail wraps inside the connector card instead of running off it", async () => {
+    it("a long unbroken health detail wraps inside the drawer instead of running off it", async () => {
       const misp = connectors[0];
       const before = { ...misp };
       Object.assign(misp, { last_health_ok: false, last_health_detail: "HTTPSConnectionPool(host=" + "x".repeat(160) + ")" });
@@ -335,7 +341,7 @@ describe("SettingsPage: structure for assistive technology", () => {
       await page.viewport(390, 800);
       stubMatchMedia({ phone: true });
       await open("connectors?connector=misp");
-      await screen.findByRole("heading", { level: 3, name: "misp" });
+      await screen.findByRole("dialog", { name: "misp" });
       expect(document.activeElement).toBe(document.body);
     });
   });

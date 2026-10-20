@@ -6,6 +6,8 @@ import { ConfigFieldInput, SECRET_MASK } from "@/features/settings/components/co
 import { dottedGet } from "@/features/settings/components/configHelpers";
 import type { ConfigField, Connector } from "@/features/settings/components/connectors";
 import { groupFields, type FieldGroup } from "@/features/settings/connectorConfig";
+import { PROVIDER_SWITCH, splitSchema } from "@/features/settings/connectorPresentation";
+import { ProviderSwitch } from "@/features/settings/components/ProviderSwitch";
 import { useAccent } from "@/features/settings/useAccent";
 
 type Props = {
@@ -17,7 +19,23 @@ type Props = {
   onChange(field: ConfigField, value: unknown): void;
 };
 
-function Group({ group, config, saved, errors, onChange }: Omit<Props, "connector"> & { group: FieldGroup }) {
+type FormProps = Omit<Props, "connector">;
+
+function fieldInput(f: ConfigField, { config, saved, errors, onChange }: FormProps) {
+  return (
+    <ConfigFieldInput
+      key={f.key}
+      field={f}
+      value={dottedGet(config, f.key)}
+      secretIsSet={dottedGet(saved, f.key) === SECRET_MASK}
+      error={errors[f.key]}
+      onChange={(v) => onChange(f, v)}
+    />
+  );
+}
+
+function Group({ group, ...form }: FormProps & { group: FieldGroup }) {
+  const { config, saved, errors } = form;
   const regionId = useId();
   const accent = useAccent();
   // null = the user has not chosen, so edits and server errors keep optional fields in view.
@@ -28,16 +46,7 @@ function Group({ group, config, saved, errors, onChange }: Omit<Props, "connecto
   const collapsible = group.required.length > 0 && group.optional.length > 0;
   const open = !collapsible || (chosen ?? needsAttention);
 
-  const input = (f: ConfigField) => (
-    <ConfigFieldInput
-      key={f.key}
-      field={f}
-      value={dottedGet(config, f.key)}
-      secretIsSet={dottedGet(saved, f.key) === SECRET_MASK}
-      error={errors[f.key]}
-      onChange={(v) => onChange(f, v)}
-    />
-  );
+  const input = (f: ConfigField) => fieldInput(f, form);
 
   return (
     <Box component="fieldset" sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}>
@@ -72,12 +81,17 @@ function Group({ group, config, saved, errors, onChange }: Omit<Props, "connecto
 }
 
 export function ConnectorConfigForm({ connector, ...rest }: Props) {
-  const groups = groupFields(connector.config_schema);
-  if (groups.length === 0) {
+  const spec = PROVIDER_SWITCH[connector.name];
+  const split = spec ? splitSchema(connector.config_schema, spec) : null;
+  // A spec whose switch field is not in the schema (an older backend) falls back to the generic form rather than hiding fields.
+  const withSwitch = spec && split?.switchField ? { spec, split } : null;
+  const groups = groupFields(withSwitch ? withSwitch.split.rest : connector.config_schema);
+  if (groups.length === 0 && !withSwitch) {
     return <Typography variant="body2" color="text.secondary">This connector has no settings.</Typography>;
   }
   return (
     <Stack spacing={3.5} sx={{ maxWidth: 640 }}>
+      {withSwitch && <ProviderSwitch {...withSwitch} {...rest} renderField={(f) => fieldInput(f, rest)} />}
       {groups.map((g) => (
         <Group key={g.key} group={g} {...rest} />
       ))}
