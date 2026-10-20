@@ -17,6 +17,7 @@ import json
 import threading
 import time
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pytest
@@ -330,9 +331,11 @@ def test_truncated_weight_files_are_reported_per_file_not_a_crash(make_app):
     """The weights in the original hand-off were byte-for-byte truncated copies
     (cut at 512 KiB: they still start with a valid zip header but have no
     central directory). Loading must fail soft, say which file and why."""
-    client, dirs = make_app(public=True)
-    for path in dirs["public"].glob("*.pth"):
-        path.write_bytes(path.read_bytes()[:4096])
+    client, dirs = make_app(public=False)
+    with TemporaryDirectory() as good:
+        write_models(Path(good), seed=100)
+        for path in Path(good).glob("*.pth"):
+            (dirs["public"] / path.name).write_bytes(path.read_bytes()[:4096])
     client.post("/reload")
 
     body = client.get("/health").json()
@@ -463,3 +466,77 @@ def test_sub_probabilities_zero_fill_a_missing_model_keeping_the_vector_width():
     assert (probs[2:4] == 0).all()
     assert probs[:2].sum() == pytest.approx(0.5, abs=1e-5)
     assert probs[4:].sum() == pytest.approx(0.2, abs=1e-5)
+
+
+# --- end to end: Cortex client -> real HTTP -> server -------------------------
+
+
+@pytest.fixture
+def live_server(make_app):
+    """The real app behind a real uvicorn socket on loopback (what a Cortex job
+    container talks to), with the same temp weights/fake vectorizer as make_app."""
+    import socket
+
+    import uvicorn
+
+    make_app()
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    uv = uvicorn.Server(uvicorn.Config(server.app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=uv.run, daemon=True)
+    thread.start()
+    deadline = time.time() + 15
+    while not uv.started and time.time() < deadline:
+        time.sleep(0.05)
+    assert uv.started, "uvicorn did not start"
+    yield f"http://127.0.0.1:{port}"
+    uv.should_exit = True
+    thread.join(timeout=10)
+
+
+def run_cortex_job(tmp_path, url, variant="personal"):
+    import tarfile
+
+    import ai_mail_classifier
+
+    job = tmp_path / "job"
+    (job / "input").mkdir(parents=True)
+    (job / "output").mkdir()
+    with tarfile.open(job / "input" / "mail.tar", "w") as tar:
+        for name, content in {"mail.txt": BODY, "mail.headers": "From: a@evil.example\nSubject: urgent\n"}.items():
+            src = tmp_path / f"src_{name}"
+            src.write_text(content)
+            tar.add(src, arcname=name)
+    (job / "input" / "input.json").write_text(json.dumps({
+        "dataType": "file", "file": "mail.tar", "filename": "mail.tar", "tlp": 2, "pap": 2,
+        "config": {"inference_url": url, "variant": variant},
+    }))
+    try:
+        ai_mail_classifier.AIMailClassifier(job_directory=str(job)).run()
+    except SystemExit:
+        pass  # cortexutils exits after writing an error report
+    return json.loads((job / "output" / "output.json").read_text())
+
+
+def test_cortex_analyzer_against_a_live_server(live_server, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    out = run_cortex_job(tmp_path, live_server)
+
+    assert out["success"] is True
+    assert out["summary"]["classification"] in {"SAFE", "UNWANTED", "DANGEROUS", "INCONCLUSIVE"}
+    report = out["full"]["report"]
+    assert report["analyzed_mail_content"] == BODY
+    assert len(json.loads(report["email_embedding"])) == DIM
+    assert set(report["main_probabilities"]) == {"SAFE", "UNWANTED", "DANGEROUS"}
+
+
+def test_cortex_analyzer_reports_the_unavailable_public_variant(live_server, tmp_path, monkeypatch):
+    import ai_mail_classifier
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ai_mail_classifier, "INFERENCE_RETRIES", 0)
+    out = run_cortex_job(tmp_path, live_server, variant="public")
+
+    assert out["success"] is False
+    assert "Required models unavailable for variant 'public'" in out["errorMessage"]
