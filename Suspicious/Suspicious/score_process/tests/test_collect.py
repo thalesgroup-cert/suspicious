@@ -231,7 +231,13 @@ class CollectVotesTest(TestCase):
                    return_value={"analyzers": {"ai": "AIMailAnalyzer"}}):
             return {v.analyzer: v for v in collect_votes(self.case, ai)}
 
+    def _allow(self, address="a.test"):
+        from domain_process.models import Domain
+        from settings.models import AllowListDomain
+        AllowListDomain.objects.create(domain=Domain.objects.create(value=address), user=self.user)
+
     def test_whitelisted_safe_and_dangerous_votes(self):
+        self._allow()
         self._report("WL", 0.3, category="Safe DW triggered")
         self._report("Clean", 0.2)
         self._report("Bad", 0.5, level="malicious", score=10)
@@ -248,7 +254,12 @@ class CollectVotesTest(TestCase):
         self._report("Zero", 0)
         self.assertEqual(self._votes(), {})
 
+    def test_stored_marker_without_a_live_allow_list_entry_is_not_whitelisted(self):
+        self._report("Stale", 0.3, category="Safe DW triggered")
+        self.assertFalse(self._votes()["Stale"].whitelisted)
+
     def test_analyzer_flagging_one_target_and_whitelisted_on_another_votes_dissent(self):
+        self._allow()
         self._report("Both", category="Safe DW triggered")
         self._report("Both", url=self.url2, level="malicious", score=10, job="2")
         vote = self._votes()["Both"]

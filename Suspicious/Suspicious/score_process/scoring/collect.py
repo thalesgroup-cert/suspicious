@@ -99,6 +99,24 @@ def _compute_deny_listed(case) -> tuple[bool, str]:
     return False, ""
 
 
+def _marker_still_valid(r) -> bool:
+    """Re-run the allow-list check for the report's target: a marker stored in
+    category lapses when the entry was removed or the domain is now overridden."""
+    from score_process.scoring.cortex_analyzers.allow_list import check_allow_list
+
+    if r.url_id:
+        data, kind = r.url.address, "url"
+    elif r.domain_id:
+        data, kind = r.domain.value, "domain"
+    elif r.ip_id:
+        data, kind = r.ip.address, "ip"
+    elif r.file_id:
+        data, kind = r.file.file_path, "file"
+    else:
+        return False
+    return any(check_allow_list(data, kind).model_dump().values())
+
+
 def collect_votes(case, ai=None) -> tuple:
     """One Vote per analyzer from the case's latest reports plus the AI signal.
     An analyzer's band is the worst across its reports, so a tool that flags one
@@ -122,7 +140,8 @@ def collect_votes(case, ai=None) -> tuple:
         if (r.status != "Success" or r.level == "info" or r.confidence < CONF_FLOOR
                 or r.analyzer.name == ai_name):
             continue
-        add(r.analyzer.name, r.analyzer.weight, band(r.score), is_allow_listed_category(r.category))
+        add(r.analyzer.name, r.analyzer.weight, band(r.score),
+            is_allow_listed_category(r.category) and _marker_still_valid(r))
 
     if ai is not None and ai_name and ai.confidence >= CONF_FLOOR:
         weight = Analyzer.objects.filter(name=ai_name).values_list("weight", flat=True).first()
