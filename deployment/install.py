@@ -319,6 +319,9 @@ def main() -> None:
     header("Starting the stack")
     console.print("  This may take a few minutes on first run (image pull).\n")
     subprocess.run(["docker", "compose", "--env-file", ".env", "up", "-d",
+                    "elasticsearch"], check=True)
+    run(["bash", "scripts/es-security-bootstrap.sh"])  # service accounts before the app starts
+    subprocess.run(["docker", "compose", "--env-file", ".env", "up", "-d",
                     "--remove-orphans"], check=True)
 
     console.print()

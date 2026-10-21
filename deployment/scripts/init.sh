@@ -59,6 +59,9 @@ else
     echo "→ UI .env present"
 fi
 
+# Generate data-service secrets (fills only missing values)
+bash ./scripts/gen-service-secrets.sh .env .env.data
+
 # Load environment variables
 set -a
 . ./.env

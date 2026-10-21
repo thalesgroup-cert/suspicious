@@ -42,6 +42,12 @@ while IFS= read -r line; do
     done
 done < "$ENV_FILE"
 
+for k in REDIS_BROKER_PASSWORD REDIS_CACHE_PASSWORD ES_SUSPICIOUS_USER ES_SUSPICIOUS_PASSWORD ES_CORTEX_USER ES_CORTEX_PASSWORD CHROMA_TOKEN; do
+    grep -Eq "^${k}=[A-Za-z0-9_.-]+$" "$ENV_FILE" || failures+=("  $k is missing, empty or has unsupported characters (new install: make init; existing deployment: make db-auth-migrate)")
+done
+DATA_ENV_FILE="${DATA_ENV_FILE:-$(dirname "$ENV_FILE")/.env.data}"
+grep -Eq "^ELASTIC_PASSWORD=[A-Za-z0-9_.-]+$" "$DATA_ENV_FILE" 2>/dev/null || failures+=("  ELASTIC_PASSWORD is missing in $DATA_ENV_FILE (new install: make init; existing deployment: make db-auth-migrate)")
+
 if [ ${#failures[@]} -gt 0 ]; then
     echo ""
     echo -e "${RED}${BOLD}✗ Deployment blocked — placeholder secrets found in $ENV_FILE${RESET}"

@@ -5,12 +5,14 @@
 #   1. Pull latest images (no downtime — just downloads)
 #   2. Run database migrations (forward-compatible migrations first)
 #   3. Restart suspicious (rolling — healthcheck gates the cutover)
-#   4. Restart suspicious_celery (Celery worker + Beat, no web traffic)
+#   4. Restart suspicious_celery and suspicious_celery_beat (no web traffic)
 #   5. Restart feeder (simple restart)
 #   6. Restart suspicious_ui (static files, near-instant)
 #
 # Services that are NOT restarted here (no code changes):
-#   - db_suspicious, elasticsearch, rustfs, chromadb, traefik
+#   - db_suspicious, elasticsearch, rustfs, chromadb, chromadb_proxy, redis_*, traefik
+#   Pre-flight refuses to run until the data services enforce authentication
+#   (one-time `make db-auth-migrate`).
 #   Use `docker compose restart <service>` if you need to restart them manually.
 
 set -euo pipefail
@@ -31,6 +33,10 @@ step "Pre-flight checks"
 bash "${SCRIPTS}/check-secrets.sh" .env
 bash "${SCRIPTS}/check-mounts.sh"
 bash "${SCRIPTS}/check-network.sh"
+bash "${SCRIPTS}/db-auth-check.sh" || {
+  echo "Data services do not enforce authentication yet: run 'make db-auth-migrate' once, then re-run 'make deploy'."
+  exit 1
+}
 ok "Pre-flight passed"
 
 # ── 1b. Unseal Vault (before any container reads secrets from it) ─────────
@@ -83,8 +89,8 @@ bash "${SCRIPTS}/health-wait.sh" suspicious 120
 ok "suspicious restarted"
 
 # ── 6. Restart Celery worker + Beat ──────────────────────────────────────
-step "Restarting suspicious_celery"
-$COMPOSE up -d --no-deps suspicious_celery
+step "Restarting suspicious_celery and suspicious_celery_beat"
+$COMPOSE up -d --no-deps suspicious_celery suspicious_celery_beat
 ok "suspicious_celery restarted"
 
 # ── 7. Restart feeder ────────────────────────────────────────────────────

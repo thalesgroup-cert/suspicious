@@ -35,7 +35,7 @@ endef
         backup-db restore-db \
         logs status shell db-shell \
         create-certs network clean prune \
-        check-secrets check-updates provision-vault seed-vault-secrets unseal
+        secrets-init db-auth-check db-auth-migrate check-secrets check-updates provision-vault seed-vault-secrets unseal
 
 # ---------------------------------------------------------------------------
 # Help
@@ -74,6 +74,9 @@ help:
 	@echo "  restore-db f=<file>   Restore from a .sql.gz dump"
 	@echo ""
 	@echo "$(BOLD)Diagnostics$(RESET)"
+	@echo "  secrets-init     Generate missing data-service secrets (.env, .env.data)"
+	@echo "  db-auth-check    Verify Redis/Elasticsearch/Chroma enforce authentication"
+	@echo "  db-auth-migrate  One-time upgrade of an existing stack to authenticated data services"
 	@echo "  check-secrets    Verify no placeholder secrets remain in .env"
 	@echo "  check-updates    Compare running image digests vs registry"
 	@echo "  logs [s=<svc>]   Follow logs — all or one service"
@@ -143,6 +146,19 @@ create-certs:
 # Deployment
 # ---------------------------------------------------------------------------
 
+## Generate missing data-service secrets (idempotent, never overwrites)
+secrets-init:
+	@bash $(SCRIPTS)/gen-service-secrets.sh .env
+
+## Check every data service rejects anonymous access and accepts the credential
+db-auth-check:
+	@bash $(SCRIPTS)/db-auth-check.sh
+
+## One-time upgrade of an existing deployment (~2 min maintenance window)
+db-auth-migrate:
+	@bash $(SCRIPTS)/db-auth-migrate.sh
+	$(OK) "Data services now require authentication."
+
 ## Zero-downtime rolling deploy (recommended)
 deploy: check-secrets
 	$(call require_script,$(SCRIPTS)/deploy.sh)
@@ -163,6 +179,8 @@ up: check-secrets
 	@echo "Starting services…"
 	@$(COMPOSE) up -d vault --remove-orphans
 	@$(SCRIPTS)/unseal-vault.sh
+	@$(COMPOSE) up -d elasticsearch
+	@bash $(SCRIPTS)/es-security-bootstrap.sh
 	@$(COMPOSE) up -d --remove-orphans
 	$(OK) "Services started."
 
