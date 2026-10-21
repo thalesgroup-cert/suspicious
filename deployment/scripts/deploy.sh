@@ -33,8 +33,11 @@ step "Pre-flight checks"
 bash "${SCRIPTS}/check-secrets.sh" .env
 bash "${SCRIPTS}/check-mounts.sh"
 bash "${SCRIPTS}/check-network.sh"
+for svc in redis_broker redis_cache elasticsearch chromadb_proxy; do
+  [ -n "$($COMPOSE ps -q --status running "$svc" 2>/dev/null)" ] || { echo "Data service $svc is not running: start it (make up) first."; exit 1; }
+done
 bash "${SCRIPTS}/db-auth-check.sh" || {
-  echo "Data services do not enforce authentication yet: run 'make db-auth-migrate' once, then re-run 'make deploy'."
+  echo "Data services do not enforce authentication yet (or the check could not reach them): run 'make db-auth-migrate' once, then re-run 'make deploy'."
   exit 1
 }
 ok "Pre-flight passed"
@@ -85,7 +88,7 @@ ok "Static files collected"
 # The old container stays alive until the new one passes its healthcheck.
 step "Rolling restart: suspicious (web)"
 $COMPOSE up -d --no-deps suspicious
-bash "${SCRIPTS}/health-wait.sh" suspicious 120
+bash "${SCRIPTS}/health-wait.sh" "${SVC_PREFIX:-}suspicious" 120
 ok "suspicious restarted"
 
 # ── 6. Restart Celery worker + Beat ──────────────────────────────────────

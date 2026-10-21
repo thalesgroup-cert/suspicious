@@ -3,9 +3,9 @@
 # accepts the credential from .env / .env.data.
 set -uo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
-ENV_FILE="${ENV_FILE:-.env}"; DATA_ENV_FILE="${DATA_ENV_FILE:-.env.data}"
+ENV_FILE="$(realpath "${ENV_FILE:-.env}")"; DATA_ENV_FILE="$(realpath "${DATA_ENV_FILE:-$(dirname "$ENV_FILE")/.env.data}")"
 COMPOSE="${COMPOSE:-docker compose --env-file $ENV_FILE}"
-set -a; . "./$ENV_FILE"; [ -f "$DATA_ENV_FILE" ] && . "./$DATA_ENV_FILE"; set +a
+set -a; . "$ENV_FILE"; [ -f "$DATA_ENV_FILE" ] && . "$DATA_ENV_FILE"; set +a
 fail=0
 check() { if eval "$2" >/dev/null 2>&1; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }
 # Secrets are passed as inherited env vars, never in argv.

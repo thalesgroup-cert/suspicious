@@ -5,10 +5,10 @@
 # read from .env.data, the service accounts from .env).
 set -euo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
-ENV_FILE="${ENV_FILE:-.env}"
-DATA_ENV_FILE="${DATA_ENV_FILE:-.env.data}"
+ENV_FILE="$(realpath "${ENV_FILE:-.env}")"
+DATA_ENV_FILE="$(realpath "${DATA_ENV_FILE:-$(dirname "$ENV_FILE")/.env.data}")"
 COMPOSE="${COMPOSE:-docker compose --env-file $ENV_FILE}"
-set -a; . "$(realpath "$ENV_FILE")"; . "$(realpath "$DATA_ENV_FILE")"; set +a
+set -a; . "$ENV_FILE"; . "$DATA_ENV_FILE"; set +a
 for v in ELASTIC_PASSWORD ES_SUSPICIOUS_USER ES_SUSPICIOUS_PASSWORD ES_CORTEX_USER ES_CORTEX_PASSWORD; do
   [[ "${!v:-}" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "ERROR: $v is empty or has characters outside [A-Za-z0-9_.-]" >&2; exit 1; }
 done
