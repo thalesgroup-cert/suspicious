@@ -23,11 +23,11 @@ An allow-listed observable gets its Safe verdict at submission time and no Corte
 The MISP connector withholds these indicators from shared events:
 
 - Campaign (phishing-simulation) domains: domain objects, URL hosts and email-address objects. Subdomains are included.
-- Domains and URLs whose host is on the domain allow list (subdomains included).
+- Domains and URLs whose host is exactly on the domain allow list (subdomains are not covered, so allow-listing `sharepoint.com` never hides `evil.sharepoint.com`). Company and Watcher legit domains keep the subdomain rule.
 - Hashes on the file allow list.
 - IPs on the IP allow list.
 
-Filtering is per IOC: a case from a campaign sender still shares its other IOCs. MISP matching covers subdomains, while launch matching is on exact domains.
+Filtering is per IOC: a case from a campaign sender still shares its other IOCs. Company, Watcher legit and campaign domains are matched with their subdomains; allow-listed domains are matched exactly, like launch.
 
 Hash skips compare the stored value of the allow-listed hash only: an md5 entry does not cover the same file's sha256 IOC.
 
@@ -36,8 +36,10 @@ Hash skips compare the stored value of the allow-listed hash only: an md5 entry 
 Allow-listing is not only a launch filter, it also takes part in the verdict:
 
 - Each analyzer casts one weighted vote (its configured weight). Its band is the worst across all of its reports on the case, so a tool that flags one artifact and is allow-listed on another votes dissent, not safe. The AI analyzer votes from its signal.
-- A vote is marked allow-listed when its band is Safe and at least one of its reports carries an allow-list marker.
+- A vote is marked allow-listed when its band is Safe and at least one of its reports carries an allow-list marker that is still valid: the allow-list check is re-run for the report's target at scoring time, so a removed entry or a domain that is now deny-listed, Watcher-monitored or campaign no longer counts.
 - When the Safe plus allow-listed weight is a strict majority of the voting weight, the case is Safe under the rule `allow-list-majority`, and the rationale names the dissenting analyzers.
 - Reports that do not vote: failed or pending jobs, `info` level, confidence below the floor, and analyzers with weight 0.
 - Deny-listed, campaign and Watcher-monitored targets are never overridden by the majority.
 - The embedded-IOC escalation still applies afterwards.
+
+What is guaranteed: launch normally skips allow-listed values, so a vote only becomes allow-listed for reports that exist anyway (a job that was already running, a list edited after the job ran, or an analyzer that runs at case level on an allow-listed target). The majority rule is therefore a safety net, not the main path. If building the votes fails, scoring falls back to the verdict without votes and the failure is logged.
