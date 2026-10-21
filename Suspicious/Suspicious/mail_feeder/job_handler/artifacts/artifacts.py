@@ -6,6 +6,7 @@ from .models import ArtifactModel
 from .utils import safe_execution
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 from settings.models import AllowListFile, AllowListDomain, WatcherLegitDomain, DenyListDomain, WatcherMonitoredDomain
+from settings.allow_lists import is_ip_allow_listed, overrides_allow_list
 from url_process.url_utils.url_handler import URLHandler
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
@@ -127,6 +128,10 @@ class ArtifactJobLauncherService:
     def _process_ip_artifact(self, artifact):
         if artifact.artifactIsIp:
             ip_obj = artifact.artifactIsIp.ip
+            if is_ip_allow_listed(ip_obj.address):
+                fetch_mail_logger.info(f"IP {ip_obj.address} is allow-listed")
+                ip_obj.update_allow_listed()
+                return
             fetch_mail_logger.info(f"Processing IP: {ip_obj.address}")
             self._launch_cortex_jobs(ip_obj, "ip")
 
@@ -196,7 +201,7 @@ class ArtifactJobLauncherService:
         if domain_obj and (
             AllowListDomain.objects.filter(domain=domain_obj).exists()
             or WatcherLegitDomain.objects.filter(domain=domain_obj).exists()
-        ):
+        ) and not overrides_allow_list(domain_obj):
             fetch_mail_logger.info(f"Domain {domain_obj} is allow-listed")
             domain_obj.ioc_score = 0
             domain_obj.ioc_confidence = 100

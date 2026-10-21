@@ -19,3 +19,7 @@ The history lives in the append-only `ListChangeLog` table, not in a status flag
 Only changes made through the Settings API are logged. Admin edits, CSV imports and code that writes the list tables directly leave no row. Deleting a user account cascades (the `user` foreign key of the six list tables is `CASCADE`) and removes the entries that user added, with no log row; the earlier `added` rows stay, with the username snapshot.
 
 Limit: history starts when this version is deployed. Additions made earlier still show `added_by`, but removals made earlier were never recorded and cannot be recovered. The table is read-only in the Django admin.
+
+## Allow-list behaviour
+
+What an allow-list entry does at job launch, and how it interacts with the deny, Watcher and campaign lists, is described in [Allow lists](../../operations/allow-lists.md).

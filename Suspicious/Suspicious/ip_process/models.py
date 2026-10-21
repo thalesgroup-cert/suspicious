@@ -1,6 +1,8 @@
 from django.db import models
 
-class IP(models.Model):
+from common.model_mixins import AllowListableMixin
+
+class IP(AllowListableMixin, models.Model):
     id = models.AutoField(primary_key=True)
     address = models.CharField(max_length=45, db_index=True)
     ioc_score = models.FloatField(default=5)

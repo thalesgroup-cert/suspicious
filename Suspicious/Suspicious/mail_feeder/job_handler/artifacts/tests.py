@@ -10,6 +10,10 @@ class ArtifactJobLauncherServiceTests(TestCase):
 
     def setUp(self):
         self.service = ArtifactJobLauncherService()
+        for name in ("is_ip_allow_listed", "overrides_allow_list"):
+            p = patch(f"mail_feeder.job_handler.artifacts.artifacts.{name}", return_value=False)
+            p.start()
+            self.addCleanup(p.stop)
 
     def _artifact(self, artifact_type, **kwargs):
         art = MagicMock()
@@ -29,6 +33,13 @@ class ArtifactJobLauncherServiceTests(TestCase):
 
         self.assertIs(service, self.service)
         self.assertEqual(service.pending_dispatch_intents, [(ip, "ip")])
+
+    def test_ip_allow_listed_skips_cortex(self):
+        ip = MagicMock(address="1.1.1.1")
+        with patch("mail_feeder.job_handler.artifacts.artifacts.is_ip_allow_listed", return_value=True):
+            service = self.service.process_artifacts([self._artifact("IP", artifactIsIp=MagicMock(ip=ip))])
+        self.assertEqual(service.pending_dispatch_intents, [])
+        ip.update_allow_listed.assert_called_once_with()
 
     @patch("mail_feeder.job_handler.artifacts.artifacts.AllowListFile")
     def test_hash_allow_listed_skips_cortex(self, m_allow):
@@ -187,3 +198,52 @@ class ArtifactPlannerIntegrationTest(django.test.TestCase):
         service.dispatch_pending(case)
 
         self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 4)
+
+
+class AllowListLaunchDbTests(django.test.TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        self.user = get_user_model().objects.create_user(username="al_launch", password="x")
+
+    def _launch(self, kind, **kw):
+        return ArtifactJobLauncherService().process_artifacts(
+            [MagicMock(artifact_type=kind, **kw)]).pending_dispatch_intents
+
+    def _domain(self, value):
+        from domain_process.models import Domain
+        d = Domain.objects.get_or_create(value=value)[0]
+        return d, self._launch("Domain", artifactIsDomain=MagicMock(domain=d))
+
+    def test_allow_listed_ip_is_skipped_in_any_spelling_and_others_launch(self):
+        from ip_process.models import IP
+        from settings.models import AllowListIp
+        AllowListIp.objects.create(ip=IP.objects.create(address="2606:4700:4700::1111"), user=self.user)
+        listed = IP.objects.create(address="2606:4700:4700:0000:0000:0000:0000:1111")
+        self.assertEqual(self._launch("IP", artifactIsIp=MagicMock(ip=listed)), [])
+        listed.refresh_from_db()
+        self.assertEqual(listed.ioc_level, "SAFE-ALLOW_LISTED")
+        other = IP.objects.create(address="8.8.4.4")
+        self.assertEqual(self._launch("IP", artifactIsIp=MagicMock(ip=other)), [(other, "ip")])
+
+    def test_only_the_exact_allow_listed_domain_is_skipped(self):
+        from domain_process.models import Domain
+        from settings.models import AllowListDomain
+        AllowListDomain.objects.create(domain=Domain.objects.create(value="allowlisted.test"), user=self.user)
+        self.assertEqual(self._domain("allowlisted.test")[1], [])
+        for lookalike in ("sub.allowlisted.test", "allowlisted.test.evil.tld", "evil-allowlisted.test"):
+            d, intents = self._domain(lookalike)
+            self.assertEqual(intents, [(d, "domain")], lookalike)
+
+    def test_deny_beats_allow_and_campaign_still_launches(self):
+        from domain_process.models import Domain
+        from settings.models import AllowListDomain, CampaignDomainAllowList, DenyListDomain
+        both = Domain.objects.create(value="both.test")
+        sim = Domain.objects.create(value="sim.test")
+        for d in (both, sim):
+            AllowListDomain.objects.create(domain=d, user=self.user)
+        DenyListDomain.objects.create(domain=both, user=self.user)
+        CampaignDomainAllowList.objects.create(domain=sim, user=self.user)
+        self.assertEqual(self._domain("both.test")[1], [])
+        both.refresh_from_db()
+        self.assertEqual(both.ioc_level, "dangerous")
+        self.assertEqual(self._domain("sim.test")[1], [(sim, "domain")])

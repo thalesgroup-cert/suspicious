@@ -12,6 +12,7 @@ from url_process.url_utils.url_handler import URLHandler
 
 from case_handler.case_utils.form_handlers.mail.mail_form import MailFormHandler
 
+from settings.allow_lists import is_ip_allow_listed, overrides_allow_list
 from settings.models import (
     AllowListDomain,
     AllowListFile,
@@ -133,7 +134,9 @@ class CaseHandler:
         try:
             url_inst, domain = URLHandler().handle_url(url)
             if url_inst and domain:
-                if not AllowListDomain.objects.filter(domain=domain).exists() and not WatcherLegitDomain.objects.filter(domain=domain).exists():
+                listed = (AllowListDomain.objects.filter(domain=domain).exists()
+                          or WatcherLegitDomain.objects.filter(domain=domain).exists())
+                if not listed or overrides_allow_list(domain):
                     self._launch_analysis(url_inst, None, data_type="url")
                     return url_inst, False, ""
                 url_inst.update_allow_listed()
@@ -156,6 +159,9 @@ class CaseHandler:
             if is_ip:
                 ip_inst = IPHandler().handle_ip(other)
                 if ip_inst:
+                    if is_ip_allow_listed(ip_inst.address):
+                        ip_inst.update_allow_listed()
+                        return ip_inst, None, True, f"IP '{ip_inst.address}' is allow-listed."
                     self._launch_analysis(ip_inst, ip_inst, data_type="ip")
                 return ip_inst, None, allow_listed, ""
 
