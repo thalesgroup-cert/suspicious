@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase
 from case_handler.models import Result
 from score_process.scoring.engine import (
-    Signal, AiSignal, band, score_case, CONF_FLOOR,
+    Signal, AiSignal, Vote, band, score_case, CONF_FLOOR,
 )
 
 
@@ -104,3 +104,64 @@ class ScoreCaseTest(SimpleTestCase):
         v = score_case([sig(4, 60), sig(5, 40)])
         self.assertEqual(v.final_score, 4)
         self.assertEqual(v.result, Result.SAFE)
+
+
+def vote(name, weight, band=Result.SAFE, wl=False):
+    return Vote(analyzer=name, weight=weight, band=band, whitelisted=wl)
+
+
+# a malicious signal elsewhere in the case: today this always means Dangerous
+DANGEROUS_CASE = [sig(0, 100, src="url"), sig(0, 100, src="url"), sig(9, 90, mal=True, src="ip")]
+
+
+class AllowListMajorityTest(SimpleTestCase):
+    def test_baseline_is_dangerous_without_votes(self):
+        self.assertEqual(score_case(DANGEROUS_CASE).result, Result.DANGEROUS)
+
+    def test_majority_overrides_and_names_the_dissenter(self):
+        votes = [vote("VT", 0.3, wl=True), vote("Urlscan", 0.3, wl=True),
+                 vote("AIMailAnalyzer", 0.2, Result.DANGEROUS)]
+        v = score_case(DANGEROUS_CASE, votes=votes)
+        self.assertEqual((v.result, v.final_score, v.final_confidence, v.rule),
+                         (Result.SAFE, 0, 100, "allow-list-majority"))
+        self.assertIn("Dangerous: AIMailAnalyzer", v.rationale[-1])
+        self.assertIn("75%", v.rationale[-1])
+
+    def test_exactly_half_does_not_override_even_with_float_drift(self):
+        for votes in ([vote("A", 0.5, wl=True), vote("B", 0.5, Result.DANGEROUS)],
+                      [vote("A", 0.1, wl=True), vote("B", 0.2), vote("C", 0.3, Result.DANGEROUS)]):
+            v = score_case(DANGEROUS_CASE, votes=votes)
+            self.assertEqual(v.result, Result.DANGEROUS)
+            self.assertIn("only 50%", v.rationale[-1])
+
+    def test_minority_keeps_dangerous_and_says_why(self):
+        votes = [vote("A", 0.2, wl=True), vote("B", 0.5, Result.DANGEROUS), vote("C", 0.3, Result.SUSPICIOUS)]
+        v = score_case(DANGEROUS_CASE, votes=votes)
+        self.assertEqual((v.result, v.rule), (Result.DANGEROUS, "weighted-consensus"))
+        self.assertIn("only 20%", v.rationale[-1])
+
+    def test_no_whitelisted_vote_is_identical_to_today(self):
+        cases = [(DANGEROUS_CASE, None, False), ([sig(2, 95)], AiSignal(9, 10), False),
+                 ([sig(1, 40)], AiSignal(9, 90), False), ([sig(5, 85), sig(5, 80)], AiSignal(6, 100), False),
+                 ([sig(7, 40)], None, True)]
+        plain = [vote("A", 1.0), vote("B", 1.0, Result.DANGEROUS)]
+        for signals, ai, missing in cases:
+            self.assertEqual(score_case(signals, ai, ai_missing=missing, votes=plain),
+                             score_case(signals, ai, ai_missing=missing))
+
+    def test_deny_list_zero_weight_and_already_safe_are_untouched(self):
+        v = score_case(DANGEROUS_CASE, deny_listed=True, deny_reason="d", votes=[vote("A", 1, wl=True)])
+        self.assertEqual((v.result, v.rule), (Result.DANGEROUS, "deny-listed"))
+        self.assertEqual(score_case(DANGEROUS_CASE, votes=[vote("A", 0, wl=True)]).result, Result.DANGEROUS)
+        self.assertEqual(score_case([sig(0, 100)], votes=[vote("A", 1, wl=True)]), score_case([sig(0, 100)]))
+
+    def test_missing_ai_inconclusive_becomes_safe_on_majority(self):
+        v = score_case([sig(0, 100)], ai_missing=True, votes=[vote("A", 1, wl=True)])
+        self.assertEqual((v.result, v.rule), (Result.SAFE, "allow-list-majority"))
+
+    def test_embedded_dangerous_ioc_still_raises_the_majority_verdict(self):
+        from score_process.scoring.engine import mail_band_escalation
+        from score_process.scoring.observable_engine import ObservableVerdict
+        safe = score_case(DANGEROUS_CASE, votes=[vote("A", 1, wl=True)])
+        out = mail_band_escalation(safe, [ObservableVerdict("Dangerous", 80, None, {}, [])])
+        self.assertEqual((out.result, out.rule), (Result.DANGEROUS, "embedded-ioc-escalation"))

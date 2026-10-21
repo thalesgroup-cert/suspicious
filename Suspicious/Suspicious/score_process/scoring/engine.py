@@ -25,6 +25,38 @@ class AiSignal:
 
 
 @dataclass(frozen=True)
+class Vote:
+    """One analyzer's say on a case: its weight, its worst band across the
+    case's artifacts, and whether a Safe band came from an allow-list hit."""
+    analyzer: str
+    weight: float
+    band: str
+    whitelisted: bool = False
+
+
+def _allow_list_majority(verdict, votes):
+    """Allow-list is a vote, not an absolute override: a strict majority of Safe
+    plus allow-listed weight makes the case Safe and records the dissent.
+    Cases without a whitelisted vote, already-Safe cases and failures pass through."""
+    if verdict.result in (Result.SAFE, Result.FAILURE) or not any(v.whitelisted for v in votes):
+        return verdict
+    total = sum(v.weight for v in votes)
+    if total <= 0:
+        return verdict
+    safe = sum(v.weight for v in votes if v.band == Result.SAFE)
+    pct = round(100 * safe / total)
+    dissent = ", ".join(f"{v.band}: {v.analyzer}" for v in votes if v.band != Result.SAFE) or "none"
+    if round(2 * safe - total, 9) <= 0:
+        line = (f"Allow-listed, but only {pct}% of analyzer weight agrees "
+                f"(dissent: {dissent}); verdict not overridden.")
+        return replace(verdict, rationale=tuple(verdict.rationale) + (line,))
+    line = (f"Allow-list majority: {pct}% of analyzer weight is Safe or allow-listed; "
+            f"dissent overruled ({dissent}).")
+    return replace(verdict, final_score=0, final_confidence=100, result=Result.SAFE,
+                   rationale=tuple(verdict.rationale) + (line,), rule="allow-list-majority")
+
+
+@dataclass(frozen=True)
 class CaseVerdict:
     final_score: float
     final_confidence: float
@@ -106,7 +138,8 @@ def _classify_rule(*, ai, base_conf, ai_missing, final_score, final_conf,
     return "weighted-consensus"
 
 
-def score_case(signals, ai=None, deny_listed=False, ai_missing=False, deny_reason="") -> CaseVerdict:
+def score_case(signals, ai=None, deny_listed=False, ai_missing=False, deny_reason="",
+               votes=()) -> CaseVerdict:
     scored = [s for s in signals if not s.is_failure]
     n_malicious = sum(1 for s in scored if s.is_malicious)
     n_scored = len(scored)
@@ -140,7 +173,7 @@ def score_case(signals, ai=None, deny_listed=False, ai_missing=False, deny_reaso
     else:
         result = band(final_score)
 
-    return CaseVerdict(
+    return _allow_list_majority(CaseVerdict(
         final_score=final_score,
         final_confidence=min(round(final_conf), 100),
         result=result,
@@ -152,4 +185,4 @@ def score_case(signals, ai=None, deny_listed=False, ai_missing=False, deny_reaso
             n_malicious=n_malicious, n_scored=n_scored,
             result=result, worst=worst, wmean=wmean,
         ),
-    )
+    ), votes)

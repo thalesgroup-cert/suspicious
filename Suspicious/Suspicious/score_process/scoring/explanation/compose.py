@@ -86,6 +86,11 @@ _RULE_TEMPLATES = {
                    "the verdict at {band}.",
         "reporter": "Automated phishing detection was decisive for this verdict.",
     },
+    "allow-list-majority": {
+        "analyst": "Most of the analyzer weight is Safe or allow-listed, so this {data_type} is "
+                   "{band}. Analyzers that disagreed are listed in the verdict rationale.",
+        "reporter": "The checks that carry most weight for this item came back safe or allow-listed.",
+    },
     "no-signal": {
         "analyst": "No analyzer flagged anything in this {data_type}.",
         "reporter": "No security check flagged this {data_type}.",

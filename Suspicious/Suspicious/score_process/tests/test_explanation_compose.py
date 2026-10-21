@@ -25,3 +25,8 @@ class ComposeTest(SimpleTestCase):
     def test_strong_confidence_reading(self):
         _, _, c = compose("tier1-authoritative-malicious", "Dangerous", 95, [], **FACTS)
         self.assertRegex(c.lower(), r"strong|high")
+
+
+class AllowListRuleTemplateTest(SimpleTestCase):
+    def test_allow_list_majority_has_a_template(self):
+        self.assertIn("allow-list-majority", RULE_KEYS)
