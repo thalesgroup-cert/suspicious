@@ -173,3 +173,9 @@ Deferred:
 ## Settings follow-ups
 
 - Per-type weight guard: the analyzer weight guard only keeps the total over all active analyzers above 0, but scoring divides per kind of evidence (`processing.py`), so zeroing every file or hash analyzer scores that evidence as Safe. A per-type guard needs a data-type field on `Analyzer` to know which analyzers handle which kind.
+
+## Challenged cases review (raised 2026-10-21)
+The challenge flow does not work well end to end and needs its own review:
+- A challenge raises an alert (TheHive / notification) that carries no useful detail: attachments and case details are missing from the TheHive alert.
+- The link in the email is good, but the reporter is never asked for a challenge reason, so people sometimes challenge a verdict for no reason. Require (or at least prompt for) a reason, carry it into the alert and the case timeline, and show it to the analyst.
+- Audit the whole path: challenge view, token flow, TheHive alert content (observables, attachments, verdict context), analyst-side display, and the follow-up when the challenge is accepted or rejected.
