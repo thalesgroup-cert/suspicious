@@ -254,6 +254,18 @@ class CollectVotesTest(TestCase):
         self._report("Zero", 0)
         self.assertEqual(self._votes(), {})
 
+    def test_allow_listed_domain_later_campaign_or_deny_listed_is_not_whitelisted(self):
+        from domain_process.models import Domain
+        from settings.models import CampaignDomainAllowList, DenyListDomain
+        self._allow("a.test")
+        d = Domain.objects.get(value="a.test")
+        for model in (CampaignDomainAllowList, DenyListDomain):
+            self._report("Late", 0.3, category="Safe DW triggered")
+            self.assertTrue(self._votes()["Late"].whitelisted)
+            row = model.objects.create(domain=d, user=self.user)
+            self.assertFalse(self._votes()["Late"].whitelisted)
+            row.delete()
+
     def test_stored_marker_without_a_live_allow_list_entry_is_not_whitelisted(self):
         self._report("Stale", 0.3, category="Safe DW triggered")
         self.assertFalse(self._votes()["Stale"].whitelisted)

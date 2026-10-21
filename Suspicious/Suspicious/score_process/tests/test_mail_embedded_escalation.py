@@ -104,6 +104,22 @@ class MailEmbeddedEscalationTests(TestCase):
         ma = MailArtifact.objects.get(artifactIsUrl__url=self.url)
         self.assertEqual(ma.artifact_level, "SAFE-ALLOW_LISTED")
 
+    def test_allow_listed_levels_lapse_when_the_domain_becomes_campaign_listed(self):
+        from domain_process.models import Domain
+        from settings.models import CampaignDomainAllowList
+        URL.objects.filter(pk=self.url.pk).update(ioc_level="SAFE-ALLOW_LISTED", ioc_score=0, ioc_confidence=100)
+        MailArtifact.objects.filter(pk=self.ma.pk).update(artifact_level="SAFE-ALLOW_LISTED")
+        CampaignDomainAllowList.objects.create(
+            domain=Domain.objects.create(value="evil.test"),
+            user=get_user_model().objects.create_user("camp_u", password="x"))
+        self._rep(self.gti, "malicious", 95, 9)
+        CortexAnalyzerReports._apply_embedded_escalation(
+            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))
+        self.url.refresh_from_db()
+        self.ma.refresh_from_db()
+        self.assertEqual(self.url.ioc_level, "malicious")
+        self.assertEqual(self.ma.artifact_level, "malicious")
+
     def test_sticky_ioc_level_keeps_score_and_confidence(self):
         """A sticky global row skips the WHOLE re-score, not just the level."""
         URL.objects.filter(pk=self.url.pk).update(

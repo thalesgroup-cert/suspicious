@@ -38,11 +38,19 @@ def sticky_holds(obj, level=None) -> bool:
         return False
     if level != "SAFE-ALLOW_LISTED":
         return True
+    import re
     from urllib.parse import urlparse
 
     from domain_process.models import Domain
     from settings.allow_lists import overrides_allow_list
 
-    host = getattr(obj, "value", None) or urlparse(getattr(obj, "address", "") or "").hostname
-    domain = Domain.objects.filter(value=host).first() if host else None
+    host = getattr(obj, "value", None)
+    if host is None:
+        host = getattr(obj, "address", "") or ""
+        if "@" not in host:
+            host = urlparse(host).hostname
+    host = (host or "").rsplit("@", 1)[-1]   # mail address: its sender domain
+    if not host or re.fullmatch(r"[0-9a-fA-F]{32,128}", host):   # hash: no domain
+        return True
+    domain = Domain.objects.filter(value=host).first()
     return not overrides_allow_list(domain)

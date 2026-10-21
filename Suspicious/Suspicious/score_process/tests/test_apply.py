@@ -53,4 +53,4 @@ class StickyAllowListTests(TestCase):
         CampaignDomainAllowList.objects.create(domain=d, user=user)
         finalise_ioc_group(case)
         d.refresh_from_db()
-        self.assertNotEqual(d.ioc_level, "SAFE-ALLOW_LISTED")
+        self.assertEqual(d.ioc_level, "malicious")  # re-scored, not kept Safe

@@ -38,6 +38,7 @@ Allow-listing is not only a launch filter, it also takes part in the verdict:
 - Each analyzer casts one weighted vote (its configured weight). Its band is the worst across all of its reports on the case, so a tool that flags one artifact and is allow-listed on another votes dissent, not safe. The AI analyzer votes from its signal.
 - A vote is marked allow-listed when its band is Safe and at least one of its reports carries an allow-list marker that is still valid: the allow-list check is re-run for the report's target at scoring time, so a removed entry or a domain that is now deny-listed, Watcher-monitored or campaign no longer counts.
 - When the Safe plus allow-listed weight is a strict majority of the voting weight, the case is Safe under the rule `allow-list-majority`, and the rationale names the dissenting analyzers.
+- Reports with no recheckable target (hash, mail address, mail body, mail header) never carry a marker, so they never vote as allow-listed.
 - Reports that do not vote: failed or pending jobs, `info` level, confidence below the floor, and analyzers with weight 0.
 - Deny-listed, campaign and Watcher-monitored targets are never overridden by the majority.
 - The embedded-IOC escalation still applies afterwards.

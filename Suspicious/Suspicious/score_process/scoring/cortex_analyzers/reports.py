@@ -211,7 +211,9 @@ class CortexAnalyzerReports:
             verdict, [ObservableVerdict(worst_band, 100, None, {}, [])], note=note
         )
 
-        # mirror _STICKY_IOC_LEVELS: an allow/deny-listed artifact keeps its level
+        # mirror _STICKY_IOC_LEVELS: an allow/deny-listed artifact keeps its level.
+        # Kill-switch path only: this gates the display level, not the verdict, so it
+        # does not re-check allow-list overrides (sticky_holds).
         sticky = {"critical", "SAFE-ALLOW_LISTED"}
         ioc_level = {"Suspicious": "suspicious", "Dangerous": "malicious"}
         for (ptype, pid), (band, _note, _conf) in escalations.items():
