@@ -2,13 +2,17 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import SimpleTestCase, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from case_handler.models import Case, CaseHasFileOrMail
 from hash_process.models import Hash
 from ip_process.models import IP
-from mail_feeder.models import ArtifactIsIp, Mail, MailArtifact
+from mail_feeder.models import (
+    ArtifactIsDomain, ArtifactIsIp, ArtifactIsUrl, Mail, MailArtifact, MailHeader,
+)
 from settings.models import CampaignDomainAllowList
 
 from connectors.contrib.misp.connector import MISPConnector
@@ -301,3 +305,64 @@ class CampaignSenderCaseStillSharesOtherIocsTest(TestCase):
             svc.update_misp(case)
         self.assertIn("sim.test", email.call_args.args[3])  # address objects drop the campaign sender
         ip_obj.assert_called_once()                          # no whole-case skip
+
+
+class UpdateMispAllowListQueriesTest(TestCase):
+    def _case(self, user, n_ips, sender_is_campaign=False):
+        mail = Mail.objects.create(subject="t", mail_from="hr@sim.test", date=timezone.now())
+        if sender_is_campaign:
+            mail.mail_header = MailHeader.objects.create(
+                header_value="From: HR <hr@sim.test>\nTo: bob@other.test\nSubject: t\n",
+                fuzzy_hash="x",
+            )
+            mail.save(update_fields=["mail_header"])
+        for i in range(n_ips):
+            art = MailArtifact.objects.create(mail=mail, artifact_type="IP", artifact_score=0, artifact_confidence=0)
+            art.artifactIsIp = ArtifactIsIp.objects.create(
+                ip=IP.objects.create(address="203.0.113.%d" % (i + 1)), artifact=art)
+            art.save(update_fields=["artifactIsIp"])
+        case = Case.objects.create(description="", reporter=user, results="Safe")
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
+        case.save(update_fields=["fileOrMail"])
+        return case, mail
+
+    def _run(self, case):
+        pushed = []
+        with patch("connectors.contrib.misp.service.MISPEventManager") as mem, \
+                patch("connectors.contrib.misp.service.MISPClient"), \
+                patch.object(MISPService, "_push", side_effect=lambda eid, obj, *a, **k: pushed.append(obj)):
+            mem.return_value.get_or_create_event.return_value = MagicMock(id=1)
+            svc = MISPService.__new__(MISPService)
+            svc.client, svc.primary = MagicMock(), True
+            with CaptureQueriesContext(connection) as ctx:
+                svc.update_misp(case)
+        return pushed, ctx
+
+    def test_allow_list_queries_do_not_grow_with_iocs(self):
+        user = get_user_model().objects.create_user(username="misp_q", password="x")
+        counts = []
+        for n in (1, 20):
+            case, _ = self._case(user, n)
+            pushed, ctx = self._run(case)
+            self.assertGreaterEqual(len(pushed), n)
+            counts.append(sum(1 for q in ctx.captured_queries
+                              if "allowlist" in q["sql"].lower() or "campaign" in q["sql"].lower()))
+        self.assertGreater(counts[0], 0)
+        self.assertEqual(counts[0], counts[1])
+
+    def test_campaign_url_domain_and_sender_dropped_from_pushed_objects(self):
+        user = get_user_model().objects.create_user(username="misp_c2", password="x")
+        CampaignDomainAllowList.objects.create(domain=Domain.objects.create(value="sim.test"), user=user)
+        case, mail = self._case(user, 1, sender_is_campaign=True)
+        for kind, rel, model in (("url", "artifactIsUrl", ArtifactIsUrl), ("domain", "artifactIsDomain", ArtifactIsDomain)):
+            art = MailArtifact.objects.create(mail=mail, artifact_type=kind, artifact_score=0, artifact_confidence=0)
+            if kind == "url":
+                link = model.objects.create(url=URL.objects.create(address="https://login.sim.test/x"), artifact=art)
+            else:
+                link = model.objects.create(domain=Domain.objects.create(value="login.sim.test"), artifact=art)
+            setattr(art, rel, link)
+            art.save(update_fields=[rel])
+        pushed, _ = self._run(case)
+        values = [str(a.value) for o in pushed for a in o.Attribute]
+        self.assertIn("203.0.113.1", values)  # the other IOC is still shared
+        self.assertFalse([v for v in values if "sim.test" in v], values)

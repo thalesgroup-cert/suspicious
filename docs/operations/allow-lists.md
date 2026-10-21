@@ -28,3 +28,5 @@ The MISP connector withholds these indicators from shared events:
 - IPs on the IP allow list.
 
 Filtering is per IOC: a case from a campaign sender still shares its other IOCs. MISP matching covers subdomains, while launch matching is on exact domains.
+
+Hash skips compare the stored value of the allow-listed hash only: an md5 entry does not cover the same file's sha256 IOC.

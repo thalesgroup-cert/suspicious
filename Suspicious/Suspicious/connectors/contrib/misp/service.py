@@ -13,12 +13,11 @@ from url_process.models import URL
 from hash_process.models import Hash
 from domain_process.models import Domain
 from mail_feeder.models import Mail
+from settings.allow_lists import normalise_ip
 
 from .client import MISPClient
 from .config_loader import load_misp_settings
 from .events import MISPEventManager
-from settings.allow_lists import normalise_ip
-
 from .internal import (
     allow_listed_domains,
     allow_listed_hashes,
