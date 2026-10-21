@@ -16,6 +16,7 @@ cp deployment/.env deployment/.env.ci.bak 2>/dev/null || true
 SEED_ARG=""; [ -n "${SEED:-}" ] && SEED_ARG="--seed ${SEED}"
 # shellcheck disable=SC2086
 python scripts/ci/gen_company.py ${SEED_ARG} >/dev/null
+bash deployment/scripts/gen-service-secrets.sh deployment/.env deployment/.env.data >/dev/null
 
 # Load generated identity (DOMAIN, SVC_PREFIX, COMPOSE_PROJECT_NAME, WEBHOOK_SECRET, MINIO_*).
 set -a; . deployment/.env; set +a
@@ -39,7 +40,7 @@ cleanup() {
   # Restore the config files the generator rewrote (tracked) + drop runtime.
   git checkout -- Suspicious/settings.json email-feeder/config.json 2>/dev/null || true
   { mv deployment/.env.ci.bak deployment/.env 2>/dev/null || rm -f deployment/.env; } || true
-  rm -f scripts/ci/.runtime.json
+  rm -f scripts/ci/.runtime.json deployment/.env.data
 }
 trap cleanup EXIT
 

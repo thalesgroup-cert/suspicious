@@ -11,11 +11,11 @@ and a Celery worker.
 | `suspicious_celery` | Celery beat + worker (background jobs, cortex sync, case finalisation) |
 | `suspicious_ui` | React/Vite frontend (Nginx, port 9021) |
 | `db_suspicious` | MariaDB 12 (primary; opt-in replica via R6 router) |
-| `redis_broker` / `redis_cache` | Valkey 9 — Celery broker + Django cache |
-| `elasticsearch` | Search and indexing |
+| `redis_broker` / `redis_cache` | Valkey 9 — Celery broker + Django cache; password required (`REDIS_*_PASSWORD`) |
+| `elasticsearch` | Search and indexing; security enabled, per-service accounts (`ES_SUSPICIOUS_*`, `ES_CORTEX_*`) |
 | `rustfs` | S3-compatible object storage (artifacts/attachments) |
 | `cortex` | Analyzer execution engine (YARA, AI, sandbox) |
-| `chromadb` | Vector DB for semantic similarity search |
+| `chromadb` / `chromadb_proxy` | Vector DB for semantic similarity search; reachable only through the token-checking nginx proxy (`CHROMA_TOKEN`) |
 | `feeder` | IMAP poller that auto-ingests emails (container `email_feeder`) |
 | `traefik` | Reverse proxy with TLS termination |
 | `tempo` / `grafana` | Optional OpenTelemetry trace store + dashboards (manual setup under `deployment/docker/monitoring/`) |

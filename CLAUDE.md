@@ -159,8 +159,9 @@ cd .. && bash scripts/init.sh   # now completes: downloads Cortex catalogs too
 cd deployment
 docker network create --driver bridge --subnet 172.20.0.0/16 \
   --gateway 172.20.0.1 --ip-range 172.20.0.0/24 suspicious_net   # or `make network`
+bash scripts/gen-service-secrets.sh .env .env.data   # Redis/ES/Chroma passwords (make init does this too)
 docker compose --env-file .env build suspicious suspicious_ui feeder
-docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb
+docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb chromadb_proxy
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev-extras.yml \
   up -d greenmail openldap
 ```
@@ -204,6 +205,8 @@ for username, first, last, groups in PERSONAS:
 ```
 
 ```bash
+docker compose --env-file .env up -d elasticsearch
+bash scripts/es-security-bootstrap.sh   # creates the ES service accounts
 docker compose --env-file .env up -d suspicious suspicious_celery suspicious_celery_beat suspicious_ui feeder
 ```
 `suspicious_celery_beat` is a separate container from the worker — omitting it (as this walkthrough used to) leaves the stack running with no periodic tasks at all: no email polling, no stale-job cleanup, no connector sync. `cortex` and `elasticsearch` come up automatically as dependencies of `suspicious`. Confirm everything: `docker compose --env-file .env ps` (all healthy) and `curl --noproxy '*' http://localhost:9020/api/health/` → `{"status": "ok", "checks": {"db": true, "redis": true, "cortex": true}, ...}`.

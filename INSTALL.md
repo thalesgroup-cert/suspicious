@@ -60,11 +60,12 @@ cp docs/getting-started/examples/suspicious-ui-env.example        suspicious-ui/
 
 # 3. Create the Docker network and build the backend image
 cd deployment
+bash scripts/gen-service-secrets.sh .env .env.data   # fills the data-service passwords
 docker network create suspicious_net
 docker compose build suspicious
 
 # 4. Start the data stores, then the backend
-docker compose up -d db_suspicious redis_cache redis_broker
+docker compose up -d db_suspicious redis_cache redis_broker chromadb chromadb_proxy
 docker compose up -d --no-deps suspicious
 
 # 5. Initialise the database and create your admin account
@@ -196,7 +197,7 @@ cd deployment
 make init
 ```
 
-`make init` needs `keytool` (a JDK) and internet access for the Cortex catalogs.
+`make init` also generates the Redis/Elasticsearch/ChromaDB secrets (`.env`, `.env.data`) before any data store starts. It needs `keytool` (a JDK) and internet access for the Cortex catalogs.
 
 ### 2. Three settings the full stack requires
 
@@ -212,7 +213,8 @@ make init
 cd deployment
 docker compose build suspicious suspicious_ui
 
-docker compose up -d db_suspicious redis_cache redis_broker
+bash scripts/gen-service-secrets.sh .env .env.data   # fills the data-service passwords
+docker compose up -d db_suspicious redis_cache redis_broker chromadb chromadb_proxy
 docker compose run --rm --no-deps suspicious python manage.py migrate --no-input
 docker compose run --rm --no-deps suspicious python manage.py seed_config
 docker compose run --rm --no-deps \
@@ -221,6 +223,8 @@ docker compose run --rm --no-deps \
   -e DJANGO_SUPERUSER_EMAIL=admin@example.com \
   suspicious python manage.py createsuperuser --noinput
 
+docker compose up -d elasticsearch
+bash scripts/es-security-bootstrap.sh   # creates the Elasticsearch service accounts
 docker compose up -d
 docker compose ps
 ```

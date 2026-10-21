@@ -37,6 +37,7 @@ This performs:
 * Directory structure validation
 * Download/creation of config files
 * Certificate generation (if missing)
+* Generation of the Redis, Elasticsearch and ChromaDB secrets (`.env`, `.env.data`; existing values are never overwritten)
 * Cortex catalog download
 * Check of Docker socket permissions
   …and other required system checks.
@@ -236,6 +237,8 @@ The app now reads secrets from Vault and runtime config from the DB. Later resta
 
 * `.env` **must never be committed** — it contains secrets.
 * `.env` is already included in `.gitignore`.
+* `.env.data` holds the Elasticsearch superuser password (mode 600, git-ignored); only the `elasticsearch` service and `scripts/es-security-bootstrap.sh` read it.
+* Upgrading an existing stack: run `make db-auth-migrate` once (see `docs/operations/deploy.md`); `make deploy` refuses to run until the data services enforce authentication.
 * Secrets can also be provided through:
 
   * environment variables

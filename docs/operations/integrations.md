@@ -19,7 +19,7 @@ for secret fields) rather than static `settings.json` blocks, though a
 | `elastic_siem` | `integrations.elastic_siem` | Forward cases at or above `min_verdict` to Elasticsearch as ECS documents for Elastic Security. Off by default; needs `url` and an `api_key`. See the connectors README |
 | `xsoar` | `integrations.xsoar` | Open a Cortex XSOAR incident for each finalised case at or above `min_verdict`. Off by default; needs `url` and an `api_key` (plus `api_key_id` on XSOAR 8). See the connectors README |
 | LDAP / OIDC | `authentication.ldap` / `authentication.oidc` | Single sign-on |
-| Elasticsearch | (service) | Search and indexing |
+| Elasticsearch | (service) | Search and indexing; credentials come from `ES_SUSPICIOUS_USER`/`ES_SUSPICIOUS_PASSWORD` in `deployment/.env`, see [Internal service authentication](../../CONFIG.md#internal-service-authentication) |
 | SMTP | `email.smtp` | Outbound reporter notifications |
 
 Each integration is optional except Cortex; leave a section's credentials blank,

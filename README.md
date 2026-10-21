@@ -74,9 +74,10 @@ cp docs/getting-started/examples/deployment-env.example          deployment/.env
 cp docs/getting-started/examples/Suspicious-settings.example.json Suspicious/settings.json
 
 cd deployment
+bash scripts/gen-service-secrets.sh .env .env.data   # fills the data-service passwords
 docker network create suspicious_net
 docker compose build suspicious
-docker compose up -d db_suspicious redis_cache redis_broker
+docker compose up -d db_suspicious redis_cache redis_broker chromadb chromadb_proxy
 docker compose up -d --no-deps suspicious
 make migrate
 make seed-config

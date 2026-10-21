@@ -105,12 +105,20 @@ Paste the resulting token into `BACKEND_URL`/`FEEDER_API_TOKEN` in
 `deployment/.env`. Leave both blank to keep the feeder on its local config —
 that path still works.
 
+## Authenticated data services
+
+Existing deployments upgrade once with `make db-auth-migrate` (maintenance
+window of about 2 minutes; see `docs/operations/deploy.md`). It generates the
+Redis, Elasticsearch and ChromaDB secrets, restarts the data tier with
+authentication and verifies the result.
+
 ## Step 4 — Bring up the new services
 
 ```bash
 cd deployment
 docker compose --env-file .env build suspicious suspicious_ui feeder
-docker compose --env-file .env up -d redis_cache redis_broker chromadb
+bash scripts/gen-service-secrets.sh .env .env.data   # data-service passwords
+docker compose --env-file .env up -d redis_cache redis_broker chromadb chromadb_proxy
 docker compose --env-file .env up -d suspicious suspicious_celery suspicious_ui
 ```
 
