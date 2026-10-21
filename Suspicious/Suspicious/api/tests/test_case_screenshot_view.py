@@ -77,10 +77,10 @@ class CaseScreenshotViewTest(TestCase):
         resp = self.client.get(self._url())
         self.assertEqual(resp.status_code, 404)
 
-    def test_403_for_non_investigator(self):
+    def test_404_for_non_investigator(self):
         self.client.force_authenticate(self.plain_user)
         resp = self.client.get(self._url())
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 404)
 
     @patch("api.views.case_screenshot.get_s3_client")
     def test_prefers_lookyloo_over_urlscan(self, client):

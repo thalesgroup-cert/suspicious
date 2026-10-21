@@ -15,6 +15,16 @@ def user_has_submission_elevated_access(user) -> bool:
     return user.groups.filter(name__in=SUBMISSION_ELEVATED_GROUPS).exists()
 
 
+def has_elevated_view(user, case) -> bool:
+    """Analyst extras (raw data, internal comments) on ``case``: CERT/Admin always;
+    a CISO only when acting in their scope role, not on their own submission."""
+    if not user_has_submission_elevated_access(user):
+        return False
+    if case.reporter_id != user.id:
+        return True
+    return bool(set(user.groups.values_list("name", flat=True)) & _GLOBAL_GROUPS)
+
+
 def submission_queryset(queryset, user):
     """Restrict a Case queryset to the submissions ``user`` may open.
 

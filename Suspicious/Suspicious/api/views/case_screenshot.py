@@ -18,7 +18,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from api.permissions.submissions import CanAccessSubmission
+from api.permissions.submissions import CanAccessSubmission, submission_queryset
 from api.utils.analyzer_reports import reports_for_case
 from case_handler.models import Case
 from common.clients import get_s3_client
@@ -35,7 +35,7 @@ class CaseScreenshotView(APIView):
 
     def get(self, request, case_id: int):
         try:
-            case = Case.objects.get(pk=case_id)
+            case = submission_queryset(Case.objects.all(), request.user).get(pk=case_id)
         except Case.DoesNotExist as exc:
             raise NotFound("Case not found") from exc
         self.check_object_permissions(request, case)

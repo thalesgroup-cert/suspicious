@@ -15,7 +15,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from api.tests.test_url_ondemand import _build_case_with_non_file_ioc, _make_url
-from case_handler.models import Case
+from case_handler.models import Case, CaseComment
 from profiles.models import CISOProfile
 
 User = get_user_model()
@@ -139,24 +139,27 @@ class CaseScopedEndpointTests(CisoSubmissionScopeBase):
                 ok = client.get(reverse(name, kwargs={"case_id": self.in_scope.id}) + query)
                 self.assertEqual(ok.status_code, 200)
                 no = client.get(reverse(name, kwargs={"case_id": self.out_scope.id}) + query)
-                self.assertEqual(no.status_code, 403)
+                self.assertEqual(no.status_code, 404)
 
     def test_mail_preview(self):
-        # Passing the permission check reaches "No mail linked to case" (404);
-        # failing it is a 403 before any mail lookup.
+        # In scope reaches the mail lookup; out of scope looks like a missing case.
         client = self.as_user(self.ciso)
         ok = client.get(reverse("case-mail-preview", kwargs={"case_id": self.in_scope.id}))
         self.assertEqual(ok.status_code, 404)
+        self.assertEqual(ok.data["detail"], "No mail linked to case")
         no = client.get(reverse("case-mail-preview", kwargs={"case_id": self.out_scope.id}))
-        self.assertEqual(no.status_code, 403)
+        self.assertEqual(no.status_code, 404)
+        self.assertEqual(no.data["detail"], "Case not found")
 
     def test_screenshot(self):
-        # In scope with no captured screenshot is 404; out of scope is 403.
+        # In scope with no captured screenshot says so; out of scope looks like a missing case.
         client = self.as_user(self.ciso)
         ok = client.get(reverse("case-screenshot", kwargs={"case_id": self.in_scope.id}))
         self.assertEqual(ok.status_code, 404)
+        self.assertEqual(ok.data["detail"], "No screenshot available")
         no = client.get(reverse("case-screenshot", kwargs={"case_id": self.out_scope.id}))
-        self.assertEqual(no.status_code, 403)
+        self.assertEqual(no.status_code, 404)
+        self.assertEqual(no.data["detail"], "Case not found")
 
     @mock.patch("api.views.url_analysis.CortexJob")
     def test_url_analysis(self, cortex):
@@ -165,7 +168,7 @@ class CaseScopedEndpointTests(CisoSubmissionScopeBase):
         ok = client.post(f"/api/submissions/{self.in_scope.id}/urls/{self.url_in.id}/analyze/")
         self.assertEqual(ok.status_code, 202)
         no = client.post(f"/api/submissions/{self.out_scope.id}/urls/{self.url_out.id}/analyze/")
-        self.assertEqual(no.status_code, 403)
+        self.assertEqual(no.status_code, 404)
 
     def test_cert_keeps_global_access_on_case_endpoints(self):
         client = self.as_user(_user("ss_cert_ep", groups=["CERT"]))
@@ -178,10 +181,71 @@ class CaseScopedEndpointTests(CisoSubmissionScopeBase):
         own = client.get(reverse("case-report", kwargs={"case_id": self.out_scope.id}) + "?format=html")
         self.assertEqual(own.status_code, 200)
         other = client.get(reverse("case-report", kwargs={"case_id": self.in_scope.id}) + "?format=html")
-        self.assertEqual(other.status_code, 403)
+        self.assertEqual(other.status_code, 404)
 
     def test_ciso_keeps_own_out_of_scope_submission(self):
         mine = _build_case_with_non_file_ioc(self.ciso, _make_url("https://mine.example.com/"))
         client = self.as_user(self.ciso)
         resp = client.get(reverse("case-report", kwargs={"case_id": mine.id}) + "?format=html")
         self.assertEqual(resp.status_code, 200)
+
+
+class ElevatedExtrasScopeTests(CisoSubmissionScopeBase):
+    """A CISO on their own submission gets the reporter view; in scope, the analyst view."""
+
+    def setUp(self):
+        super().setUp()
+        self.own = Case.objects.create(reporter=self.ciso, description="mine")
+        for case in (self.own, self.in_scope):
+            CaseComment.objects.create(case=case, author=self.emea_reporter, body="public", is_internal=False)
+            CaseComment.objects.create(case=case, author=self.emea_reporter, body="secret", is_internal=True)
+
+    def _detail(self, user, case):
+        return self.as_user(user).get(reverse("submission-details", kwargs={"submission_id": case.id}))
+
+    def _bodies(self, user, case):
+        resp = self.as_user(user).get(reverse("case-comments", kwargs={"case_id": case.id}))
+        self.assertEqual(resp.status_code, 200)
+        return {c["body"] for c in resp.data}
+
+    def test_own_case_detail_has_no_raw_but_in_scope_has(self):
+        self.assertIsNone(self._detail(self.ciso, self.own).data.get("raw"))
+        self.assertIsNotNone(self._detail(self.ciso, self.in_scope).data.get("raw"))
+
+    def test_own_case_hides_internal_comments_in_scope_shows_them(self):
+        self.assertEqual(self._bodies(self.ciso, self.own), {"public"})
+        self.assertEqual(self._bodies(self.ciso, self.in_scope), {"public", "secret"})
+
+    def test_own_case_comment_is_not_internal_in_scope_comment_is(self):
+        client = self.as_user(self.ciso)
+        with mock.patch("api.views.comments.sync_case_comment_to_thehive") as sync:
+            mine = client.post(reverse("case-comments", kwargs={"case_id": self.own.id}), {"body": "m"}, format="json")
+            scoped = client.post(reverse("case-comments", kwargs={"case_id": self.in_scope.id}), {"body": "s"}, format="json")
+        self.assertEqual((mine.status_code, scoped.status_code), (201, 201))
+        self.assertFalse(CaseComment.objects.get(body="m").is_internal)
+        self.assertTrue(CaseComment.objects.get(body="s").is_internal)
+
+    def test_cert_and_ciso_keeps_extras_on_own_case(self):
+        both = _user("ss_cert_ciso2", groups=["CERT", "CISO"])
+        mine = Case.objects.create(reporter=both, description="m")
+        CaseComment.objects.create(case=mine, author=both, body="secret", is_internal=True)
+        self.assertIn("secret", self._bodies(both, mine))
+        self.assertIsNotNone(self._detail(both, mine).data.get("raw"))
+
+
+class SubmissionListQueryCountTests(CisoSubmissionScopeBase):
+    def _count(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        client = self.as_user(self.ciso)
+        with CaptureQueriesContext(connection) as ctx:
+            self.assertEqual(client.get(reverse("submissions-list")).status_code, 200)
+        return len(ctx)
+
+    def test_list_query_count_is_constant_in_rows(self):
+        self._count()  # warm caches
+        before = self._count()
+        for i in range(5):
+            _build_case_with_non_file_ioc(self.emea_reporter, _make_url(f"https://more{i}.example.com/"))
+        self.assertEqual(self._count(), before)

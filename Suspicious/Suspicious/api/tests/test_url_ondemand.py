@@ -7,7 +7,7 @@ Fixture construction follows the same pattern as test_url_planner_serialization.
 
 Authorization tests verify:
   - unauthenticated users get 401/403
-  - non-owner gets 403 (CanAccessSubmission raises PermissionDenied)
+  - non-owner gets 404 (CanAccessSubmission raises PermissionDenied)
   - url_id from a different submission gets 404 (Fix 1 binding)
   - owner with valid url gets 202 (dispatch mocked)
 """
@@ -81,13 +81,13 @@ class UrlOnDemandAuthTest(APITestCase):
         self.assertIn(resp.status_code, (401, 403))
 
     # ------------------------------------------------------------------
-    # Fix 3b: authenticated non-owner → 403 (CanAccessSubmission)
+    # Fix 3b: authenticated non-owner → 404 (CanAccessSubmission)
     # ------------------------------------------------------------------
     def test_non_owner_forbidden(self):
-        """User B POSTs against a case owned by user A → 403 from CanAccessSubmission."""
+        """User B POSTs against a case owned by user A → 404 from CanAccessSubmission."""
         self.client.force_authenticate(self.other)
         resp = self.client.post(_url(self.case.pk, self.url.pk))
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 404)
 
     # ------------------------------------------------------------------
     # Fix 3c / Fix 1: url_id from a different case → 404

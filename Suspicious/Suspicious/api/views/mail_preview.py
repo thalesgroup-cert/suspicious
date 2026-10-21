@@ -23,7 +23,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from api.permissions.submissions import CanAccessSubmission
+from api.permissions.submissions import CanAccessSubmission, submission_queryset
 from case_handler.models import Case
 from mail_feeder.utils.email_preview.preview_jobs import enqueue_preview_render
 
@@ -38,7 +38,7 @@ class MailPreviewView(APIView):
     permission_classes = [IsAuthenticated, CanAccessSubmission]
 
     def get(self, request, case_id: int):
-        case = self._get_case(case_id)
+        case = self._get_case(case_id, request.user)
         self.check_object_permissions(request, case)
 
         mail = self._get_mail(case)
@@ -72,9 +72,11 @@ class MailPreviewView(APIView):
         return response
 
     @staticmethod
-    def _get_case(case_id: int) -> Case:
+    def _get_case(case_id: int, user) -> Case:
         try:
-            return Case.objects.select_related("fileOrMail__mail").get(pk=case_id)
+            return submission_queryset(
+                Case.objects.select_related("fileOrMail__mail"), user
+            ).get(pk=case_id)
         except Case.DoesNotExist as exc:
             raise NotFound("Case not found") from exc
 

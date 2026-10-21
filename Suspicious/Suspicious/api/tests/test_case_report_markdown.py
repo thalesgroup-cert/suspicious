@@ -103,4 +103,4 @@ class MarkdownReportTests(TestCase):
 
     def test_other_users_cannot_read_the_report(self):
         self.client.force_authenticate(_user("stranger"))
-        self.assertEqual(self._get().status_code, 403)
+        self.assertEqual(self._get().status_code, 404)

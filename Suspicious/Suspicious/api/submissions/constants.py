@@ -3,6 +3,7 @@ from django.conf import settings
 
 DEFAULT_SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 
+# CISO is special-cased (own submissions plus its scope); every other group listed here is global.
 SUBMISSION_ELEVATED_GROUPS = tuple(
     getattr(settings, "SUBMISSION_ELEVATED_GROUPS", DEFAULT_SUBMISSION_ELEVATED_GROUPS)
 )

@@ -179,7 +179,7 @@ class SubmissionDetailsView(RetrieveAPIView):
         return submission_queryset(queryset, self.request.user)
 
     def get_serializer_class(self):
-        if user_has_submission_elevated_access(self.request.user):
+        if user_has_submission_elevated_access(self.request.user):  # raw itself is gated per case
             return AdminSubmissionDetailsSerializer
         return SubmissionDetailsSerializer
 

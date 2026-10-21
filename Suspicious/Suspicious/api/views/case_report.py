@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import BaseRenderer, StaticHTMLRenderer
 from rest_framework.views import APIView
 
-from api.permissions.submissions import CanAccessSubmission
+from api.permissions.submissions import CanAccessSubmission, submission_queryset
 from api.utils.observable_report import assemble_observables
 from case_handler.models import Case
 from common.clients import get_s3_client
@@ -90,7 +90,7 @@ class CaseReportView(APIView):
     renderer_classes = [StaticHTMLRenderer]
 
     def get(self, request, case_id):
-        case = get_object_or_404(Case, pk=case_id)
+        case = get_object_or_404(submission_queryset(Case.objects.all(), request.user), pk=case_id)
         self.check_object_permissions(request, case)
         observables = assemble_observables(case, full=True) if case.observable_group_id else []
         observables = _inline_screenshots(observables)
@@ -130,7 +130,9 @@ class CaseReportMarkdownView(APIView):
         from score_process.scoring.classification import derive_threat_classification
         from score_process.scoring.health import analysis_health
 
-        case = get_object_or_404(Case.objects.select_related("reporter"), pk=case_id)
+        case = get_object_or_404(
+            submission_queryset(Case.objects.select_related("reporter"), request.user), pk=case_id
+        )
         self.check_object_permissions(request, case)
         reports = _dedup_analyzer_reports(reports_for_case(case, defer_full=True))
         observables = assemble_observables(case) if case.observable_group_id else []

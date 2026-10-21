@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.permissions.submissions import CanAccessSubmission
+from api.permissions.submissions import CanAccessSubmission, submission_queryset
 from api.serializers.submissions import case_url_ids
 from case_handler.models import Case
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
@@ -28,7 +28,7 @@ class SubmissionUrlAnalyzeView(APIView):
     permission_classes = [IsAuthenticated, CanAccessSubmission]
 
     def post(self, request, submission_id: int, url_id: int):
-        case = get_object_or_404(Case, pk=submission_id)
+        case = get_object_or_404(submission_queryset(Case.objects.all(), request.user), pk=submission_id)
         self.check_object_permissions(request, case)
 
         if url_id not in case_url_ids(case):

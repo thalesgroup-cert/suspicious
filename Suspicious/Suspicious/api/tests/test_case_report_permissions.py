@@ -45,7 +45,7 @@ class CaseReportPermissionsTests(TestCase):
         client.force_authenticate(other)
 
         resp = client.get(f"/api/cases/{case.id}/report/?format=html")
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 404)
 
     def test_investigator_can_download_any_case_report(self):
         investigator = _make_user("investigator", groups=["CERT"])
