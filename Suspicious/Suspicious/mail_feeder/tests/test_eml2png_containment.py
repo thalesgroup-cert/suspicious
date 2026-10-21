@@ -84,3 +84,17 @@ class BodySanitisationWiringTests(SimpleTestCase):
             html = Eml2PngRenderer()._build_preview_html(_html_message(self.HOSTILE))
         self.assertIn("plain fallback", html)
         self.assertNotIn(HOST, html)
+
+
+class HostileRenderThroughOptionsTests(SimpleTestCase):
+    def test_hostile_body_is_rendered_only_with_proxy_option_and_clean_html(self):
+        renderer = Eml2PngRenderer()
+        renderer._imgkit_available = True
+        html = renderer._build_preview_html(
+            _html_message(f"<iframe src=http://{HOST}/x></iframe><p>visible</p>")
+        )
+        with mock.patch("imgkit.from_string", return_value=b"PNG") as mocked:
+            renderer._render_html_to_png(html)
+        args, kwargs = mocked.call_args
+        self.assertNotIn(HOST, args[0])
+        self.assertEqual(kwargs["options"]["proxy"], _CLOSED_PROXY)

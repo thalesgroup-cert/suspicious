@@ -54,15 +54,26 @@ _STYLE_PROPERTIES = {
 _INLINE_IMAGE = re.compile(
     r"^(?:data:image/(?:png|jpe?g|gif|webp|bmp)[;,]|cid:)", re.IGNORECASE
 )
-_STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style\s*>", re.IGNORECASE | re.DOTALL)
-_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 # A <style> block is kept only if none of this appears (checked after
-# comments are removed). Any @-rule except @media, any backslash escape and
-# any function or keyword that can load a resource rejects the whole block.
+# comments are removed). Fail closed: any @-rule except @media, any backslash
+# escape and any function or keyword that can load a resource or run code
+# rejects the whole block. Plain words such as a ".image-wrap" class are fine
+# because a fetch needs url(, image-set(, image(, ... or an @-rule.
 _CSS_FORBIDDEN = re.compile(
-    r"url|image|src|import|expression|behavior|binding|@(?!media\b)|[\\<&]",
+    r"url|image-set|image\(|cross-fade|element\(|paint\(|import|expression|"
+    r"behavior|binding|@(?!media\b)|[\\<&]",
     re.IGNORECASE,
 )
+
+# Input beyond this is cut off before parsing; a mail body that large is not
+# a legitimate preview and every pass below stays linear in it.
+MAX_HTML_CHARS = 1024 * 1024
+
+# nh3 is quadratic in nesting depth (20k nested <div> take about a second), so
+# the number of tag openers is capped too. Real mail stays far below this.
+MAX_HTML_TAGS = 10_000
+
+_ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
 
 
 def _attribute_filter(tag: str, attr: str, value: str):
@@ -86,13 +97,65 @@ _CLEANER = nh3.Cleaner(
 )
 
 
+def _strip_css_comments(css: str) -> str:
+    # Linear scan; an unterminated comment runs to the end, as in a browser.
+    out, pos = [], 0
+    while True:
+        start = css.find("/*", pos)
+        if start < 0:
+            out.append(css[pos:])
+            return "".join(out)
+        out.append(css[pos:start])
+        end = css.find("*/", start + 2)
+        if end < 0:
+            return "".join(out)
+        pos = end + 2
+
+
+def _style_block_bodies(html: str):
+    # str.find based so each position is scanned once. When a needle is
+    # missing it is missing for the rest of the input too, so stop.
+    low = html.translate(_ASCII_LOWER)  # same length as html
+    pos = 0
+    while True:
+        start = low.find("<style", pos)
+        if start < 0:
+            return
+        after = start + len("<style")
+        if after < len(low) and (low[after].isalnum() or low[after] in "-_"):
+            pos = after
+            continue
+        open_end = low.find(">", after)
+        if open_end < 0:
+            return
+        close = low.find("</style", open_end + 1)
+        if close < 0:
+            return
+        close_end = low.find(">", close)
+        if close_end < 0:
+            return
+        yield html[open_end + 1:close]
+        pos = close_end + 1
+
+
 def _safe_style_blocks(html: str) -> str:
     blocks = []
-    for css in _STYLE_BLOCK.findall(html):
-        css = _CSS_COMMENT.sub("", css)
+    for css in _style_block_bodies(html):
+        css = _strip_css_comments(css)
         if css.strip() and not _CSS_FORBIDDEN.search(css):
             blocks.append(f"<style>{css}</style>")
     return "".join(blocks)
+
+
+def _truncate(html: str) -> str:
+    html = html[:MAX_HTML_CHARS]
+    pos = -1
+    for _ in range(MAX_HTML_TAGS):
+        pos = html.find("<", pos + 1)
+        if pos < 0:
+            return html
+    cut = html.find("<", pos + 1)
+    return html if cut < 0 else html[:cut]
 
 
 def sanitize_email_html(html: str) -> str:
@@ -102,5 +165,5 @@ def sanitize_email_html(html: str) -> str:
     each one is checked by ``_CSS_FORBIDDEN`` and re-wrapped from the checked
     text, so nothing the HTML parser disagrees about can leak through.
     """
-    html = html.replace("\x00", "")
+    html = _truncate(html).replace("\x00", "")
     return _safe_style_blocks(html) + _CLEANER.clean(html)

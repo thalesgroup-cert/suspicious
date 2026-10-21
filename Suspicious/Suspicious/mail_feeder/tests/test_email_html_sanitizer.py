@@ -1,12 +1,15 @@
 """sanitize_email_html must leave no outbound reference in hostile mail
 bodies, and must keep an ordinary newsletter readable."""
 import re
+import time
 from html.parser import HTMLParser
 
 from django.test import SimpleTestCase
 
 from mail_feeder.utils.email_preview.html_sanitizer import (
+    _ATTRIBUTES,
     ALLOWED_TAGS,
+    MAX_HTML_CHARS,
     sanitize_email_html,
 )
 
@@ -57,12 +60,27 @@ HOSTILE = {
     "nested_split_tag": f"<scr<script>ipt>x</scr</script>ipt><img src=http://{HOST}/n>",
     "imgkit_option_meta": '<meta name="imgkit-enable-local-file-access" content=""><p>t</p>',
     "huge_attribute": f'<img alt="{"A" * 1_000_000}" src="http://{HOST}/x">',
+    "uppercase_style_block": f"<STYLE>div{{background:URL(//{HOST}/x)}}</STYLE><p>t</p>",
+    "style_close_with_space": f"<style>div{{background:url(//{HOST}/x)}}</style ><p>t</p>",
+    "style_close_with_newline": f"<style>@import '//{HOST}/a'</STYLE\n><p>t</p>",
+    "style_inside_svg": f"<svg><style>@import '//{HOST}/a';</style></svg><p>t</p>",
+    "style_inside_noscript": f"<noscript><style>div{{background:url(//{HOST}/x)}}</style></noscript>",
+    "style_inside_textarea": f"<textarea><style>@import '//{HOST}/a';</style></textarea><img src=//{HOST}/y>",
+    "style_inside_xmp": f"<xmp><style>@import '//{HOST}/a';</style></xmp><img src=//{HOST}/y>",
+    "vtab_in_tag": f"<img\x0bsrc=http://{HOST}/x>",
+    "formfeed_in_attr_name": f"<img s\x0crc=http://{HOST}/x>",
+    "cr_in_scheme": f'<img src="ht\rtp://{HOST}/x">',
+    "formfeed_in_scheme": f'<img src="java\x0cscript:{HOST}">',
+    "style_attr_css_escape": f'<div style="background:\\75rl(//{HOST}/x)">t</div>',
+    "style_attr_comment_split": f'<div style="background:u/**/rl(//{HOST}/x)">t</div>',
+    "moz_binding": f'<div style="-moz-binding:url(//{HOST}/b.xml#x)">t</div>',
+    "behavior": f'<div style="behavior:url(//{HOST}/b.htc)">t</div>',
+    "expression": f'<div style="width:expression(document.body.innerHTML=\'{HOST}\')">t</div>',
+    "style_block_binding": f"<style>div{{-moz-binding:url(//{HOST}/b.xml)}}</style>",
+    "style_block_expression": f"<style>div{{width:expression(alert(1))}}</style>",
 }
 
-_FETCHING_ATTRS = {
-    "href", "background", "srcset", "action", "formaction", "poster", "data",
-    "xlink:href", "ping", "srcdoc", "longdesc", "usemap",
-}
+_ALLOWED_ATTRS = set().union(*_ATTRIBUTES.values())
 
 
 class _Collector(HTMLParser):
@@ -98,7 +116,7 @@ class SanitizeEmailHtmlHostileTests(SimpleTestCase):
         for tag in c.tags:
             self.assertTrue(tag in ALLOWED_TAGS or tag == "style", f"tag {tag!r} survived")
         for tag, name, value in c.attrs:
-            self.assertNotIn(name, _FETCHING_ATTRS, f"{tag}[{name}] survived")
+            self.assertIn(name, _ALLOWED_ATTRS, f"{tag}[{name}] survived")
             if name == "src":
                 self.assertRegex(value, r"(?i)^(data:image/(png|jpe?g|gif|webp|bmp)[;,]|cid:)")
             else:
@@ -128,6 +146,47 @@ class SanitizeEmailHtmlHostileTests(SimpleTestCase):
     def test_script_and_event_handlers_removed(self):
         out = sanitize_email_html('<p onclick="x()">a</p><script>alert(1)</script>')
         self.assertEqual(out, "<p>a</p>")
+
+
+SLOW_BUDGET_S = 1.5
+
+
+class SanitizeEmailHtmlPerformanceTests(SimpleTestCase):
+    PAYLOADS = {
+        "unclosed_style_repeats": "<style>" * 40_000,
+        "unclosed_style_comment_repeats": "<style>/* " * 40_000,
+        "unclosed_comment_in_closed_style": "<style>" + "/* " * 400_000 + "</style>",
+        "unclosed_style_tag_open": "<style " * 100_000,
+        "two_mb_nested_tags": "<div>" * 400_000,
+        "two_mb_nested_tables": "<table><tr><td>" * 150_000,
+    }
+
+    def test_hostile_sizes_finish_quickly_and_stay_safe(self):
+        for name, payload in self.PAYLOADS.items():
+            with self.subTest(payload=name):
+                start = time.monotonic()
+                out = sanitize_email_html(payload + f"<img src=//{HOST}/x>")
+                self.assertLess(time.monotonic() - start, SLOW_BUDGET_S)
+                self.assertNotIn(HOST, out)
+
+    def test_input_is_capped(self):
+        out = sanitize_email_html("a" * (MAX_HTML_CHARS + 500))
+        self.assertEqual(len(out), MAX_HTML_CHARS)
+
+
+class SanitizeEmailHtmlStyleBlockTests(SimpleTestCase):
+    def test_block_with_fetching_token_is_dropped_whole(self):
+        for css in (
+            "p{color:red}@font-face{font-family:x}",
+            "p{color:red}div{background:url(x)}",
+            "p{color:red}@import 'x'",
+        ):
+            with self.subTest(css=css):
+                self.assertNotIn("<style>", sanitize_email_html(f"<style>{css}</style><p>t</p>"))
+
+    def test_harmless_class_names_do_not_drop_the_block(self):
+        out = sanitize_email_html("<style>.image-wrap{color:red}.src{margin:0}</style><p>t</p>")
+        self.assertIn(".image-wrap{color:red}", out)
 
 
 class SanitizeEmailHtmlBenignTests(SimpleTestCase):
