@@ -2,7 +2,7 @@
 
 Promotes a `skipped` (or stale `reused`) URL to `pending` and dispatches Cortex
 for that single URL. Reuses CanAccessSubmission so only the submission owner (or
-an elevated role) can trigger it; a URL not belonging to an accessible
+a CERT/Admin user, or a CISO whose scope covers it) can trigger it; a URL not belonging to an accessible
 submission returns 404.
 """
 import logging

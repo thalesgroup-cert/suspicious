@@ -6,7 +6,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.permissions.submissions import user_has_submission_elevated_access
+from api.permissions.submissions import (
+    submission_queryset,
+    user_has_submission_elevated_access,
+)
 from api.serializers.comments import CaseCommentSerializer
 from case_handler.models import Case
 from connectors.contrib.thehive.comments import sync_case_comment_to_thehive
@@ -16,10 +19,7 @@ class CaseCommentListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_case(self, request, case_id: int) -> Case:
-        queryset = Case.objects.all()
-        if not user_has_submission_elevated_access(request.user):
-            queryset = queryset.filter(reporter=request.user)
-        return get_object_or_404(queryset, pk=case_id)
+        return get_object_or_404(submission_queryset(Case.objects.all(), request.user), pk=case_id)
 
     def get(self, request, case_id: int):
         case = self.get_case(request, case_id)

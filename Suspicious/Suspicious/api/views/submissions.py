@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from api.permissions.submissions import (
     CanAccessSubmission,
     CanChallengeSubmission,
+    submission_queryset,
     user_has_submission_elevated_access,
 )
 from api.serializers.challenge import SubmissionChallengeSerializer
@@ -89,10 +90,7 @@ class SubmissionListView(ListAPIView):
         return Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
 
     def get_queryset(self):
-        queryset = self.get_base_queryset()
-
-        if not user_has_submission_elevated_access(self.request.user):
-            queryset = queryset.filter(reporter=self.request.user)
+        queryset = submission_queryset(self.get_base_queryset(), self.request.user)
 
         mine = self.request.query_params.get("mine")
         if self._is_truthy(mine):
@@ -178,9 +176,7 @@ class SubmissionDetailsView(RetrieveAPIView):
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
             )
         )
-        if not user_has_submission_elevated_access(self.request.user):
-            queryset = queryset.filter(reporter=self.request.user)
-        return queryset
+        return submission_queryset(queryset, self.request.user)
 
     def get_serializer_class(self):
         if user_has_submission_elevated_access(self.request.user):
@@ -363,9 +359,9 @@ class SubmissionVerdictView(APIView):
 
     @extend_schema(summary="Compact verdict for a submission (poll until done)")
     def get(self, request, submission_id: int):
-        queryset = Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
-        if not user_has_submission_elevated_access(request.user):
-            queryset = queryset.filter(reporter=request.user)
+        queryset = submission_queryset(
+            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED), request.user
+        )
         case = get_object_or_404(queryset, pk=submission_id)
         self.check_object_permissions(request, case)
         return Response(build_verdict(case))
@@ -380,7 +376,10 @@ class SubmissionTicketView(APIView):
 
     def _case(self, submission_id: int) -> Case:
         return get_object_or_404(
-            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED), pk=submission_id
+            submission_queryset(
+                Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED), self.request.user
+            ),
+            pk=submission_id,
         )
 
     @extend_schema(summary="Ticket-shaped SOAR payload for a submission")
