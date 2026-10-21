@@ -39,3 +39,15 @@ class SubmissionChallengeViewTest(APITestCase):
         case.refresh_from_db()
         self.assertFalse(case.is_challenged)
         m_notify.assert_not_called()
+
+    def test_other_users_submission_is_404_like_a_missing_one(self):
+        other = get_user_model().objects.create_user(username="scv2", password="x")
+        case = Case.objects.create(
+            description="", reporter=other, is_challengeable=True,
+            lifecycle_state=LifecycleState.FINALIZED, status="Done", results="Safe",
+        )
+        r = self.client.post(
+            reverse("submission-challenge", args=[case.id]),
+            {"proposed_result": "Dangerous"}, format="json",
+        )
+        self.assertEqual(r.status_code, 404)

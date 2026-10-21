@@ -112,6 +112,23 @@ class SubmissionListAndDetailScopeTests(CisoSubmissionScopeBase):
         no = client.get(reverse("submission-ticket", kwargs={"submission_id": self.out_scope.id}))
         self.assertEqual(no.status_code, 404)
 
+    def test_ticket_on_own_submission_is_404_for_a_ciso(self):
+        # A CISO reporting their own mail is a reporter, not an analyst.
+        own = Case.objects.create(reporter=self.ciso, description="mine")
+        client = self.as_user(self.ciso)
+        url = reverse("submission-ticket", kwargs={"submission_id": own.id})
+        self.assertEqual(client.get(url).status_code, 404)
+        self.assertEqual(client.post(url).status_code, 404)
+
+    def test_ticket_post_out_of_scope_is_404(self):
+        url = reverse("submission-ticket", kwargs={"submission_id": self.out_scope.id})
+        self.assertEqual(self.as_user(self.ciso).post(url).status_code, 404)
+
+    def test_ticket_for_cert_unchanged(self):
+        cert = _user("ss_cert", groups=["CERT"])
+        url = reverse("submission-ticket", kwargs={"submission_id": self.out_scope.id})
+        self.assertEqual(self.as_user(cert).get(url).status_code, 200)
+
 
 class CaseScopedEndpointTests(CisoSubmissionScopeBase):
     def test_comments_in_scope_ok_out_of_scope_404(self):

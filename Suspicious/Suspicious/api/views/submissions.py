@@ -1,6 +1,7 @@
 import logging
 
 from django.db.models import Q
+from django.http import Http404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import status
@@ -14,6 +15,7 @@ from rest_framework.views import APIView
 from api.permissions.submissions import (
     CanAccessSubmission,
     CanChallengeSubmission,
+    has_elevated_view,
     submission_queryset,
     user_has_submission_elevated_access,
 )
@@ -216,6 +218,7 @@ class SubmissionChallengeView(APIView):
         obj = get_object_or_404(
             Case.objects.only("id", "reporter_id", "is_challenged", "is_challengeable", "status"),
             pk=submission_id,
+            reporter_id=self.request.user.id,  # someone else's id is a 404, like a missing one
         )
         self.check_object_permissions(self.request, obj)
         return obj
@@ -375,12 +378,15 @@ class SubmissionTicketView(APIView):
     permission_classes = [IsAuthenticated, IsInvestigator]
 
     def _case(self, submission_id: int) -> Case:
-        return get_object_or_404(
+        case = get_object_or_404(
             submission_queryset(
                 Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED), self.request.user
             ),
             pk=submission_id,
         )
+        if not has_elevated_view(self.request.user, case):
+            raise Http404  # a reporter (even a CISO) has no analyst ticket
+        return case
 
     @extend_schema(summary="Ticket-shaped SOAR payload for a submission")
     def get(self, request, submission_id: int):
