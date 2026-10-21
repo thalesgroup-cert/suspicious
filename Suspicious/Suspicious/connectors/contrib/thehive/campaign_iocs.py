@@ -31,10 +31,11 @@ class Iocs:
     subjects: list[str] = field(default_factory=list)
     filenames: list[str] = field(default_factory=list)
     hashes: list[str] = field(default_factory=list)
+    hash_files: list[tuple[str, str]] = field(default_factory=list)  # (sha256, file name)
     auth_failures: list[str] = field(default_factory=list)
 
 
-def _add(target: list, value: str) -> None:
+def _add(target: list, value) -> None:
     if value and value not in target:
         target.append(value)
 
@@ -171,10 +172,12 @@ def extract_iocs(
     for att in kept:
         _add(iocs.filenames, att.name)
         _add(iocs.hashes, att.sha256)
+        _add(iocs.hash_files, (att.sha256, att.name))
     for name, sha, _size, reason in skipped:
         if reason.startswith("too large"):
             _add(iocs.filenames, name)
             _add(iocs.hashes, sha)
+            _add(iocs.hash_files, (sha, name))
     return iocs
 
 

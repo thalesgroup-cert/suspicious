@@ -38,6 +38,7 @@ class MemberMaterial:
     kept: list
     skipped: list
     iocs: Iocs
+    preview: bytes = b""  # the rendered mail, evidence for the Attachments tab
 
 
 @dataclass
@@ -58,7 +59,8 @@ class CampaignContent:
     tags: list[str]
     source_ref: str
     observables: list[dict] = field(default_factory=list)
-    files: list[FilePart] = field(default_factory=list)
+    files: list[FilePart] = field(default_factory=list)  # file observables: TheHive hashes and analyses them
+    attachments: list[FilePart] = field(default_factory=list)  # alert attachments: evidence, not analysed
     alert_type: str = "Suspicious"
 
 
@@ -87,12 +89,20 @@ def build_observables(iocs: Iocs) -> list[dict]:
     out += [_obs("domain", d, "Domain of a URL or of a sender address", ["domain"], ioc=True) for d in iocs.domains]
     out += [_obs("ip", i, "Host of a URL or hop in the mail's network path", ["ip"], ioc=True) for i in iocs.ips]
     out += [_obs("mail", e, "Sender, Reply-To or Return-Path address", ["sender"], ioc=True) for e in iocs.emails]
-    out += [_obs("hash", h, "SHA-256 of an attachment", ["attachment"], ioc=True) for h in iocs.hashes]
+    out += [_obs("hash", h, "SHA-256 of an attachment", ["attachment"] + [f"filename:{n}" for s, n in iocs.hash_files if s == h],
+                 ioc=True) for h in iocs.hashes]
     out += [_obs("filename", n, "Attachment name", ["attachment"], ioc=False) for n in iocs.filenames]
     out += [_obs("mail-subject", s, "Mail subject", ["subject"], ioc=False) for s in iocs.subjects]
     out += [_obs("other", n, "Sender display name", ["display-name"], ioc=False) for n in iocs.display_names]
     out += [_obs("other", m, "Message-ID", ["message-id"], ioc=False) for m in iocs.message_ids]
     return out
+
+
+def preview_parts(members: list[MemberMaterial]) -> list[FilePart]:
+    """Rendered mails of the same sample members whose source mail is attached."""
+    return [FilePart(f"mail-preview-case-{m.info.case_id}.png", m.preview,
+                     f"Rendered mail of case {m.info.case_id}", ["preview"])
+            for m in members[:MAX_EML_SAMPLES] if m.preview]
 
 
 def severity_for(verdicts, n_members: int) -> int:
@@ -218,4 +228,5 @@ def build_content(campaign, members: list[MemberMaterial], *, ui_base: str) -> C
         source_ref=campaign.ref,
         observables=build_observables(iocs),
         files=files,
+        attachments=preview_parts(members),
     )

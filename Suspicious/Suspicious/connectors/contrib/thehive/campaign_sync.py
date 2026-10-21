@@ -25,6 +25,17 @@ CONNECTOR = "thehive"
 MAX_MEMBERS = 100
 
 
+def _read_preview(minio, mail) -> bytes:
+    bucket, key = mail.preview_bucket, mail.preview_object_key
+    if not (bucket and key):
+        return b""
+    try:
+        return minio.get_object(bucket, key).read()
+    except Exception as exc:  # noqa: BLE001 — the preview is optional evidence
+        logger.warning("mail %s: cannot read its preview %s/%s: %s", mail.mail_id, bucket, key, exc)
+        return b""
+
+
 def load_member(case, minio, own_domains) -> MemberMaterial | None:
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
     if mail is None:
@@ -37,17 +48,20 @@ def load_member(case, minio, own_domains) -> MemberMaterial | None:
         verdict=str(case.results), malscore=float(case.score_ai or 0),
         subject=mail.subject, created_at=case.creation_date,
     )
-    return MemberMaterial(info, material, kept, skipped, iocs)
+    return MemberMaterial(info, material, kept, skipped, iocs, _read_preview(minio, mail))
 
 
 def _update(client, alert_id: str, content: CampaignContent, new_case_ids: list[int]) -> None:
     existing = client.list_observables(alert_id)
-    have = {(o["dataType"], o.get("data")) for o in existing if o["dataType"] != "file"}
     have_files = {h for o in existing if o["dataType"] == "file"
                   for h in (o.get("attachment") or {}).get("hashes", [])[:1]}
+    by_key = {(o["dataType"], o.get("data")): o for o in existing if o["dataType"] != "file"}
     for obs in content.observables:
-        if (obs["dataType"], obs["data"]) not in have:
+        found = by_key.get((obs["dataType"], obs["data"]))
+        if found is None:
             client.add_observable(alert_id, obs)
+        elif missing := [t for t in obs["tags"] if t not in found.get("tags", [])]:
+            client.add_observable_tags(found["_id"], [*found.get("tags", []), *missing])
     for part in content.files:
         if hashlib.sha256(part.data).hexdigest() not in have_files:
             client.add_file_observable(alert_id, part, content.tlp, content.pap)
@@ -81,10 +95,10 @@ def sync_campaign(campaign: Campaign, client, minio, *, ui_base: str, own_domain
             _update(client, alert["_id"], content, [m.case_id for m in pending])
             outcome = "updated"
 
-        # Files are file observables already; attach them to the alert too (its
-        # Attachments tab). Best effort: a rejected file must not fail the sync.
+        # The Attachments tab holds the rendered mails; the files themselves are file
+        # observables. Best effort: a rejected file must not fail the sync.
         try:
-            added, present, failed = client.add_attachments(alert["_id"], content.files)
+            added, present, failed = client.add_attachments(alert["_id"], content.attachments)
         except requests.RequestException as exc:
             added, present, failed = 0, 0, [str(exc)]
         not_sent = sum(len(m.skipped) for m in loaded if m)

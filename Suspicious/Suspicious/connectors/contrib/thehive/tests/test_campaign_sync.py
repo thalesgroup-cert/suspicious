@@ -15,6 +15,11 @@ S = "connectors.contrib.thehive.campaign_sync"
 HEADERS = 'From: "HR" <hr@evil.example>\r\nSubject: Verify payroll\r\n'
 
 
+class FakeMinio:
+    def get_object(self, bucket, key):
+        return type("Obj", (), {"read": lambda self: b"PNG:" + key.encode()})()
+
+
 class FakeHive:
     """In-memory TheHive: just enough state to check what was sent."""
 
@@ -50,8 +55,15 @@ class FakeHive:
             if o["dataType"] == "file":
                 out.append({"dataType": "file", "attachment": {"hashes": [o["sha"]]}})
             else:
-                out.append(o)
+                out.append({**o, "_id": f"~o{id(o)}"})
         return out
+
+    def add_observable_tags(self, observable_id, tags):
+        for obs in self.observables_by_id(observable_id):
+            obs["tags"] = tags
+
+    def observables_by_id(self, observable_id):
+        return [o for obs in self.observables.values() for o in obs if f"~o{id(o)}" == observable_id]
 
     def add_observable(self, aid, obs):
         self.observables[aid].append(dict(obs))
@@ -81,7 +93,7 @@ def _member(campaign, n, *, atts=()):
     user, _ = get_user_model().objects.get_or_create(username=f"r{n}", defaults={"email": f"r{n}@meridian.example"})
     case = Case.objects.create(reporter=user, description="t", results="Dangerous", score_ai=9.0)
     mail = Mail.objects.create(subject="Verify payroll", reportedBy=user.email, to="s@x", mail_id=f"2610-{n:04d}",
-                               date=timezone.now())
+                               date=timezone.now(), preview_bucket="b", preview_object_key=f"2610-{n:04d}/p.png")
     case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
     case.save(update_fields=["fileOrMail"])
     CampaignMember.objects.create(campaign=campaign, case=case)
@@ -103,7 +115,7 @@ class SyncTest(TestCase):
 
     def _sync(self):
         with patch(f"{S}.fetch_mail_material", side_effect=lambda client, mail_id: self.materials[mail_id]):
-            return sync_campaign(self.campaign, self.hive, minio=object(), ui_base="https://sus.example",
+            return sync_campaign(self.campaign, self.hive, minio=FakeMinio(), ui_base="https://sus.example",
                                  own_domains=("meridian.example",))
 
     def test_first_sync_creates_the_alert_and_marks_members(self):
@@ -154,16 +166,30 @@ class SyncTest(TestCase):
         self.assertFalse(any("thehive" in m.synced for m in self.campaign.members.all()))
 
 
-    def test_files_are_attached_to_the_alert_and_not_duplicated_on_update(self):
+    def test_alert_attachments_are_previews_while_files_stay_observables(self):
+        case = self._add(1, atts=[Attachment("notice.pdf", b"%PDF-1")])
+        self._sync()
+        alert_id = self.campaign.refresh_from_db() or self.campaign.external_refs["thehive"]
+        self.assertEqual(sorted(self.hive.attachments[alert_id]), [f"mail-preview-case-{case.id}.png"])
+        files = sorted(o["name"] for o in self.hive.observables[alert_id] if o["dataType"] == "file")
+        self.assertEqual(files, [f"mail-source-case-{case.id}.eml", "notice.pdf"])
+        second = self._add(2)
+        self.assertEqual(self._sync(), "updated")
+        self.assertEqual(len(self.hive.attachments[alert_id]), 2)
+        self.assertIn(f"mail-preview-case-{second.id}.png", self.hive.attachments[alert_id])
+
+    def test_hash_observables_name_their_file_and_old_ones_get_the_tags(self):
         self._add(1, atts=[Attachment("notice.pdf", b"%PDF-1")])
         self._sync()
         alert_id = self.campaign.refresh_from_db() or self.campaign.external_refs["thehive"]
-        self.assertEqual(sorted(self.hive.attachments[alert_id]), ["mail-source-case-%d.eml" % Case.objects.first().id, "notice.pdf"])
-        self._add(2, atts=[Attachment("notice.pdf", b"%PDF-1")])      # same file again
-        self.assertEqual(self._sync(), "updated")
-        names = sorted(self.hive.attachments[alert_id])
-        self.assertEqual(names.count("notice.pdf"), 1)
-        self.assertEqual(len([n for n in names if n.startswith("mail-source-case-")]), 2)
+        sha = hashlib.sha256(b"%PDF-1").hexdigest()
+        digest = next(o for o in self.hive.observables[alert_id] if o["dataType"] == "hash")
+        self.assertEqual((digest["data"], "filename:notice.pdf" in digest["tags"]), (sha, True))
+        digest["tags"] = []                       # an alert created before the tags existed
+        self._add(2)
+        self._sync()
+        self.assertIn("filename:notice.pdf", digest["tags"])
+        self.assertIn("attachment", digest["tags"])
 
     def test_attachment_failures_are_logged_but_do_not_fail_the_sync(self):
         self._add(1, atts=[Attachment("notice.pdf", b"%PDF-1")])

@@ -99,6 +99,9 @@ class HiveClient:
             "attachment": (part.filename, part.data),
         })
 
+    def add_observable_tags(self, observable_id: str, tags: list[str]) -> None:
+        self._call("PATCH", f"/observable/{observable_id}", json={"tags": tags})
+
     def list_attachment_names(self, alert_id: str) -> set[str]:
         found = self._query([{"_name": "getAlert", "idOrName": alert_id}, {"_name": "attachments"}])
         return {a["name"] for a in found if a.get("name")}

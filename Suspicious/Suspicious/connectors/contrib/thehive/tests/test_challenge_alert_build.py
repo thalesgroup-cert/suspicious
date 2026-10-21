@@ -60,7 +60,9 @@ class ChallengeSendTest(SimpleTestCase):
         from connectors.contrib.thehive.challenge_alert import send_challenge_alert
         client = MagicMock()
         client.create_alert.return_value = {"_id": "~1"}
-        send_challenge_alert(client, _case(), member(351), CHALLENGER, ref="r", ui_base="", preview=preview)
+        m = member(351)
+        m.preview = preview
+        send_challenge_alert(client, _case(), m, CHALLENGER, ref="r", ui_base="")
         return client
 
     def test_files_are_observables_only_and_preview_is_the_attachment(self):
@@ -70,5 +72,6 @@ class ChallengeSendTest(SimpleTestCase):
         (alert_id, parts), _ = client.add_attachments.call_args
         self.assertEqual((alert_id, [p.filename for p in parts]), ("~1", ["mail-preview-case-351.png"]))
 
-    def test_no_preview_means_no_attachment_call(self):
-        self.send(None).add_attachments.assert_not_called()
+    def test_no_preview_means_nothing_to_attach(self):
+        client = self.send(b"")
+        self.assertEqual(client.add_attachments.call_args.args[1], [])

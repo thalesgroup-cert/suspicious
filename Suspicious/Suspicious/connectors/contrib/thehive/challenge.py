@@ -65,17 +65,6 @@ def _save_thehive_alert_id(case, alert: dict | None) -> None:
     case.save(update_fields=["thehive_alert_id"])
 
 
-def _mail_preview(s3, mail) -> bytes | None:
-    bucket, key = getattr(mail, "preview_bucket", ""), getattr(mail, "preview_object_key", "")
-    if not (bucket and key):
-        return None
-    try:
-        return s3.get_object(bucket, key).read()
-    except Exception as exc:  # noqa: BLE001 — the preview is optional evidence
-        logger.warning("challenge alert: cannot read mail preview %s/%s: %s", bucket, key, exc)
-        return None
-
-
 class ChallengeToTheHiveService:
 
     def __init__(self, case, recipient: str, subject: str) -> None:
@@ -285,14 +274,12 @@ class ChallengeToTheHiveService:
 
         try:
             ui_base, own_domains = _email_settings()
-            s3 = get_s3_client()
-            member = load_member(case, s3, own_domains)
+            member = load_member(case, get_s3_client(), own_domains)
             if member is None:
                 return
             alert = send_challenge_alert(
                 HiveClient(api_url, api_key, verify=_certificate_path()),
                 case, member, challenger, ref=generate_ref(), ui_base=ui_base,
-                preview=_mail_preview(s3, mail),
             )
             _save_thehive_alert_id(case, alert)
         except Exception as e:

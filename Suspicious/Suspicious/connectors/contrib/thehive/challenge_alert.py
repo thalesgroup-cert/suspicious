@@ -13,11 +13,11 @@ from connectors.contrib.thehive.campaign_alert import (
     PAP_AMBER,
     TLP_AMBER,
     CampaignContent,
-    FilePart,
     MemberMaterial,
     _build_files,
     attachment_lines,
     build_observables,
+    preview_parts,
     indicator_lines,
     severity_for,
 )
@@ -59,20 +59,19 @@ def build_challenge_content(case, member: MemberMaterial, challenger: dict, *,
         source_ref=ref,
         observables=build_observables(member.iocs),
         files=files,
+        attachments=preview_parts([member]),
         alert_type=ALERT_TYPE,
     )
 
 
 def send_challenge_alert(client, case, member: MemberMaterial, challenger: dict, *,
-                         ref: str, ui_base: str, preview: bytes | None = None) -> dict:
+                         ref: str, ui_base: str) -> dict:
     """Files TheHive should analyse (the mail, its attachments) go up as file
     observables; the Attachments tab gets the rendered mail as evidence."""
     content = build_challenge_content(case, member, challenger, ref=ref, ui_base=ui_base)
     alert = client.create_alert(content)
-    if preview:
-        try:
-            client.add_attachments(alert["_id"], [FilePart(
-                f"mail-preview-case-{case.id}.png", preview, "Rendered mail as the reporter saw it", ["preview"])])
-        except requests.RequestException as exc:
-            logger.warning("Challenge alert %s: could not attach the mail preview: %s", alert.get("_id"), exc)
+    try:
+        client.add_attachments(alert["_id"], content.attachments)
+    except requests.RequestException as exc:
+        logger.warning("Challenge alert %s: could not attach the mail preview: %s", alert.get("_id"), exc)
     return alert
