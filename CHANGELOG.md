@@ -186,6 +186,14 @@ management moving to HashiCorp Vault.
 - Dependency bumps closing known CVEs: `pillow`, `django`, `jinja2`, `nltk`,
   the `opentelemetry` stack (needed to unblock a `protobuf` fix), and on the
   UI side `vite`, `undici`, `form-data`.
+- Mail preview: the HTML body is now cleaned by an allow-list sanitiser (`nh3`)
+  instead of regexes, and `wkhtmltoimage` runs behind a closed local proxy, so
+  a crafted mail can no longer make the renderer fetch internal URLs.
+- CISO scope now applies to submission endpoints (list, detail, verdict, ticket,
+  comments, report, mail preview, screenshot, URL analysis); a CISO without a
+  profile sees no cases instead of all of them.
+- Submission bucket names are normalised to valid S3 names (uppercase,
+  underscores, dots, non-ASCII and long usernames no longer break uploads).
 
 ### Documentation
 
