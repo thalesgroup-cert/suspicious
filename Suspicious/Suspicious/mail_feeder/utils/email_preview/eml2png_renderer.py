@@ -23,7 +23,6 @@ from __future__ import annotations
 import email
 import io
 import logging
-import re
 from email.message import EmailMessage
 from email.policy import default as email_default_policy
 from html import escape
@@ -33,6 +32,7 @@ from typing import Optional
 from django.conf import settings
 
 from common.clients import ensure_bucket
+from mail_feeder.utils.email_preview.html_sanitizer import sanitize_email_html
 
 logger = logging.getLogger(__name__)
 
@@ -60,30 +60,11 @@ _MAX_PNG_BYTES = 15 * 1024 * 1024
 
 _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
 
-_REMOTE_CSS_RE = re.compile(
-    r"<link\b[^>]*>|@import\b[^;]*;", re.IGNORECASE | re.DOTALL
-)
-
-# imgkit's `no-images` option only blocks <img> tag loads, not CSS
-# background-image/@font-face url(...) (in <style> blocks or inline
-# style="" attributes) or other resource-fetching tags. Phishing HTML
-# routinely hides tracking pixels in exactly those spots. The render
-# worker has no route to arbitrary external hosts, so each such fetch
-# blocks on connect until timeout instead of failing fast, and enough of
-# them trip the Celery soft time limit.
-_REMOTE_URL_FUNC_RE = re.compile(
-    r"url\(\s*['\"]?https?://[^'\")]+['\"]?\s*\)", re.IGNORECASE
-)
-_REMOTE_SRC_ATTR_RE = re.compile(
-    r'\b(?:src|data)\s*=\s*(["\'])https?://.*?\1', re.IGNORECASE
-)
-
-
-def _strip_remote_resources(html: str) -> str:
-    html = _REMOTE_CSS_RE.sub("", html)
-    html = _REMOTE_URL_FUNC_RE.sub("url()", html)
-    html = _REMOTE_SRC_ATTR_RE.sub("", html)
-    return html
+# Network containment, independent of the sanitiser: wkhtmltoimage is pointed
+# at a loopback port nothing listens on, so a reference that gets past
+# sanitize_email_html() reaches no host (the render fails instead).
+# `proxy-hostname-lookup` keeps DNS lookups off the worker's resolver too.
+_CLOSED_PROXY = "http://127.0.0.1:1"
 
 
 class Eml2PngRenderer:
@@ -167,11 +148,11 @@ class Eml2PngRenderer:
 
         We escape every header value, prefer the HTML body when present,
         and fall back to the text/plain body wrapped in <pre>. The body
-        HTML is rendered as-is but rasterised to a PNG with remote images,
-        JavaScript and local-file access all disabled at imgkit time (see
-        _render_html_to_png), and remote-fetching CSS/attributes stripped
-        (see _strip_remote_resources), so it cannot phone home, read host
-        files, or execute script.
+        HTML goes through sanitize_email_html() (allow-list, no resource
+        references) and is rasterised to a PNG with images, JavaScript,
+        local-file access and the network all disabled at imgkit time (see
+        _render_html_to_png), so it cannot phone home, read host files, or
+        execute script.
         """
         header_rows = []
         for name in _VISIBLE_HEADERS:
@@ -255,7 +236,7 @@ class Eml2PngRenderer:
 
         if html_part is not None:
             try:
-                return _strip_remote_resources(html_part.get_content())
+                return sanitize_email_html(html_part.get_content())
             except Exception:
                 logger.exception("Failed to decode HTML body; falling back to text/plain")
 
@@ -291,6 +272,10 @@ class Eml2PngRenderer:
             "no-images": "",
             "disable-javascript": "",
             "disable-local-file-access": "",
+            "proxy": _CLOSED_PROXY,
+            "proxy-hostname-lookup": "",
+            "load-error-handling": "ignore",
+            "load-media-error-handling": "ignore",
         }
 
         try:

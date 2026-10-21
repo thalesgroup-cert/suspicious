@@ -26,6 +26,8 @@ email-validator==2.3.0
 # runtime image. Replaces the unmaintained eml2png==0.0.2 CLI; see
 # mail_feeder/utils/email_preview/eml2png_renderer.py for the renderer.
 imgkit==1.2.3
+# Allow-list HTML sanitiser for the mail preview body (Rust, prebuilt wheels).
+nh3==0.3.7
 
 # Natural Language Processing and Similarity Checking
 nltk==3.10.3
