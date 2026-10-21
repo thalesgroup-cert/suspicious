@@ -42,6 +42,8 @@ def scoped_case_queryset(queryset, user):
     CISO with scope "ALL": unrestricted.
     CISO with a real scope: cases whose reporter is in a scope group.
     CISO with an unset scope: nothing (the UI prompts them to set one).
+    CISO group member with no CISOProfile: nothing (no scope to apply, so
+    fail closed rather than show everything).
     """
     from profiles.models import CISOProfile
 
@@ -50,6 +52,8 @@ def scoped_case_queryset(queryset, user):
     try:
         ciso_profile = user.cisoprofile
     except CISOProfile.DoesNotExist:
+        if user.groups.filter(name="CISO").exists():
+            return queryset.none()
         return queryset
 
     groups = parse_scope_groups(ciso_profile.scope)
