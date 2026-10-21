@@ -1,6 +1,8 @@
 import logging
 import os
+import re
 import shutil
+import unicodedata
 from email import policy
 from email.parser import BytesParser
 from pathlib import Path
@@ -16,6 +18,25 @@ from case_handler.case_utils.form_handlers.mail.minio import MinioManager
 logger = logging.getLogger(__name__)
 
 DEFAULT_CASE_BASE_PATH = Path("/app/case")
+
+_BUCKET_MAX_LEN = 63
+_BUCKET_INFIX = "-submission-"
+
+
+def bucket_name_for(user_prefix: str, mail_id: str) -> str:
+    """S3-valid name for a submission bucket: ``<prefix>-submission-<stamp>``.
+
+    ``user_prefix`` is the local part of the username and can carry anything
+    (uppercase, ``_``, ``.``, non-ASCII), none of which an S3 bucket allows.
+    It is folded to ``[a-z0-9-]``, repeated hyphens are collapsed and the
+    prefix is cut so the whole name stays within 63 characters, always
+    keeping the unique timestamp suffix. An empty result becomes ``user``.
+    """
+    stamp = re.sub(r"[^a-z0-9]", "", mail_id.split("-", 1)[0].lower())
+    ascii_prefix = unicodedata.normalize("NFKD", user_prefix).encode("ascii", "ignore").decode()
+    prefix = re.sub(r"-{2,}", "-", re.sub(r"[^a-z0-9]", "-", ascii_prefix.lower())).strip("-")
+    room = _BUCKET_MAX_LEN - len(_BUCKET_INFIX) - len(stamp)
+    return f"{prefix[:room].strip('-') or 'user'}{_BUCKET_INFIX}{stamp}"
 
 
 class MailFormHandler:
@@ -55,7 +76,7 @@ class MailFormHandler:
         # from being flagged as tainted.
         user_prefix = os.path.basename(self.user.username.split('@')[0])
         mail_id = generate_object_reference()
-        bucket = f"{user_prefix}-submission-{mail_id.split('-',1)[0]}"
+        bucket = bucket_name_for(user_prefix, mail_id)
         ext = Path(mail_file.name).suffix.lower()
 
         if ext not in ('.eml', '.msg'):
