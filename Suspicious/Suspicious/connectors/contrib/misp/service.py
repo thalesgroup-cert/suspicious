@@ -198,7 +198,7 @@ class MISPService:
         return None
 
     def _shareable_domain(self, domain: Domain) -> bool:
-        """Allow-listed, legit and company domains (and their subdomains) are not indicators."""
+        """Company/legit domains (subdomains included) and exactly allow-listed domains are not indicators."""
         value = (domain.value or "").strip().lower()
         return (
             not is_company_domain(value, self._company_domains)

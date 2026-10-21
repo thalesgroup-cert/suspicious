@@ -21,7 +21,7 @@ def company_domains() -> frozenset[str]:
 
 
 def allow_listed_domains() -> frozenset[str]:
-    """Allow-listed domains; their subdomains are covered too (see is_allow_listed)."""
+    """Allow-listed domains; matched exactly (see is_allow_listed)."""
     from settings.models import AllowListDomain
 
     values = AllowListDomain.objects.values_list("domain__value", flat=True)
@@ -57,7 +57,8 @@ def is_company_domain(domain: str, domains) -> bool:
 
 
 def is_allow_listed(domain: str, allow_listed) -> bool:
-    return is_company_domain(domain, allow_listed)
+    """Exact match, like launch: allow-listing sharepoint.com must not hide evil.sharepoint.com."""
+    return (domain or "").strip().lower().rstrip(".") in allow_listed
 
 
 def url_host(address: str | None) -> str:

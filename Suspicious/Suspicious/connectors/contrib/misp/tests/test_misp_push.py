@@ -193,12 +193,20 @@ class CompanyDomainObjectsTest(SimpleTestCase):
         self.assertIsNone(svc._build_artifact_object(art("corp.example"), 1, "Dangerous", None))
         self.assertIsNotNone(svc._build_artifact_object(art("evil.test"), 1, "Dangerous", None))
 
-    def test_allow_listed_subdomains_are_skipped_too(self):
+    def test_allow_listed_domains_match_exactly_so_subdomains_still_share(self):
         svc = self._svc()
         build = lambda v: svc._build_artifact_object(  # noqa: E731
             Domain(value=v), 1, "Dangerous", "domain")
-        self.assertIsNone(build("cdn.good.test"))
+        self.assertIsNone(build("good.test"))
+        self.assertIsNotNone(build("evil.good.test"))
         self.assertIsNotNone(build("notgood.test"))
+
+    def test_allow_listed_url_hosts_match_exactly(self):
+        svc = self._svc()
+        build = lambda a: svc._build_artifact_object(  # noqa: E731
+            URL(address=a), 1, "Dangerous", "url")
+        self.assertIsNone(build("https://good.test/x"))
+        self.assertIsNotNone(build("https://evil.good.test/x"))
 
 
 class CompanyUrlsStayOutOfMispTest(SimpleTestCase):
@@ -257,7 +265,7 @@ class AllowListedAndCampaignIocsStayOutOfMispTest(SimpleTestCase):
 
     def test_url_on_allow_listed_domain_skipped_lookalikes_pushed(self):
         self.assertIsNone(self._build(URL(address="https://good.test/a"), "url"))
-        self.assertIsNone(self._build(URL(address="https://cdn.good.test/a"), "url"))
+        self.assertIsNotNone(self._build(URL(address="https://cdn.good.test/a"), "url"))  # exact match
         self.assertIsNotNone(self._build(URL(address="https://good.test.evil.tld/a"), "url"))
         self.assertIsNotNone(self._build(URL(address="https://evil.test/?u=https://good.test/"), "url"))
 
