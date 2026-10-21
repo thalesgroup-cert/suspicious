@@ -137,3 +137,16 @@ class AdapterTest(TestCase):
         by_name = {s.name: s for s in ve.sources}
         self.assertEqual(by_name["Sandbox"].verdict, "failed")
         self.assertFalse(by_name["Sandbox"].counted)
+
+
+class AllowListMajorityAdapterTest(TestCase):
+    def test_allow_list_majority_counts_the_clean_sources(self):
+        rep = _report(_analyzer("VirusTotal", tier=1), level="safe", category="")
+        ve = explain_mail_case(
+            None,
+            CaseVerdict(0, 100, Result.SAFE, 0, 1, rule="allow-list-majority"),
+            analyzer_reports=[rep],
+            embedded_verdicts=[],
+        )
+        self.assertEqual(ve.decisive_rule, "allow-list-majority")
+        self.assertTrue(any(s.counted for s in ve.sources))

@@ -165,3 +165,24 @@ class AllowListMajorityTest(SimpleTestCase):
         safe = score_case(DANGEROUS_CASE, votes=[vote("A", 1, wl=True)])
         out = mail_band_escalation(safe, [ObservableVerdict("Dangerous", 80, None, {}, [])])
         self.assertEqual((out.result, out.rule), (Result.DANGEROUS, "embedded-ioc-escalation"))
+
+
+class AllowListPercentAndSuspiciousTest(SimpleTestCase):
+    def test_percentage_never_contradicts_the_decision(self):
+        # 50.04% is an override: must not print as 50 or lower
+        v = score_case(DANGEROUS_CASE, votes=[vote("A", 5004, wl=True), vote("B", 4996, Result.DANGEROUS)])
+        self.assertEqual(v.rule, "allow-list-majority")
+        self.assertIn("50.1%", v.rationale[-1])
+        # 49.96% is not: must not print as 50
+        v = score_case(DANGEROUS_CASE, votes=[vote("A", 4996, wl=True), vote("B", 5004, Result.DANGEROUS)])
+        self.assertEqual(v.result, Result.DANGEROUS)
+        self.assertIn("only 49.9%", v.rationale[-1])
+
+    def test_whitelisted_vote_on_a_suspicious_result(self):
+        case = [sig(6, 90, src="url")]
+        self.assertEqual(score_case(case).result, Result.SUSPICIOUS)
+        v = score_case(case, votes=[vote("A", 0.6, wl=True), vote("B", 0.4, Result.SUSPICIOUS)])
+        self.assertEqual((v.result, v.rule), (Result.SAFE, "allow-list-majority"))
+        v = score_case(case, votes=[vote("A", 0.4, wl=True), vote("B", 0.6, Result.SUSPICIOUS)])
+        self.assertEqual(v.result, Result.SUSPICIOUS)
+        self.assertIn("only 40%", v.rationale[-1])

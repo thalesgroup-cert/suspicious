@@ -24,6 +24,7 @@ _COUNTED_PREDICATES = {
     "weighted-consensus": lambda sv: sv.verdict in _FLAGGED,
     "single-strong-signal": lambda sv: sv.verdict in _FLAGGED and (sv.confidence or 0) >= 50,
     "embedded-ioc-escalation": lambda sv: sv.verdict in _FLAGGED,
+    "allow-list-majority": lambda sv: sv.verdict == "clean",
     "ai-classifier-decisive": lambda sv: "ai_mail" in sv.name.lower()
     or "aimailanalyzer" in sv.name.lower().replace("_", ""),
 }

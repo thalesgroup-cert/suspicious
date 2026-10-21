@@ -1,5 +1,6 @@
 """Pure, DB-free case-scoring core. No Django models are queried or mutated
 here — inputs are plain dataclasses, output is a CaseVerdict."""
+import math
 from dataclasses import dataclass, replace
 
 from case_handler.models import Result
@@ -44,9 +45,12 @@ def _allow_list_majority(verdict, votes):
     if total <= 0:
         return verdict
     safe = sum(v.weight for v in votes if v.band == Result.SAFE)
-    pct = round(100 * safe / total)
+    exact = round(100 * safe / total, 9)
     dissent = ", ".join(f"{v.band}: {v.analyzer}" for v in votes if v.band != Result.SAFE) or "none"
-    if round(2 * safe - total, 9) <= 0:
+    override = round(2 * safe - total, 9) > 0
+    # one decimal, rounded away from 50 so the text never contradicts the decision
+    pct = f"{(math.ceil if override else math.floor)(exact * 10) / 10:g}"
+    if not override:
         line = (f"Allow-listed, but only {pct}% of analyzer weight agrees "
                 f"(dissent: {dissent}); verdict not overridden.")
         return replace(verdict, rationale=tuple(verdict.rationale) + (line,))
