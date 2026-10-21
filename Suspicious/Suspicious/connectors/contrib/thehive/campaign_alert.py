@@ -5,6 +5,7 @@ alert can be built, tested and reviewed without a TheHive.
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -112,6 +113,18 @@ def severity_for(verdicts, n_members: int) -> int:
     return 2 if "Suspicious" in verdicts else 1
 
 
+_URL_IN_TEXT = re.compile(r"https?://[^\s<>\"')]+", re.IGNORECASE)
+
+
+def defang(value: str) -> str:
+    """Make a URL, domain, IP or address inert in text an analyst reads: hxxp and [.]."""
+    return re.sub(r"^http", "hxxp", value, flags=re.IGNORECASE).replace(".", "[.]")
+
+
+def defang_urls_in(text: str) -> str:
+    return _URL_IN_TEXT.sub(lambda m: defang(m.group(0)), text)
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
@@ -159,29 +172,25 @@ def _build_files(members: list[MemberMaterial]):
 
 
 def _list(values, limit=_TOP) -> str:
-    shown = [f"`{v}`" for v in values[:limit]]
+    shown = [f"`{defang(v)}`" for v in values[:limit]]
     extra = len(values) - limit
     return ", ".join(shown) + (f" and {extra} more" if extra > 0 else "") if shown else "none"
 
 
 def indicator_lines(iocs: Iocs) -> list[str]:
-    return [
-        "", "## Indicators",
-        f"- **Sender domains / addresses:** {_list(iocs.emails)}",
-        f"- **Domains:** {_list(iocs.domains)}",
-        f"- **IP addresses:** {_list(iocs.ips)}",
-        f"- **URLs:** {_list(iocs.urls)}",
-        f"- **Sender display names:** {_list(iocs.display_names)}",
-    ]
+    rows = [("Sender domains / addresses", iocs.emails), ("Domains", iocs.domains), ("IP addresses", iocs.ips),
+            ("URLs", iocs.urls), ("Sender display names", iocs.display_names)]
+    return ["", "## Indicators", *[f"- **{label}:** {_list(values)}" for label, values in rows if values]]
 
 
-def attachment_lines(rows) -> list[str]:
+def attachment_lines(rows, *, count: bool = True) -> list[str]:
     lines = ["", "## Attachments"]
-    if rows:
-        lines += ["| File | Size | SHA-256 | Status | Mails |", "|---|---|---|---|---|"]
-        lines += [f"| {n} | {s} B | {'`' + h + '`' if h else ''} | {st} | {c} |" for n, s, h, st, c in rows]
-    else:
-        lines.append("No attachments.")
+    if not rows:
+        return lines + ["No attachments."]
+    lines += ["| File | Size | SHA-256 | Status |" + (" Mails |" if count else ""),
+              "|---|---|---|---|" + ("---|" if count else "")]
+    lines += [f"| {n} | {s} B | {'`' + h + '`' if h else ''} | {st} |" + (f" {c} |" if count else "")
+              for n, s, h, st, c in rows]
     return lines
 
 
@@ -197,6 +206,7 @@ def build_description(campaign, members: list[MemberMaterial], iocs: Iocs, rows,
 
     lines = [
         f"# Potential phishing campaign: {campaign.title}", "",
+        f"[Open the campaign in Suspicious]({ui_base}/campaigns)", "",
         "| | |", "|---|---|",
         f"| Campaign | `{campaign.ref}` |",
         f"| Reported | {_plural(len(infos), 'mail')} from {_plural(len(reporters), 'reporter')} |",
@@ -210,7 +220,7 @@ def build_description(campaign, members: list[MemberMaterial], iocs: Iocs, rows,
     lines += ["", "## Suspicious cases"]
     lines += [f"- [#{i.case_id}]({ui_base}/investigation?open={i.case_id}) reported by {i.reporter} "
               f"({i.verdict})" for i in sorted(infos, key=lambda i: i.case_id)[:50]]
-    example = (members[0].material.text or members[0].material.html or "")[:1500].replace("```", "'''")
+    example = defang_urls_in((members[0].material.text or members[0].material.html or "")[:1500]).replace("```", "'''")
     if example:
         lines += ["", "## Example mail body", "```", example, "```"]
     return "\n".join(lines)

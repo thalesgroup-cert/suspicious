@@ -89,9 +89,11 @@ class ContentTest(SimpleTestCase):
                            member(2, reporter="b@meridian.example", minute=15)])
         d = c.description
         for needle in ("261007-abc12", "2 mails", "2 reporters", "Dangerous", "spf=fail",
-                       "portal.example", "evil1.example", "Notice.pdf", "empty", "10:10", "10:15",
-                       "https://sus.example/investigation?open=1", "Verify payroll"):
+                       "portal[.]example", "evil1[.]example", "Notice.pdf", "empty", "10:10", "10:15",
+                       "https://sus.example/investigation?open=1", "Verify payroll",
+                       "(https://sus.example/campaigns)", "hxxps://portal[.]example/login?u=1"):
             self.assertIn(needle, d)
+        self.assertNotIn("https://portal", d)
 
     def test_only_relevant_files_are_uploaded_once(self):
         pdf = Attachment("Notice.pdf", b"%PDF-1")

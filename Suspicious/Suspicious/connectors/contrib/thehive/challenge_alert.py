@@ -17,6 +17,7 @@ from connectors.contrib.thehive.campaign_alert import (
     _build_files,
     attachment_lines,
     build_observables,
+    defang_urls_in,
     preview_parts,
     indicator_lines,
     severity_for,
@@ -28,20 +29,26 @@ ALERT_TYPE = "user_challenge"
 
 
 def _description(case, member: MemberMaterial, challenger: dict, rows, ui_base: str) -> str:
-    name = " ".join(p for p in (challenger.get("firstname"), challenger.get("lastname")) if p) or "A user"
+    name = " ".join(p for p in (challenger.get("firstname"), challenger.get("lastname")) if p) or "The reporter"
+    reason = (case.challenge_reason or "No reason provided.").strip().replace("\n", "\n> ")
     lines = [
-        f"# {name} ({challenger.get('email') or 'N/A'}) has challenged the verdict of case #{case.id}", "",
+        f"# Reporter disputes **{case.results or 'N/A'}** and proposes **{case.challenge_proposed_result or 'no verdict'}**",
+        "", f"> {reason}", "",
         "| | |", "|---|---|",
+        f"| Reporter | {name} ({challenger.get('email') or 'N/A'}) |",
         f"| Case | [#{case.id}]({ui_base}/investigation?open={case.id}) |",
         f"| Mail subject | {member.info.subject or 'N/A'} |",
         f"| Verdict | {case.results or 'N/A'} (score {case.score}, confidence {case.confidence}) |",
         f"| AI suggestion | {case.category_ai or 'N/A'} / {case.results_ai or 'N/A'} "
         f"(score {case.score_ai}, confidence {case.confidence_ai}) |",
-        f"| Proposed verdict | {case.challenge_proposed_result or 'N/A'} |",
-        "", "## Challenge reason", case.challenge_reason or "No reason provided.",
+        f"| Email authentication | {', '.join(member.iocs.auth_failures) or 'no failure recorded'} |",
     ]
-    lines += indicator_lines(member.iocs) + attachment_lines(rows)
-    example = (member.material.text or member.material.html or "")[:1500].replace("```", "'''")
+    if case.verdict_rationale:
+        lines += ["", "## Why this verdict"] + [f"- {r}" for r in case.verdict_rationale]
+    lines += indicator_lines(member.iocs) + attachment_lines(rows, count=False)
+    lines += ["", "The mail and its attachments are file observables; the rendered mail is in the Attachments tab. "
+              "Every observable is in the Observables tab."]
+    example = defang_urls_in((member.material.text or member.material.html or "")[:1500]).replace("```", "'''")
     if example:
         lines += ["", "## Example mail body", "```", example, "```"]
     return "\n".join(lines)
