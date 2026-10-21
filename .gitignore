@@ -90,3 +90,5 @@ docs/research/screenshots/
 .DS_Store
 Thumbs.db
 .env.data
+.env.pre-db-auth.*
+.env.data.pre-db-auth.*
