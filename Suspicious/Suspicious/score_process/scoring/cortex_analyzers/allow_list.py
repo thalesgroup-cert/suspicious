@@ -16,6 +16,16 @@ from .result import AllowListResult
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
+SAFE_FW, SAFE_FTW = "Safe FW triggered", "Safe FTW triggered"
+SAFE_DW, SAFE_WL, SAFE_IPW = "Safe DW triggered", "Safe WL triggered", "Safe IPW triggered"
+ALLOW_LIST_MARKERS = frozenset({SAFE_FW, SAFE_FTW, SAFE_DW, SAFE_WL, SAFE_IPW})
+
+
+def is_allow_listed_category(category) -> bool:
+    """True for a stored AnalyzerReport.category produced by an allow-list hit."""
+    text = category or ""
+    return any(marker in text for marker in ALLOW_LIST_MARKERS)
+
 
 def check_allow_list(data: str, data_type: str) -> AllowListResult:
     result = AllowListResult()
@@ -27,26 +37,26 @@ def check_allow_list(data: str, data_type: str) -> AllowListResult:
                 if AllowListFile.objects.filter(
                     linked_file_hash=file.linked_hash
                 ).exists():
-                    result.FileAllowList = "Safe FW triggered"
+                    result.FileAllowList = SAFE_FW
 
                 if AllowListFiletype.objects.filter(
                     filetype=file.filetype
                 ).exists():
-                    result.FiletypeAllowList = "Safe FTW triggered"
+                    result.FiletypeAllowList = SAFE_FTW
 
         elif data_type in ("url", "domain"):
             domain = extract_domain(data) if data_type == "url" else data
 
             if domain:
                 if AllowListDomain.objects.filter(domain__value=domain).exists():
-                    result.DomainAllowList = "Safe DW triggered"
+                    result.DomainAllowList = SAFE_DW
 
                 elif WatcherLegitDomain.objects.filter(domain__value=domain).exists():
-                    result.DomainAllowList = "Safe WL triggered"
+                    result.DomainAllowList = SAFE_WL
 
         elif data_type == "ip":
             if is_ip_allow_listed(data):
-                result.IpAllowList = "Safe IPW triggered"
+                result.IpAllowList = SAFE_IPW
 
     except Exception as exc:
         logger.error("Allow-list check failed for %r (%s): %s", data, data_type, exc)

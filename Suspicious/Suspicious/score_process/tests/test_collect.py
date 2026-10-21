@@ -10,8 +10,9 @@ from file_process.models import File
 from hash_process.models import Hash
 from ip_process.models import IP
 from mail_feeder.models import Mail, MailArchive
-from score_process.scoring.collect import collect_signals
-from score_process.scoring.engine import Signal
+from score_process.scoring.collect import collect_signals, collect_votes
+from score_process.scoring.engine import AiSignal, Signal
+from url_process.models import URL
 
 
 class CollectSignalsTest(TestCase):
@@ -203,3 +204,64 @@ class MailEmbeddedSignalOptOutTests(TestCase):
         case = self._mail_case_with_embedded_bad_url()
         signals, *_ = collect_signals(case)
         self.assertTrue(any(s.score >= 8 for s in signals))  # the bad URL still votes
+
+
+class CollectVotesTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="cv_u", password="x")
+        self.url = URL.objects.create(address="https://a.test/1")
+        self.url2 = URL.objects.create(address="https://b.test/2")
+        self.url.analyzed_url = self.url2   # a case covers both URLs
+        self.url.save()
+        self.case = Case.objects.create(description="", reporter=self.user)
+        self.case.nonFileIocs = CaseHasNonFileIocs.objects.create(case=self.case, url=self.url)
+        self.case.save()
+
+    def _report(self, name, weight=0.2, *, url=None, job="j", status="Success", level="safe",
+                score=0, confidence=100, category=""):
+        analyzer, _ = Analyzer.objects.get_or_create(
+            name=name, defaults={"analyzer_cortex_id": name, "weight": weight})
+        return AnalyzerReport.objects.create(
+            cortex_job_id=f"{name}-{job}", type="url", status=status, analyzer=analyzer,
+            url=url or self.url, level=level, score=score, confidence=confidence,
+            category=category, report_summary={"x": 1}, report_taxonomy={}, report_full={})
+
+    def _votes(self, ai=None):
+        with patch("cortex_job.cortex_utils.cortex_and_job_management._get_cortex_config",
+                   return_value={"analyzers": {"ai": "AIMailAnalyzer"}}):
+            return {v.analyzer: v for v in collect_votes(self.case, ai)}
+
+    def test_whitelisted_safe_and_dangerous_votes(self):
+        self._report("WL", 0.3, category="Safe DW triggered")
+        self._report("Clean", 0.2)
+        self._report("Bad", 0.5, level="malicious", score=10)
+        v = self._votes()
+        self.assertEqual((v["WL"].band, v["WL"].whitelisted, v["WL"].weight), ("Safe", True, 0.3))
+        self.assertEqual((v["Clean"].band, v["Clean"].whitelisted), ("Safe", False))
+        self.assertEqual((v["Bad"].band, v["Bad"].whitelisted), ("Dangerous", False))
+
+    def test_failed_pending_info_low_confidence_and_zero_weight_are_not_votes(self):
+        self._report("Failed", status="Failure")
+        self._report("Pending", status="InProgress")
+        self._report("Info", level="info", score=2, confidence=50)
+        self._report("Unsure", level="suspicious", score=7, confidence=49)
+        self._report("Zero", 0)
+        self.assertEqual(self._votes(), {})
+
+    def test_analyzer_flagging_one_target_and_whitelisted_on_another_votes_dissent(self):
+        self._report("Both", category="Safe DW triggered")
+        self._report("Both", url=self.url2, level="malicious", score=10, job="2")
+        vote = self._votes()["Both"]
+        self.assertEqual((vote.band, vote.whitelisted), ("Dangerous", False))
+
+    def test_a_newer_rerun_replaces_a_stale_dissent(self):
+        self._report("Re", level="malicious", score=10, job="old")
+        self._report("Re", job="new")
+        self.assertEqual(self._votes()["Re"].band, "Safe")
+
+    def test_ai_signal_votes_with_the_ai_analyzer_weight(self):
+        Analyzer.objects.create(name="AIMailAnalyzer", analyzer_cortex_id="ai", weight=0.4)
+        ai = self._votes(AiSignal(score=9, confidence=90))["AIMailAnalyzer"]
+        self.assertEqual((ai.band, ai.weight), ("Dangerous", 0.4))
+        self.assertNotIn("AIMailAnalyzer", self._votes(AiSignal(score=9, confidence=10)))
+        self.assertNotIn("AIMailAnalyzer", self._votes(None))

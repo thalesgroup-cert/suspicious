@@ -6,7 +6,9 @@ into Signal objects, plus the AI signal and the deny-list flag.
 """
 import logging
 
-from score_process.scoring.engine import Signal, AiSignal, MALICIOUS_SCORE_THRESHOLD
+from score_process.scoring.engine import (
+    Signal, AiSignal, Vote, MALICIOUS_SCORE_THRESHOLD, CONF_FLOOR, band, _BAND_RANK,
+)
 from score_process.scoring.processing import (
     process_file_ioc, process_mail, process_ioc,
 )
@@ -95,3 +97,36 @@ def _compute_deny_listed(case) -> tuple[bool, str]:
         if _is_address_deny_listed(address, deny, logger):
             return True, f"URL deny-listed: {address}"
     return False, ""
+
+
+def collect_votes(case, ai=None) -> tuple:
+    """One Vote per analyzer from the case's latest reports plus the AI signal.
+    An analyzer's band is the worst across its reports, so a tool that flags one
+    artifact and is allow-listed on another votes dissent, not safe."""
+    from api.utils.analyzer_reports import reports_for_case
+    from api.views.investigations import _dedup_analyzer_reports
+    from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
+    from cortex_job.models import Analyzer
+    from score_process.scoring.cortex_analyzers.allow_list import is_allow_listed_category
+
+    ai_name = _get_cortex_config().get("analyzers", {}).get("ai")
+    seen: dict = {}   # analyzer name -> [weight, worst band, any allow-list hit]
+
+    def add(name, weight, report_band, hit):
+        cur = seen.setdefault(name, [weight, Result.SAFE, False])
+        if _BAND_RANK[report_band] > _BAND_RANK[cur[1]]:
+            cur[1] = report_band
+        cur[2] = cur[2] or hit
+
+    for r in _dedup_analyzer_reports(reports_for_case(case, defer_full=True)):
+        if (r.status != "Success" or r.level == "info" or r.confidence < CONF_FLOOR
+                or r.analyzer.name == ai_name):
+            continue
+        add(r.analyzer.name, r.analyzer.weight, band(r.score), is_allow_listed_category(r.category))
+
+    if ai is not None and ai_name and ai.confidence >= CONF_FLOOR:
+        weight = Analyzer.objects.filter(name=ai_name).values_list("weight", flat=True).first()
+        if weight:
+            add(ai_name, weight, band(ai.score), False)
+
+    return tuple(Vote(n, w, b, hit and b == Result.SAFE) for n, (w, b, hit) in seen.items() if w > 0)

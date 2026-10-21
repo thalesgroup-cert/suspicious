@@ -30,3 +30,14 @@ The MISP connector withholds these indicators from shared events:
 Filtering is per IOC: a case from a campaign sender still shares its other IOCs. MISP matching covers subdomains, while launch matching is on exact domains.
 
 Hash skips compare the stored value of the allow-listed hash only: an md5 entry does not cover the same file's sha256 IOC.
+
+## Scoring: an allow-list is a vote
+
+Allow-listing is not only a launch filter, it also takes part in the verdict:
+
+- Each analyzer casts one weighted vote (its configured weight). Its band is the worst across all of its reports on the case, so a tool that flags one artifact and is allow-listed on another votes dissent, not safe. The AI analyzer votes from its signal.
+- A vote is marked allow-listed when its band is Safe and at least one of its reports carries an allow-list marker.
+- When the Safe plus allow-listed weight is a strict majority of the voting weight, the case is Safe under the rule `allow-list-majority`, and the rationale names the dissenting analyzers.
+- Reports that do not vote: failed or pending jobs, `info` level, confidence below the floor, and analyzers with weight 0.
+- Deny-listed, campaign and Watcher-monitored targets are never overridden by the majority.
+- The embedded-IOC escalation still applies afterwards.

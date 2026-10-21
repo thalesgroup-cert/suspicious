@@ -7,3 +7,7 @@ prompt builder (`scoring/narration/`) the `ai_narration` connector calls.
 TheHive/MISP pushes and reporter SMTP notification now happen via the
 [connectors](connectors.md) framework's `case_finalised` event, not inline
 here.
+
+Allow-lists take part in scoring as votes: `collect.collect_votes` builds one
+`engine.Vote` per analyzer and `score_case` applies the `allow-list-majority`
+rule to them. See [Allow-lists](../../operations/allow-lists.md).

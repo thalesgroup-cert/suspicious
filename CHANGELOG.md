@@ -126,6 +126,7 @@ management moving to HashiCorp Vault.
 - MkDocs documentation site deploy workflow.
 
 ### Changed
+- Allow-lists are a weighted vote in `score_case`: a strict majority of Safe plus allow-listed analyzer weight now yields Safe (rule `allow-list-majority`) with dissenting analyzers named in the rationale.
 - Old `docker-image-latest`/`docker-image-tags`/`docker-image-test` workflows
   retired in favor of the CI/release matrix above.
 - `docker-compose.override.yml`'s dev-only `greenmail`/`openldap` stubs moved
@@ -135,6 +136,7 @@ management moving to HashiCorp Vault.
   net; web-submission case creation no longer logs into the fetch-mail log.
 
 ### Fixed
+- Allow-listed IPs no longer launch Cortex jobs (email and web submit); an allow-list entry no longer silences a deny-listed, Watcher-monitored or campaign domain; MISP no longer receives campaign-domain indicators or allow-listed URLs, IPs and hashes.
 
 - **Cortex analyzer launch dispatches asynchronously** from the submit path,
   so a slow Cortex doesn't hold up the request that creates the case.

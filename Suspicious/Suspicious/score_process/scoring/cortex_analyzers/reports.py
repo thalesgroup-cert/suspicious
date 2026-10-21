@@ -24,7 +24,7 @@ class CortexAnalyzerReports:
         notify, KPI).
         """
         from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
-        from score_process.scoring.collect import collect_signals
+        from score_process.scoring.collect import collect_signals, collect_votes
         from score_process.scoring.engine import score_case
         from score_process.scoring.apply import apply_verdict
 
@@ -58,7 +58,12 @@ class CortexAnalyzerReports:
                     )
 
             signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
-            verdict = score_case(signals, ai, deny_listed, ai_missing, deny_reason)
+            try:
+                votes = collect_votes(case, ai)
+            except Exception:
+                update_cases_logger.exception("get_report: collect_votes failed for case %s", case.id)
+                votes = ()
+            verdict = score_case(signals, ai, deny_listed, ai_missing, deny_reason, votes=votes)
 
             # Embedded-observable escalation (mail road): every embedded
             # observable of the mail is scored on its own analyzer reports via
