@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from ip_process.models import IP
-from settings.models import AllowListIp
+from domain_process.models import Domain
+from settings.models import AllowListDomain, AllowListIp, CampaignDomainAllowList
 from score_process.scoring.cortex_analyzers.allow_list import check_allow_list
 
 
@@ -25,3 +26,18 @@ class AllowListIpBranchTests(TestCase):
     def test_unparseable_ip_does_not_crash(self):
         result = check_allow_list("garbage", "ip")
         self.assertIsNone(result.IpAllowList)
+
+
+class AllowListOverrideTests(TestCase):
+    def setUp(self):
+        self.u = User.objects.create_user("ov", password="p")
+        self.d = Domain.objects.create(value="both.example")
+        AllowListDomain.objects.create(domain=self.d, user=self.u)
+
+    def test_allow_listed_domain_triggers(self):
+        self.assertEqual(check_allow_list("both.example", "domain").DomainAllowList, "Safe DW triggered")
+
+    def test_campaign_domain_never_triggers_for_domain_or_url(self):
+        CampaignDomainAllowList.objects.create(domain=self.d, user=self.u)
+        self.assertIsNone(check_allow_list("both.example", "domain").DomainAllowList)
+        self.assertIsNone(check_allow_list("https://both.example/x", "url").DomainAllowList)

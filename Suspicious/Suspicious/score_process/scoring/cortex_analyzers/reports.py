@@ -125,7 +125,7 @@ class CortexAnalyzerReports:
         from score_process.scoring.engine import mail_band_escalation
         from score_process.scoring.bands import (
             _BAND_ORDER, _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE,
-            _STICKY_IOC_LEVELS,
+            _STICKY_IOC_LEVELS, sticky_holds,
         )
         from cortex_job.cortex_utils.derived_observables import score_derived_observables
 
@@ -154,13 +154,16 @@ class CortexAnalyzerReports:
             # just the level string — deliberate departure from spec §5's
             # literal "write score/confidence unconditionally" (matches the
             # Phase B IOC-road final-review guidance).
-            if getattr(obj, "ioc_level", "info") not in _STICKY_IOC_LEVELS:
+            obj_sticky = sticky_holds(obj)
+            if not obj_sticky:
                 obj.ioc_level = ioc_level
                 obj.ioc_score = score
                 obj.ioc_confidence = v.confidence
                 obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
 
-            if m_art.artifact_level not in _STICKY_IOC_LEVELS:
+            art_sticky = m_art.artifact_level in _STICKY_IOC_LEVELS and (
+                m_art.artifact_level != "SAFE-ALLOW_LISTED" or obj_sticky)
+            if not art_sticky:
                 m_art.artifact_level = ioc_level
                 m_art.artifact_score = score
                 m_art.artifact_confidence = v.confidence

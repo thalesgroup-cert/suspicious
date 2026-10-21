@@ -3,7 +3,7 @@ The only place Case scoring fields are written by the scoring path."""
 import logging
 
 from score_process.scoring.bands import (
-    _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE, _STICKY_IOC_LEVELS,
+    _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE, sticky_holds,
 )
 from score_process.scoring.update_handler import (
     save_case_results, update_kpi_and_user_stats,
@@ -80,7 +80,10 @@ def finalise_ioc_group(case) -> None:
             )
         idx_by_key[(_art_type.lower(), obj.pk)] = len(obs_verdicts)
         obs_verdicts.append(v)
-        if obj.ioc_level not in _STICKY_IOC_LEVELS:
+        if sticky_holds(obj):
+            if obj.ioc_level == "SAFE-ALLOW_LISTED":
+                continue  # keeps its 0 / 100 marker values
+        else:
             obj.ioc_level = _BAND_TO_IOC_LEVEL.get(v.band, "info")
         obj.ioc_score = _DERIVED_SCORE.get(v.band, 5)
         obj.ioc_confidence = v.confidence
@@ -97,7 +100,7 @@ def finalise_ioc_group(case) -> None:
         if i is None:
             continue
         obj = obj_by_key[(ptype, pid)]
-        if obj.ioc_level in _STICKY_IOC_LEVELS:
+        if sticky_holds(obj):
             continue  # allow/deny-listed marker wins — child still votes via score_group
         v = obs_verdicts[i]
         if _BAND_RANK.get(eband, 0) <= _BAND_RANK.get(v.band, 0):

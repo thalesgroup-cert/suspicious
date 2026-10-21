@@ -4,7 +4,8 @@ Allow-list checks for files, filetypes, URLs, domain, and IP IOCs.
 import logging
 
 from file_process.models import File
-from settings.allow_lists import is_ip_allow_listed
+from domain_process.models import Domain
+from settings.allow_lists import is_ip_allow_listed, overrides_allow_list
 from settings.models import (
     AllowListDomain,
     AllowListFile,
@@ -47,7 +48,7 @@ def check_allow_list(data: str, data_type: str) -> AllowListResult:
         elif data_type in ("url", "domain"):
             domain = extract_domain(data) if data_type == "url" else data
 
-            if domain:
+            if domain and not overrides_allow_list(Domain.objects.filter(value=domain).first()):
                 if AllowListDomain.objects.filter(domain__value=domain).exists():
                     result.DomainAllowList = SAFE_DW
 
