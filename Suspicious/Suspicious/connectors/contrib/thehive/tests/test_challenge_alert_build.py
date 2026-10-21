@@ -49,3 +49,26 @@ class ChallengeContentTest(SimpleTestCase):
     def test_missing_reason_and_proposal_are_stated(self):
         d = self.build(_case(challenge_reason="", challenge_proposed_result="")).description
         self.assertIn("No reason provided.", d)
+
+
+class ChallengeSendTest(SimpleTestCase):
+    """Observables are what TheHive analyses (values, and files it hashes);
+    the Attachments tab holds evidence files, so a file is never sent to both."""
+
+    def send(self, preview):
+        from unittest.mock import MagicMock
+        from connectors.contrib.thehive.challenge_alert import send_challenge_alert
+        client = MagicMock()
+        client.create_alert.return_value = {"_id": "~1"}
+        send_challenge_alert(client, _case(), member(351), CHALLENGER, ref="r", ui_base="", preview=preview)
+        return client
+
+    def test_files_are_observables_only_and_preview_is_the_attachment(self):
+        client = self.send(b"\x89PNG preview")
+        content = client.create_alert.call_args.args[0]
+        self.assertEqual([f.filename for f in content.files], ["mail-source-case-351.eml"])
+        (alert_id, parts), _ = client.add_attachments.call_args
+        self.assertEqual((alert_id, [p.filename for p in parts]), ("~1", ["mail-preview-case-351.png"]))
+
+    def test_no_preview_means_no_attachment_call(self):
+        self.send(None).add_attachments.assert_not_called()
