@@ -238,6 +238,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Cache: Redis (redis_cache container)
 
+from suspicious.service_urls import redis_url, service_secret
+
 _redis_cache_host = _redis_cfg.get("cache_host", "redis_cache")
 
 if _is_test:
@@ -246,7 +248,10 @@ else:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": f"redis://{_redis_cache_host}:6379/0",
+            "LOCATION": redis_url(
+                _redis_cache_host,
+                service_secret("REDIS_CACHE_PASSWORD", "redis.cache_password", required=True),
+            ),
         }
     }
 
@@ -459,7 +464,10 @@ from celery.schedules import crontab
 
 _redis_broker_host = _redis_cfg.get("broker_host", "redis_broker")
 
-CELERY_BROKER_URL         = f"redis://{_redis_broker_host}:6379/0"
+CELERY_BROKER_URL         = redis_url(
+    _redis_broker_host,
+    service_secret("REDIS_BROKER_PASSWORD", "redis.broker_password", required=not _is_test),
+)
 CELERY_RESULT_BACKEND     = "django-db"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_SERIALIZER    = "json"
