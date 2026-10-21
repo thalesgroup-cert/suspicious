@@ -27,6 +27,7 @@ SECRET_FIELDS: dict[str, tuple[str, ...]] = {
     "app": ("secret_key",),
     "database": ("password",),
     "integrations.cortex": ("api_key", "webhook_secret"),
+    "integrations.chromadb": ("token",),
     "integrations.thehive": ("api_key",),
     "integrations.misp.instances.primary": ("api_key",),
     "integrations.misp.instances.secondary": ("api_key",),

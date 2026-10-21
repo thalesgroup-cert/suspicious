@@ -123,6 +123,10 @@ def get_chroma_client():
     host = str(cfg.get("host", _DEFAULT_CHROMA_HOST))
     port = int(cfg.get("port", _DEFAULT_CHROMA_PORT))
 
+    token = cfg.get("token") or os.environ.get("CHROMA_TOKEN", "")
+    if not token:
+        raise RuntimeError("ChromaDB token missing: set CHROMA_TOKEN (see make db-auth-migrate)")
+
     _disable_chromadb_telemetry()
 
-    return chromadb.HttpClient(host=host, port=port)
+    return chromadb.HttpClient(host=host, port=port, headers={"X-Chroma-Token": token})
