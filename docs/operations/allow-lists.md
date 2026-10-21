@@ -17,3 +17,14 @@ An allow-listed observable gets its Safe verdict at submission time and no Corte
 - **IPs** are matched on the parsed address, so `2606:4700:4700:0:0:0:0:1111` and `2606:4700:4700::1111` are the same entry.
 - **Domains** are matched exactly. Allow-listing `google.com` does not allow `sites.google.com`, `google.com.evil.tld` or `evil-google.com`. List the subdomain itself if you want it skipped.
 - **Precedence**: an allow-list entry never beats a deny-listed domain, a Watcher monitored domain or a campaign domain. A domain on both an allow list and the deny list is marked dangerous and not analysed; a domain on both an allow list and the campaign list is analysed as usual.
+
+## MISP: what is not shared
+
+The MISP connector withholds these indicators from shared events:
+
+- Campaign (phishing-simulation) domains: domain objects, URL hosts and email-address objects. Subdomains are included.
+- Domains and URLs whose host is on the domain allow list (subdomains included).
+- Hashes on the file allow list.
+- IPs on the IP allow list.
+
+Filtering is per IOC: a case from a campaign sender still shares its other IOCs. MISP matching covers subdomains, while launch matching is on exact domains.

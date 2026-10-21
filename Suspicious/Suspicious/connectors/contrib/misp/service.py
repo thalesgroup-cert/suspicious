@@ -17,8 +17,13 @@ from mail_feeder.models import Mail
 from .client import MISPClient
 from .config_loader import load_misp_settings
 from .events import MISPEventManager
+from settings.allow_lists import normalise_ip
+
 from .internal import (
     allow_listed_domains,
+    allow_listed_hashes,
+    allow_listed_ips,
+    campaign_domains,
     company_domains,
     is_allow_listed,
     is_company_domain,
@@ -46,6 +51,9 @@ _UPDATE_MISP_PREFETCH = (
 
 
 class MISPService:
+    _allow_listed_ips: frozenset = frozenset()
+    _allow_listed_hashes: frozenset = frozenset()
+
     def __init__(self, primary: bool = True) -> None:
         settings     = load_misp_settings()
         config       = settings.suspicious if primary else settings.security
@@ -57,8 +65,12 @@ class MISPService:
     # ── Case update ───────────────────────────────────────────────────────
 
     def update_misp(self, case: Case) -> None:
-        self._company_domains = company_domains()
+        # campaign simulations are withheld like company domains: domain, URL host
+        # and email-address objects all go through this one set
+        self._company_domains = company_domains() | campaign_domains()
         self._allow_listed = allow_listed_domains()
+        self._allow_listed_ips = allow_listed_ips()
+        self._allow_listed_hashes = allow_listed_hashes()
         mem   = MISPEventManager(self.client)
         event = mem.get_or_create_event(case)
         if not event or not getattr(event, "id", None):
@@ -145,8 +157,12 @@ class MISPService:
                     return build_domain_object(artifact, case_number, detection_level)
                 return None
             if ioc_type == "ip" and isinstance(artifact, IP):
+                if not self._shareable_ip(artifact):
+                    return None
                 return build_ip_object(artifact, case_number, detection_level)
             if ioc_type == "hash" and isinstance(artifact, Hash):
+                if not self._shareable_hash(artifact):
+                    return None
                 return build_hash_object(artifact, case_number, detection_level)
             logger.warning(
                 "[MISPHandler] Unsupported ioc_type %r for case %s — skipping.",
@@ -161,9 +177,15 @@ class MISPService:
                 return None
             return build_url_object(url, case_number, detection_level)
         if artifact_type == "ip" and getattr(artifact, "artifactIsIp", None):
-            return build_ip_object(artifact.artifactIsIp.ip, case_number, detection_level)
+            ip = artifact.artifactIsIp.ip
+            if not self._shareable_ip(ip):
+                return None
+            return build_ip_object(ip, case_number, detection_level)
         if artifact_type == "hash" and getattr(artifact, "artifactIsHash", None):
-            return build_hash_object(artifact.artifactIsHash.hash, case_number, detection_level)
+            hash_obj = artifact.artifactIsHash.hash
+            if not self._shareable_hash(hash_obj):
+                return None
+            return build_hash_object(hash_obj, case_number, detection_level)
         if artifact_type == "domain" and getattr(artifact, "artifactIsDomain", None):
             domain = artifact.artifactIsDomain.domain
             if not self._shareable_domain(domain):
@@ -185,8 +207,16 @@ class MISPService:
         )
 
     def _shareable_url(self, url: URL) -> bool:
-        """A link on a company domain points at the victim, not at the attacker."""
-        return not is_company_domain(url_host(url.address), self._company_domains)
+        """A link on a company or allow-listed host is not an indicator."""
+        host = url_host(url.address)
+        return (not is_company_domain(host, self._company_domains)
+                and not is_allow_listed(host, self._allow_listed))
+
+    def _shareable_ip(self, ip: IP) -> bool:
+        return normalise_ip(ip.address) not in self._allow_listed_ips
+
+    def _shareable_hash(self, hash_obj: Hash) -> bool:
+        return (hash_obj.value or "").strip().lower() not in self._allow_listed_hashes
 
     def add_attachment_object(
         self,
@@ -205,6 +235,8 @@ class MISPService:
                 "[MISPHandler] Attachment %s on case %s has no linked hash — skipping.",
                 getattr(attachment, "id", attachment), case_number,
             )
+            return
+        if not self._shareable_hash(hash_obj):
             return
         obj = build_hash_object(hash_obj, case_number, detection_level)
         if obj:

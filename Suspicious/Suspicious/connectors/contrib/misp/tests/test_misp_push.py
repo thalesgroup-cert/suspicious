@@ -1,7 +1,15 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
+
+from case_handler.models import Case, CaseHasFileOrMail
+from hash_process.models import Hash
+from ip_process.models import IP
+from mail_feeder.models import ArtifactIsIp, Mail, MailArtifact
+from settings.models import CampaignDomainAllowList
 
 from connectors.contrib.misp.connector import MISPConnector
 from connectors.contrib.misp.events import MISPEventManager
@@ -220,3 +228,76 @@ class CompanyUrlsStayOutOfMispTest(SimpleTestCase):
             artifact_type="URL", artifactIsUrl=SimpleNamespace(url=URL(address=a)))
         self.assertIsNone(svc._build_artifact_object(art("https://corp.example/x"), 1, "Dangerous", None))
         self.assertIsNotNone(svc._build_artifact_object(art("https://evil.test/x"), 1, "Dangerous", None))
+
+
+class AllowListedAndCampaignIocsStayOutOfMispTest(SimpleTestCase):
+    def _svc(self):
+        svc = MISPService.__new__(MISPService)
+        svc._company_domains = frozenset({"corp.example", "sim.test"})  # update_misp merges campaign domains in
+        svc._allow_listed = frozenset({"good.test"})
+        svc._allow_listed_ips = frozenset({"8.8.8.8", "2606:4700:4700::1111"})
+        svc._allow_listed_hashes = frozenset({"ab" * 16})
+        return svc
+
+    def _build(self, artifact, ioc_type):
+        return self._svc()._build_artifact_object(artifact, 1, "Dangerous", ioc_type)
+
+    def test_campaign_domain_and_subdomains_skipped(self):
+        self.assertIsNone(self._build(Domain(value="sim.test"), "domain"))
+        self.assertIsNone(self._build(Domain(value="mail.sim.test"), "domain"))
+        self.assertIsNotNone(self._build(Domain(value="notsim.test"), "domain"))
+
+    def test_url_host_judged_after_credentials_are_stripped(self):
+        self.assertIsNone(self._build(URL(address="https://corp.example@sim.test/x"), "url"))
+        self.assertIsNotNone(self._build(URL(address="https://sim.test@evil.test/x"), "url"))
+
+    def test_url_on_allow_listed_domain_skipped_lookalikes_pushed(self):
+        self.assertIsNone(self._build(URL(address="https://good.test/a"), "url"))
+        self.assertIsNone(self._build(URL(address="https://cdn.good.test/a"), "url"))
+        self.assertIsNotNone(self._build(URL(address="https://good.test.evil.tld/a"), "url"))
+        self.assertIsNotNone(self._build(URL(address="https://evil.test/?u=https://good.test/"), "url"))
+
+    def test_allow_listed_ip_and_hash_skipped_others_pushed(self):
+        self.assertIsNone(self._build(IP(address="2606:4700:4700:0:0:0:0:1111"), "ip"))
+        self.assertIsNotNone(self._build(IP(address="8.8.4.4"), "ip"))
+        self.assertIsNone(self._build(Hash(value="AB" * 16, hashtype="md5"), "hash"))
+        self.assertIsNotNone(self._build(Hash(value="cd" * 16, hashtype="md5"), "hash"))
+
+    def test_mail_artifact_ip_and_attachment_hash_filtered_too(self):
+        svc = self._svc()
+        art = SimpleNamespace(artifact_type="IP", artifactIsIp=SimpleNamespace(ip=IP(address="8.8.8.8")))
+        self.assertIsNone(svc._build_artifact_object(art, 1, "Dangerous", None))
+        att = SimpleNamespace(id=1, file=SimpleNamespace(linked_hash=Hash(value="ab" * 16, hashtype="md5")))
+        with patch.object(MISPService, "_push") as push:
+            svc.add_attachment_object("1", att, 1, "Dangerous")
+        push.assert_not_called()
+
+    def test_service_built_without_the_new_sets_still_works(self):
+        svc = MISPService.__new__(MISPService)
+        svc._company_domains, svc._allow_listed = frozenset(), frozenset()
+        self.assertIsNotNone(svc._build_artifact_object(IP(address="8.8.8.8"), 1, "Dangerous", "ip"))
+
+
+class CampaignSenderCaseStillSharesOtherIocsTest(TestCase):
+    def test_campaign_domain_withheld_but_rest_of_case_pushed(self):
+        user = get_user_model().objects.create_user(username="misp_camp", password="x")
+        CampaignDomainAllowList.objects.create(domain=Domain.objects.create(value="sim.test"), user=user)
+        mail = Mail.objects.create(subject="t", mail_from="hr@sim.test", date=timezone.now())
+        art = MailArtifact.objects.create(mail=mail, artifact_type="IP", artifact_score=0, artifact_confidence=0)
+        art.artifactIsIp = ArtifactIsIp.objects.create(ip=IP.objects.create(address="203.0.113.9"), artifact=art)
+        art.save(update_fields=["artifactIsIp"])
+        case = Case.objects.create(description="", reporter=user, results="Safe")
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
+        case.save(update_fields=["fileOrMail"])
+        with patch("connectors.contrib.misp.service.MISPEventManager") as mem, \
+                patch("connectors.contrib.misp.service.MISPClient"), \
+                patch("connectors.contrib.misp.service.build_email_object", return_value=None) as email, \
+                patch("connectors.contrib.misp.service.build_ip_object", return_value=MagicMock()) as ip_obj, \
+                patch("connectors.contrib.misp.service.finalize_misp_object"), \
+                patch.object(MISPService, "_maybe_push_monthly"):
+            mem.return_value.get_or_create_event.return_value = MagicMock(id=1)
+            svc = MISPService.__new__(MISPService)
+            svc.client, svc.primary = MagicMock(), True
+            svc.update_misp(case)
+        self.assertIn("sim.test", email.call_args.args[3])  # address objects drop the campaign sender
+        ip_obj.assert_called_once()                          # no whole-case skip

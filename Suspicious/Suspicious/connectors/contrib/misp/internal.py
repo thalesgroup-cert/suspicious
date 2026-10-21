@@ -28,6 +28,29 @@ def allow_listed_domains() -> frozenset[str]:
     return frozenset(v.strip().lower().rstrip(".") for v in values if v)
 
 
+def campaign_domains() -> frozenset[str]:
+    """Authorised phishing-simulation domains: withheld from MISP like company
+    domains (subdomains included) but still scored Dangerous."""
+    from settings.models import CampaignDomainAllowList
+
+    values = CampaignDomainAllowList.objects.values_list("domain__value", flat=True)
+    return frozenset(v.strip().lower().rstrip(".") for v in values if v)
+
+
+def allow_listed_ips() -> frozenset[str]:
+    from settings.allow_lists import normalise_ip
+    from settings.models import AllowListIp
+
+    return frozenset(normalise_ip(a) for a in AllowListIp.objects.values_list("ip__address", flat=True) if a)
+
+
+def allow_listed_hashes() -> frozenset[str]:
+    from settings.models import AllowListFile
+
+    values = AllowListFile.objects.values_list("linked_file_hash__value", flat=True)
+    return frozenset(v.strip().lower() for v in values if v)
+
+
 def is_company_domain(domain: str, domains) -> bool:
     domain = (domain or "").strip().lower().rstrip(".")
     return bool(domain) and any(domain == d or domain.endswith("." + d) for d in domains)
