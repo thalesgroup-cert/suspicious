@@ -132,6 +132,8 @@ services:
       - "8000"
     volumes:
       - "chromadb_data:/data:Z"
+    environment:
+      ANONYMIZED_TELEMETRY: "False"   # the backend has no outbound route
     security_opt:
       - no-new-privileges:true
     # The server has no authentication: it lives only on an internal network

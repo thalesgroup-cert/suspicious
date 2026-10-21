@@ -1,13 +1,23 @@
 # Token-checking front for the ChromaDB server (which has no authentication of
 # its own). The official nginx image renders this with envsubst at start, so
 # the token never appears on a command line; $http_* variables are untouched.
+# CHROMA_TOKEN must be hex only: `$`, quotes or backslashes would break this file.
+server_tokens off;
+
 server {
     listen 8000;
     client_max_body_size 64m;
+    # Docker's resolver + a variable make nginx re-resolve the backend, so a
+    # recreated container is followed and the proxy starts before the backend.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $chroma_upstream http://chroma-backend:8000;
     location / {
         if ($http_x_chroma_token != "${CHROMA_TOKEN}") { return 401; }
         proxy_set_header X-Chroma-Token "";
-        proxy_pass http://chroma-backend:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_pass $chroma_upstream;   # no URI part: path and query pass unchanged
         proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
     }
 }
