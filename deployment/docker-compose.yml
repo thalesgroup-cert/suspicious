@@ -25,8 +25,8 @@ services:
         condition: service_healthy
       cortex:
         condition: service_started   # R2: decoupled — circuit breaker handles unavailability at call time
-      chromadb:
-        condition: service_started
+      chromadb_proxy:
+        condition: service_healthy
       redis_cache:
         condition: service_healthy
     healthcheck:
@@ -138,6 +138,16 @@ services:
     image: chromadb/chroma:${CHROMADB_VERSION:?CHROMADB_VERSION is required}
     container_name: ${SVC_PREFIX:-}chromadb
 
+  chromadb_proxy:
+    extends:
+      file: compose_databases.yaml
+      service: chromadb_proxy
+    image: nginx:${CHROMA_PROXY_VERSION:-1.29-alpine}
+    container_name: ${SVC_PREFIX:-}chromadb_proxy
+    depends_on:
+      chromadb:
+        condition: service_started
+
   redis_broker:
     extends:
       file: compose_databases.yaml
@@ -236,4 +246,6 @@ networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  chroma_internal:
+    internal: true
   reverse_network:

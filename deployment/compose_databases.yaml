@@ -134,8 +134,32 @@ services:
       - "chromadb_data:/data:Z"
     security_opt:
       - no-new-privileges:true
+    # The server has no authentication: it lives only on an internal network
+    # and is reached through chromadb_proxy.
     networks:
-      - suspicious_network
+      chroma_internal:
+        aliases: [chroma-backend]
+
+  chromadb_proxy:
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      CHROMA_TOKEN: "${CHROMA_TOKEN:?CHROMA_TOKEN is required (run make init)}"
+    volumes:
+      - "./docker/chroma-proxy/default.conf.template:/etc/nginx/templates/default.conf.template:ro"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null --header \"X-Chroma-Token: $$CHROMA_TOKEN\" http://127.0.0.1:8000/api/v2/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      suspicious_network:
+        aliases: [chromadb]   # clients keep using host "chromadb"
+      chroma_internal: {}
 
   redis_broker:
     init: true
@@ -210,3 +234,5 @@ networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  chroma_internal:
+    internal: true
