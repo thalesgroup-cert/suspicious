@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from typing import Optional
 from django.contrib.auth import get_user_model
@@ -42,10 +43,12 @@ def _get_user_by_username_variants(username: str) -> Optional[object]:
     Variants tried for 'first.last':
         first.last, f.last, first_last, first-last
     """
+    # Bucket names carry "." and "_" as "-", so split on any of them.
     try:
-        first, last = username.split(".", 1)
+        first, last = re.split(r"[._-]", username, maxsplit=1)
         variants = {
             username,
+            f"{first}.{last}",
             f"{first[0]}.{last}",
             f"{first}_{last}",
             f"{first}-{last}",
