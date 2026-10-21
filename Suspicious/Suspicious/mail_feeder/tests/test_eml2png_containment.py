@@ -42,8 +42,10 @@ class NetworkContainmentOptionsTests(SimpleTestCase):
         self.assertEqual(options["load-media-error-handling"], "ignore")
 
     def test_render_failure_returns_none_instead_of_raising(self):
-        # With the proxy closed, a fetch that slips past the sanitiser makes
-        # wkhtmltoimage exit non-zero and imgkit raise: no preview, no fetch.
+        # imgkit failures (e.g. wkhtmltoimage exiting non-zero) give no preview
+        # rather than an exception. A reference that slips past the sanitiser
+        # reaches the closed proxy and is simply not loaded
+        # (load-error-handling=ignore), so nothing is fetched.
         renderer = Eml2PngRenderer()
         renderer._imgkit_available = True
         with mock.patch("imgkit.from_string", side_effect=OSError("Failed to load")):
@@ -98,3 +100,27 @@ class HostileRenderThroughOptionsTests(SimpleTestCase):
         args, kwargs = mocked.call_args
         self.assertNotIn(HOST, args[0])
         self.assertEqual(kwargs["options"]["proxy"], _CLOSED_PROXY)
+
+
+class BlankBodyFallbackTests(SimpleTestCase):
+    def test_html_that_sanitises_to_nothing_falls_back_to_plain_text(self):
+        for body in (
+            f"<img src=http://{HOST}/x.gif>",
+            f"<iframe src=http://{HOST}/x></iframe>",
+            "   <div> </div>  ",
+        ):
+            with self.subTest(body=body):
+                html = Eml2PngRenderer()._build_preview_html(_html_message(body))
+                self.assertRegex(html, r"<pre>plain fallback\s*</pre>")
+                self.assertNotIn(HOST, html)
+
+
+class HeaderRowsCannotBeHiddenTests(SimpleTestCase):
+    def test_header_cells_carry_inline_important_display(self):
+        html = Eml2PngRenderer()._build_preview_html(
+            _html_message("<p>x</p>", subject="Urgent invoice")
+        )
+        self.assertIn("Urgent invoice", html)
+        row = html[html.index("<tr"):html.index("</tr>")]
+        for cell in ("<tr", "<th", "<td"):
+            self.assertIn("!important", row[row.index(cell):].split(">", 1)[0])

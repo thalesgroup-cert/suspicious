@@ -29,6 +29,7 @@ from html import escape
 from pathlib import Path
 from typing import Optional
 
+import nh3
 from django.conf import settings
 
 from common.clients import ensure_bucket
@@ -60,9 +61,14 @@ _MAX_PNG_BYTES = 15 * 1024 * 1024
 
 _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
 
+# Inline !important wins over any stylesheet rule in the (sanitised) body, so a
+# mail cannot hide the header rows the analyst relies on.
+_KEEP_VISIBLE = "visibility:visible !important;display:{} !important"
+
 # Network containment, independent of the sanitiser: wkhtmltoimage is pointed
 # at a loopback port nothing listens on, so a reference that gets past
-# sanitize_email_html() reaches no host (the render fails instead).
+# sanitize_email_html() reaches no host (the resource is simply not loaded:
+# load-error-handling=ignore renders the page without it).
 # `proxy-hostname-lookup` keeps DNS lookups off the worker's resolver too.
 _CLOSED_PROXY = "http://127.0.0.1:1"
 
@@ -160,7 +166,9 @@ class Eml2PngRenderer:
             if not value:
                 continue
             header_rows.append(
-                f"<tr><th>{escape(name)}</th><td>{escape(value)}</td></tr>"
+                f'<tr style="{_KEEP_VISIBLE.format("table-row")}">'
+                f'<th style="{_KEEP_VISIBLE.format("table-cell")}">{escape(name)}</th>'
+                f'<td style="{_KEEP_VISIBLE.format("table-cell")}">{escape(value)}</td></tr>'
             )
 
         body_html = self._extract_body_html(msg)
@@ -236,7 +244,10 @@ class Eml2PngRenderer:
 
         if html_part is not None:
             try:
-                return sanitize_email_html(html_part.get_content())
+                body = sanitize_email_html(html_part.get_content())
+                if "<img src=" in body or nh3.clean(body, tags=set()).strip():
+                    return body
+                # Image-only / iframe-only / truncated to nothing: show the text part.
             except Exception:
                 logger.exception("Failed to decode HTML body; falling back to text/plain")
 

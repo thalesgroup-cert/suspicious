@@ -47,7 +47,7 @@ _STYLE_PROPERTIES = {
     "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
     "border", "border-top", "border-right", "border-bottom", "border-left",
     "border-collapse", "border-spacing", "border-color", "border-style",
-    "border-width", "border-radius", "display", "float",
+    "border-width", "border-radius", "display",
 }
 
 # Raster data: and cid: only. data:image/svg+xml can carry external refs.
@@ -61,7 +61,9 @@ _INLINE_IMAGE = re.compile(
 # because a fetch needs url(, image-set(, image(, ... or an @-rule.
 _CSS_FORBIDDEN = re.compile(
     r"url|src\(|image-set|image\(|cross-fade|element\(|paint\(|import|expression|"
-    r"behavior|binding|@(?!media\b)|[\\<&]",
+    r"behavior|binding|@(?!media\b)|[\\<&]|"
+    # Layout tricks that could hide or cover the analyst header rows above the body.
+    r"position|z-index|visibility|opacity|transform|float|display\s*:\s*none",
     re.IGNORECASE,
 )
 

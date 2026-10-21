@@ -206,6 +206,19 @@ class SanitizeEmailHtmlStyleBlockTests(SimpleTestCase):
                 out = sanitize_email_html(f"<style>p{{color:red;background:{fn}}}</style><p>t</p>")
                 self.assertNotIn("<style>", out)
 
+    def test_blocks_that_could_hide_or_overlay_the_header_are_dropped(self):
+        for rule in (
+            ".hdr{display:none}", ".hdr{display : none !important}",
+            "table{position:fixed;top:0}", "td{visibility:hidden}", "th{opacity:0}",
+            "table{z-index:99}", "table{transform:scale(0)}", "th{float:right}",
+        ):
+            with self.subTest(rule=rule):
+                self.assertNotIn("<style>", sanitize_email_html(f"<style>{rule}</style><p>t</p>"))
+
+    def test_ordinary_newsletter_css_survives(self):
+        css = "body{margin:0;color:#333;font-family:Arial}td{width:600px;text-align:center}"
+        self.assertIn(css, sanitize_email_html(f"<style>{css}</style><p>t</p>"))
+
     def test_harmless_class_names_do_not_drop_the_block(self):
         out = sanitize_email_html("<style>.image-wrap{color:red}.src{margin:0}</style><p>t</p>")
         self.assertIn(".image-wrap{color:red}", out)
