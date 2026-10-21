@@ -4,7 +4,7 @@ Logos are bundled so the settings page never fetches an image at runtime (air-ga
 used only to identify the integration next to its name; every mark remains the property of its owner and no
 endorsement is implied. `smtp_notify` and `ai_narration` have no single brand and use a neutral icon instead.
 All files were retrieved on 2026-10-19 by `curl` from raw.githubusercontent.com. Commit hashes pin the exact
-revision. Confirm brand usage before the final merge.
+revision. Brand usage confirmed by the project owner on 2026-10-21 (all five marks kept).
 
 | File | Brand | Source URL | Licence | Retrieved | Modification |
 |---|---|---|---|---|---|
