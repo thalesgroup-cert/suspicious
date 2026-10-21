@@ -138,9 +138,18 @@ services:
     restart: always
     expose:
       - "6379"
-    command: ["valkey-server", "--requirepass", "${REDIS_BROKER_PASSWORD:?REDIS_BROKER_PASSWORD is required (run make init)}"]
+    # The password is read from the environment and fed to valkey on stdin so it
+    # never appears in the process arguments or `docker inspect` Cmd. It must not
+    # contain `$` (compose interpolation); `make init` generates hex.
+    command:
+      - sh
+      - -c
+      - |
+        exec valkey-server - <<EOF
+        requirepass $$REDISCLI_AUTH
+        EOF
     environment:
-      REDISCLI_AUTH: "${REDIS_BROKER_PASSWORD}"   # makes the redis-cli healthcheck authenticate
+      REDISCLI_AUTH: "${REDIS_BROKER_PASSWORD:?REDIS_BROKER_PASSWORD is required (run make init)}"   # also authenticates the redis-cli healthcheck
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -157,9 +166,18 @@ services:
     restart: always
     expose:
       - "6379"
-    command: ["valkey-server", "--requirepass", "${REDIS_CACHE_PASSWORD:?REDIS_CACHE_PASSWORD is required (run make init)}"]
+    # The password is read from the environment and fed to valkey on stdin so it
+    # never appears in the process arguments or `docker inspect` Cmd. It must not
+    # contain `$` (compose interpolation); `make init` generates hex.
+    command:
+      - sh
+      - -c
+      - |
+        exec valkey-server - <<EOF
+        requirepass $$REDISCLI_AUTH
+        EOF
     environment:
-      REDISCLI_AUTH: "${REDIS_CACHE_PASSWORD}"   # makes the redis-cli healthcheck authenticate
+      REDISCLI_AUTH: "${REDIS_CACHE_PASSWORD:?REDIS_CACHE_PASSWORD is required (run make init)}"   # also authenticates the redis-cli healthcheck
     security_opt:
       - no-new-privileges:true
     healthcheck:
