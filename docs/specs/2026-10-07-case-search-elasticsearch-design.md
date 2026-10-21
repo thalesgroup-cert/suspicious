@@ -80,7 +80,7 @@ helper from it.
 ## Testing
 - Unit: document builder (file case, mail case, IOC group case), query
   builder, fallback when the client raises.
-- Live ES test that runs only when `ES_TEST_URL` is set (CI's compose stub has
+- Live ES test that runs only when `ES_TEST_URL` is set (with `ES_TEST_USER` / `ES_TEST_PASSWORD`, since Elasticsearch requires credentials; CI's compose stub has
   no Elasticsearch), covering the index + search roundtrip only;
   update-on-modify and fallback are covered by the mocked unit tests.
 - Existing investigations API tests must pass unchanged with the connector

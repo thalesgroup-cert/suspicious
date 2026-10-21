@@ -17,7 +17,16 @@ the search box asks Elasticsearch for matching case ids, then the normal
 scoped queryset filters by those ids.
 
 Config in `settings.json`: `integrations.case_search.url`,
-`integrations.case_search.index`, `integrations.case_search.timeout_seconds`.
+`integrations.case_search.index`, `integrations.case_search.timeout_seconds`,
+and optionally `integrations.case_search.username` / `password`. Blank
+credentials with the default URL use the in-stack `suspicious_app` account
+(`ES_SUSPICIOUS_USER` / `ES_SUSPICIOUS_PASSWORD`); a custom URL never receives
+those internal credentials.
+
+Cortex logs in to Elasticsearch as `cortex_app` through `-Dsearch.user` /
+`-Dsearch.password` in `JAVA_OPTS`. If an operator-owned Cortex
+`application.conf` already sets `search.user` / `search.password`, that file
+wins over the `JAVA_OPTS` values.
 
 Enable: first enable `case_search` (Settings UI, or `PATCH /api/connectors/case_search/`
 with body `{"enabled": true}`; admin/CERT only, `enabled` must be a boolean), then
@@ -34,4 +43,6 @@ or longer queries use the ORM search. Any Elasticsearch error or timeout logs
 a warning and falls back to the ORM search.
 
 The live test (`connectors.contrib.case_search.tests.test_live_es`) runs only
-when `ES_TEST_URL` is set.
+when `ES_TEST_URL` is set. Elasticsearch now requires authentication, so also
+set `ES_TEST_USER` and `ES_TEST_PASSWORD` (a user allowed to manage
+`suspicious-*` indices, e.g. `suspicious_app`).

@@ -737,7 +737,7 @@ git commit -m "feat(connectors): reindex_cases command for the case_search index
 **Files:**
 - Modify: `docs/components/backend/connectors.md` (add a `case_search` section)
 - Modify: `docs/specs/2026-10-07-case-search-elasticsearch-design.md` (align with decisions made while planning, see Step 3)
-- Create: `connectors/contrib/case_search/tests/test_live_es.py` (skipped unless `ES_TEST_URL` is set)
+- Create: `connectors/contrib/case_search/tests/test_live_es.py` (skipped unless `ES_TEST_URL` is set; needs `ES_TEST_USER`/`ES_TEST_PASSWORD` once Elasticsearch security is on)
 
 - [ ] **Step 1: Write the live ES test (skipped by default)**
 
@@ -787,7 +787,7 @@ The image needs the new dependency, then the test runs against the dev cluster (
 ```bash
 cd deployment
 docker compose --env-file .env build suspicious
-docker compose --env-file .env run --rm --no-deps -e ES_TEST_URL=http://elasticsearch:9200 \
+docker compose --env-file .env run --rm --no-deps -e ES_TEST_URL=http://elasticsearch:9200 -e ES_TEST_USER -e ES_TEST_PASSWORD \
   suspicious python manage.py test connectors.contrib.case_search.tests.test_live_es
 ```
 
