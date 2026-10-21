@@ -60,7 +60,7 @@ _INLINE_IMAGE = re.compile(
 # rejects the whole block. Plain words such as a ".image-wrap" class are fine
 # because a fetch needs url(, image-set(, image(, ... or an @-rule.
 _CSS_FORBIDDEN = re.compile(
-    r"url|image-set|image\(|cross-fade|element\(|paint\(|import|expression|"
+    r"url|src\(|image-set|image\(|cross-fade|element\(|paint\(|import|expression|"
     r"behavior|binding|@(?!media\b)|[\\<&]",
     re.IGNORECASE,
 )
@@ -72,6 +72,9 @@ MAX_HTML_CHARS = 1024 * 1024
 # nh3 is quadratic in nesting depth (20k nested <div> take about a second), so
 # the number of tag openers is capped too. Real mail stays far below this.
 MAX_HTML_TAGS = 10_000
+# nh3 is also quadratic in the number of attributes on one tag (100k distinct
+# attributes take about 12 s), so a single tag is capped as well.
+MAX_TAG_CHARS = 20_000
 
 _ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
 
@@ -148,14 +151,17 @@ def _safe_style_blocks(html: str) -> str:
 
 
 def _truncate(html: str) -> str:
+    """Cut the body at the first sign of an input that makes nh3 slow."""
     html = html[:MAX_HTML_CHARS]
     pos = -1
     for _ in range(MAX_HTML_TAGS):
         pos = html.find("<", pos + 1)
         if pos < 0:
             return html
-    cut = html.find("<", pos + 1)
-    return html if cut < 0 else html[:cut]
+        end = html.find(">", pos)
+        if end < 0 or end - pos > MAX_TAG_CHARS:
+            return html[:pos]
+    return html[:pos]
 
 
 def sanitize_email_html(html: str) -> str:

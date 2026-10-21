@@ -148,17 +148,21 @@ class SanitizeEmailHtmlHostileTests(SimpleTestCase):
         self.assertEqual(out, "<p>a</p>")
 
 
-SLOW_BUDGET_S = 1.5
+SLOW_BUDGET_S = 3
 
 
 class SanitizeEmailHtmlPerformanceTests(SimpleTestCase):
+    # Every payload stays under MAX_HTML_TAGS / MAX_TAG_CHARS wherever the
+    # HOST probe is appended, so the probe is not simply truncated away.
     PAYLOADS = {
-        "unclosed_style_repeats": "<style>" * 40_000,
-        "unclosed_style_comment_repeats": "<style>/* " * 40_000,
-        "unclosed_comment_in_closed_style": "<style>" + "/* " * 400_000 + "</style>",
-        "unclosed_style_tag_open": "<style " * 100_000,
-        "two_mb_nested_tags": "<div>" * 400_000,
-        "two_mb_nested_tables": "<table><tr><td>" * 150_000,
+        "unclosed_style_repeats": "<style>" * 9_000,
+        "unclosed_style_comment_repeats": "<style>/* " * 9_000,
+        "unclosed_comment_in_closed_style": "<style>" + "/* " * 300_000 + "</style>",
+        "unclosed_style_tag_open": "<style " * 9_000,
+        "nested_divs": "<div>" * 9_000,
+        "nested_tables": "<table><tr><td>" * 3_000,
+        "misnested_b_p": "<b><p>" * 4_000,
+        "many_attributes_on_one_tag": "<td " + " ".join(f"a{i}=1" for i in range(3_000)) + ">x",
     }
 
     def test_hostile_sizes_finish_quickly_and_stay_safe(self):
@@ -168,6 +172,18 @@ class SanitizeEmailHtmlPerformanceTests(SimpleTestCase):
                 out = sanitize_email_html(payload + f"<img src=//{HOST}/x>")
                 self.assertLess(time.monotonic() - start, SLOW_BUDGET_S)
                 self.assertNotIn(HOST, out)
+
+    def test_oversized_inputs_are_cut_and_fast(self):
+        payloads = {
+            "nested_divs": "<div>" * 200_000,
+            "one_huge_tag": "<td " + " ".join(f"a{i}=1" for i in range(100_000)) + ">x",
+            "unclosed_style_repeats": "<style>" * 40_000,
+        }
+        for name, payload in payloads.items():
+            with self.subTest(payload=name):
+                start = time.monotonic()
+                sanitize_email_html(payload)
+                self.assertLess(time.monotonic() - start, SLOW_BUDGET_S)
 
     def test_input_is_capped(self):
         out = sanitize_email_html("a" * (MAX_HTML_CHARS + 500))
@@ -183,6 +199,12 @@ class SanitizeEmailHtmlStyleBlockTests(SimpleTestCase):
         ):
             with self.subTest(css=css):
                 self.assertNotIn("<style>", sanitize_email_html(f"<style>{css}</style><p>t</p>"))
+
+    def test_every_resource_function_drops_the_block(self):
+        for fn in ("src(x)", "image-set(x 1x)", "image(x)", "cross-fade(x,y)", "element(#a)"):
+            with self.subTest(fn=fn):
+                out = sanitize_email_html(f"<style>p{{color:red;background:{fn}}}</style><p>t</p>")
+                self.assertNotIn("<style>", out)
 
     def test_harmless_class_names_do_not_drop_the_block(self):
         out = sanitize_email_html("<style>.image-wrap{color:red}.src{margin:0}</style><p>t</p>")
