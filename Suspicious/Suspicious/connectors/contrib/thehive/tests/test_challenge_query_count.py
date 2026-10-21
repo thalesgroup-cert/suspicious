@@ -85,10 +85,11 @@ class ChallengeMailQueryCountTest(TestCase):
             "groups": [],
         }
 
-        with patch(
-            "connectors.contrib.thehive.challenge.create_alert_from_challenge",
-            return_value={"_id": "~stub-alert"},
-        ):
+        with patch("connectors.contrib.thehive.challenge_alert.send_challenge_alert",
+                   return_value={"_id": "~stub-alert"}), \
+             patch("connectors.contrib.thehive.campaign_sync.load_member"), \
+             patch("connectors.contrib.thehive.challenge.get_s3_client"), \
+             patch("connectors.contrib.thehive.connector._email_settings", return_value=("", ())):
             original_debug = settings.DEBUG
             settings.DEBUG = True
             try:

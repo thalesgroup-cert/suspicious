@@ -59,6 +59,7 @@ class CampaignContent:
     source_ref: str
     observables: list[dict] = field(default_factory=list)
     files: list[FilePart] = field(default_factory=list)
+    alert_type: str = "Suspicious"
 
 
 def merge_iocs(parts) -> Iocs:
@@ -153,6 +154,27 @@ def _list(values, limit=_TOP) -> str:
     return ", ".join(shown) + (f" and {extra} more" if extra > 0 else "") if shown else "none"
 
 
+def indicator_lines(iocs: Iocs) -> list[str]:
+    return [
+        "", "## Indicators",
+        f"- **Sender domains / addresses:** {_list(iocs.emails)}",
+        f"- **Domains:** {_list(iocs.domains)}",
+        f"- **IP addresses:** {_list(iocs.ips)}",
+        f"- **URLs:** {_list(iocs.urls)}",
+        f"- **Sender display names:** {_list(iocs.display_names)}",
+    ]
+
+
+def attachment_lines(rows) -> list[str]:
+    lines = ["", "## Attachments"]
+    if rows:
+        lines += ["| File | Size | SHA-256 | Status | Mails |", "|---|---|---|---|---|"]
+        lines += [f"| {n} | {s} B | {'`' + h + '`' if h else ''} | {st} | {c} |" for n, s, h, st, c in rows]
+    else:
+        lines.append("No attachments.")
+    return lines
+
+
 def build_description(campaign, members: list[MemberMaterial], iocs: Iocs, rows, ui_base: str) -> str:
     infos = [m.info for m in members]
     reporters = {i.reporter for i in infos}
@@ -172,19 +194,8 @@ def build_description(campaign, members: list[MemberMaterial], iocs: Iocs, rows,
         f"| Verdicts | {', '.join(f'{v} x{n}' for v, n in verdicts.most_common())} |",
         f"| Highest AI malscore | {max(i.malscore for i in infos):.1f} |",
         f"| Email authentication | {', '.join(iocs.auth_failures) or 'no failure recorded'} |",
-        "", "## Indicators",
-        f"- **Sender domains / addresses:** {_list(iocs.emails)}",
-        f"- **Domains:** {_list(iocs.domains)}",
-        f"- **IP addresses:** {_list(iocs.ips)}",
-        f"- **URLs:** {_list(iocs.urls)}",
-        f"- **Sender display names:** {_list(iocs.display_names)}",
-        "", "## Attachments",
     ]
-    if rows:
-        lines += ["| File | Size | SHA-256 | Status | Mails |", "|---|---|---|---|---|"]
-        lines += [f"| {n} | {s} B | {'`' + h + '`' if h else ''} | {st} | {c} |" for n, s, h, st, c in rows]
-    else:
-        lines.append("No attachments.")
+    lines += indicator_lines(iocs) + attachment_lines(rows)
     lines += ["", "## Subjects"] + [f"- {s} (x{n})" for s, n in subjects]
     lines += ["", "## Suspicious cases"]
     lines += [f"- [#{i.case_id}]({ui_base}/investigation?open={i.case_id}) reported by {i.reporter} "

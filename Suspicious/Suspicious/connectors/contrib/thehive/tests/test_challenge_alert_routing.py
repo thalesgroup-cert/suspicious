@@ -33,7 +33,7 @@ class ChallengeAlertRoutingTest(TestCase):
         service = self._service_for(case)
 
         with patch("connectors.contrib.thehive.challenge.add_comment_to_item") as mock_comment, \
-             patch("connectors.contrib.thehive.challenge.create_alert_from_challenge") as mock_new_alert, \
+             patch("connectors.contrib.thehive.challenge_alert.send_challenge_alert") as mock_new_alert, \
              patch("connectors.contrib.thehive.challenge.create_alert_from_challenge_without_mail") as mock_new_alert_nomail:
             service.send_to_thehive()
 

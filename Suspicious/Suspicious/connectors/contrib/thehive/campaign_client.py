@@ -50,7 +50,7 @@ class HiveClient:
             observables.append(_file_observable(part, f"file{i}", content.tlp, content.pap))
             files[f"file{i}"] = (part.filename, part.data)
         alert = {
-            "type": _ALERT_TYPE, "source": _ALERT_SOURCE, "sourceRef": content.source_ref,
+            "type": content.alert_type, "source": _ALERT_SOURCE, "sourceRef": content.source_ref,
             "title": content.title, "description": content.description,
             "severity": content.severity, "tlp": content.tlp, "pap": content.pap,
             "tags": content.tags, "customFields": {"tha-id": content.source_ref},
@@ -62,17 +62,17 @@ class HiveClient:
         except requests.HTTPError as exc:
             # Alerts are unique on (type, source, sourceRef): a retry after a
             # response was lost must reuse the alert it already created.
-            existing = self.find_by_source_ref(content.source_ref) if _is_client_error(exc) else None
+            existing = self.find_by_source_ref(content.source_ref, content.alert_type) if _is_client_error(exc) else None
             if existing:
                 return existing
             raise
 
-    def find_by_source_ref(self, ref: str) -> dict | None:
+    def find_by_source_ref(self, ref: str, alert_type: str = _ALERT_TYPE) -> dict | None:
         # Match on (type, source, sourceRef), the alert's uniqueness key: case alerts
         # use the same ref format, so the ref alone could select one of those.
         found = self._query([
             {"_name": "listAlert"},
-            {"_name": "filter", "_eq": {"_field": "type", "_value": _ALERT_TYPE}},
+            {"_name": "filter", "_eq": {"_field": "type", "_value": alert_type}},
             {"_name": "filter", "_eq": {"_field": "source", "_value": _ALERT_SOURCE}},
             {"_name": "filter", "_eq": {"_field": "sourceRef", "_value": ref}},
         ])

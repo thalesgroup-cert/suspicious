@@ -6,9 +6,8 @@ from jinja2 import Environment, FileSystemLoader
 from mail_feeder.models import Mail
 
 from common.clients import get_s3_client
-from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import fetch_mail_files_from_minio
 from .phishing import add_comment_to_item
-from .utils import generate_ref, build_mail_attachments_paths
+from .utils import generate_ref
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
 from score_process.score_utils.send_mail.send_email_service import SendMailService
 
@@ -268,37 +267,19 @@ class ChallengeToTheHiveService:
                     _save_thehive_alert_id(case, alert)
 
     def _send_thehive_with_mail(self, api_url, api_key, case, mail, challenger) -> None:
-        artifact_type_map = {
-            "ip":          lambda a: (_safe(getattr(getattr(a, "artifactIsIp",          None), "ip.address",           None)), "ip"),
-            "url":         lambda a: (_safe(getattr(getattr(a, "artifactIsUrl",         None), "url.address",          None)), "url"),
-            "mailaddress": lambda a: (_safe(getattr(getattr(a, "artifactIsMailAddress", None), "mail_address.address", None)), "mail"),
-            "domain":      lambda a: (_safe(getattr(getattr(a, "artifactIsDomain",      None), "domain.value",         None)), "domain"),
-            "hash":        lambda a: (_safe(getattr(getattr(a, "artifactIsHash",        None), "hash.value",           None)), "hash"),
-        }
-
-        mail = _refetch_mail_with_prefetch(mail)
-
-        artifact_summary = []
-        for artifact in mail.mail_artifacts.all():
-            artifact_type = _safe(artifact.artifact_type, "").lower()
-            if artifact_type in artifact_type_map:
-                data, dtype = artifact_type_map[artifact_type](artifact)
-                if data:
-                    artifact_summary.append((data, dtype))
-
-        attachments_summary = [
-            _safe(att.file.file_path.name)
-            for att in mail.mail_attachments.all()
-            if _safe(att.file.file_path.name)
-        ]
+        from .campaign_client import HiveClient
+        from .campaign_sync import load_member
+        from .challenge_alert import send_challenge_alert
+        from .connector import _email_settings
 
         try:
-            alert = create_alert_from_challenge(
-                api_url=api_url, api_key=api_key,
-                case=case, mail=mail,
-                challenger=challenger,
-                artifact_summary=artifact_summary,
-                attachments_summary=attachments_summary,
+            ui_base, own_domains = _email_settings()
+            member = load_member(case, get_s3_client(), own_domains)
+            if member is None:
+                return
+            alert = send_challenge_alert(
+                HiveClient(api_url, api_key, verify=_certificate_path()),
+                case, member, challenger, ref=generate_ref(), ui_base=ui_base,
             )
             _save_thehive_alert_id(case, alert)
         except Exception as e:
@@ -339,72 +320,3 @@ def create_alert_from_challenge_without_mail(api_url, api_key, case, file, ioc, 
         "tags":         ["challenge", "file_ioc", "suspicious"],
         "customFields": {"tha-id": ticket_id},
     })
-
-
-def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
-                                artifact_summary=None, attachments_summary=None):
-    api       = TheHiveApi(url=api_url, apikey=api_key, verify=_certificate_path())
-    ticket_id = generate_ref()
-
-    def safe(v, default="N/A"):
-        return v if v not in (None, "") else default
-
-    title = f"Challenge: Case #{safe(case.id)} - {safe(getattr(mail, 'subject', None), 'No Subject')}"
-
-    summary_table = (
-        f"|Value|Description|\n|---|---|\n"
-        f"|Mail Subject|{safe(getattr(mail, 'subject', None))}|\n"
-        f"|From|{safe(getattr(mail, 'mail_from', None))}|\n"
-        f"|Case Score|{safe(getattr(case, 'score', None))}|\n"
-        f"|Case Confidence|{safe(getattr(case, 'confidence', None))}|\n"
-        f"|AI Suggestion|{safe(getattr(case, 'category_ai', None))} / {safe(getattr(case, 'results_ai', None))} "
-        f"(Score: {_safe_round(getattr(case, 'score_ai', None))}, "
-        f"Confidence: {_safe_round(getattr(case, 'confidence_ai', None))})|\n"
-        f"|Results|{safe(getattr(case, 'results', None))}|\n"
-        f"|Proposed Verdict|{safe(getattr(case, 'challenge_proposed_result', None))}|"
-    )
-
-    artifacts_section = "\n".join(
-        f"- {v[0].replace('.', '[.]')} ({v[1]})" for v in (artifact_summary or [])
-    ) or "No artifacts found."
-
-    attachments_section = "\n".join(
-        f"- {v}" for v in (attachments_summary or [])
-    ) or "No attachments found."
-
-    description = (
-        f"# {safe(challenger.get('firstname'))} {safe(challenger.get('lastname'))} "
-        f"({safe(challenger.get('email'))}) has challenged the result of case #{safe(case.id)}.\n\n"
-        f"{summary_table}\n\n"
-        f"## Challenge Reason:\n{safe(getattr(case, 'challenge_reason', None), 'No reason provided.')}\n\n"
-        f"## Extracted Artifacts:\n{artifacts_section}\n\n"
-        f"## Attachments:\n{attachments_section}"
-    )
-
-    mail_id = safe(getattr(mail, "mail_id", None), "unknown-mail-id")
-    minio_client = get_s3_client()
-
-    _headers, eml, _txt, _html = fetch_mail_files_from_minio(minio_client, mail_id)
-
-    tmp_path = build_mail_attachments_paths(eml, ticket_id)
-
-    observables = [{"data": v[0], "dataType": v[1]} for v in (artifact_summary or [])]
-    attachment_map = {}
-    if tmp_path:
-        observables.append({"dataType": "file", "attachment": ticket_id})
-        attachment_map[ticket_id] = tmp_path
-
-    return api.alert.create(
-        alert={
-            "type":        "user_challenge",
-            "source":      "suspicious",
-            "sourceRef":   ticket_id,
-            "title":       title,
-            "description": description,
-            "observables": observables,
-            "severity": 1, "tlp": 1, "pap": 1,
-            "tags":         ["challenge", "mail", "suspicious"],
-            "customFields": {"tha-id": ticket_id},
-        },
-        attachment_map=attachment_map,
-    )

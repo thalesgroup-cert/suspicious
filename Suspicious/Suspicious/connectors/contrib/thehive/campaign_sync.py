@@ -25,8 +25,7 @@ CONNECTOR = "thehive"
 MAX_MEMBERS = 100
 
 
-def _load_member(member, minio, own_domains) -> MemberMaterial | None:
-    case = member.case
+def load_member(case, minio, own_domains) -> MemberMaterial | None:
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
     if mail is None:
         return None
@@ -74,7 +73,7 @@ def sync_campaign(campaign: Campaign, client, minio, *, ui_base: str, own_domain
         if alert is not None and not pending:
             return "up-to-date"
 
-        loaded = [_load_member(m, minio, own_domains) for m in members[-MAX_MEMBERS:]]
+        loaded = [load_member(m.case, minio, own_domains) for m in members[-MAX_MEMBERS:]]
         content = build_content(campaign, [m for m in loaded if m], ui_base=ui_base)
         if alert is None:
             alert, outcome = client.create_alert(content), "created"
