@@ -31,7 +31,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,vault"
+      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,vault"
       VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
@@ -79,7 +79,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
+      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
       VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
@@ -108,7 +108,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
+      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
       VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
@@ -167,7 +167,11 @@ services:
       # dot-form entries (`.corp.example`), never `*`.
       no_proxy:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
       NO_PROXY:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
-      JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
+      # Cortex logs in to Elasticsearch with its own least-privilege account. The
+      # credentials are passed as JVM properties, so they are visible in the JVM
+      # argv inside this container (same audience as its environment); this keeps
+      # the operator-owned application.conf untouched.
+      JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks -Dsearch.user=${ES_CORTEX_USER:?ES_CORTEX_USER is required (run make init)} -Dsearch.password=${ES_CORTEX_PASSWORD:?ES_CORTEX_PASSWORD is required (run make init)}"
       job_directory: "${CORTEX_PATH}/jobs"
       # The Cortex process runs as uid 1001 (entrypoint `su cortex`). The
       # docker.sock is bind-mounted :ro so the entrypoint's own

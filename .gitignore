@@ -89,3 +89,4 @@ docs/research/screenshots/
 .idea
 .DS_Store
 Thumbs.db
+.env.data

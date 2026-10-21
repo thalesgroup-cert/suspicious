@@ -5,6 +5,7 @@ load without it installed."""
 from __future__ import annotations
 
 import logging
+import os
 
 from cortex_job.cortex_utils.case_targets import collect_case_targets
 
@@ -28,14 +29,25 @@ CASE_RELATED = (
 )
 
 
+def _credentials(config: dict):
+    user, password = config.get("username"), config.get("password")
+    if not (user and password) and (config.get("url") or DEFAULT_URL) == DEFAULT_URL:
+        # ponytail: env creds only for the in-stack ES, never for an admin-typed URL
+        user = os.environ.get("ES_SUSPICIOUS_USER")
+        password = os.environ.get("ES_SUSPICIOUS_PASSWORD")
+    return (user, password) if user and password else None
+
+
 def get_client(config: dict, timeout: float):
     from elasticsearch import Elasticsearch
 
     # max_retries=0: the client's default 3 retries would multiply request_timeout
     # (a hung ES = ~4x the 2 s search bound); the connector framework retries events.
-    return Elasticsearch(
-        config.get("url") or DEFAULT_URL, request_timeout=timeout, max_retries=0,
-    )
+    kwargs = {"request_timeout": timeout, "max_retries": 0}
+    creds = _credentials(config)
+    if creds:
+        kwargs["basic_auth"] = creds
+    return Elasticsearch(config.get("url") or DEFAULT_URL, **kwargs)
 
 
 def index_body() -> dict:

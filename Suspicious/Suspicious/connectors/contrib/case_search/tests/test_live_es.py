@@ -15,7 +15,11 @@ ES_URL = os.environ.get("ES_TEST_URL")
 @skipUnless(ES_URL, "set ES_TEST_URL to run against a real Elasticsearch")
 class LiveEsTests(TestCase):
     def test_substring_search_roundtrip(self):
-        config = {"url": ES_URL}
+        config = {
+            "url": ES_URL,
+            "username": os.environ.get("ES_TEST_USER"),
+            "password": os.environ.get("ES_TEST_PASSWORD"),
+        }
         client = service.get_client(config, timeout=10)
         index = f"suspicious-cases-test-{uuid.uuid4().hex[:8]}"
         try:

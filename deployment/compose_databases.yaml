@@ -80,6 +80,10 @@ services:
     volumes:
       - "elasticsearch_data:/usr/share/elasticsearch/data:Z"
       - "elasticsearch_logs:/usr/share/elasticsearch/logs:Z"
+    # ELASTIC_PASSWORD (built-in superuser) lives in .env.data, read only by this
+    # service and the bootstrap script; the application containers never get it.
+    env_file:
+      - ".env.data"
     ulimits:
       nofile:
         soft: 65536
@@ -90,7 +94,7 @@ services:
     environment:
       no_proxy:                 "localhost"
       discovery.type:           "single-node"
-      xpack.security.enabled:   "false"
+      xpack.security.enabled:   "true"
       http.host:                "0.0.0.0"
       cluster.name:             "suspicious"
       script.allowed_types:     "inline,stored"

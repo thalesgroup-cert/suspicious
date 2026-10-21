@@ -25,6 +25,8 @@ class CaseSearchConnector(Connector):
                     "Run `manage.py reindex_cases` before enabling.",
         config_schema=(
             ConfigField("url", "url", default=service.DEFAULT_URL, help="Elasticsearch URL"),
+            ConfigField("username", "str", help="Elasticsearch user (blank = in-stack service account)"),
+            ConfigField("password", "secret", help="Elasticsearch password"),
             ConfigField("index", "str", default=service.DEFAULT_INDEX, help="Index name"),
             ConfigField("timeout_seconds", "int", default=2, help="Search timeout"),
         ),

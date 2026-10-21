@@ -1,9 +1,10 @@
+import os
 import sys
 import types
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from case_handler.models import Case, CaseHasNonFileIocs
@@ -143,3 +144,27 @@ class GetClientTests(TestCase):
         stub.Elasticsearch.assert_called_once_with(
             "http://es:9200", request_timeout=2.0, max_retries=0,
         )
+
+
+class GetClientAuthTests(SimpleTestCase):
+    def _call(self, config, env):
+        with mock.patch.dict(os.environ, env, clear=True), \
+             mock.patch("elasticsearch.Elasticsearch") as es:
+            service.get_client(config, timeout=2.0)
+        return es.call_args
+
+    def test_default_url_uses_env_credentials(self):
+        args = self._call({}, {"ES_SUSPICIOUS_USER": "suspicious_app", "ES_SUSPICIOUS_PASSWORD": "pw"})
+        self.assertEqual(args.kwargs["basic_auth"], ("suspicious_app", "pw"))
+
+    def test_custom_url_never_receives_internal_credentials(self):
+        args = self._call({"url": "https://other.example:9200"},
+                          {"ES_SUSPICIOUS_USER": "suspicious_app", "ES_SUSPICIOUS_PASSWORD": "pw"})
+        self.assertNotIn("basic_auth", args.kwargs)
+
+    def test_explicit_config_credentials_win(self):
+        args = self._call({"url": "https://other.example:9200", "username": "u", "password": "p"}, {})
+        self.assertEqual(args.kwargs["basic_auth"], ("u", "p"))
+
+    def test_no_credentials_means_no_auth_kwarg(self):
+        self.assertNotIn("basic_auth", self._call({}, {}).kwargs)

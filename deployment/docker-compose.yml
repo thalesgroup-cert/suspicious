@@ -109,7 +109,7 @@ services:
     image: elasticsearch:${ELASTICSEARCH_VERSION:?ELASTICSEARCH_VERSION is required}
     container_name: ${SVC_PREFIX:-}elasticsearch
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -Eq '\"status\":\"(green|yellow)\"' || exit 1"]
+      test: ["CMD-SHELL", "curl -sf -u \"elastic:$$ELASTIC_PASSWORD\" http://localhost:9200/_cluster/health | grep -Eq '\"status\":\"(green|yellow)\"' || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 30
