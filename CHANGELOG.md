@@ -136,6 +136,12 @@ management moving to HashiCorp Vault.
   starts them; pass `-f docker-compose.dev-extras.yml` explicitly.
 - Per-app log files with corrected logger nesting and a root-logger safety
   net; web-submission case creation no longer logs into the fetch-mail log.
+- Out-of-scope submission ids now return 404 instead of 403, including another
+  user's id on the challenge endpoint.
+- A CISO acting on their own submission gets the reporter view (no analyst
+  ticket, no internal comments).
+- Mail previews are rendered from sanitised HTML: remote styles, links and
+  images and some stylesheets are dropped, and very large mails are truncated.
 
 ### Fixed
 - **Allow-lists no longer over-reach**: allow-listed IPs no longer launch
@@ -186,9 +192,8 @@ management moving to HashiCorp Vault.
 - Dependency bumps closing known CVEs: `pillow`, `django`, `jinja2`, `nltk`,
   the `opentelemetry` stack (needed to unblock a `protobuf` fix), and on the
   UI side `vite`, `undici`, `form-data`.
-- Mail preview: the HTML body is now cleaned by an allow-list sanitiser (`nh3`)
-  instead of regexes, and `wkhtmltoimage` runs behind a closed local proxy, so
-  a crafted mail can no longer make the renderer fetch internal URLs.
+- Mail preview rendering is hardened: HTML is sanitised with an allow-list
+  (`nh3`) and rendered without network access.
 - CISO scope now applies to submission endpoints (list, detail, verdict, ticket,
   comments, report, mail preview, screenshot, URL analysis); a CISO without a
   profile sees no cases instead of all of them.
