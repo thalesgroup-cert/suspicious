@@ -154,16 +154,13 @@ class CortexAnalyzerReports:
             # just the level string — deliberate departure from spec §5's
             # literal "write score/confidence unconditionally" (matches the
             # Phase B IOC-road final-review guidance).
-            obj_sticky = sticky_holds(obj)
-            if not obj_sticky:
+            if not sticky_holds(obj):
                 obj.ioc_level = ioc_level
                 obj.ioc_score = score
                 obj.ioc_confidence = v.confidence
                 obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
 
-            art_sticky = m_art.artifact_level in _STICKY_IOC_LEVELS and (
-                m_art.artifact_level != "SAFE-ALLOW_LISTED" or obj_sticky)
-            if not art_sticky:
+            if not sticky_holds(obj, m_art.artifact_level):
                 m_art.artifact_level = ioc_level
                 m_art.artifact_score = score
                 m_art.artifact_confidence = v.confidence
