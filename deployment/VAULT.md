@@ -64,16 +64,30 @@ boot, so the unseal step is mandatory.
    ```bash
    docker compose --env-file .env exec vault vault operator init    # record the unseal keys + root token SECURELY
    ```
-   Save the unseal keys (one per line) to `deployment/vault/unseal.keys`
-   (gitignored, `chmod 600`). Vault comes up **sealed** on every boot, but
-   `make up` and `make deploy` run `make unseal`, which reads that file and
-   unseals automatically — no manual step after the first init. To unseal on
-   demand: `make unseal`. Without the keys file, unseal by hand:
+   Record the unseal keys and root token **off the host** (password manager,
+   split between operators). Vault comes up **sealed** on every restart, and
+   `make unseal` asks for the keys at a hidden prompt, one per line, until it
+   opens; nothing is written to disk and no key reaches a command line or log.
+   `make up` and `make deploy` run it too: from a terminal they prompt, without
+   one (CI, cron) they leave Vault sealed and say so, so run `make unseal` once
+   from a terminal. Without the Makefile:
    `docker compose --env-file .env exec vault vault operator unseal`.
 
-   > Security: unseal keys on the host weaken the seal (a stolen disk can be
-   > unsealed). Acceptable for a single-host deployment; use Vault auto-unseal
-   > (cloud KMS / transit Vault) for production.
+   > **Production: use auto-unseal.** Shamir keys typed by an operator mean a
+   > restart needs a person. For unattended restarts add a `seal` stanza to
+   > `vault/config.hcl` backed by a cloud KMS, an HSM or a transit seal (a second
+   > Vault on another host, the usual on-prem route); see HashiCorp's seal
+   > documentation for the providers and for which are available in your Vault
+   > edition. Vault is then unsealed by that service, `make unseal` is not needed,
+   > and `operator init` gives you recovery keys instead of unseal keys (they
+   > cannot unseal Vault if the seal service is lost, so keep them off the host
+   > too). Moving an existing Vault from Shamir to auto-unseal is a seal
+   > migration, not a config edit; follow the migration steps in that documentation.
+   >
+   > **Legacy:** a keys file at `vault/unseal.keys` (or `VAULT_UNSEAL_KEYS_FILE`,
+   > one key per line) is still honoured and the script warns when it uses it.
+   > Anyone who can read that file can unseal Vault; delete it once you move to
+   > the prompt or auto-unseal.
 4. **Export the root token** for the provisioning + seeding steps (the `make`
    targets run the vault CLI inside the container for you, so only the token is
    needed on the host):

@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# Unseal the Vault container using operator unseal keys stored on the host.
+# Unseal the Vault container.
+#
+# Default: the operator types the unseal keys when asked. Vault's own hidden
+# prompt reads them, so a key never reaches a command line, a file or a log:
+# `make unseal`, from a terminal, once per Vault restart.
 #
 # Idempotent and safe to run at every boot: it no-ops when Vault is already
-# unsealed, when Vault is unreachable, or when no keys file is present — so it
-# never blocks `make up` on an uninitialised or Vault-less setup.
+# unsealed or unreachable, and when there is no terminal to ask on (make up,
+# make deploy from CI or cron) it leaves Vault sealed with a clear message
+# instead of blocking.
 #
-# SECURITY: the unseal keys live on the same host as Vault
-# (vault/unseal.keys, gitignored, chmod 600). This trades away part of the
-# seal's protection — whoever can read the file can unseal Vault. Acceptable
-# for a single-host dev/staging deployment; for production use Vault
-# auto-unseal backed by a cloud KMS or a transit Vault instead.
+# Legacy: if a keys file exists (vault/unseal.keys, or VAULT_UNSEAL_KEYS_FILE) it
+# is still used, one key per line. That keeps the keys on the same host as
+# Vault, so whoever can read the file can unseal it; delete it and unseal by
+# hand, or use Vault auto-unseal (cloud KMS / transit Vault) in production —
+# see VAULT.md.
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -55,11 +60,31 @@ case "$(seal_state)" in
 esac
 
 if [ ! -f "$KEYS_FILE" ]; then
-  echo "WARN: no unseal keys at $KEYS_FILE — Vault left sealed." >&2
-  echo "      Run 'make provision-vault' prerequisites: 'vault operator init'," >&2
-  echo "      then write the unseal keys (one per line) to that file." >&2
-  exit 0
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    echo "Vault is sealed and there is no terminal to ask for the unseal keys." >&2
+    echo "      Run 'make unseal' from a terminal and type them in." >&2
+    exit 0
+  fi
+  echo "Vault is sealed. Enter unseal keys (hidden) until it opens; Ctrl-C to stop."
+  attempts=0
+  while [ "$(seal_state)" = sealed ] && [ "$attempts" -lt 10 ]; do
+    attempts=$((attempts + 1))
+    # A TTY exec (no -T, stdout left on the terminal, or no TTY is allocated):
+    # Vault reads the key from its own hidden prompt and prints only the seal
+    # progress, never the key.
+    docker compose --env-file .env exec \
+      -e VAULT_ADDR=https://127.0.0.1:8200 -e VAULT_CACERT=/vault/ca/ca.pem \
+      "$VAULT_SVC" vault operator unseal || echo "  key rejected." >&2
+  done
+  if [ "$(seal_state)" = unsealed ]; then
+    echo "Vault unsealed."
+    exit 0
+  fi
+  echo "ERROR: Vault still sealed." >&2
+  exit 1
 fi
+
+echo "WARN: using unseal keys stored on this host ($KEYS_FILE); see VAULT.md for the alternatives." >&2
 
 # Emit one unseal key per line. Tolerates both a bare "<key>" per line and the
 # verbose `vault operator init` layout ("Unseal Key 1: <key>"); strips inline
