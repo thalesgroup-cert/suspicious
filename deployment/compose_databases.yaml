@@ -37,7 +37,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     networks:
-      - suspicious_network
+      - data
 
   # Read replica — opt-in via `--profile replica`.
   # Run `make db-replica-init` once to bootstrap from primary, then
@@ -70,7 +70,7 @@ services:
     depends_on:
       - db_suspicious
     networks:
-      - suspicious_network
+      - data
 
   elasticsearch:
     init: true
@@ -103,7 +103,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - suspicious_network
+      - cortex
 
   rustfs:
     restart: always
@@ -124,7 +124,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - suspicious_network
+      - storage
 
   chromadb:
     restart: unless-stopped
@@ -159,7 +159,7 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      suspicious_network:
+      data:
         aliases: [chromadb]   # clients keep using host "chromadb"
       chroma_internal: {}
 
@@ -189,7 +189,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - suspicious_network
+      - data
 
   redis_cache:
     init: true
@@ -217,7 +217,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - suspicious_network
+      - data
 
 # Volume stubs — the named volumes are declared in docker-compose.yml.
 # These stubs satisfy Compose's requirement that volumes referenced by
@@ -236,5 +236,9 @@ networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  data:
+    internal: true
+  storage:
+  cortex:
   chroma_internal:
     internal: true

@@ -194,6 +194,13 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **Network segmentation.** The flat stack network is split: MariaDB, Redis and
+  the Chroma proxy sit on an internal `data` network, RustFS on `storage`, and
+  Cortex with Elasticsearch on `cortex`, each reachable only by the services
+  that need it (the UI, reverse proxy, Vault and feeder cannot reach a
+  database). `make network-check` verifies the layout and `make deploy` runs
+  it and moves MariaDB and RustFS onto their networks on upgrade (one short
+  restart). See `docs/operations/deploy.md`.
 - **Data services require authentication.** Redis (broker and cache) needs a
   password, Elasticsearch has security enabled with separate service accounts
   for the application and Cortex, and ChromaDB sits behind a token-checking

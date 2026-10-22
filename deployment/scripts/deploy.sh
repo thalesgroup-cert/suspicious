@@ -106,6 +106,23 @@ step "Restarting suspicious_ui"
 $COMPOSE up -d --no-deps suspicious_ui
 ok "suspicious_ui restarted"
 
+# ── 9. Stateful services onto their own networks ─────────────────────────
+# MariaDB and RustFS used to share the flat network. Compose recreates a service
+# only when its configuration changed, so this is a no-op on an up-to-date stack
+# and one short restart (a few seconds of database errors) the first time.
+# It runs last so the app tier, already attached to every network, never loses them.
+step "Attaching MariaDB and RustFS to their networks"
+$COMPOSE up -d --no-deps db_suspicious rustfs
+if [ -n "$($COMPOSE ps -q db_suspicious_replica 2>/dev/null)" ]; then
+  $COMPOSE --profile replica up -d --no-deps db_suspicious_replica
+fi
+for svc in db_suspicious rustfs; do bash "${SCRIPTS}/health-wait.sh" "${SVC_PREFIX:-}${svc}" 180; done
+bash "${SCRIPTS}/network-check.sh" || {
+  echo "A service is not on the networks it needs (see above)."
+  exit 1
+}
+ok "network segmentation in place"
+
 # ── Done ──────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}${BOLD}✓ Deploy complete.${RESET}"

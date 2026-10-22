@@ -35,7 +35,7 @@ endef
         backup-db restore-db \
         logs status shell db-shell \
         create-certs network clean prune \
-        secrets-init db-auth-check db-auth-migrate check-secrets check-updates provision-vault seed-vault-secrets unseal
+        secrets-init db-auth-check db-auth-migrate network-check check-secrets check-updates provision-vault seed-vault-secrets unseal
 
 # ---------------------------------------------------------------------------
 # Help
@@ -76,6 +76,7 @@ help:
 	@echo "$(BOLD)Diagnostics$(RESET)"
 	@echo "  secrets-init     Generate missing data-service secrets (.env, .env.data)"
 	@echo "  db-auth-check    Verify Redis/Elasticsearch/Chroma enforce authentication"
+	@echo "  network-check    Verify each service sits only on the networks it needs"
 	@echo "  db-auth-migrate  One-time upgrade of an existing stack to authenticated data services"
 	@echo "  check-secrets    Verify no placeholder secrets remain in .env"
 	@echo "  check-updates    Compare running image digests vs registry"
@@ -153,6 +154,9 @@ secrets-init:
 ## Check every data service rejects anonymous access and accepts the credential
 db-auth-check:
 	@bash $(SCRIPTS)/db-auth-check.sh
+
+network-check:
+	@bash $(SCRIPTS)/network-check.sh
 
 ## One-time upgrade of an existing deployment (~2 min maintenance window)
 db-auth-migrate:

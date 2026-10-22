@@ -47,6 +47,9 @@ services:
       start_period: 30s
     networks:
       - suspicious_network
+      - data
+      - storage
+      - cortex
 
   # ── suspicious_celery (Celery worker) ─────────────────────────────────
   #
@@ -92,6 +95,9 @@ services:
       start_period: 30s
     networks:
       - suspicious_network
+      - data
+      - storage
+      - cortex
 
   # ── suspicious_celery_beat (Celery beat scheduler) ────────────────────
 
@@ -126,6 +132,7 @@ services:
       start_period: 120s
     networks:
       - suspicious_network
+      - data
 
   # ── suspicious_ui (Nginx SPA) ──────────────────────────────────────────
 
@@ -200,7 +207,7 @@ services:
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json:ro"
       - "${YARA_PATH}/rules/:/opt/Yara/rules:ro"
     networks:
-      - suspicious_network
+      - cortex
 
   # ── feeder (Python — email-feeder/) ──────────────────────────────────────
 
@@ -227,6 +234,7 @@ services:
       start_period: 90s
     networks:
       - suspicious_network
+      - storage
 
   # ── vault (HashiCorp Vault — secrets) ──────────────────────────────────
 
@@ -257,4 +265,11 @@ networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  # Segments inside the stack. suspicious_network stays the shared integration
+  # network (reverse proxy, UI, feeder, Vault, TheHive/MISP/monitoring peers);
+  # the services below are reachable only from the networks they need.
+  data:                # MariaDB, Redis, Chroma proxy: Django, Celery and beat only
+    internal: true
+  storage:             # RustFS: Django, Celery and the feeder only
+  cortex:              # Cortex and Elasticsearch: Django and Celery only
   reverse_network:

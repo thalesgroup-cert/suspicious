@@ -70,3 +70,40 @@ All commands run from `deployment/` after editing the value.
 | ES app / Cortex users | `bash scripts/es-security-bootstrap.sh`, then `up -d --force-recreate --no-deps suspicious suspicious_celery cortex` |
 | `ELASTIC_PASSWORD` | Send the change through the security API with a curl config on stdin, so neither password appears in argv: `printf 'user = "elastic:OLD"\ndata = "{\"password\":\"NEW\"}"\n' \| docker compose exec -T elasticsearch curl -sS -K - -X POST -H 'Content-Type: application/json' http://localhost:9200/_security/user/elastic/_password` (run it with history disabled). Then update `.env.data` and `up -d --force-recreate --no-deps elasticsearch` (its healthcheck reads the container's `$ELASTIC_PASSWORD`) |
 | `CHROMA_TOKEN` | recreate `chromadb_proxy suspicious suspicious_celery` |
+
+## Network segmentation
+
+The stack no longer runs on one flat network. `suspicious_network` (created by
+`make network`) stays the shared network for the reverse proxy, the UI, the
+feeder, Vault and integrations such as TheHive, MISP or monitoring. Three
+networks managed by Compose sit behind it, so a compromised front-end service
+cannot connect to a database:
+
+| Network | Members | Reachable by |
+|---|---|---|
+| `data` (internal, no outbound traffic) | MariaDB (and replica), Redis broker, Redis cache, Chroma proxy | Django, Celery worker, Celery beat |
+| `storage` | RustFS | Django, Celery worker, feeder |
+| `cortex` | Cortex, Elasticsearch | Django, Celery worker |
+
+The Chroma server itself sits on its own internal link behind the proxy. The UI,
+the reverse proxy and Vault are not on any of the three networks; the feeder
+reaches only the Django API and RustFS; Cortex reaches only Elasticsearch and
+the Django webhook. Cortex still needs the Docker socket to start analyzers
+(see the socket notes in the deployment README).
+
+`make network-check` verifies that every service is on exactly the networks it
+needs and that the paths it needs work (Django and Celery reach every data
+service, the feeder reaches Django and RustFS, Cortex reaches Elasticsearch and
+the webhook, and the feeder cannot resolve Redis or MariaDB). `make deploy`
+runs it at the end.
+
+### Upgrading an existing deployment
+
+`make deploy` handles it. As the last step it recreates MariaDB and RustFS so
+they join their own networks and leave the shared one. Compose only recreates a
+service whose configuration changed, so this is a no-op on an up-to-date stack
+and a single restart of MariaDB and RustFS (a few seconds of database errors,
+once) on the first run. Run it in a quiet period. Tools that connected to
+MariaDB, Elasticsearch or Redis through `suspicious_network` from outside the
+stack (a backup container, a monitoring exporter) must be attached to the
+network they need or use `docker compose exec`.

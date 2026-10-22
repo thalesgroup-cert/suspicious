@@ -135,10 +135,17 @@ wait_healthy() {  # wait_healthy container [secs]
   die "$c not healthy (last: $s)"
 }
 # one-off Python in the app image on the authcheck network, code of the release under test
-cli() {  # cli <code-dir> <python code> [-e VAR ...]
+cli() {  # cli <code-dir> <python code> [-e VAR ...]: a throwaway app container on every project network that exists
   local code=$1 py=$2; shift 2
-  docker run --rm --network "$NET" "$@" -v "$R/Suspicious/$code:/app/Suspicious:ro" -v "$R/Suspicious/settings.json:/app/settings.json:ro" \
-    "$APP_REPO:$IMG_APP" python -c "$py"
+  local c rc n
+  c=$(docker create --network "$NET" "$@" -v "$R/Suspicious/$code:/app/Suspicious:ro" -v "$R/Suspicious/settings.json:/app/settings.json:ro" \
+    "$APP_REPO:$IMG_APP" python -c "$py")
+  for n in authcheck_data authcheck_storage authcheck_cortex; do
+    docker network inspect "$n" >/dev/null 2>&1 && docker network connect "$n" "$c"
+  done
+  docker start -a "$c"; rc=$?
+  docker rm -f "$c" >/dev/null
+  return $rc
 }
 es_curl() {  # es_curl <user:pass or ''> <curl args...> ; credential only via env + curl config on stdin
   local a=$1; shift
@@ -168,6 +175,10 @@ secret_env() {  # -e flags for the secrets (values never printed)
   for k in REDIS_BROKER_PASSWORD REDIS_CACHE_PASSWORD ES_SUSPICIOUS_USER ES_SUSPICIOUS_PASSWORD CHROMA_TOKEN; do printf -- '-e\n%s=%s\n' "$k" "$(envv $k)"; done
 }
 
+check_network() {
+  ENV_FILE="$D/.env" COMPOSE="$COMPOSE" bash "$D/scripts/network-check.sh" > "$T/net.out" 2>&1 || true; cat "$T/net.out"
+  ! grep -q '^FAIL' "$T/net.out" || die "network-check failed"; ok "network-check ($(grep -c '^ok ' "$T/net.out") checks)"
+}
 check_auth() {
   ENV_FILE="$D/.env" COMPOSE="$COMPOSE" bash "$D/scripts/db-auth-check.sh" > "$T/check.out"; cat "$T/check.out"
   [ "$(grep -c '^ok ' "$T/check.out")" = 10 ] || die "db-auth-check not 10/10"; ok "db-auth-check 10/10"
@@ -215,6 +226,7 @@ fresh() {
   AC run --rm --no-deps suspicious python manage.py migrate --noinput >/dev/null
   AC up -d suspicious suspicious_celery suspicious_celery_beat suspicious_ui cortex >/dev/null  # feeder excluded: it exits without an enabled mailbox and touches none of the data services
   for c in suspicious suspicious_celery suspicious_celery_beat cortex; do wait_healthy "$P$c" 400; done; ok "app tier + cortex healthy"
+  check_network
   curl_h=$(AC exec -T suspicious curl -sf http://localhost:9020/api/health/); echo "$curl_h" | grep -q '"redis": true' && ok "/api/health/ reports redis ok" || die "health: $curl_h"
   cortex_migrate
   rotate_redis; rotate_es_elastic; rotate_es_app
@@ -290,6 +302,7 @@ col=c.get_collection("sentinel_col"); assert col.count()==1, col.count(); print(
   tail -8 "$T/deploy.out"
   [ "$beat_before" != "$(docker inspect -f '{{.Id}}' "${P}suspicious_celery_beat")" ] && ok "deploy.sh recreated celery beat"
   for c in suspicious suspicious_celery suspicious_celery_beat; do wait_healthy "$P$c" 300; done; ok "deploy.sh end to end"
+  check_network
   # deploy refuses when auth is not enforced: simulate with a wrong credential
   cortex_migrate
   rotate_redis; rotate_es_elastic; rotate_es_app
