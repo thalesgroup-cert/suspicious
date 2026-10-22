@@ -3,8 +3,9 @@
 Rule (api.permissions.submissions.submission_queryset):
 - reporter: own submissions
 - CERT/Admin: every submission
-- CISO: own submissions plus those whose reporter is in the CISO's scope
-  (scope "ALL" = every submission; unset scope or no CISOProfile = own only)
+- CISO: the Submissions page lists only their own; their scope is reachable by
+  id (detail, report, ...) and listed on the Investigations page
+  (scope "ALL" = every case; unset scope or no CISOProfile = own only)
 """
 from unittest import mock
 
@@ -58,19 +59,20 @@ class SubmissionListAndDetailScopeTests(CisoSubmissionScopeBase):
         self.assertEqual(resp.status_code, 200)
         return {row["id"] for row in resp.data["results"]}
 
-    def test_list_contains_only_in_scope_cases(self):
-        self.assertEqual(self._list_ids(self.ciso), {self.in_scope.id})
+    def test_list_does_not_include_scope_cases(self):
+        self.assertEqual(self._list_ids(self.ciso), set())
 
     def test_list_search_cannot_reach_out_of_scope_cases(self):
         self.assertEqual(self._list_ids(self.ciso, search="out-of-scope.example.com"), set())
 
-    def test_list_keeps_own_submission_outside_scope(self):
+    def test_list_is_the_cisos_own_submissions_only(self):
         own = Case.objects.create(reporter=self.ciso, description="mine")
-        self.assertEqual(self._list_ids(self.ciso), {self.in_scope.id, own.id})
+        self.assertEqual(self._list_ids(self.ciso), {own.id})
 
-    def test_all_scope_sees_everything(self):
+    def test_all_scope_list_is_still_own_only(self):
         self.set_scope("ALL")
-        self.assertEqual(self._list_ids(self.ciso), {self.in_scope.id, self.out_scope.id})
+        own = Case.objects.create(reporter=self.ciso, description="mine")
+        self.assertEqual(self._list_ids(self.ciso), {own.id})
 
     def test_unset_scope_sees_only_own(self):
         self.set_scope("Not defined")
