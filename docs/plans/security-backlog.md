@@ -26,20 +26,24 @@ own payloads were not replayed.
 ## Backlog, suggested order
 
 Done on branches, waiting for review and merge: VULN-05, VULN-06, VULN-07 (backend),
-VULN-08, VULN-09, plus PRs #424 (nltk) and #425 (Chroma proxy).
+VULN-08, VULN-09, the Elasticsearch bump, plus PRs #424 (nltk) and #425 (Chroma proxy).
 
 1. **CISO challenge in the UI.** A challenge button on the Investigations page for a
    CISO in scope; decide whether redo-analysis, ticket push and comments stay open to
    a CISO.
-2. **Verify, not build:** exercise the Traefik socket proxy on a Traefik-enabled
-   stack; run `make up` / `make deploy` end to end with the
-   Vault TLS change and an upgrade of an existing Vault.
+2. **Secrets in container environments.** A spike showed the Traefik socket proxy
+   (`CONTAINERS=1`) lets a compromised Traefik read every container's environment
+   (82 variables from the Django container, 14 secret-looking). The shipped
+   `traefik.yaml` uses only the file provider, so the proxy is idle by default;
+   keep it that way, document the exposure, and move secrets out of container env.
+   The Traefik proxy and the Vault TLS upgrade (existing Vault with data) were
+   otherwise verified in a throwaway spike; a full `make deploy` was not.
 3. **S3 client library.** `minio-py` 7.2.20 is current but its last release is
    2025-11-27 and the MinIO server repo is archived (2026-04-24); `boto3` has ~9.9k
    stars, a release on 2026-10-21 and 100+ commits in 2026. Migrating touches ~10 files
    plus the feeder; `boto3` needs `request_checksum_calculation="when_required"` for
    non-AWS stores, and must be tested against RustFS. Not a security fix; schedule it.
-4. **Dependencies:** bump Elasticsearch (`8.19.7` in use, `8.19.23` is the newest 8.19.x
-   tag) after checking its advisories; revisit chromadb when a release above 1.5.9
+4. **Dependencies:** Elasticsearch is bumped to 8.19.23 on `feature/bump-elasticsearch-8.19.23`
+   (`595d8790`, verified on the dev stack); revisit chromadb when a release above 1.5.9
    ships; `nginx:1.29-alpine` and `valkey/valkey:7.2` (MISP stack) also lag.
 5. **Hardening left over:** `cap_drop` on the database services, Vault and Traefik.
