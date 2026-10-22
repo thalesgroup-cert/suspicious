@@ -39,6 +39,7 @@ import {
   FilterList,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSnackbar } from "notistack";
 import { Skeleton } from "boneyard-js/react";
 import { useNavigate, useSearchParams } from "react-router";
 import { alpha } from "@mui/material/styles";
@@ -68,6 +69,8 @@ import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationDrawer } from "@/features/investigation/components/InvestigationDrawer";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
+import { ChallengeDialog, type ChallengeRequest } from "@/features/submissions/components/ChallengeDialog";
+import { challengeSubmission } from "@/features/submissions/api";
 import { fmtDate } from "@/features/investigation/utils";
 
 // Page
@@ -76,6 +79,7 @@ export default function InvestigationPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
@@ -149,6 +153,9 @@ export default function InvestigationPage() {
   );
   // A CISO with no scope set can't meaningfully browse cases yet: prompt them
   // to pick one first (same modal Home shows on first connection).
+  // CERT and Admin edit a case; the API refuses it from a CISO. A CISO challenges for a user in their scope.
+  const canEditCase = groups.includes("CERT") || groups.includes("Admin");
+  const isCiso = groups.includes("CISO");
   const needsScope =
     !!me &&
     groups.includes("CISO") &&
@@ -237,6 +244,19 @@ export default function InvestigationPage() {
     },
   });
   const [redoConfirmOpen, setRedoConfirmOpen] = React.useState(false);
+
+  const [challengeId, setChallengeId] = React.useState<number | null>(null);
+  const challengeMutation = useMutation({
+    mutationFn: (v: ChallengeRequest) => challengeSubmission(v.id, { proposed_result: v.proposed_result, reason: v.reason }),
+    onSuccess: async (_res, v) => {
+      setChallengeId(null);
+      enqueueSnackbar(`Challenge submitted for #${v.id}.`, { variant: "success" });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["investigationDetails"] }),
+        qc.invalidateQueries({ queryKey: ["investigation"] }),
+      ]);
+    },
+  });
 
   const commentsQuery = useQuery({
     queryKey: ["caseComments", selectedIdNum],
@@ -703,6 +723,12 @@ export default function InvestigationPage() {
         editClassification={editClassification}
         setEditClassification={setEditClassification}
         onRedo={() => setRedoConfirmOpen(true)}
+        canEdit={canEditCase}
+        onChallenge={
+          isCiso && drawerRow?.is_challengeable && !drawerRow.is_challenged
+            ? () => { challengeMutation.reset(); setChallengeId(selectedIdNum); }
+            : undefined
+        }
         commentsQuery={commentsQuery}
         addCommentMutation={addCommentMutation}
         siblings={rows.map((r) => r.id)}
@@ -712,6 +738,14 @@ export default function InvestigationPage() {
           next.set("open", String(id));
           setSearchParams(next, { replace: true });
         }}
+      />
+
+      <ChallengeDialog
+        caseId={challengeId}
+        onClose={() => setChallengeId(null)}
+        onSubmit={(request) => challengeMutation.mutate(request)}
+        pending={challengeMutation.isPending}
+        error={challengeMutation.isError}
       />
 
       <Dialog open={redoConfirmOpen} onClose={() => setRedoConfirmOpen(false)}>

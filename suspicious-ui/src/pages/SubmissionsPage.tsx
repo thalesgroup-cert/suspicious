@@ -45,6 +45,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 import { getMe, type Me } from "@/api/auth";
+import { ChallengeDialog, type ChallengeRequest } from "@/features/submissions/components/ChallengeDialog";
 import {
   challengeSubmission,
   getSubmissionDetails,
@@ -152,8 +153,6 @@ export default function SubmissionsPage() {
   const [openDrawer, setOpenDrawer] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<number | string | null>(null);
   const [challengeId, setChallengeId] = React.useState<number | null>(null);
-  const [proposedResult, setProposedResult] = React.useState<"Safe" | "Dangerous" | null>(null);
-  const [challengeReason, setChallengeReason] = React.useState("");
 
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
@@ -198,7 +197,7 @@ export default function SubmissionsPage() {
   });
 
   const challengeMutation = useMutation({
-    mutationFn: async (vars: { id: number; proposed_result: "Safe" | "Dangerous"; reason: string }) =>
+    mutationFn: async (vars: ChallengeRequest) =>
       challengeSubmission(vars.id, { proposed_result: vars.proposed_result, reason: vars.reason }),
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ["submissions"] });
@@ -221,11 +220,7 @@ export default function SubmissionsPage() {
       qc.invalidateQueries({ queryKey: ["submissions"] });
       qc.invalidateQueries({ queryKey: ["submissionDetails"] });
     },
-    onSuccess: () => {
-      setChallengeId(null);
-      setProposedResult(null);
-      setChallengeReason("");
-    },
+    onSuccess: () => setChallengeId(null),
   });
 
   const commentsQuery = useQuery({
@@ -334,8 +329,6 @@ export default function SubmissionsPage() {
   // ── Derived values ──────────────────────────────────────────────────────
 
   const BADGE_W = 132;
-  const DIALOG_RADIUS = 2;
-  const MIN_CHALLENGE_REASON = 10; // keep in step with the backend serializer
 
   const refreshBtnBorder = isDark
     ? "1px solid rgba(255,255,255,.10)"
@@ -764,75 +757,13 @@ export default function SubmissionsPage() {
         }}
       />
 
-      <Dialog
-        open={challengeId !== null}
-        onClose={() => {
-          setChallengeId(null);
-          setProposedResult(null);
-          setChallengeReason("");
-        }}
-        maxWidth="xs"
-        fullWidth
-        slotProps={{ paper: { sx: { borderRadius: DIALOG_RADIUS } } }}
-      >
-        <DialogTitle>Challenge submission</DialogTitle>
-        <DialogContent>
-          <Typography color="text.secondary">
-            Tell us what you think the verdict should be for submission #{challengeId}.
-          </Typography>
-          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-            What should the verdict be?
-          </Typography>
-          <ToggleButtonGroup
-            value={proposedResult}
-            exclusive
-            onChange={(_, v) => v && setProposedResult(v)}
-            size="small"
-          >
-            <ToggleButton value="Safe">Safe</ToggleButton>
-            <ToggleButton value="Dangerous">Dangerous</ToggleButton>
-          </ToggleButtonGroup>
-          <TextField
-            label="Why is the verdict wrong?"
-            helperText={`Required, at least ${MIN_CHALLENGE_REASON} characters.`}
-            required
-            value={challengeReason}
-            onChange={(e) => setChallengeReason(e.target.value)}
-            multiline
-            minRows={2}
-            fullWidth
-            sx={{ mt: 2 }}
-          />
-          {challengeMutation.isError ? (
-            <Alert severity="error" sx={{ mt: 2 }}>Failed to challenge.</Alert>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setChallengeId(null);
-              setProposedResult(null);
-              setChallengeReason("");
-            }}
-            sx={{ borderRadius: 2 }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disabled={challengeMutation.isPending || challengeId === null || proposedResult === null
-              || challengeReason.trim().length < MIN_CHALLENGE_REASON}
-            onClick={() => {
-              if (challengeId && proposedResult) {
-                challengeMutation.mutate({ id: challengeId, proposed_result: proposedResult, reason: challengeReason.trim() });
-              }
-            }}
-            sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}
-          >
-            {challengeMutation.isPending ? "Sending…" : "Confirm"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ChallengeDialog
+        caseId={challengeId}
+        onClose={() => setChallengeId(null)}
+        onSubmit={(request) => challengeMutation.mutate(request)}
+        pending={challengeMutation.isPending}
+        error={challengeMutation.isError}
+      />
     </Box>
     </Skeleton>
   );
