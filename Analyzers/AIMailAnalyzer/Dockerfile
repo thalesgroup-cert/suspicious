@@ -41,5 +41,15 @@ RUN VEC=/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2
     curl -fL -o "$VEC/config.json" "$BASE/config.json" && \
     curl -fL -o "$VEC/1_Pooling/config.json" "$BASE/1_Pooling/config.json"
 
+# Run as an unprivileged user: a compromised analyzer must not be root in its
+# container. ai_mail_classifier.py unpacks the mail archive into ./tmp/ under
+# the working directory, so that one directory is handed to the analyzer user;
+# HOME points at /tmp for library caches. Weights and code stay root-owned and
+# read-only to it.
+RUN useradd --system --uid 1001 --no-create-home --shell /usr/sbin/nologin analyzer && \
+    mkdir -p /worker/tmp && chown 1001:1001 /worker/tmp
+ENV HOME=/tmp
+USER 1001:1001
+
 # Expose the application
 ENTRYPOINT ["python","AIMailAnalyzer/ai_mail_classifier.py"]
