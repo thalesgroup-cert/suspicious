@@ -88,8 +88,7 @@ cannot connect to a database:
 The Chroma server itself sits on its own internal link behind the proxy. The UI,
 the reverse proxy and Vault are not on any of the three networks; the feeder
 reaches only the Django API and RustFS; Cortex reaches only Elasticsearch and
-the Django webhook. Cortex still needs the Docker socket to start analyzers
-(see the socket notes in the deployment README).
+the Django webhook. Cortex still needs the Docker socket to start analyzers.
 
 `make network-check` verifies that every service is on exactly the networks it
 needs and that the paths it needs work (Django and Celery reach every data
