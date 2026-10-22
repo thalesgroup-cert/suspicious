@@ -32,7 +32,7 @@ from api.utils.analyzer_reports import reports_for_case
 from api.views.downloads import get_request_ip
 from api.views.investigations import IsInvestigator, _dedup_analyzer_reports
 from case_handler.models import Case
-from tasp.services.challenge import notify_and_record_challenge
+from tasp.services.challenge import CaseChallengeService, notify_and_record_challenge
 
 logger = logging.getLogger(__name__)
 
@@ -235,19 +235,11 @@ class SubmissionChallengeView(APIView):
         if not obj.is_challengeable:
             raise ValidationError({"detail": "Submission cannot be challenged."})
 
-        from case_handler.lifecycle import LifecycleState, transition
-
-        obj.is_challenged = True
-        obj.challenge_proposed_result = serializer.validated_data["proposed_result"]
-        obj.challenge_reason = serializer.validated_data.get("reason", "")
-        obj.save(update_fields=[
-            "is_challenged", "challenge_proposed_result", "challenge_reason", "last_update",
-        ])
-        if obj.lifecycle_state == LifecycleState.FINALIZED:
-            transition(obj, LifecycleState.CONTESTED)
-        else:
-            obj.status = "Challenged"
-            obj.save(update_fields=["status"])
+        try:
+            CaseChallengeService(obj, logger).mark_challenged(
+                serializer.validated_data["proposed_result"], serializer.validated_data["reason"])
+        except ValueError:  # lost a race with another challenge of the same case
+            raise ValidationError({"detail": "Submission already challenged."})
 
         try:
             notify_and_record_challenge(obj, logger)

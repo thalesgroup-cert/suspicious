@@ -21,12 +21,13 @@ class SubmissionChallengeViewTest(APITestCase):
     def test_stores_proposal_marks_and_notifies(self, m_notify):
         case = self._case()
         url = reverse("submission-challenge", args=[case.id])
-        r = self.client.post(url, {"proposed_result": "Dangerous", "reason": "phish"}, format="json")
+        r = self.client.post(url, {"proposed_result": "Dangerous", "reason": "it is phishing"}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         case.refresh_from_db()
         self.assertTrue(case.is_challenged)
         self.assertEqual(case.challenge_proposed_result, "Dangerous")
-        self.assertEqual(case.challenge_reason, "phish")
+        self.assertEqual(case.challenge_reason, "it is phishing")
+        self.assertIn("it is phishing", case.comments.get().body)
         self.assertEqual(case.lifecycle_state, LifecycleState.CONTESTED)
         m_notify.assert_called_once()
 
@@ -48,6 +49,16 @@ class SubmissionChallengeViewTest(APITestCase):
         )
         r = self.client.post(
             reverse("submission-challenge", args=[case.id]),
-            {"proposed_result": "Dangerous"}, format="json",
+            {"proposed_result": "Dangerous", "reason": "a proper reason"}, format="json",
         )
         self.assertEqual(r.status_code, 404)
+
+    @patch("api.views.submissions.notify_and_record_challenge")
+    def test_missing_or_short_reason_is_400_and_no_change(self, m_notify):
+        case = self._case()
+        url = reverse("submission-challenge", args=[case.id])
+        for body in ({"proposed_result": "Safe"}, {"proposed_result": "Safe", "reason": "no"}):
+            self.assertEqual(self.client.post(url, body, format="json").status_code, 400)
+        case.refresh_from_db()
+        self.assertFalse(case.is_challenged)
+        m_notify.assert_not_called()

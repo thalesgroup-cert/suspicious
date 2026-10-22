@@ -122,13 +122,17 @@ describe("SubmissionsPage - Test Suite", () => {
       const dangerousToggle = await screen.findByRole("button", { name: /dangerous/i });
       await user.click(dangerousToggle);
 
+      expect(confirmButton).toBeDisabled(); // a verdict alone is not enough: the reason is required
+      await user.type(screen.getByLabelText(/why is the verdict wrong/i), "short");
+      expect(confirmButton).toBeDisabled();
+      await user.type(screen.getByLabelText(/why is the verdict wrong/i), " but a real reason");
       expect(confirmButton).not.toBeDisabled();
       await user.click(confirmButton);
 
       await waitFor(() =>
         expect(challengeSubmission).toHaveBeenCalledWith(
           101,
-          { proposed_result: "Dangerous", reason: "" },
+          { proposed_result: "Dangerous", reason: "short but a real reason" },
         )
       );
     });

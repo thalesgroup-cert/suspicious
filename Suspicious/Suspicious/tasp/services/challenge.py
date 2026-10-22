@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.utils import timezone
 
 from dashboard.models import UserCasesMonthlyStats
@@ -28,16 +29,31 @@ class CaseChallengeService:
         if self.case.is_challenged or self.case.status == "Challenged":
             raise ValueError("Case already challenged")
 
-    def mark_challenged(self):
+    def mark_challenged(self, proposed: str = "", reason: str = ""):
+        """Mark the case, keep the reporter's proposal and reason, and put the
+        challenge on the case timeline, all or nothing. A second challenge of
+        the same case (double submit, two tabs) is refused under the row lock."""
         from case_handler.lifecycle import LifecycleState, transition
+        from case_handler.models import Case, CaseComment
 
-        self.case.is_challenged = True
-        self.case.save(update_fields=["is_challenged"])
-        if self.case.lifecycle_state == LifecycleState.FINALIZED:
-            transition(self.case, LifecycleState.CONTESTED)
-        else:
-            self.case.status = "Challenged"
-            self.case.save(update_fields=["status"])
+        with transaction.atomic():
+            fresh = Case.objects.select_for_update().get(pk=self.case.pk)
+            if fresh.is_challenged or fresh.status == "Challenged":
+                raise ValueError("Case already challenged")
+            was = self.case.results
+            self.case.is_challenged = True
+            self.case.challenge_proposed_result = proposed
+            self.case.challenge_reason = reason
+            self.case.save(update_fields=["is_challenged", "challenge_proposed_result", "challenge_reason"])
+            if self.case.lifecycle_state == LifecycleState.FINALIZED:
+                transition(self.case, LifecycleState.CONTESTED)
+            else:
+                self.case.status = "Challenged"
+                self.case.save(update_fields=["status"])
+            body = f"Challenged the {was} verdict"
+            body += f", proposing {proposed}" if proposed else ""
+            CaseComment.objects.create(case=self.case, author=self.case.reporter,
+                                       body=body + (f": {reason}" if reason else "."))
 
     def update_user_stats(self):
         _update_case_challenge_stats(self.case.reporter)
@@ -66,10 +82,10 @@ class CaseChallengeService:
                 ChallengeToTheHiveService(self.case, cert_user, mail_header).send()
 
 
-def run_case_challenge(case, logger) -> None:
+def run_case_challenge(case, logger, proposed: str = "", reason: str = "") -> None:
     service = CaseChallengeService(case, logger)
     service.validate()
-    service.mark_challenged()
+    service.mark_challenged(proposed, reason)
     service.update_user_stats()
     service.notify()
 

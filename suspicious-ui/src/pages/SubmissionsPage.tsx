@@ -335,6 +335,7 @@ export default function SubmissionsPage() {
 
   const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
+  const MIN_CHALLENGE_REASON = 10; // keep in step with the backend serializer
 
   const refreshBtnBorder = isDark
     ? "1px solid rgba(255,255,255,.10)"
@@ -792,7 +793,9 @@ export default function SubmissionsPage() {
             <ToggleButton value="Dangerous">Dangerous</ToggleButton>
           </ToggleButtonGroup>
           <TextField
-            label="Why? (optional)"
+            label="Why is the verdict wrong?"
+            helperText={`Required, at least ${MIN_CHALLENGE_REASON} characters.`}
+            required
             value={challengeReason}
             onChange={(e) => setChallengeReason(e.target.value)}
             multiline
@@ -817,10 +820,11 @@ export default function SubmissionsPage() {
           </Button>
           <Button
             variant="contained"
-            disabled={challengeMutation.isPending || challengeId === null || proposedResult === null}
+            disabled={challengeMutation.isPending || challengeId === null || proposedResult === null
+              || challengeReason.trim().length < MIN_CHALLENGE_REASON}
             onClick={() => {
               if (challengeId && proposedResult) {
-                challengeMutation.mutate({ id: challengeId, proposed_result: proposedResult, reason: challengeReason });
+                challengeMutation.mutate({ id: challengeId, proposed_result: proposedResult, reason: challengeReason.trim() });
               }
             }}
             sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}

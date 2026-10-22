@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Challenge the verdict</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 0; background: #f4f6fa; color: #101828; }
+  main { max-width: 34rem; margin: 3rem auto; padding: 0 1rem; }
+  form { background: #fff; border: 1px solid #d0d5dd; border-radius: 12px; padding: 1.5rem; }
+  h1 { font-size: 1.4rem; margin-top: 0; }
+  fieldset { border: 0; padding: 0; margin: 1rem 0; }
+  textarea { width: 100%; min-height: 8rem; box-sizing: border-box; font: inherit; padding: .5rem; }
+  button { font: inherit; padding: .6rem 1.2rem; border: 0; border-radius: 8px; background: #2563eb; color: #fff; cursor: pointer; }
+  .error { color: #b42318; margin: .5rem 0; }
+</style>
+</head>
+<body>
+<main>
+<form method="post">
+  <h1>Challenge the verdict of case #{{ case_id }}</h1>
+  <p>The analysis said <strong>{{ result }}</strong>. If you think it is wrong, tell the security team what it should be and why.</p>
+  {% for message in errors %}<p class="error" role="alert">{{ message }}</p>{% endfor %}
+  <fieldset>
+    <legend>It should be</legend>
+    <label><input type="radio" name="proposed_result" value="Safe" required {% if proposed == "Safe" %}checked{% endif %}> Safe</label><br>
+    <label><input type="radio" name="proposed_result" value="Dangerous" {% if proposed == "Dangerous" %}checked{% endif %}> Dangerous</label>
+  </fieldset>
+  <label for="reason">Why is the verdict wrong?</label>
+  <textarea id="reason" name="reason" required minlength="{{ min_reason }}" maxlength="2000">{{ reason }}</textarea>
+  <p><button type="submit">Send challenge</button></p>
+</form>
+</main>
+</body>
+</html>
