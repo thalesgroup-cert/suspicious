@@ -144,6 +144,21 @@ management moving to HashiCorp Vault.
   images and some stylesheets are dropped, and very large mails are truncated.
 
 ### Fixed
+- **Challenge flow**: the emailed challenge link opens a form instead of
+  changing the case when fetched, so mail scanners and link previews can no
+  longer challenge a case or spend the token. The form and the in-app dialog
+  both require a proposed verdict and a reason (10 characters or more). The
+  token, the case mark, the proposal and a timeline comment are written in one
+  transaction; a second challenge of the same case is refused, and a failing
+  TheHive alert no longer turns a recorded challenge into an error page.
+- **TheHive challenge alerts** now carry what campaign alerts carry: extracted
+  observables, the original mail and its attachments as file observables, an
+  indicators section, the case link, the verdict rationale and severity from the
+  verdict (artifacts were always empty before). Files are sent either as
+  observables (analysed by TheHive) or as alert attachments (evidence, the
+  rendered mail), never both, also for campaign alerts. Hash observables are
+  tagged with their file name and existing ones get missing tags on the next
+  sync. Alert descriptions defang URLs, domains, IPs and addresses.
 - **Allow-lists no longer over-reach**: allow-listed IPs no longer launch
   Cortex jobs (email and web submit); an allow-list entry no longer silences a
   deny-listed, Watcher-monitored or campaign domain; MISP no longer receives
@@ -178,6 +193,14 @@ management moving to HashiCorp Vault.
   `vault status` on failure.
 
 ### Security
+
+- **Data services require authentication.** Redis (broker and cache) needs a
+  password, Elasticsearch has security enabled with separate service accounts
+  for the application and Cortex, and ChromaDB sits behind a token-checking
+  proxy on an isolated network. `make init` generates the secrets;
+  `make db-auth-migrate` upgrades an existing deployment (a short maintenance
+  window, see the deployment docs). The Helm chart does not yet configure
+  service authentication.
 
 - Added `SECURITY.md`: Thales PSIRT responsible-disclosure contact (email + PGP
   key) and a threat model scoped to the stack, with explicit in-scope and
