@@ -17,7 +17,7 @@ own payloads were not replayed.
 | Phase 2.1 mail preview sanitiser | VULN-04 | Merged: `nh3` allow-list and rendering without network access (`eml2png_renderer.py`). Report payloads not re-tested. | `fix(preview)` 2026-10-21 |
 | Phase 2.1 replace wkhtmltoimage | VULN-08 | Branch `feature/chromium-mail-renderer`. Separate `mail_renderer` container (headless Chromium, internal network, no route out, non-root, seccomp, read-only). `wkhtmltopdf` and `imgkit` removed from the Django image. Also fixes a storage bloat: previews were a fixed ~14 MB each (114 took 1.6 GB), now ~20-40 KB. After deploying, run `regenerate_mail_previews --all` to shrink old ones. | `a4caa59b` |
 | Phase 2.2 CISO fail-closed | VULN-07 | Done in `profiles_utils/scope.py` (no profile returns none). | main |
-| Phase 2.2 CISO scope on submissions | VULN-07 | Branch `feature/ciso-scope`. Submissions page lists a CISO's own submissions only; scope is on Investigations; a CISO can challenge for a user in scope (audit trail names the CISO) and cannot edit case details. Backend only: no challenge button on the Investigations page yet. Redo-analysis, ticket push and comments are still open to a CISO in scope (decision pending). | `724cdb1d` |
+| Phase 2.2 CISO scope on submissions | VULN-07 | Branch `feature/ciso-scope`. Submissions page lists a CISO's own submissions only; scope is on Investigations; a CISO can challenge for a user in scope (audit trail names the CISO) and cannot edit case details. The challenge button is on `feature/ciso-challenge-ui`. Redo-analysis, ticket push and comments are still open to a CISO in scope (decision pending). | `724cdb1d` |
 | Phase 2.3 single MinIO bucket | VULN-09 | Branch `feature/single-mail-bucket`. Web uploads go to `storage.s3.web_bucket` (default `mail-submissions`), one prefix per submission, untagged so the legacy scanner skips it. Existing buckets untouched. | `c350d308` |
 | Phase 3.1 Vault TLS, unseal keys off the host | VULN-05 | Branch `feature/vault-tls`. TLS on the listener (Vault-only CA, SANs), `VAULT_CACERT` for clients; `make unseal` prompts for the keys, no file; auto-unseal documented as the production path. Not run: `make up`/`deploy` end to end or an upgrade of an existing Vault. | `4dac184e`, `f4665043` |
 | Phase 3.2 `no-new-privileges` + `cap_drop: ALL` | n/a | Done for `suspicious`, `suspicious_celery`, `suspicious_celery_beat`, `suspicious_ui`, `feeder`, `cortex`. Not applied to the database services, Vault or Traefik. | `5232de22` |
@@ -28,9 +28,10 @@ own payloads were not replayed.
 Done on branches, waiting for review and merge: VULN-05, VULN-06, VULN-07 (backend),
 VULN-08, VULN-09, the Elasticsearch bump, plus PRs #424 (nltk) and #425 (Chroma proxy).
 
-1. **CISO challenge in the UI.** A challenge button on the Investigations page for a
-   CISO in scope; decide whether redo-analysis, ticket push and comments stay open to
-   a CISO.
+1. **CISO: remaining decision.** The challenge button is built on
+   `feature/ciso-challenge-ui` (`5ea12875`, stacked on `feature/ciso-scope`). Still
+   open to a CISO in scope: redo-analysis, ticket push and comments. Decide whether
+   they stay.
 2. **Secrets in container environments.** A spike showed the Traefik socket proxy
    (`CONTAINERS=1`) lets a compromised Traefik read every container's environment
    (82 variables from the Django container, 14 secret-looking). The shipped
