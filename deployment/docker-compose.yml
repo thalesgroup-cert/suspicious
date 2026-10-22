@@ -173,6 +173,8 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+      docker_proxy_cortex:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9001/api/status | grep -q 200 || exit 1"]
       interval: 30s
@@ -200,7 +202,21 @@ services:
       service: vault
     container_name: ${SVC_PREFIX:-}vault
 
+  docker_proxy_cortex:
+    extends:
+      file: compose_apps.yaml
+      service: docker_proxy_cortex
+    image: ghcr.io/tecnativa/docker-socket-proxy:v0.4.1
+    container_name: ${SVC_PREFIX:-}docker_proxy_cortex
+
   # ── Reverse proxy ─────────────────────────────────────────────────────────
+
+  docker_proxy_traefik:
+    extends:
+      file: compose_reverse_proxy.yaml
+      service: docker_proxy_traefik
+    image: ghcr.io/tecnativa/docker-socket-proxy:v0.4.1
+    container_name: ${SVC_PREFIX:-}docker_proxy_traefik
 
   traefik:
     init: true
@@ -209,8 +225,11 @@ services:
     extends:
       file: compose_reverse_proxy.yaml
       service: traefik
+    depends_on:
+      - docker_proxy_traefik
     command:
       - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://docker_proxy_traefik:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=${NETWORK_NAME}"
       - "--providers.file.directory=/dynamic"
@@ -253,3 +272,7 @@ networks:
   chroma_internal:
     internal: true
   reverse_network:
+  docker_cortex:
+    internal: true
+  docker_traefik:
+    internal: true

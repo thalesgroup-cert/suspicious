@@ -30,7 +30,10 @@ check "chromadb_proxy on data and its backend link" "exactly chromadb_proxy data
 check "chromadb only on its backend link"    "exactly chromadb chroma_internal"
 check "elasticsearch only on cortex"         "exactly elasticsearch cortex"
 check "rustfs only on storage"               "exactly rustfs storage"
-check "cortex only on cortex"                "exactly cortex cortex"
+check "cortex on cortex and its Docker proxy link" "exactly cortex cortex docker_cortex"
+check "cortex Docker proxy only on its link"   "exactly docker_proxy_cortex docker_cortex"
+check "traefik Docker proxy only on its link"  "exactly docker_proxy_traefik docker_traefik"
+check "traefik on edge, app and its proxy link" "exactly traefik suspicious_network reverse_network docker_traefik"
 check "feeder on app and storage, not data"  "exactly feeder suspicious_network storage"
 check "suspicious_ui off the data tier"      "! running suspicious_ui || ! nets suspicious_ui | grep -qE '${P}_(data|storage|cortex)'"
 check "django on all four tiers"             "exactly suspicious suspicious_network data storage cortex"
@@ -49,6 +52,8 @@ for hp in db_suspicious:3306 redis_broker:6379 elasticsearch:9200 rustfs:9000 ch
 done
 check "beat reaches db and redis"    "py_reach suspicious_celery_beat db_suspicious 3306 && py_reach suspicious_celery_beat redis_broker 6379"
 check "feeder reaches django and rustfs" "py_reach feeder suspicious 9020 && py_reach feeder rustfs 9000"
+check "cortex reaches its Docker proxy"      "! running cortex || $COMPOSE exec -T cortex curl -sf http://docker-proxy-cortex:2375/_ping"
+check "cortex proxy refuses what a job does not need" "! running cortex || [ \"\$($COMPOSE exec -T cortex curl -s -o /dev/null -w '%{http_code}' http://docker-proxy-cortex:2375/volumes)\" = 403 ]"
 check "cortex reaches elasticsearch and django" \
   "! running cortex || $COMPOSE exec -T cortex bash -c 'exec 3<>/dev/tcp/elasticsearch/9200 && exec 4<>/dev/tcp/suspicious/9020'"
 # what must NOT resolve: Docker DNS only answers for names on a shared network

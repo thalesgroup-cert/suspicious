@@ -106,3 +106,34 @@ once) on the first run. Run it in a quiet period. Tools that connected to
 MariaDB, Elasticsearch or Redis through `suspicious_network` from outside the
 stack (a backup container, a monitoring exporter) must be attached to the
 network they need or use `docker compose exec`.
+
+## Docker socket and container hardening
+
+Neither Traefik nor Cortex mounts the host Docker socket any more. Each reaches
+the daemon through its own `tecnativa/docker-socket-proxy` container on a private
+network that only the two of them share:
+
+| Proxy | Allowed | Used by |
+|---|---|---|
+| `docker_proxy_traefik` | listing containers and events, read only (`POST=0`) | Traefik's Docker provider |
+| `docker_proxy_cortex` | containers, images and daemon info, with writes | Cortex's Docker job runner |
+
+The Traefik proxy removes the host takeover path: Traefik can no longer create
+or start containers. The Cortex proxy is a narrower surface, not a complete
+fix. Cortex has to create containers to run analyzers, and the proxy filters by
+path and method, not by request body, so a compromised Cortex could still ask
+for a privileged container. Treat Cortex as high risk: run it on a host where
+the Docker daemon is rootless, or run analyzers on a dedicated host, if the
+platform handles hostile content from untrusted reporters.
+
+**Required when you upgrade:** if your `traefik.yaml` defines its own Docker
+provider, set `providers.docker.endpoint: tcp://docker_proxy_traefik:2375`.
+A static file overrides the flag in the compose file, and `make deploy` stops
+with a message if the endpoint is missing (`scripts/check-traefik-provider.sh`).
+Cortex needs no change: the compose file passes `docker.host` as a Java option,
+and `DOCKER_SOCK_GID` is no longer used by Cortex.
+
+The Django, Celery, beat and feeder containers also run with every Linux
+capability dropped and `no-new-privileges`. The UI and Cortex start as root and
+then drop to their own user, so they keep only `CHOWN`, `DAC_OVERRIDE`, `SETGID`
+and `SETUID`. Vault is unchanged.

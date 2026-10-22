@@ -194,6 +194,15 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **No Docker socket in Traefik or Cortex.** Both reach the daemon through a
+  socket proxy on a private network: Traefik through a read-only proxy (list
+  containers and events, no writes), Cortex through a proxy that allows only
+  what its job runner calls. If your `traefik.yaml` defines the Docker
+  provider, set its endpoint to `tcp://docker_proxy_traefik:2375` (`make deploy`
+  checks). The Cortex proxy narrows the Docker API surface but cannot filter
+  request bodies; see `docs/operations/deploy.md`. The Django, Celery, beat and
+  feeder containers drop all Linux capabilities and set `no-new-privileges`; the
+  UI and Cortex keep only the four they need to switch user.
 - **Network segmentation.** The flat stack network is split: MariaDB, Redis and
   the Chroma proxy sit on an internal `data` network, RustFS on `storage`, and
   Cortex with Elasticsearch on `cortex`, each reachable only by the services

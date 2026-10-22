@@ -45,6 +45,6 @@ $COMPOSE stop suspicious_celery_beat suspicious feeder cortex
 $COMPOSE up -d --force-recreate --no-deps redis_broker redis_cache elasticsearch chromadb chromadb_proxy
 for c in redis_broker redis_cache elasticsearch chromadb_proxy; do bash scripts/health-wait.sh "${P}$c" 240; done
 bash scripts/es-security-bootstrap.sh
-$COMPOSE up -d --no-deps suspicious suspicious_celery suspicious_celery_beat feeder cortex
+$COMPOSE up -d --no-deps docker_proxy_cortex suspicious suspicious_celery suspicious_celery_beat feeder cortex
 bash scripts/health-wait.sh "${P}suspicious" 180
 bash scripts/db-auth-check.sh

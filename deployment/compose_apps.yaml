@@ -45,6 +45,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - suspicious_network
       - data
@@ -93,6 +97,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - suspicious_network
       - data
@@ -130,6 +138,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - suspicious_network
       - data
@@ -150,6 +162,15 @@ services:
     env_file:
       - path: ../suspicious-ui/.env
         required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
     networks:
       - suspicious_network
       - reverse_network
@@ -174,11 +195,14 @@ services:
       # dot-form entries (`.corp.example`), never `*`.
       no_proxy:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
       NO_PROXY:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
+      # Cortex starts analyzers through docker_proxy_cortex, not the host socket
+      # (docker.host is read from the config, not from DOCKER_HOST; Java's URI parser
+      # rejects underscores in host names, hence the hyphenated alias).
       # Cortex logs in to Elasticsearch with its own least-privilege account. The
       # credentials are passed as JVM properties, so they are visible in the JVM
       # argv inside this container (same audience as its environment); this keeps
       # the operator-owned application.conf untouched.
-      JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks -Dsearch.user=${ES_CORTEX_USER:?ES_CORTEX_USER is required (run make init)} -Dsearch.password=${ES_CORTEX_PASSWORD:?ES_CORTEX_PASSWORD is required (run make init)}"
+      JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks -Ddocker.host=tcp://docker-proxy-cortex:2375 -Dsearch.user=${ES_CORTEX_USER:?ES_CORTEX_USER is required (run make init)} -Dsearch.password=${ES_CORTEX_PASSWORD:?ES_CORTEX_PASSWORD is required (run make init)}"
       job_directory: "${CORTEX_PATH}/jobs"
       # The Cortex process runs as uid 1001 (entrypoint `su cortex`). The
       # docker.sock is bind-mounted :ro so the entrypoint's own
@@ -199,15 +223,46 @@ services:
       - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:Z"
       - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
       - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
       - "${CUSTOM_ANALYZERS_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json:ro"
       - "${YARA_PATH}/rules/:/opt/Yara/rules:ro"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
     networks:
       - cortex
+      - docker_cortex
+
+  # Cortex's route to the Docker daemon. It limits the API Cortex can call to what
+  # running an analyzer needs (containers, images; no exec, volumes, networks,
+  # build, swarm, secrets or plugins). It cannot inspect request bodies, so it
+  # narrows the attack surface but does not make the Docker daemon safe against a
+  # compromised Cortex: see docs/operations/deploy.md.
+  docker_proxy_cortex:
+    init: true
+    restart: unless-stopped
+    environment:
+      CONTAINERS: "1"
+      IMAGES: "1"
+      INFO: "1"
+      POST: "1"
+      LOG_LEVEL: warning
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      docker_cortex:
+        aliases: [docker-proxy-cortex]
 
   # ── feeder (Python — email-feeder/) ──────────────────────────────────────
 
@@ -232,6 +287,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - suspicious_network
       - storage
@@ -273,3 +332,5 @@ networks:
   storage:             # RustFS: Django, Celery and the feeder only
   cortex:              # Cortex and Elasticsearch: Django and Celery only
   reverse_network:
+  docker_cortex:
+    internal: true

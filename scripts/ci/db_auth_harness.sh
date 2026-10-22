@@ -82,7 +82,7 @@ setup_tree() {
   # previous release code + compose files, and the new compose files (swapped in place like a git pull would)
   git -C "$WT" archive "$OLD_REF" Suspicious/Suspicious | tar -x -C "$T/old"
   rsync -a "$T/old/Suspicious/Suspicious/" "$R/Suspicious/code-old/"
-  for f in docker-compose.yml compose_databases.yaml compose_apps.yaml; do
+  for f in docker-compose.yml compose_databases.yaml compose_apps.yaml compose_reverse_proxy.yaml; do
     git -C "$WT" show "$OLD_REF:deployment/$f" > "$T/old/$f"; cp "$D/$f" "$T/new/$f"
   done
   chmod -R a+rwX "$R/Suspicious"
@@ -120,7 +120,7 @@ write_override() {
 }
 
 swap_compose() {  # $1 = old|new
-  for f in docker-compose.yml compose_databases.yaml compose_apps.yaml; do cp "$T/$1/$f" "$D/$f"; done
+  for f in docker-compose.yml compose_databases.yaml compose_apps.yaml compose_reverse_proxy.yaml; do cp "$T/$1/$f" "$D/$f"; done
 }
 
 # ── helpers ─────────────────────────────────────────────────────────────────
@@ -226,6 +226,7 @@ fresh() {
   AC run --rm --no-deps suspicious python manage.py migrate --noinput >/dev/null
   AC up -d suspicious suspicious_celery suspicious_celery_beat suspicious_ui cortex >/dev/null  # feeder excluded: it exits without an enabled mailbox and touches none of the data services
   for c in suspicious suspicious_celery suspicious_celery_beat cortex; do wait_healthy "$P$c" 400; done; ok "app tier + cortex healthy"
+  AC exec -T cortex curl -sf http://docker-proxy-cortex:2375/info >/dev/null || die "cortex cannot reach the Docker daemon through its proxy"; ok "cortex reaches the Docker daemon through its proxy"
   check_network
   curl_h=$(AC exec -T suspicious curl -sf http://localhost:9020/api/health/); echo "$curl_h" | grep -q '"redis": true' && ok "/api/health/ reports redis ok" || die "health: $curl_h"
   cortex_migrate

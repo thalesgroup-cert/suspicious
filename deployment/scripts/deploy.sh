@@ -33,6 +33,7 @@ step "Pre-flight checks"
 bash "${SCRIPTS}/check-secrets.sh" .env
 bash "${SCRIPTS}/check-mounts.sh"
 bash "${SCRIPTS}/check-network.sh"
+bash "${SCRIPTS}/check-traefik-provider.sh"
 for svc in redis_broker redis_cache elasticsearch chromadb_proxy; do
   [ -n "$($COMPOSE ps -q --status running "$svc" 2>/dev/null)" ] || { echo "Data service $svc is not running: start it (make up) first."; exit 1; }
 done
@@ -111,8 +112,15 @@ ok "suspicious_ui restarted"
 # only when its configuration changed, so this is a no-op on an up-to-date stack
 # and one short restart (a few seconds of database errors) the first time.
 # It runs last so the app tier, already attached to every network, never loses them.
-step "Attaching MariaDB and RustFS to their networks"
+step "Attaching MariaDB and RustFS to their networks, Cortex and Traefik to their Docker proxies"
 $COMPOSE up -d --no-deps db_suspicious rustfs
+# Cortex and Traefik lost the host Docker socket: start their proxies and recreate them
+# (compose recreates only what changed, so this is a no-op on an up-to-date stack).
+$COMPOSE up -d --no-deps docker_proxy_cortex cortex
+if [ -n "$($COMPOSE ps -q traefik 2>/dev/null)" ]; then
+  $COMPOSE up -d --no-deps docker_proxy_traefik traefik
+fi
+bash "${SCRIPTS}/health-wait.sh" "${SVC_PREFIX:-}cortex" 180
 if [ -n "$($COMPOSE ps -q db_suspicious_replica 2>/dev/null)" ]; then
   $COMPOSE --profile replica up -d --no-deps db_suspicious_replica
 fi
