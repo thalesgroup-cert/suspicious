@@ -23,7 +23,7 @@ VAULT_SVC="${VAULT_SVC:-vault}"
 # keys after the first, stalling unseal at 1/3.
 vault() {
   docker compose --env-file .env exec -T \
-    -e VAULT_ADDR=http://127.0.0.1:8200 "$VAULT_SVC" vault "$@" </dev/null
+    -e VAULT_ADDR=https://127.0.0.1:8200 -e VAULT_CACERT=/vault/ca/ca.pem "$VAULT_SVC" vault "$@" </dev/null
 }
 
 # Echo the seal state: unsealed | sealed | down.

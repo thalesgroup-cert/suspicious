@@ -22,6 +22,8 @@ services:
     ports:
       - "127.0.0.1:${SUSPICIOUS_PORT:-9020}:9020"
     volumes:
+      # Public CA that signed the Vault listener certificate (VAULT_CACERT below)
+      - "${VAULT_PATH:-./vault}/ca:/etc/suspicious/vault-ca:ro"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
@@ -33,6 +35,7 @@ services:
     environment:
       no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,vault"
       VAULT_ADDR: "${VAULT_ADDR:-}"
+      VAULT_CACERT: /etc/suspicious/vault-ca/ca.pem
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
       SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
@@ -78,6 +81,8 @@ services:
         --max-memory-per-child=${CELERY_MAX_MEMORY_PER_CHILD_KB:-1000000}
     mem_limit: ${CELERY_MEM_LIMIT:-8g}
     volumes:
+      # Public CA that signed the Vault listener certificate (VAULT_CACERT below)
+      - "${VAULT_PATH:-./vault}/ca:/etc/suspicious/vault-ca:ro"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
@@ -88,6 +93,7 @@ services:
     environment:
       no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
       VAULT_ADDR: "${VAULT_ADDR:-}"
+      VAULT_CACERT: /etc/suspicious/vault-ca/ca.pem
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
       SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
@@ -114,6 +120,8 @@ services:
     restart: always
     command: celery -A suspicious beat --loglevel=info
     volumes:
+      # Public CA that signed the Vault listener certificate (VAULT_CACERT below)
+      - "${VAULT_PATH:-./vault}/ca:/etc/suspicious/vault-ca:ro"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
@@ -124,6 +132,7 @@ services:
     environment:
       no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
       VAULT_ADDR: "${VAULT_ADDR:-}"
+      VAULT_CACERT: /etc/suspicious/vault-ca/ca.pem
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
       SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
@@ -306,13 +315,16 @@ services:
     ports:
       - "127.0.0.1:${VAULT_PORT:-8200}:8200"
     environment:
-      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_ADDR: "https://127.0.0.1:8200"
+      VAULT_CACERT: /vault/ca/ca.pem
     volumes:
       - "${VAULT_PATH:-./vault}/config.hcl:/vault/config/config.hcl:ro"
+      - "${VAULT_PATH:-./vault}/tls:/vault/tls:ro"
+      - "${VAULT_PATH:-./vault}/ca:/vault/ca:ro"
       - "${VAULT_PATH:-./vault}/data:/vault/file"
     command: ["vault", "server", "-config=/vault/config/config.hcl"]
     healthcheck:
-      test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1 || [ $$? -eq 2 ]"]
+      test: ["CMD-SHELL", "vault status >/dev/null 2>&1 || [ $$? -eq 2 ]"]
       interval: 30s
       timeout: 5s
       retries: 5

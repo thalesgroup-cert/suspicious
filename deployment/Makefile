@@ -181,6 +181,7 @@ up: check-secrets
 	@$(SCRIPTS)/check-network.sh
 	@$(SCRIPTS)/replace-tls.sh
 	@echo "Starting services…"
+	@$(SCRIPTS)/gen-vault-tls.sh
 	@$(COMPOSE) up -d vault --remove-orphans
 	@$(SCRIPTS)/unseal-vault.sh
 	@$(COMPOSE) up -d elasticsearch

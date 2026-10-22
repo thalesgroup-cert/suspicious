@@ -48,7 +48,17 @@ boot, so the unseal step is mandatory.
 
 1. **`make init`** — network, TLS certs, config files (creates `settings.json`
    from the sample if absent).
-2. **`make up`** — start the stack (including the Vault container).
+2. **`make up`** — start the stack (including the Vault container). The Vault
+   listener uses TLS: `scripts/gen-vault-tls.sh` (run by `make up` and
+   `make deploy`, idempotent) creates a Vault-only CA and a server certificate
+   with SANs `vault`, `localhost`, `127.0.0.1` in `vault/tls/` (server key,
+   mounted into Vault only) and `vault/ca/ca.pem` (public, mounted into the app
+   containers as `VAULT_CACERT`). `VAULT_ADDR` must be `https://vault:8200`; an
+   existing `.env` with `http://` is switched for you (backup
+   `.env.bak-vault-tls`). To rotate: `VAULT_TLS_FORCE=1 bash scripts/gen-vault-tls.sh`,
+   then restart and unseal Vault. A Vault behind your own CA: put that CA in
+   `vault/ca/ca.pem` and your certificate and key in `vault/tls/` as
+   `vault.pem` / `vault.key` (readable by uid 100).
 3. **Initialise + unseal Vault** (first boot only initialises). Vault runs as a
    Compose service, so run its CLI inside the container:
    ```bash

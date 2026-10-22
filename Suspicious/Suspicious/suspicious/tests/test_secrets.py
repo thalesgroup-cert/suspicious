@@ -40,6 +40,17 @@ class SecretsTestCase(unittest.TestCase):
         self.addCleanup(cc.load_settings.cache_clear)
         self.assertEqual(sec.get_secret("integrations.cortex.api_key"), "DEVKEY")
 
+    def test_client_verifies_against_vault_cacert(self):
+        env = {"VAULT_ADDR": "https://vault:8200", "VAULT_ROLE_ID": "r", "VAULT_SECRET_ID": "s"}
+        for cacert, expected in (("/etc/suspicious/vault-ca/ca.pem", "/etc/suspicious/vault-ca/ca.pem"), (None, True)):
+            with self.subTest(cacert=cacert), mock.patch.dict(os.environ, env), \
+                    mock.patch("hvac.Client") as client:
+                os.environ.pop("VAULT_CACERT", None)
+                if cacert:
+                    os.environ["VAULT_CACERT"] = cacert
+                sec._make_client()
+                self.assertEqual(client.call_args.kwargs["verify"], expected)
+
     def test_vault_read_uses_kv_v2(self):
         self._set_env(
             VAULT_ADDR="http://vault:8200", VAULT_ROLE_ID="r", VAULT_SECRET_ID="s",

@@ -12,6 +12,11 @@ config.json
 settings.json
 # Vault unseal keys (host-only secret; never commit)
 deployment/vault/unseal.keys
+# Vault TLS: the server key never gets committed (the dirs stay via .gitkeep)
+deployment/vault/tls/*
+!deployment/vault/tls/.gitkeep
+deployment/vault/ca/*
+!deployment/vault/ca/.gitkeep
 
 # ===== Certificates / keys =====
 *.crt

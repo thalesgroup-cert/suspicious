@@ -32,7 +32,9 @@ class SecretStoreUnavailable(RuntimeError):
 def _make_client():
     import hvac
 
-    client = hvac.Client(url=os.environ["VAULT_ADDR"])
+    # VAULT_CACERT names the CA that signed the Vault listener certificate; unset
+    # means the system trust store, so a Vault behind a public CA still works.
+    client = hvac.Client(url=os.environ["VAULT_ADDR"], verify=os.environ.get("VAULT_CACERT") or True)
     client.auth.approle.login(
         role_id=os.environ["VAULT_ROLE_ID"],
         secret_id=os.environ["VAULT_SECRET_ID"],

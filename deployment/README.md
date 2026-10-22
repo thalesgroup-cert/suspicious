@@ -174,7 +174,7 @@ Run from `deployment/`. Vault uses file storage and starts **sealed** on every b
 **1. Enable Vault in `.env`** (uncomment / add):
 
 ```bash
-VAULT_ADDR=http://vault:8200
+VAULT_ADDR=https://vault:8200
 VAULT_PORT=8200
 VAULT_PATH=./vault
 ```

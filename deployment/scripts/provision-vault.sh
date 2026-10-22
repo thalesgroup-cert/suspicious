@@ -17,7 +17,7 @@ VAULT_SVC="${VAULT_SVC:-vault}"
 # Run the vault CLI inside the running Vault container (no host CLI required).
 vault() {
   docker compose --env-file .env exec -T \
-    -e VAULT_TOKEN -e VAULT_ADDR=http://127.0.0.1:8200 \
+    -e VAULT_TOKEN -e VAULT_ADDR=https://127.0.0.1:8200 -e VAULT_CACERT=/vault/ca/ca.pem \
     "$VAULT_SVC" vault "$@"
 }
 
