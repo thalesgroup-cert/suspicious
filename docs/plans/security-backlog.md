@@ -17,30 +17,31 @@ own payloads were not replayed.
 | Phase 2.1 mail preview sanitiser | VULN-04 | Merged: `nh3` allow-list and rendering without network access (`eml2png_renderer.py`). Report payloads not re-tested. | `fix(preview)` 2026-10-21 |
 | Phase 2.1 replace wkhtmltoimage | VULN-08 | **Open.** Still `imgkit` + `wkhtmltopdf`. | backlog |
 | Phase 2.2 CISO fail-closed | VULN-07 | Done in `profiles_utils/scope.py` (no profile returns none). | main |
-| Phase 2.2 align submission views with `scoped_case_queryset()` | VULN-07 | **Open.** `DEFAULT_SUBMISSION_ELEVATED_GROUPS` still contains `CISO` and the submission/comment views do not use the scoped queryset. | backlog |
-| Phase 2.3 single MinIO bucket | VULN-09 | **Open.** Bucket names are now valid S3 names (`bucket_name_for`), but there is still one bucket per submission. | backlog |
-| Phase 3.1 Vault TLS, unseal keys off the host | VULN-05 | **Open.** `tls_disable = 1`; keys still in `vault/unseal.keys`. | backlog |
+| Phase 2.2 CISO scope on submissions | VULN-07 | Branch `feature/ciso-scope`. Submissions page lists a CISO's own submissions only; scope is on Investigations; a CISO can challenge for a user in scope (audit trail names the CISO) and cannot edit case details. Backend only: no challenge button on the Investigations page yet. Redo-analysis, ticket push and comments are still open to a CISO in scope (decision pending). | `724cdb1d` |
+| Phase 2.3 single MinIO bucket | VULN-09 | Branch `feature/single-mail-bucket`. Web uploads go to `storage.s3.web_bucket` (default `mail-submissions`), one prefix per submission, untagged so the legacy scanner skips it. Existing buckets untouched. | `c350d308` |
+| Phase 3.1 Vault TLS, unseal keys off the host | VULN-05 | Branch `feature/vault-tls`. TLS on the listener (Vault-only CA, SANs), `VAULT_CACERT` for clients; `make unseal` prompts for the keys, no file; auto-unseal documented as the production path. Not run: `make up`/`deploy` end to end or an upgrade of an existing Vault. | `4dac184e`, `f4665043` |
 | Phase 3.2 `no-new-privileges` + `cap_drop: ALL` | n/a | Done for `suspicious`, `suspicious_celery`, `suspicious_celery_beat`, `suspicious_ui`, `feeder`, `cortex`. Not applied to the database services, Vault or Traefik. | `5232de22` |
-| Phase 3.2 non-root analyzers | VULN-06 | **Open.** No `USER` in `AIMailAnalyzer` or `MailHeaderAnalyzer` Dockerfiles. | backlog |
+| Phase 3.2 non-root analyzers | VULN-06 | Branch `feature/analyzers-non-root`. Both run as uid 1001; AIMailAnalyzer needed a writable `./tmp`. Verified through Cortex; AI image tested as a layer, not a full rebuild. Will conflict with `feature/ai-inference-server` (same Dockerfile). | `e5d1d775` |
 
 ## Backlog, suggested order
 
-1. **Analyzers run as root (VULN-06, CVSS 7.8).** Add a non-root `USER` to the
-   AIMailAnalyzer and MailHeaderAnalyzer images; check Cortex can still write the
-   mounted job directory.
-2. **CISO scope on submission views (VULN-07).** Use `scoped_case_queryset()` in
-   `api/views/submissions.py`, `comments.py` and `CanAccessSubmission`, and drop
-   `CISO` from the elevated groups, with tests for a CISO outside their scope.
-3. **Vault (VULN-05).** TLS on the listener and a plan for the unseal keys
-   (auto-unseal or split custody).
-4. **One MinIO bucket (VULN-09).** `mail-submissions` with per-submission prefixes;
-   needs a migration path for existing buckets.
-5. **Renderer (VULN-08).** Replace `wkhtmltoimage` with headless Chromium without
-   root; replay the report's three SSRF payloads against the current renderer first.
-6. **Verify, not build:** exercise the Traefik socket proxy on a Traefik-enabled
-   stack; re-run the report's SSRF payloads against the `nh3` renderer.
-7. **Dependencies:** merge #424 and #425; bump Elasticsearch (`8.19.7` in use,
-   `8.19.23` is the newest 8.19.x tag) after checking its advisories; revisit
-   chromadb when a release above 1.5.9 ships; `nginx:1.29-alpine` and
-   `valkey/valkey:7.2` (MISP stack) also lag.
-8. **Hardening left over:** `cap_drop` on the database services, Vault and Traefik.
+Done on branches, waiting for review and merge: VULN-05, VULN-06, VULN-07 (backend),
+VULN-09, plus PRs #424 (nltk) and #425 (Chroma proxy).
+
+1. **Renderer (VULN-08).** Replace `wkhtmltoimage` with headless Chromium without
+   root; replay the report's three SSRF payloads against the current `nh3` renderer first.
+2. **CISO challenge in the UI.** A challenge button on the Investigations page for a
+   CISO in scope; decide whether redo-analysis, ticket push and comments stay open to
+   a CISO.
+3. **Verify, not build:** exercise the Traefik socket proxy on a Traefik-enabled
+   stack; re-run the SSRF payloads; run `make up` / `make deploy` end to end with the
+   Vault TLS change and an upgrade of an existing Vault.
+4. **S3 client library.** `minio-py` 7.2.20 is current but its last release is
+   2025-11-27 and the MinIO server repo is archived (2026-04-24); `boto3` has ~9.9k
+   stars, a release on 2026-10-21 and 100+ commits in 2026. Migrating touches ~10 files
+   plus the feeder; `boto3` needs `request_checksum_calculation="when_required"` for
+   non-AWS stores, and must be tested against RustFS. Not a security fix; schedule it.
+5. **Dependencies:** bump Elasticsearch (`8.19.7` in use, `8.19.23` is the newest 8.19.x
+   tag) after checking its advisories; revisit chromadb when a release above 1.5.9
+   ships; `nginx:1.29-alpine` and `valkey/valkey:7.2` (MISP stack) also lag.
+6. **Hardening left over:** `cap_drop` on the database services, Vault and Traefik.
