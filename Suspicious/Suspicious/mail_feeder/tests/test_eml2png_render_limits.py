@@ -1,57 +1,27 @@
-"""Tests for the render-height cap and post-render size guard.
+"""Size guard on what comes back from the renderer.
 
-Root cause of a production incident: wkhtmltoimage renders the full page
-height with no bound, so a pathologically tall email body produced
-multi-hundred-MB to multi-GB preview PNGs. `_render_html_to_png` now caps
-the rendered height and drops (never stores) any render that still comes
-out oversized.
+Root cause of a production incident: the old wkhtmltoimage renderer drew the
+full page height with no bound (multi-hundred-MB PNGs). The renderer service now
+clips to the content and compresses; `_render_html_to_png` still drops, never
+stores, a render that comes back oversized.
 """
 from unittest import mock
 
 from django.test import SimpleTestCase
 
-from mail_feeder.utils.email_preview.eml2png_renderer import (
-    _MAX_PNG_BYTES,
-    _MAX_RENDER_HEIGHT_PX,
-    Eml2PngRenderer,
-)
+from mail_feeder.utils.email_preview.eml2png_renderer import _MAX_PNG_BYTES, Eml2PngRenderer
 
 
-class RenderHeightCapTests(SimpleTestCase):
-    def test_height_option_passed_to_imgkit(self):
-        renderer = Eml2PngRenderer()
-        renderer._imgkit_available = True
-        with mock.patch("imgkit.from_string", return_value=b"PNGDATA") as mocked:
-            out = renderer._render_html_to_png("<p>hi</p>")
-        self.assertEqual(out, b"PNGDATA")
-        _, kwargs = mocked.call_args
-        self.assertEqual(kwargs["options"]["height"], str(_MAX_RENDER_HEIGHT_PX))
+def _render(content):
+    resp = mock.Mock(status_code=200, content=content, text="")
+    with mock.patch("requests.Session.post", return_value=resp):
+        return Eml2PngRenderer()._render_html_to_png("<p>hi</p>")
 
-    def test_crop_options_bound_the_output(self):
-        # --height alone only sets the viewport; the PNG still grows to the
-        # full content height (923 MB seen in production). --crop-h is the cap.
-        renderer = Eml2PngRenderer()
-        renderer._imgkit_available = True
-        with mock.patch("imgkit.from_string", return_value=b"PNGDATA") as mocked:
-            renderer._render_html_to_png("<p>hi</p>")
-        options = mocked.call_args.kwargs["options"]
-        self.assertEqual(options["crop-h"], str(_MAX_RENDER_HEIGHT_PX))
-        self.assertEqual(options["crop-x"], "0")
-        self.assertEqual(options["crop-y"], "0")
-        self.assertEqual(options["crop-w"], options["width"])
 
+class RenderSizeGuardTests(SimpleTestCase):
     def test_oversized_render_is_dropped_not_stored(self):
-        renderer = Eml2PngRenderer()
-        renderer._imgkit_available = True
-        oversized = b"x" * (_MAX_PNG_BYTES + 1)
-        with mock.patch("imgkit.from_string", return_value=oversized):
-            out = renderer._render_html_to_png("<p>hi</p>")
-        self.assertIsNone(out)
+        self.assertIsNone(_render(b"x" * (_MAX_PNG_BYTES + 1)))
 
     def test_render_at_or_under_limit_is_kept(self):
-        renderer = Eml2PngRenderer()
-        renderer._imgkit_available = True
         at_limit = b"x" * _MAX_PNG_BYTES
-        with mock.patch("imgkit.from_string", return_value=at_limit):
-            out = renderer._render_html_to_png("<p>hi</p>")
-        self.assertEqual(out, at_limit)
+        self.assertEqual(_render(at_limit), at_limit)

@@ -40,6 +40,14 @@ services:
         - HTTP_PROXY=${HTTP_PROXY:-}
         - HTTPS_PROXY=${HTTPS_PROXY:-}
 
+  mail_renderer:
+    build:
+      context: ${MAIL_RENDERER_PATH:-../mail-renderer}/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
+
   feeder:
     build:
       context: ${FEEDER_PATH:?FEEDER_PATH is required}/

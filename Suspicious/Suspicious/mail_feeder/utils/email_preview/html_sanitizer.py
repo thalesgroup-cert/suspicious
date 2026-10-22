@@ -1,10 +1,11 @@
 """Allow-list sanitiser for the HTML body of a reported email.
 
-The body is attacker-controlled and is rasterised by wkhtmltoimage on a
-worker that can reach internal services, so anything that makes the
-renderer fetch a URL (img/iframe/link/object, CSS url()/@import, meta
-refresh, background attributes) must not survive. Everything not listed
-here is dropped, rather than matching known-bad patterns.
+The body is attacker-controlled and is rasterised by a browser (the isolated
+mail renderer, which also has no network route). Anything that makes a renderer
+fetch a URL (img/iframe/link/object, CSS url()/@import, meta refresh,
+background attributes) must still not survive here: the sanitiser is the first
+line, the renderer's isolation the second. Everything not listed here is
+dropped, rather than matching known-bad patterns.
 """
 from __future__ import annotations
 

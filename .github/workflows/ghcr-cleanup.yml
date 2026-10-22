@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [suspicious, suspicious-ui, suspicious-feeder]
+        package: [suspicious, suspicious-ui, suspicious-feeder, suspicious-mail-renderer]
     steps:
       # Every image push (release.yml, on every main-branch push) also pushes
       # a SLSA provenance attestation as a separate, untagged package version

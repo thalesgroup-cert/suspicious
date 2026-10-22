@@ -2,7 +2,7 @@
 
 Extracted from the `regenerate_mail_previews` management command so the
 same logic backs the command, the `render_mail_preview` Celery task, and
-the `sweep_missing_mail_previews` beat sweeper. All IO (MinIO, wkhtmltopdf)
+the `sweep_missing_mail_previews` beat sweeper. All IO (MinIO, the mail renderer)
 is reached through an injected `fetch_eml` callable + `renderer` object,
 so the orchestration is unit-testable with fakes.
 """

@@ -137,3 +137,30 @@ The Django, Celery, beat and feeder containers also run with every Linux
 capability dropped and `no-new-privileges`. The UI and Cortex start as root and
 then drop to their own user, so they keep only `CHOWN`, `DAC_OVERRIDE`, `SETGID`
 and `SETUID`. Vault is unchanged.
+
+### Mail preview renderer
+
+The PNG preview of a reported mail is drawn by `mail_renderer`, a separate
+headless-Chromium container (`mail-renderer/`), not by a binary inside the Django
+image. It replaces `wkhtmltoimage`, an unmaintained 2020 WebKit, and removes
+`wkhtmltopdf` and `imgkit` from the Django image.
+
+- **Isolation.** It sits on its own `internal` network with only Django and
+  Celery. It has no route to the internet or to any other service, which
+  `make network-check` verifies. Inside it: JavaScript off, every request the page
+  makes aborted, no DNS, a non-root user, all capabilities dropped, a read-only
+  root, 1 GB of memory, 512 processes.
+- **Sandbox.** Chromium's own sandbox stays on. As Playwright documents for
+  untrusted content, that needs a non-root user and its seccomp profile,
+  vendored as `mail-renderer/seccomp_profile.json` and applied by the compose
+  file. It uses `shm_size` instead of sharing the host IPC namespace.
+- **Output.** The screenshot is clipped to the content, at most 4000 px tall, as a
+  compressed PNG (about 20 KB for a typical mail). The old renderer wrote a fixed
+  900 x 4000 canvas of about 14 MB for every mail.
+- **Upgrading.** `make deploy` builds and starts the service. Previews stored by
+  the old renderer keep working; shrink them with
+  `docker compose exec suspicious python manage.py regenerate_mail_previews --all`
+  (add `--limit N` to do it in batches). If the renderer is down, new previews are
+  skipped and retried by the existing sweeper; analysis is not affected.
+- **Pinning.** The image tag and the `playwright` pip package must be the same
+  version (`PLAYWRIGHT_VERSION` in `mail-renderer/Dockerfile`).

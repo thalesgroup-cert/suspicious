@@ -203,6 +203,16 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **Mail previews rendered by an isolated Chromium.** `wkhtmltoimage` (a 2020
+  WebKit, unmaintained) no longer runs inside the Django image. The sanitised
+  HTML goes to a new `mail_renderer` container: headless Chromium with
+  JavaScript off, every request aborted, no DNS, on an `internal` network with
+  no route out, non-root, all capabilities dropped, read-only root, memory and
+  process limits, Playwright's seccomp profile so the browser sandbox stays on.
+  `wkhtmltopdf` and `imgkit` are gone from the Django image. As a side effect
+  previews are clipped to their content and compressed: about 20 KB instead of a
+  fixed 14 MB canvas per mail (114 stored previews took 1.6 GB). Shrink existing
+  ones with `manage.py regenerate_mail_previews --all`.
 - **One bucket for web uploads.** A mail uploaded through the web form used
   to create a bucket of its own, so the bucket count (and the legacy scanner's
   list-and-tag pass over every bucket) grew with each submission. Uploads now go

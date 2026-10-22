@@ -35,8 +35,9 @@ check "cortex Docker proxy only on its link"   "exactly docker_proxy_cortex dock
 check "traefik on edge and app, no Docker access" "exactly traefik suspicious_network reverse_network"
 check "feeder on app and storage, not data"  "exactly feeder suspicious_network storage"
 check "suspicious_ui off the data tier"      "! running suspicious_ui || ! nets suspicious_ui | grep -qE '${P}_(data|storage|cortex)'"
-check "django on all four tiers"             "exactly suspicious suspicious_network data storage cortex"
-check "celery on all four tiers"             "exactly suspicious_celery suspicious_network data storage cortex"
+check "mail_renderer only on its internal network" "exactly mail_renderer renderer"
+check "django on all tiers and the renderer"  "exactly suspicious suspicious_network data storage cortex renderer"
+check "celery on all tiers and the renderer"  "exactly suspicious_celery suspicious_network data storage cortex renderer"
 check "beat on app and data"                 "exactly suspicious_celery_beat suspicious_network data"
 
 py_reach() {  # py_reach service host port
@@ -51,6 +52,9 @@ for hp in db_suspicious:3306 redis_broker:6379 elasticsearch:9200 rustfs:9000 ch
 done
 check "beat reaches db and redis"    "py_reach suspicious_celery_beat db_suspicious 3306 && py_reach suspicious_celery_beat redis_broker 6379"
 check "feeder reaches django and rustfs" "py_reach feeder suspicious 9020 && py_reach feeder rustfs 9000"
+check "django and celery reach the mail renderer" "py_reach suspicious mail_renderer 8080 && py_reach suspicious_celery mail_renderer 8080"
+check "mail_renderer has no route out" "! running mail_renderer || ! $COMPOSE exec -T mail_renderer python -c 'import socket; socket.create_connection((\"1.1.1.1\", 80), 3)'"
+check "mail_renderer cannot resolve django or the database" "! running mail_renderer || ! $COMPOSE exec -T mail_renderer python -c 'import socket; [socket.gethostbyname(h) for h in (\"suspicious\", \"db_suspicious\")]'"
 check "cortex reaches its Docker proxy"      "! running cortex || $COMPOSE exec -T cortex curl -sf http://docker-proxy-cortex:2375/_ping"
 check "cortex proxy refuses what a job does not need" "! running cortex || [ \"\$($COMPOSE exec -T cortex curl -s -o /dev/null -w '%{http_code}' http://docker-proxy-cortex:2375/volumes)\" = 403 ]"
 check "cortex reaches elasticsearch and django" \
