@@ -22,9 +22,24 @@ DEFAULT_CASE_BASE_PATH = Path("/app/case")
 _BUCKET_MAX_LEN = 63
 _BUCKET_INFIX = "-submission-"
 
+# One shared bucket for every web upload; each submission is a key prefix in it.
+# A bucket per submission made the legacy scanner's list-and-tag scan grow
+# without bound. The bucket carries no Status tag, so that scanner skips it.
+DEFAULT_WEB_BUCKET = "mail-submissions"
+
+
+def web_submission_bucket() -> str:
+    """Shared bucket for web uploads (``storage.s3.web_bucket``)."""
+    from settings.config import get_section
+    return ((get_section("storage.s3") or {}).get("web_bucket") or DEFAULT_WEB_BUCKET).strip()
+
 
 def bucket_name_for(user_prefix: str, mail_id: str) -> str:
-    """S3-valid name for a submission bucket: ``<prefix>-submission-<stamp>``.
+    """S3-safe id of a web submission: ``<prefix>-submission-<stamp>``.
+
+    Used as the key prefix inside the shared bucket and as the local directory
+    name; it stays bucket-name-valid so it is also a legal name for the legacy
+    layout.
 
     ``user_prefix`` is the local part of the username and can carry anything
     (uppercase, ``_``, ``.``, non-ASCII), none of which an S3 bucket allows.
@@ -72,11 +87,15 @@ class MailFormHandler:
         # os.path.basename strips any separator a username could carry: Django's
         # default validator already forbids "/", but this is the barrier CodeQL's
         # path-injection query recognizes, and it's what actually stops every
-        # downstream directory built from user_prefix (bucket, local_dir, tmp_dir)
+        # downstream directory built from user_prefix (object prefix, local_dir, tmp_dir)
         # from being flagged as tainted.
         user_prefix = os.path.basename(self.user.username.split('@')[0])
         mail_id = generate_object_reference()
-        bucket = bucket_name_for(user_prefix, mail_id)
+        submission_id = bucket_name_for(user_prefix, mail_id)
+        # The id above is only second-resolution; the random tail of mail_id keeps
+        # two uploads of one user in the same second from sharing (and overwriting
+        # each other's files under) one object prefix.
+        object_prefix = "-".join(filter(None, (submission_id, mail_id.partition("-")[2])))
         ext = Path(mail_file.name).suffix.lower()
 
         if ext not in ('.eml', '.msg'):
@@ -91,7 +110,7 @@ class MailFormHandler:
             logger.error("Conversion from .msg to .eml failed: %s", e)
             return None
 
-        local_dir = self.base_path / bucket / temp.stem
+        local_dir = self.base_path / submission_id / temp.stem
         local_dir.mkdir(parents=True, exist_ok=True)
 
         dest = local_dir / "user_submission.eml"
@@ -113,11 +132,10 @@ class MailFormHandler:
             logger.critical("MinIO client unavailable, abort.")
             return None
 
-        default_tags = {"Status": "To Do"}
         self.minio.upload_directory(source_dir=local_dir,
-                                    bucket_name=bucket,
-                                    base_object_path="",
-                                    default_tags=default_tags)
+                                    bucket_name=web_submission_bucket(),
+                                    base_object_path=object_prefix,
+                                    tag_bucket=False)
 
         try:
             shutil.make_archive(str(local_dir), 'gztar', root_dir=str(local_dir))

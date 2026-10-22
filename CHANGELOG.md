@@ -203,6 +203,12 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **One bucket for web uploads.** A mail uploaded through the web form used
+  to create a bucket of its own, so the bucket count (and the legacy scanner's
+  list-and-tag pass over every bucket) grew with each submission. Uploads now go
+  to a single `storage.s3.web_bucket` (default `mail-submissions`), one key
+  prefix per submission, with no `Status` tag so the legacy scanner skips it.
+  Existing per-submission buckets are left as they are.
 - **No upstream error text in API responses.** A failed TheHive push now returns
   a generic "TheHive push failed." (the error, with the TheHive URL, stays in the
   audit log), and the challenge endpoint returns its own fixed "Case already
