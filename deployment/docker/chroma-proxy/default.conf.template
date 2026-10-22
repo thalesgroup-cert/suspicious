@@ -4,6 +4,22 @@
 # CHROMA_TOKEN must be hex only: `$`, quotes or backslashes would break this file.
 server_tokens off;
 
+# Route allow-list. ChromaDB <= 1.5.9 (latest) has no patch for GHSA-36p7-vc44-83pf
+# (code execution through a collection update with trust_remote_code),
+# GHSA-2wm9-hf6c-p5cr and GHSA-xph7-9rjv-w5fr (cross-tenant access): all need a
+# route Suspicious never calls. Only the single default tenant/database and the
+# document operations the app uses get through; PUT (collection modify),
+# tenant/database creation and collection deletion do not. Matched on the raw
+# request URI, which is also what is forwarded, so no encoding can slip a
+# different path past the check.
+map "$request_method $request_uri" $chroma_route_ok {
+    default 0;
+    "~^GET /api/v2/(heartbeat|version|auth/identity|pre-flight-checks)(\?.*)?$" 1;
+    "~^GET /api/v2/tenants/default_tenant(/databases/default_database(/collections(/[A-Za-z0-9_.-]+(/count)?)?)?)?(\?.*)?$" 1;
+    "~^POST /api/v2/tenants/default_tenant/databases/default_database/collections(\?.*)?$" 1;
+    "~^POST /api/v2/tenants/default_tenant/databases/default_database/collections/[0-9a-f-]+/(add|upsert|update|get|query|count|delete)(\?.*)?$" 1;
+}
+
 server {
     listen 8000;
     client_max_body_size 64m;
@@ -13,6 +29,7 @@ server {
     set $chroma_upstream http://chroma-backend:8000;
     location / {
         if ($http_x_chroma_token != "${CHROMA_TOKEN}") { return 401; }
+        if ($chroma_route_ok = 0) { return 403; }
         proxy_set_header X-Chroma-Token "";
         proxy_http_version 1.1;
         proxy_set_header Connection "";
