@@ -138,5 +138,5 @@ class Command(BaseCommand):
 
         storage = StorageClient()
         if not getattr(storage, "client", None):
-            raise CommandError("MinIO client initialisation failed")
+            raise CommandError("Object store initialisation failed")
         return storage
