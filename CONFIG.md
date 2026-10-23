@@ -302,6 +302,26 @@ avoid it:
   that path, so a bare `localhost:<published-9000-port>` `public_endpoint`
   works — see the `/deploy-full-e2e` flow in `CLAUDE.md`.
 
+#### Storage provider
+
+`storage.provider` selects the object-store provider behind the backend's
+`ObjectStore` interface. It is optional and defaults to `s3`, which covers
+RustFS, MinIO and AWS S3 through `boto3`; the `storage.s3` keys above are
+unchanged. Resolution order: runtime config `storage.provider`, then the
+`STORAGE_PROVIDER` environment variable, then `s3`. The provider is resolved
+lazily on first use and cached, so a change takes effect after the backend
+processes (`suspicious`, `suspicious_celery`, `suspicious_celery_beat`) are
+recreated.
+
+An unknown name raises `StorageConfigError` ("Unknown storage provider 'x';
+registered providers: s3") and is also caught at startup by the Django check
+`storage.E001` ("Unknown storage provider 'x' (from env STORAGE_PROVIDER)",
+or "from settings.json storage.provider", with the hint listing the registered
+providers).
+
+The legacy bucket-per-email tag scanner needs a provider that supports
+free-form bucket tags.
+
 The client that signs `public_endpoint` URLs pins `region` to a fixed value
 (`"us-east-1"` unless `storage.s3.region` overrides it) instead of letting
 the SDK auto-detect it. Auto-detection does a live bucket-location request

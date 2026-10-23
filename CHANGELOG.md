@@ -126,6 +126,12 @@ management moving to HashiCorp Vault.
 - MkDocs documentation site deploy workflow.
 
 ### Changed
+
+- **Object storage moves from `minio-py` to `boto3`** behind a provider-agnostic
+  `ObjectStore` interface (`common/storage/`). No config change is needed:
+  `storage.provider` (or `STORAGE_PROVIDER`) is optional and defaults to `s3`.
+  The legacy bucket-per-email tag scanner now needs a provider with free-form
+  bucket tags.
 - **Allow-lists are a weighted vote in `score_case`**: a strict majority of
   Safe plus allow-listed analyzer weight now yields Safe (rule
   `allow-list-majority`), with dissenting analyzers named in the rationale.
