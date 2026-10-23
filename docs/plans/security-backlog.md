@@ -9,7 +9,7 @@ own payloads were not replayed.
 
 | Report item | Finding | Status | Where |
 |---|---|---|---|
-| Phase 1.1 docker-socket-proxy | VULN-01 | Done. Only the two `docker_proxy_*` services mount the socket (Cortex: `CONTAINERS/IMAGES/INFO/POST=1`; Traefik: `CONTAINERS/EVENTS`, `POST=0`). Cortex analyzer launch tested on the dev stack; the Traefik proxy is **not tested** (no Traefik in dev). | `5232de22` |
+| Phase 1.1 docker-socket-proxy | VULN-01 | Cortex: done. Only `docker_proxy_cortex` mounts the socket (`CONTAINERS/IMAGES/INFO/POST=1`), tested on the dev stack; it filters by path and method, not request body, so a compromised Cortex could still ask for a privileged container. Traefik: its Docker provider and proxy are removed (nothing uses labels; a read-only proxy still exposes every container's environment). Static checks only, no live Traefik run. | `5232de22`, PR #428 |
 | Phase 1.2 network segmentation | VULN-03 | Done: `data`, `storage` and `cortex` tiers beside the shared `suspicious_network`. The report names four networks (frontend/backend/data/cortex); the split differs but the UI and feeder are off the data tier. | `dd8d804d` |
 | Phase 1.3 nltk >= 3.10.4 | VULN-02 (partly) | PR open | #424 |
 | Phase 1.3 chromadb >= 1.5.10 | VULN-02 | **No fixed release exists** (1.5.9 is the latest on PyPI, Docker tags past it are `1.5.10.dev*`). Mitigated: the proxy forwards only the routes the app uses. The report cites CVE-2026-45829; Dependabot lists GHSA-36p7-vc44-83pf, GHSA-2wm9-hf6c-p5cr, GHSA-xph7-9rjv-w5fr. PR open. | #425 |
@@ -32,13 +32,16 @@ VULN-08, VULN-09, the Elasticsearch bump, plus PRs #424 (nltk) and #425 (Chroma 
    `feature/ciso-challenge-ui` (`5ea12875`, stacked on `feature/ciso-scope`). Still
    open to a CISO in scope: redo-analysis, ticket push and comments. Decide whether
    they stay.
-2. **Secrets in container environments.** A spike showed the Traefik socket proxy
-   (`CONTAINERS=1`) lets a compromised Traefik read every container's environment
-   (82 variables from the Django container, 14 secret-looking). The shipped
-   `traefik.yaml` uses only the file provider, so the proxy is idle by default;
-   keep it that way, document the exposure, and move secrets out of container env.
-   The Traefik proxy and the Vault TLS upgrade (existing Vault with data) were
-   otherwise verified in a throwaway spike; a full `make deploy` was not.
+2. **Secrets in container environments.** The spike showed that a Docker socket proxy
+   with `CONTAINERS=1` lets a compromised container read every container's environment
+   (82 variables from the Django container, 14 secret-looking). Traefik no longer has
+   Docker access (PR #428), so that exposure is gone there. Moving secrets out of
+   container env is still worth doing for anything that can read container metadata.
+   The Vault TLS upgrade (existing Vault with data) was verified in a throwaway spike;
+   a full `make deploy` was not.
+   **Cortex Docker access (new).** `docker_proxy_cortex` cannot filter request bodies.
+   Options: rootless Docker daemon (cheapest, host setup only), a body-filtering proxy
+   (rejects `Privileged`, host mounts, `--net=host`), or a dedicated analyzer host.
 3. **S3 client library.** `minio-py` 7.2.20 is current but its last release is
    2025-11-27 and the MinIO server repo is archived (2026-04-24); `boto3` has ~9.9k
    stars, a release on 2026-10-21 and 100+ commits in 2026. Migrating touches ~10 files
