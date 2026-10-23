@@ -61,8 +61,26 @@ class RegistryTests(SimpleTestCase):
         self.assertIn("localhost:35002", get_presign_store()._client.meta.endpoint_url)
         self.assertIn("rustfs:9000", get_store()._client.meta.endpoint_url)
 
-    def test_startup_check_reports_unknown_provider(self):
-        self.assertEqual(check_storage_provider(None), [])
-        os.environ["STORAGE_PROVIDER"] = "nope"
-        errors = check_storage_provider(None)
+    def _check(self, env, json_value):
+        if env is None:
+            os.environ.pop("STORAGE_PROVIDER", None)
+        else:
+            os.environ["STORAGE_PROVIDER"] = env
+        with patch("common.storage.checks.settings_get", return_value=json_value):
+            return check_storage_provider(None)
+
+    def test_startup_check_both_unset_passes(self):
+        self.assertEqual(self._check(None, None), [])
+
+    def test_startup_check_both_valid_passes(self):
+        self.assertEqual(self._check("s3", "s3"), [])
+
+    def test_startup_check_reports_unknown_env_even_if_json_valid(self):
+        errors = self._check("nope", "s3")
         self.assertEqual([e.id for e in errors], ["storage.E001"])
+        self.assertIn("env", errors[0].msg)
+
+    def test_startup_check_reports_unknown_json_even_if_env_valid(self):
+        errors = self._check("s3", "bogus")
+        self.assertEqual([e.id for e in errors], ["storage.E001"])
+        self.assertIn("settings.json", errors[0].msg)
