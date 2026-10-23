@@ -8,7 +8,11 @@ from urllib.parse import urlparse
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import ConnectTimeoutError, EndpointConnectionError, ClientError
+from boto3.exceptions import S3UploadFailedError
+from botocore.exceptions import (
+    ClientError, ConnectTimeoutError, EndpointConnectionError, NoCredentialsError, ParamValidationError,
+    PartialCredentialsError,
+)
 from botocore.stub import Stubber
 from django.test import SimpleTestCase
 
@@ -73,6 +77,9 @@ class S3StoreTests(SimpleTestCase):
             (_client_error("InternalError", 500), "unavailable"),
             (E(endpoint_url="http://x"), "unavailable"),
             (ConnectTimeoutError(endpoint_url="http://x"), "unavailable"),
+            (ParamValidationError(report="bad"), "invalid"),
+            (NoCredentialsError(), "access_denied"),
+            (PartialCredentialsError(provider="p", cred_var="v"), "access_denied"),
         ]
         for exc, code in table:
             client = MagicMock()
@@ -100,9 +107,9 @@ class S3StoreTests(SimpleTestCase):
     def test_open_streams_without_reading_whole_body(self):
         client = _client()
         with Stubber(client) as stub:
-            stub.add_response("get_object", {"Body": _Body(b"abcdef")})
+            stub.add_response("get_object", {"Body": _Body(b"abcdefghijkl")})
             with _store(client).open("b", "k") as stream:
-                self.assertEqual(list(stream.iter_chunks(4)), [b"abcd", b"ef"])
+                self.assertEqual(list(stream.iter_chunks(4)), [b"abcd", b"efgh", b"ijkl"])
         with Stubber(client) as stub:
             stub.add_response("get_object", {"Body": _Body(b"abcdef")})
             with _store(client).open("b", "k") as stream:
@@ -124,6 +131,34 @@ class S3StoreTests(SimpleTestCase):
         _store(client).put("b", "k", data)
         client.upload_fileobj.assert_called_once_with(data, "b", "k", ExtraArgs={})
         client.put_object.assert_not_called()
+
+    def test_streaming_put_unwraps_client_error(self):
+        for name, status, code in (("NoSuchBucket", 404, "not_found"), ("AccessDenied", 403, "access_denied")):
+            client = MagicMock()
+            try:
+                raise _client_error(name, status)
+            except ClientError as inner:
+                try:
+                    raise S3UploadFailedError("upload failed") from inner
+                except S3UploadFailedError as wrapped:
+                    client.upload_fileobj.side_effect = wrapped
+            with self.assertRaises(StoreError) as ctx:
+                _store(client).put("b", "k", io.BytesIO(b"x"))
+            self.assertEqual(ctx.exception.code, code)
+
+    def test_missing_bucket_is_not_found_on_list_prefixes_and_open(self):
+        calls = {
+            "list_objects_v2": [lambda s: list(s.list("b")), lambda s: list(s.list_prefixes("b"))],
+            "get_object": [lambda s: s.open("b", "k").__enter__()],
+        }
+        for op, fns in calls.items():
+            for fn in fns:
+                client = _client()
+                with Stubber(client) as stub:
+                    stub.add_client_error(op, "NoSuchBucket", http_status_code=404)
+                    with self.assertRaises(StoreError) as ctx:
+                        fn(_store(client))
+                self.assertEqual(ctx.exception.code, "not_found")
 
     def test_delete_many_batches_of_1000(self):
         client = _client()

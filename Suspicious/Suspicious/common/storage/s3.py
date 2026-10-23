@@ -7,7 +7,9 @@ from urllib.parse import quote, urlencode
 import boto3
 from boto3.exceptions import Boto3Error
 from botocore.config import Config
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import (
+    BotoCoreError, ClientError, NoCredentialsError, ParamValidationError, PartialCredentialsError,
+)
 
 from . import base
 from .base import HealthStatus, ObjectInfo, ObjectStore, ObjectStream, StoreError
@@ -22,7 +24,14 @@ _ALREADY = {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"}
 
 def _map(exc: Exception, bucket=None, key=None) -> StoreError:
     code, message = "unavailable", str(exc)
-    if isinstance(exc, ClientError):
+    cause = exc.__cause__ or exc.__context__
+    if not isinstance(exc, ClientError) and isinstance(cause, ClientError):
+        exc = cause
+    if isinstance(exc, ParamValidationError):
+        code = "invalid"
+    elif isinstance(exc, (NoCredentialsError, PartialCredentialsError)):
+        code = "access_denied"
+    elif isinstance(exc, ClientError):
         err = exc.response.get("Error", {})
         status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
         name = str(err.get("Code", ""))
