@@ -28,6 +28,13 @@ class StoreContract:
             fn(*args, **kwargs)
         self.assertEqual(ctx.exception.code, "not_found")
 
+    def assertOpenNotFound(self, bucket, key):
+        # a provider may fail on open() itself or only on entering the context
+        with self.assertRaises(StoreError) as ctx:
+            with self.store.open(bucket, key):
+                pass
+        self.assertEqual(ctx.exception.code, "not_found")
+
     def test_put_open_roundtrip(self):
         self._put("a.eml", b"hello")
         with self.store.open(self.bucket, "a.eml") as stream:
@@ -51,7 +58,10 @@ class StoreContract:
     def test_missing_bucket_is_not_found(self):
         self.assertNotFound(lambda: list(self.store.list("no-such-bucket")))
         self.assertNotFound(self.store.stat, "no-such-bucket", "k")
-        self.assertNotFound(self.store.open, "no-such-bucket", "k")
+        self.assertOpenNotFound("no-such-bucket", "k")
+
+    def test_open_missing_key_is_not_found(self):
+        self.assertOpenNotFound(self.bucket, "nope")
 
     def test_list_prefix_and_recursive(self):
         for key in ("d/a", "d/sub/b", "other"):
