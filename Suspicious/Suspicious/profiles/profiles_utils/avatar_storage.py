@@ -2,8 +2,7 @@
 
 Deliberately not sharing case_handler's MinioManager (mail/case-artifact
 specific): profiles has no business importing that app's internals, so
-this talks to the shared common.clients.get_s3_client() MinIO client
-directly, same as tasp.cron.fetch_emails and mail_feeder do.
+this talks to the shared ObjectStore from common.storage directly.
 """
 from __future__ import annotations
 
@@ -14,7 +13,7 @@ from datetime import timedelta
 
 from PIL import Image, UnidentifiedImageError
 
-from common.clients import get_s3_client, get_s3_presign_client
+from common.storage import get_presign_store, get_store
 from settings.config import get_section
 
 logger = logging.getLogger(__name__)
@@ -36,11 +35,6 @@ def _avatar_bucket_name() -> str:
     except Exception as exc:
         logger.warning(f"Failed to read avatars_bucket from config: {exc}. Using default: {DEFAULT_AVATAR_BUCKET}")
         return DEFAULT_AVATAR_BUCKET
-
-
-def _ensure_bucket(client, bucket_name: str) -> None:
-    if not client.bucket_exists(bucket_name):
-        client.make_bucket(bucket_name)
 
 
 def process_avatar_image(content_type: str, size: int, raw: bytes) -> bytes:
@@ -75,11 +69,11 @@ def process_avatar_image(content_type: str, size: int, raw: bytes) -> bytes:
 
 def store_avatar(user_id: int, image_bytes: bytes) -> str:
     """Upload processed JPEG bytes, return the new object key."""
-    client = get_s3_client()
+    store = get_store()
     bucket = _avatar_bucket_name()
-    _ensure_bucket(client, bucket)
+    store.ensure_bucket(bucket)
     key = f"avatars/{user_id}/{uuid.uuid4().hex}.jpg"
-    client.put_object(
+    store.put(
         bucket, key, io.BytesIO(image_bytes),
         length=len(image_bytes), content_type="image/jpeg",
     )
@@ -89,8 +83,7 @@ def store_avatar(user_id: int, image_bytes: bytes) -> str:
 def delete_avatar(key: str) -> None:
     """Best-effort delete of a previous avatar object. Never raises."""
     try:
-        client = get_s3_client()
-        client.remove_object(_avatar_bucket_name(), key)
+        get_store().delete(_avatar_bucket_name(), key)
     except Exception as exc:
         logger.warning(f"Failed to delete avatar object {key!r}: {exc}")
 
@@ -98,9 +91,8 @@ def delete_avatar(key: str) -> None:
 def presigned_avatar_url(key: str) -> str | None:
     """Presigned GET URL for a stored avatar, or None on any failure."""
     try:
-        client = get_s3_presign_client()
-        return client.presigned_get_object(
-            _avatar_bucket_name(), key, expires=AVATAR_URL_EXPIRES
+        return get_presign_store().presign_get(
+            _avatar_bucket_name(), key, AVATAR_URL_EXPIRES
         )
     except Exception as exc:
         logger.warning(f"Failed to presign avatar URL for {key!r}: {exc}")
