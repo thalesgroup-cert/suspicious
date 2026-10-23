@@ -7,6 +7,8 @@ class SuspiciousConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self) -> None:
+        import common.storage.checks  # noqa: F401  registers storage.E001
+
         from django.conf import settings
         from suspicious.otel import configure
 
