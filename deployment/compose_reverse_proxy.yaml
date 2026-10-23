@@ -14,7 +14,6 @@ services:
     networks:
       - suspicious_network
       - reverse_network
-      - docker_traefik
     ports:
       - "80:80"
       - "443:443"
@@ -27,35 +26,14 @@ services:
       - "${CA_PATH}:/etc/private:ro"
       # Access and error logs
       - "${TRAEFIK_PATH}/logs:/var/log/traefik"
-      # No Docker socket here: the Docker provider reads container labels through
-      # docker_proxy_traefik, which allows only listing containers and events.
+      # No Docker socket and no Docker provider: routes come from the file provider.
     # Traefik dashboard — accessible only from localhost in production.
     # Remove the port mapping entirely if you use the file provider dashboard.
     # ports:
     #   - "127.0.0.1:8080:8080"
-
-  # The only service that mounts the Docker socket for Traefik. GET only (POST=0),
-  # containers and events only, no TLS and no authentication: reachable solely from
-  # the internal docker_traefik network that Traefik shares with it.
-  docker_proxy_traefik:
-    init: true
-    restart: unless-stopped
-    environment:
-      CONTAINERS: "1"
-      EVENTS: "1"
-      POST: "0"
-      LOG_LEVEL: warning
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    security_opt:
-      - no-new-privileges:true
-    networks:
-      - docker_traefik
 
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
   reverse_network:
-  docker_traefik:
-    internal: true
