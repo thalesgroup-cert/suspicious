@@ -1,3 +1,4 @@
+import io
 import os
 import tempfile
 import unittest
@@ -6,35 +7,33 @@ from unittest import mock
 from django.core.cache import cache
 from django.test import SimpleTestCase
 
+from common.storage import FREE_FORM_BUCKET_TAGS, FakeObjectStore
 from tasp.cron import fetch_emails as fe
 
 BUCKET = "jordan.kim-submission-261006145515"
 LOCK = f"lock:minio_bucket:{BUCKET}"
 
 
-def _fake_client(status):
-    client = mock.MagicMock()
-    bucket = mock.Mock()
-    bucket.name = BUCKET
-    client.list_buckets.return_value = [bucket]
-    client.get_bucket_tags.return_value = {"Status": status}
-    objs = []
+def _fake_client(status, capabilities=frozenset({FREE_FORM_BUCKET_TAGS})):
+    client = FakeObjectStore(capabilities=capabilities)
+    client.ensure_bucket(BUCKET)
+    client.set_bucket_labels(BUCKET, {"Status": status})
     for name in ("u-submission.eml", "261006145515-abc/261006145515-abc.eml"):
-        obj = mock.Mock()
-        obj.object_name = name
-        objs.append(obj)
-    client.list_objects.return_value = objs
+        client.put(BUCKET, name, io.BytesIO(b"From: u@x\r\n\r\nbody"))
+    labels = []
+    real_set = client.set_bucket_labels
 
-    def fget(_bucket, _name, dst):
-        with open(dst, "wb") as f:
-            f.write(b"From: u@x\r\n\r\nbody")
+    def record(bucket, value):
+        labels.append(value["Status"])
+        real_set(bucket, value)
 
-    client.fget_object.side_effect = fget
+    client.set_bucket_labels = record
+    client.labels_set = labels
     return client
 
 
 def _tags_set(client):
-    return [c.args[1]["Status"] for c in client.set_bucket_tags.call_args_list]
+    return client.labels_set
 
 
 class HandoffFailureTests(unittest.TestCase):
@@ -61,9 +60,9 @@ class BucketTagTests(SimpleTestCase):
     def tearDown(self):
         cache.delete(LOCK)
 
-    def _run(self, status, failed, ingested=frozenset()):
-        client = _fake_client(status)
-        with mock.patch.object(fe, "_init_minio_client", return_value=client), \
+    def _run(self, status, failed, ingested=frozenset(), capabilities=frozenset({FREE_FORM_BUCKET_TAGS})):
+        client = _fake_client(status, capabilities)
+        with mock.patch.object(fe, "_init_store", return_value=client), \
                 mock.patch.object(fe, "MinioEmailService"), \
                 mock.patch.object(fe, "_already_ingested", return_value=set(ingested)), \
                 mock.patch.object(fe, "_handoff_submission", return_value=failed) as handoff:
@@ -96,3 +95,9 @@ class BucketTagTests(SimpleTestCase):
     def test_normal_bucket_does_not_consult_the_database(self):
         self._run("To Do", [], ingested={"261006145515-abc"})
         self.assertEqual(self.handoff.call_args.kwargs.get("done_emails", frozenset()), frozenset())
+
+    def test_legacy_scanner_skipped_without_free_form_labels(self):
+        client = self._run("To Do", [], capabilities=frozenset())
+        self.assertEqual(_tags_set(client), [])
+        self.handoff.assert_not_called()
+        self.assertEqual(client.get_bucket_labels(BUCKET), {"Status": "To Do"})
