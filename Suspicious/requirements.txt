@@ -42,6 +42,7 @@ django-import-export==4.4.1
 # Request Handling
 requests==2.34.2
 PyJWT==2.15.1
+boto3==1.43.111
 minio==7.2.20
 tenacity==9.1.4
 pybreaker==1.4.1
