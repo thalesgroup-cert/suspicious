@@ -51,8 +51,9 @@ the email feeder. Production is moving from RustFS to a Google Cloud Storage
 
 - Choosing a provider silently. Detection only suggests; the explicit setting
   wins. A wrong guess would write evidence to the wrong store.
-- Secrets in the database or the settings JSON. Provider secrets go to Vault,
-  as connector secrets do.
+- Secrets in the database. Provider secrets are read the way `get_section`
+  reads them today: from Vault when it is deployed, from `settings.json` when it
+  is not (the dev stack). `storage.s3` keys keep working unchanged.
 - A "switch" that strands data. Changing the provider in the UI must warn that
   existing objects are not copied.
 - Hiding a real difference between providers behind one API that lies about it.
@@ -93,8 +94,8 @@ ObjectStore
   presign_get(bucket, key, expires, *, filename=None)
   presign_put(bucket, key, expires, *, content_type=None)
   # introspection
-  capabilities -> frozenset of {"object_tags", "lifecycle", "object_lock",
-                                "batch_delete", "presign_put"}
+  capabilities -> frozenset of {"object_tags", "free_form_bucket_tags", "lifecycle",
+                                "object_lock", "batch_delete", "presign_put"}
   health()     -> HealthStatus(ok, detail)
 ```
 
@@ -106,10 +107,13 @@ escape the provider.
 `open()` returns a stream, never the whole object, so a large mail does not need
 to fit in memory. `ensure_bucket` treats "already exists" as success.
 
-Bucket labels exist because the legacy mail scanner tags buckets
-(`set_bucket_tags` today). S3 maps them to bucket tags, GCS to bucket labels,
-which have stricter character rules (lowercase letters, digits, `-`, `_`). The
-provider validates and raises `invalid` rather than rewriting values.
+Bucket tags exist because the legacy bucket-per-email scanner records state on
+the bucket (`Status` = `Processing`, `To Do` and so on, in `tasp/cron/fetch_emails.py`).
+GCS bucket labels are lowercase only and do not allow spaces, so those values
+cannot be stored. The `gcs` provider therefore lacks the `free_form_bucket_tags`
+capability, and the legacy tag scanner is S3-only: it is skipped when the
+capability is missing. On GCS, submissions use the single-bucket prefix mode and
+its `_status.json` marker (VULN-09). Providers never rewrite values.
 
 ### Providers
 
@@ -131,16 +135,36 @@ Object tags map to custom metadata. There is no `public_endpoint` setting.
 Provider differences that surface to callers: tags versus metadata, lifecycle
 format, presign host. They are handled inside the provider.
 
+### Where storage is used today
+
+- The backend, the Celery scanner and `ai_minio_utils.py` (which lives in the
+  Django app, used by the TheHive campaign material) all move onto `get_store()`.
+  Nothing in `Analyzers/` or inside the Cortex image uses `minio`, so no
+  interface needs shipping there.
+- Django media storage (avatars, mail attachments) is `storage.backend`
+  (`local`, `s3`, `dual`) with `MinioMediaStorage` and `DualStorage`. It stays:
+  `storage.backend` says where media goes, `storage.provider` says which object
+  store backs the `s3` and `dual` kinds. `MinioMediaStorage` is renamed to use
+  `ObjectStore` internally. `DualStorage` (object store plus local filesystem
+  copy) is unrelated to the migration fallback and is left alone.
+- `deployment/install.py`, `scripts/ci/*` and `deployment/scripts/check-secrets.sh`
+  mention minio for credentials and the dev company generator; they change only
+  where they call the client.
+
 ### Selecting a provider
 
-Resolved once per process, in this order:
+Resolved lazily on first use of `get_store()` (never at settings import, when
+the DB may be unavailable), once per process, in this order:
 
 1. `storage.provider` from runtime settings (the settings page writes it).
 2. `STORAGE_PROVIDER` environment variable, for first boot before anyone opens
    the UI.
 3. Default `s3`.
 
-`get_store()` returns the configured `ObjectStore`. `get_s3_client()` and
+A provider change takes effect after the backend processes are recreated; the
+settings page says so. The test endpoint builds a store from the unsaved form
+values and never touches the process-wide one. `get_store()` returns the
+configured `ObjectStore`. `get_s3_client()` and
 `get_s3_presign_client()` go away once their callers move. An unknown provider
 name raises at startup, not on first use.
 
@@ -176,13 +200,19 @@ Feeder uploads move to presigned PUT URLs.
 - The feeder uploads with plain `requests`. The `minio` dependency and the
   storage credentials leave the feeder, and it can leave the `storage` network.
   Its `network-check.sh` rule changes accordingly.
-- The URL host must be reachable from the feeder: the S3 provider signs for the
-  internal endpoint when the caller is the feeder; GCS signs for its public
-  host.
-- A PUT cannot cap object size. The backend `stat`s each object after upload
-  and rejects the submission over the configured limit.
-- The prefix-mode `_status.json` marker the feeder and scanner use today stays;
-  the plan must say who writes it once the feeder has no credentials.
+- The feeder is identified by its `feeder`-scope token, as for
+  `/api/config/feeder/`. The URL host must be reachable from the feeder: the S3
+  provider signs for `storage.s3.endpoint` (the internal host) for the feeder,
+  and for `public_endpoint` for browsers. GCS signs for `storage.googleapis.com`,
+  which means the feeder host needs outbound access to it.
+- A PUT cannot cap object size, and a feeder with no credentials must not be
+  able to mark a submission complete. So the feeder calls a commit endpoint
+  after its last PUT; the backend `stat`s every object, rejects the submission
+  over the configured limit or with missing files, and then writes the
+  prefix-mode `_status.json` marker the scanner waits for (today the feeder
+  writes it last, `submission_sink.py`). A feeder that dies mid-upload never
+  commits, so the scanner never sees the prefix; the existing stale-prefix
+  cleanup handles the leftovers.
 
 The feeder still reads `/api/config/feeder/` at startup and keeps the last-good
 cache. It stops reading `s3.access_key` and `s3.secret_key`.
@@ -194,8 +224,11 @@ The application does not copy data. Bulk copy uses Storage Transfer Service (or
 
 - `storage.fallback_provider` (read-only): when an object is not found in the
   active store, `open` and `stat` try the fallback. Writes never go there.
-- `manage.py verify_storage_copy`: lists both stores and compares key sets,
-  sizes and checksums, and exits non-zero on any difference.
+- `manage.py verify_storage_copy`: lists both stores and compares key sets and
+  sizes for every object, and exits non-zero on any difference. Content is
+  compared by downloading and hashing both sides (S3 ETags of multipart uploads
+  and GCS CRC32C/MD5 are not comparable): a random sample by default
+  (`--sample N`, default 100), every object with `--full`.
 
 Cutover: copy, verify, switch `storage.provider`, keep the fallback until
 verified again, then retire it. Source data is never deleted by the application.
@@ -230,6 +263,11 @@ My calls (to be checked):
 - Feeder through presigned PUT URLs, not a duplicated SDK and not an upload
   through Django.
 - Migration is an external bulk copy plus a read fallback and a verify command.
+- The feeder commits a submission through the backend, which writes
+  `_status.json` after checking the objects.
+- The legacy bucket-tag scanner is S3-only; GCS uses the single-bucket prefix
+  mode.
+- A provider change applies after the processes are recreated.
 
 ## Left to the builder
 
@@ -241,6 +279,6 @@ test doubles (a fake `ObjectStore` for unit tests is encouraged).
 ## Open items
 
 - Verify a reliable detection signal, or drop "Detect".
-- Confirm GCS bucket-label rules against the labels the legacy scanner sets.
-- Confirm the feeder-to-scanner `_status.json` flow in the plan.
+- Confirm the feeder host can reach `storage.googleapis.com`; if egress is not
+  allowed, the feeder uploads through the backend instead and stage 4 changes.
 - Re-test every RustFS capability on the version deployed, not alpha.90.
