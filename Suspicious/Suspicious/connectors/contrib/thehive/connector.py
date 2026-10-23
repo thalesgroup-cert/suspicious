@@ -9,7 +9,7 @@ the button builds the full ticket."""
 from __future__ import annotations
 
 from case_handler.models import Campaign
-from common.clients import get_s3_client
+from common.storage import get_store
 from common.http_client import make_session
 from connectors.base import (
     EVENT_CAMPAIGN_UPDATED,
@@ -64,7 +64,7 @@ class TheHiveConnector(Connector):
         sync_campaign(
             Campaign.objects.get(pk=event.campaign_id),
             HiveClient(url, key, verify=self.config.get("certificate_path") or True),
-            get_s3_client(), ui_base=ui_base, own_domains=own_domains,
+            get_store(), ui_base=ui_base, own_domains=own_domains,
         )
 
     def health_check(self) -> HealthStatus:

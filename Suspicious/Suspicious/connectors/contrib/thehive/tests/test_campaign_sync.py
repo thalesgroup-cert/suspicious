@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import closing
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -9,15 +10,16 @@ from django.utils import timezone
 from case_handler.models import Campaign, CampaignMember, Case, CaseHasFileOrMail
 from connectors.contrib.thehive.campaign_material import Attachment, MailMaterial
 from connectors.contrib.thehive.campaign_sync import sync_campaign
+from common.storage.fake import FakeObjectStore, _Stream
 from mail_feeder.models import Mail
 
 S = "connectors.contrib.thehive.campaign_sync"
 HEADERS = 'From: "HR" <hr@evil.example>\r\nSubject: Verify payroll\r\n'
 
 
-class FakeMinio:
-    def get_object(self, bucket, key):
-        return type("Obj", (), {"read": lambda self: b"PNG:" + key.encode()})()
+class FakeStore(FakeObjectStore):
+    def open(self, bucket, key):
+        return closing(_Stream(b"PNG:" + key.encode()))
 
 
 class FakeHive:
@@ -115,7 +117,7 @@ class SyncTest(TestCase):
 
     def _sync(self):
         with patch(f"{S}.fetch_mail_material", side_effect=lambda client, mail_id: self.materials[mail_id]):
-            return sync_campaign(self.campaign, self.hive, minio=FakeMinio(), ui_base="https://sus.example",
+            return sync_campaign(self.campaign, self.hive, store=FakeStore(), ui_base="https://sus.example",
                                  own_domains=("meridian.example",))
 
     def test_first_sync_creates_the_alert_and_marks_members(self):

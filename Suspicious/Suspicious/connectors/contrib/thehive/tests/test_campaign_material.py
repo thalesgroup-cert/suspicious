@@ -1,6 +1,8 @@
-from types import SimpleNamespace
+import io
 
 from django.test import SimpleTestCase
+
+from common.storage.fake import FakeObjectStore
 
 from connectors.contrib.thehive.campaign_material import (
     MAX_FILE_BYTES,
@@ -14,24 +16,18 @@ PNG_1X1 = b"\x89PNG\r\n\x1a\n" + b"\x00" * 60
 BIG_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 5000
 
 
-class FakeMinio:
-    def __init__(self, buckets):
-        self.buckets = buckets
-
-    def list_buckets(self):
-        return [SimpleNamespace(name=n) for n in self.buckets]
-
-    def list_objects(self, bucket, prefix="", recursive=False):
-        return [SimpleNamespace(object_name=n) for n in self.buckets[bucket] if n.startswith(prefix)]
-
-    def get_object(self, bucket, name):
-        data = self.buckets[bucket][name]
-        return SimpleNamespace(read=lambda: data, close=lambda: None, release_conn=lambda: None)
+def fake_store(buckets):
+    store = FakeObjectStore()
+    for bucket, objects in buckets.items():
+        store.ensure_bucket(bucket)
+        for name, data in objects.items():
+            store.put(bucket, name, io.BytesIO(data), length=len(data))
+    return store
 
 
 class FetchMaterialTest(SimpleTestCase):
     def test_collects_mail_parts_and_attachments(self):
-        client = FakeMinio({
+        client = fake_store({
             "other-submission-261007071836": {"261007071836-aaaaaaaaaaaa/x.eml": b"X"},
             "haruto-submission-261007071836": {
                 f"{MAIL}/{MAIL}.eml": b"From: a@b\r\n\r\nbody",
@@ -51,7 +47,7 @@ class FetchMaterialTest(SimpleTestCase):
         self.assertEqual(sorted(a.name for a in m.attachments), ["empty.dat", "invoice.pdf"])
 
     def test_unknown_mail_gives_empty_material(self):
-        m = fetch_mail_material(FakeMinio({"a-submission-1": {}}), "999-abc")
+        m = fetch_mail_material(fake_store({"a-submission-1": {}}), "999-abc")
         self.assertEqual((m.headers, m.text, m.html, m.eml, m.attachments), ("", "", "", b"", []))
 
 
