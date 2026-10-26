@@ -203,6 +203,13 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **Frontend dependency fixes.** `vite` 8.1.5 to 8.1.6, `zod` 4.4.3 to 4.6.6
+  and the `vitest` family 4.1.11 to 4.1.12 (which brings `@vitest/mocker` to
+  the patched 4.1.12), plus pnpm overrides for the transitive `undici`
+  (7.30.1), `follow-redirects` (1.16.1) and the copy of `zod` that
+  `eslint-plugin-react-hooks` pulls in. `pnpm audit` reports nothing after the
+  change; the overrides matter because bumping the direct `zod` alone leaves
+  the audit gate red.
 - **No Docker socket in Traefik or Cortex.** Both reach the daemon through a
   socket proxy on a private network: Traefik through a read-only proxy (list
   containers and events, no writes), Cortex through a proxy that allows only
