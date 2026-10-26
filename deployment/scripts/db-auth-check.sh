@@ -21,5 +21,6 @@ check "elasticsearch app user ok"       "[ \"\$(es_code \"\$ES_SUSPICIOUS_USER:\
 check "elasticsearch cortex user ok"    "[ \"\$(es_code \"\$ES_CORTEX_USER:\$ES_CORTEX_PASSWORD\")\" = 200 ]"
 check "chroma proxy rejects anonymous"  "! $COMPOSE exec -T chromadb_proxy wget -q -O /dev/null http://127.0.0.1:8000/api/v2/heartbeat"
 check "chroma proxy accepts token"      "$COMPOSE exec -T chromadb_proxy sh -c 'wget -q -O /dev/null --header \"X-Chroma-Token: \$CHROMA_TOKEN\" http://127.0.0.1:8000/api/v2/heartbeat'"
+check "chroma proxy blocks tenant creation" "$COMPOSE exec -T chromadb_proxy sh -c 'wget -S -q -O /dev/null --header \"X-Chroma-Token: \$CHROMA_TOKEN\" --post-data={} http://127.0.0.1:8000/api/v2/tenants 2>&1 | grep -q \"HTTP/1.1 403\"'"
 check "chroma backend not on app network" "! docker inspect \$($COMPOSE ps -q chromadb) --format '{{json .NetworkSettings.Networks}}' | grep -q \"\$NETWORK_NAME\""
 exit $fail
