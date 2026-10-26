@@ -203,6 +203,11 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **Backend dependency fixes.** `djangorestframework` moves from 3.18.1 to
+  3.18.3 (three published advisories, fixed in 3.18.2), and the OpenTelemetry
+  packages from 1.45.0 / 0.66b0 to 1.45.1 / 0.66b1 in the backend and the email
+  feeder (one advisory in `opentelemetry-api`, fixed in 1.45.1). `pip-audit`
+  reports nothing for the feeder requirements after the bump.
 - **No Docker socket in Traefik or Cortex.** Both reach the daemon through a
   socket proxy on a private network: Traefik through a read-only proxy (list
   containers and events, no writes), Cortex through a proxy that allows only
