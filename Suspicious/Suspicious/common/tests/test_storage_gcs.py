@@ -1,15 +1,22 @@
 import io
+from datetime import timedelta
+from urllib.parse import parse_qs, urlsplit
 import tempfile
 from datetime import datetime, timezone
 
 import requests
 from django.test import SimpleTestCase
 from google.api_core import exceptions as gx
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from google.auth import credentials as gcreds
 from google.auth import exceptions as ax
+from google.cloud import storage
+from google.oauth2 import service_account
 
 from common.storage import base, gcs
 from common.storage.base import ObjectStore, StoreError
-from common.storage.gcs import GcsStore
+from common.storage.gcs import GcsStore, Signer
 
 NOT_FOUND = gx.NotFound("missing")
 
@@ -141,13 +148,8 @@ class _Client:
         return _Iterator(self.pages, self.list_error)
 
 
-class _TestStore(GcsStore):
-    """Stubs the abstract methods that later tasks implement."""
-    presign_get = presign_put = None
-
-
 def _store(client=None):
-    return _TestStore(client=client or _Client())
+    return GcsStore(client=client or _Client())
 
 
 class GcsStoreTests(SimpleTestCase):
@@ -198,11 +200,6 @@ class GcsStoreTests(SimpleTestCase):
         with self.assertRaises(StoreError) as ctx, gcs._errors("b", "k"):
             raise gx.Forbidden("nope")
         self.assertEqual(ctx.exception.code, "access_denied")
-
-    def test_class_is_still_abstract_without_stubs(self):
-        self.assertTrue(issubclass(GcsStore, ObjectStore))
-        with self.assertRaises(TypeError):
-            GcsStore(client=_Client())
 
     def test_put_rejects_duplicate_metadata_and_tags_keys(self):
         with self.assertRaises(StoreError) as ctx:
@@ -329,7 +326,7 @@ class GcsStoreTests(SimpleTestCase):
 class GcsBucketTests(SimpleTestCase):
     def test_ensure_bucket_idempotent_and_conflict_rechecks(self):
         client = _Client()
-        store = _TestStore(client=client, location="EU", project="p")
+        store = GcsStore(client=client, location="EU", project="p")
         store.ensure_bucket("b")
         store.ensure_bucket("b")
         self.assertEqual(client.created, [("b", {"location": "EU", "project": "p"})])
@@ -436,3 +433,97 @@ class GcsBucketTests(SimpleTestCase):
         store._project = "p"
         self.assertEqual(store.list_buckets(), ["a", "b"])
         self.assertEqual(client.listed, [{"project": "p"}])
+
+
+class _NoNetwork:
+    def __getattr__(self, name):
+        raise AssertionError(f"network used: {name}")
+
+
+def _real_client():
+    client = storage.Client(project="p", credentials=gcreds.AnonymousCredentials())
+    client._http_internal = _NoNetwork()
+    return client
+
+
+def _key_credentials():
+    pem = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+    return service_account.Credentials.from_service_account_info({
+        "type": "service_account", "client_email": "sa@p.iam.gserviceaccount.com", "private_key": pem,
+        "token_uri": "https://oauth2.googleapis.com/token", "project_id": "p"})
+
+
+class GcsPresignTests(SimpleTestCase):
+    def _signed(self):
+        return GcsStore(client=_real_client(), signing=Signer(credentials=_key_credentials()))
+
+    def test_presign_get_with_key_signs_offline(self):
+        url = self._signed().presign_get("b", "dir/a b.txt", timedelta(minutes=5), filename="r.pdf")
+        parts, query = urlsplit(url), parse_qs(urlsplit(url).query)
+        self.assertEqual(parts.netloc, "storage.googleapis.com")
+        self.assertIn("/b/dir/a%20b.txt", parts.path)
+        self.assertEqual(query["X-Goog-Expires"], ["300"])
+        self.assertIn("filename", query["response-content-disposition"][0])
+
+    def test_presign_get_without_filename_has_no_disposition(self):
+        url = self._signed().presign_get("b", "k", timedelta(minutes=5))
+        self.assertNotIn("response-content-disposition", url)
+
+    def test_presign_put_signs_content_type(self):
+        url = self._signed().presign_put("b", "k", timedelta(minutes=5), content_type="text/plain")
+        self.assertIn("content-type", parse_qs(urlsplit(url).query)["X-Goog-SignedHeaders"][0])
+
+    def test_presign_never_calls_the_network_with_a_key(self):
+        store = self._signed()
+        store.presign_get("b", "k", timedelta(seconds=60))
+        store.presign_put("b", "k", timedelta(seconds=60))
+
+    def test_presign_without_signing_raises_store_error(self):
+        for signing in (None, Signer(), Signer(service_account_email="sa@p")):
+            store = GcsStore(client=_real_client(), signing=signing)
+            for call in (lambda: store.presign_get("b", "k", timedelta(1)),
+                         lambda: store.presign_put("b", "k", timedelta(1))):
+                with self.assertRaises(StoreError) as ctx:
+                    call()
+                self.assertEqual(ctx.exception.code, "invalid")
+                self.assertIn("signing is not configured", str(ctx.exception))
+
+    def test_keyless_signer_passes_email_and_token_and_refreshes(self):
+        refreshed = []
+
+        def token():
+            refreshed.append(1)
+            return "tok"
+
+        seen = {}
+
+        class Blob:
+            name = "k"
+            bucket = type("B", (), {"name": "b"})
+
+            def generate_signed_url(self, **kwargs):
+                seen.update(kwargs)
+                return "https://signed"
+
+        store = GcsStore(client=_real_client(),
+                         signing=Signer(service_account_email="sa@p.iam.gserviceaccount.com", token=token))
+        self.assertEqual(store._signed_url(Blob(), method="GET"), "https://signed")
+        self.assertEqual(refreshed, [1])
+        self.assertEqual(seen["service_account_email"], "sa@p.iam.gserviceaccount.com")
+        self.assertEqual(seen["access_token"], "tok")
+        self.assertEqual(seen["version"], "v4")
+        self.assertNotIn("credentials", seen)
+
+    def test_keyless_iam_failure_maps(self):
+        class Blob:
+            name = "k"
+            bucket = type("B", (), {"name": "b"})
+
+            def generate_signed_url(self, **kwargs):
+                raise gx.Forbidden("iam")
+
+        store = GcsStore(client=_real_client(), signing=Signer(service_account_email="e", token=lambda: "t"))
+        with self.assertRaises(StoreError) as ctx:
+            store._signed_url(Blob(), method="GET")
+        self.assertEqual(ctx.exception.code, "access_denied")

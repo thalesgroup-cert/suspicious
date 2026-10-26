@@ -3,13 +3,18 @@ from __future__ import annotations
 import io
 import re
 from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Callable
 
 import requests
 from google.api_core import exceptions as gx
 from google.auth import exceptions as ax
+from google.auth.credentials import Signing
 
 from . import base
 from .base import HealthStatus, ObjectInfo, ObjectStore, ObjectStream, StoreError
+from .util import content_disposition
 
 _CHUNK = 262144
 
@@ -81,6 +86,13 @@ def _validate_labels(bucket, labels):
             raise StoreError("invalid", f"invalid label key: {key!r}", bucket=bucket)
         if not _LABEL_VALUE.fullmatch(value):
             raise StoreError("invalid", f"invalid value for label {key!r}", bucket=bucket)
+
+
+@dataclass(frozen=True)
+class Signer:
+    credentials: Signing | None = None
+    service_account_email: str | None = None
+    token: Callable[[], str] | None = None
 
 
 class GcsStore(ObjectStore):
@@ -185,6 +197,25 @@ class GcsStore(ObjectStore):
             b.reload()  # the labels setter derives removals from the loaded set; patch() only merges
             b.labels = dict(labels)
             b.patch()
+
+    def _signed_url(self, blob, **kwargs) -> str:
+        s = self._signing
+        if s is None or not (s.credentials or (s.service_account_email and s.token)):
+            raise StoreError("invalid", "signing is not configured: provide service account key credentials "
+                             "or a service account email with a token source", bucket=blob.bucket.name, key=blob.name)
+        with _errors(blob.bucket.name, blob.name):
+            if s.credentials:
+                return blob.generate_signed_url(version="v4", credentials=s.credentials, **kwargs)
+            return blob.generate_signed_url(version="v4", service_account_email=s.service_account_email,
+                                            access_token=s.token(), **kwargs)
+
+    def presign_get(self, bucket, key, expires: timedelta, *, filename=None):
+        extra = {"response_disposition": content_disposition(filename)} if filename else {}
+        return self._signed_url(self._client.bucket(bucket).blob(key), method="GET", expiration=expires, **extra)
+
+    def presign_put(self, bucket, key, expires: timedelta, *, content_type=None):
+        extra = {"content_type": content_type} if content_type else {}
+        return self._signed_url(self._client.bucket(bucket).blob(key), method="PUT", expiration=expires, **extra)
 
     @property
     def capabilities(self):
