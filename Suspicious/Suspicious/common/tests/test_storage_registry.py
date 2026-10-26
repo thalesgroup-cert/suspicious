@@ -1,6 +1,8 @@
 import os
 from unittest.mock import patch
 
+from django.apps import apps
+from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
 from common.storage import (
@@ -84,3 +86,31 @@ class RegistryTests(SimpleTestCase):
         errors = self._check("s3", "bogus")
         self.assertEqual([e.id for e in errors], ["storage.E001"])
         self.assertIn("settings.json", errors[0].msg)
+
+
+class ReadyValidationTests(SimpleTestCase):
+    def _ready(self, env, json_value):
+        if env is None:
+            os.environ.pop("STORAGE_PROVIDER", None)
+        else:
+            os.environ["STORAGE_PROVIDER"] = env
+        with patch("common.storage.checks.settings_get", return_value=json_value), \
+                patch("suspicious.otel.configure"):
+            apps.get_app_config("suspicious").ready()
+
+    def setUp(self):
+        env = patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_unset_and_valid_values_do_not_raise(self):
+        self._ready(None, None)
+        self._ready("s3", "s3")
+
+    def test_bad_env_value_raises_naming_value_source_and_providers(self):
+        with self.assertRaisesRegex(ImproperlyConfigured, r"'nope'.*env STORAGE_PROVIDER.*s3"):
+            self._ready("nope", None)
+
+    def test_bad_settings_json_value_raises(self):
+        with self.assertRaisesRegex(ImproperlyConfigured, r"'bogus'.*settings.json storage.provider.*s3"):
+            self._ready(None, "bogus")
