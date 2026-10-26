@@ -30,7 +30,7 @@ imgkit==1.2.3
 nh3==0.3.7
 
 # Natural Language Processing and Similarity Checking
-nltk==3.10.3
+nltk==3.10.4
 simhash==2.1.2
 
 # Image and Font Utilities

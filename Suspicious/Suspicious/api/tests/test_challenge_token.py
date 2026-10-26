@@ -76,7 +76,9 @@ class ChallengeTokenTests(TestCase):
     def test_already_challenged_case_is_a_conflict_and_keeps_the_token(self, notify):
         Case.objects.filter(pk=self.case.pk).update(is_challenged=True)
         self.assertEqual(self.client.get(self.url).status_code, 409)
-        self.assertEqual(self.client.post(self.url, GOOD).status_code, 409)
+        r = self.client.post(self.url, GOOD)
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.json()["detail"], "Case already challenged")
         self.assertFalse(self._used())
 
     def test_a_failed_alert_does_not_undo_the_challenge(self, notify):

@@ -180,11 +180,12 @@ class SubmissionTicketPushTests(TestCase):
         self.case.save(update_fields=["thehive_alert_id"])
         with mock.patch("connectors.registry.registry.instantiate") as inst, \
              mock.patch("connectors.contrib.thehive.phishing.update_alert",
-                        side_effect=TheHivePushError("boom")), \
+                        side_effect=TheHivePushError("boom http://thehive.internal:9000")), \
              self.assertLogs("audit.thehive_push", "INFO") as logs:
             inst.return_value.config = self._cfg()
             r = self.client.post(self._url())
         self.assertEqual(r.status_code, 502)
+        self.assertEqual(r.json()["detail"], "TheHive push failed.")
         rec = logs.records[0]
         self.assertEqual((rec.username, rec.outcome, rec.alert_id), (self.user.username, "failed", "~abc"))
         self.assertIn("boom", rec.error)

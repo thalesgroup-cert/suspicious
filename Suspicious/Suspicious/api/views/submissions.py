@@ -412,7 +412,7 @@ class SubmissionTicketView(APIView):
                 user=request.user, case_id=case.id, alert_id=case.thehive_alert_id,
                 outcome="failed", ip=ip, error=str(exc),
             )
-            return Response({"detail": f"TheHive push failed: {exc}"},
+            return Response({"detail": "TheHive push failed."},
                             status=status.HTTP_502_BAD_GATEWAY)
         log_thehive_push(
             user=request.user, case_id=case.id, alert_id=result["alert_id"],
