@@ -4,6 +4,8 @@ from unittest import mock
 from django.test import SimpleTestCase
 from PIL import Image
 
+from common.storage import FakeObjectStore, StoreError
+
 from profiles.profiles_utils.avatar_storage import (
     AVATAR_DIMENSION,
     InvalidAvatarImage,
@@ -72,87 +74,66 @@ class ProcessAvatarImageTest(SimpleTestCase):
                 process_avatar_image("image/jpeg", len(raw), raw)
 
 
+BUCKET = "suspicious-avatars"
+_GET = "profiles.profiles_utils.avatar_storage.get_store"
+_PRESIGN = "profiles.profiles_utils.avatar_storage.get_presign_store"
+
+
 class StoreAvatarTest(SimpleTestCase):
     def test_store_avatar_uploads_and_returns_key(self):
-        fake_client = mock.MagicMock()
-        fake_client.bucket_exists.return_value = True
-        with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_client",
-            return_value=fake_client,
-        ):
+        store = FakeObjectStore()
+        with mock.patch(_GET, return_value=store):
             key = store_avatar(42, b"jpegbytes")
         self.assertTrue(key.startswith("avatars/42/"))
         self.assertTrue(key.endswith(".jpg"))
-        fake_client.put_object.assert_called_once()
-        call = fake_client.put_object.call_args
-        self.assertEqual(call.args[0], "suspicious-avatars")
-        self.assertEqual(call.args[1], key)
+        with store.open(BUCKET, key) as s:
+            self.assertEqual(s.read(), b"jpegbytes")
 
     def test_store_avatar_creates_bucket_if_missing(self):
-        fake_client = mock.MagicMock()
-        fake_client.bucket_exists.return_value = False
-        with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_client",
-            return_value=fake_client,
-        ):
+        store = FakeObjectStore()
+        with mock.patch(_GET, return_value=store):
             store_avatar(1, b"bytes")
-        fake_client.make_bucket.assert_called_once_with("suspicious-avatars")
+        self.assertTrue(store.bucket_exists(BUCKET))
 
     def test_store_avatar_uses_configured_bucket_name(self):
-        fake_client = mock.MagicMock()
-        fake_client.bucket_exists.return_value = True
-        with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_client",
-            return_value=fake_client,
-        ), mock.patch(
+        store = FakeObjectStore()
+        with mock.patch(_GET, return_value=store), mock.patch(
             "profiles.profiles_utils.avatar_storage.get_section",
             return_value={"avatars_bucket": "custom-bucket"},
         ):
-            store_avatar(42, b"jpegbytes")
-        # Verify that custom-bucket was used, not the default
-        call = fake_client.put_object.call_args
-        self.assertEqual(call.args[0], "custom-bucket")
+            key = store_avatar(42, b"jpegbytes")
+        self.assertTrue(store.bucket_exists("custom-bucket"))
+        self.assertFalse(store.bucket_exists(BUCKET))
+        self.assertEqual(store.stat("custom-bucket", key).size, 9)
 
 
 class DeleteAvatarTest(SimpleTestCase):
-    def test_delete_avatar_calls_remove_object(self):
-        fake_client = mock.MagicMock()
-        with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_client",
-            return_value=fake_client,
-        ):
-            delete_avatar("avatars/1/abc.jpg")
-        fake_client.remove_object.assert_called_once_with(
-            "suspicious-avatars", "avatars/1/abc.jpg"
-        )
+    def test_delete_avatar_removes_object(self):
+        store = FakeObjectStore()
+        with mock.patch(_GET, return_value=store):
+            key = store_avatar(1, b"x")
+            delete_avatar(key)
+        with self.assertRaises(StoreError) as ctx:
+            store.stat(BUCKET, key)
+        self.assertEqual(ctx.exception.code, "not_found")
 
     def test_delete_avatar_never_raises(self):
-        fake_client = mock.MagicMock()
-        fake_client.remove_object.side_effect = Exception("network down")
-        with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_client",
-            return_value=fake_client,
-        ):
+        store = mock.MagicMock()
+        store.delete.side_effect = StoreError("unavailable")
+        with mock.patch(_GET, return_value=store):
             delete_avatar("avatars/1/abc.jpg")  # must not raise
 
 
 class PresignedAvatarUrlTest(SimpleTestCase):
-    def test_returns_url_from_client(self):
-        fake_client = mock.MagicMock()
-        fake_client.presigned_get_object.return_value = "https://rustfs/signed"
-        with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_presign_client",
-            return_value=fake_client,
-        ):
+    def test_returns_url_from_presign_store(self):
+        store = FakeObjectStore()
+        with mock.patch(_PRESIGN, return_value=store):
             url = presigned_avatar_url("avatars/1/abc.jpg")
-        self.assertEqual(url, "https://rustfs/signed")
+        self.assertEqual(url, f"fake://{BUCKET}/avatars/1/abc.jpg?expires=3600")
 
     def test_returns_none_on_failure(self):
-        fake_client = mock.MagicMock()
-        fake_client.presigned_get_object.side_effect = Exception("boom")
-        with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_presign_client",
-            return_value=fake_client,
-        ):
+        store = mock.MagicMock()
+        store.presign_get.side_effect = StoreError("unavailable")
+        with mock.patch(_PRESIGN, return_value=store):
             url = presigned_avatar_url("avatars/1/abc.jpg")
         self.assertIsNone(url)

@@ -1,11 +1,9 @@
 import logging
 from pathlib import Path
+from datetime import timedelta
 from typing import Optional, Dict
-from minio import Minio
-from minio.error import S3Error
-from minio.commonconfig import Tags
 
-from common.clients import get_s3_client, get_s3_presign_client
+from common.storage import ObjectStore, StoreError, get_presign_store, get_store
 
 logger = logging.getLogger(__name__)
 
@@ -26,30 +24,30 @@ class MinioManager:
         self.client = self._default_client()
         self.presign_client = self._presign_client()
 
-    def _default_client(self) -> Optional[Minio]:
+    def _default_client(self) -> Optional[ObjectStore]:
         """
         Create and return a MinIO client from the shared ``storage.s3`` config.
 
         Returns:
-            Minio | None: Initialized client or None on failure.
+            ObjectStore | None: Initialized client or None on failure.
         """
         try:
-            client = get_s3_client()
-            logger.info("MinIO client initialized via get_s3_client()")
+            client = get_store()
+            logger.info("Object store initialized via get_store()")
             return client
         except Exception as e:
             logger.critical("Failed to initialize MinIO client: %s", e, exc_info=True)
             return None
 
-    def _presign_client(self) -> Optional[Minio]:
+    def _presign_client(self) -> Optional[ObjectStore]:
         """
         Client for signing browser-facing URLs (storage.s3.public_endpoint).
 
         Returns:
-            Minio | None: Initialized client or None on failure.
+            ObjectStore | None: Initialized client or None on failure.
         """
         try:
-            return get_s3_presign_client()
+            return get_presign_store()
         except Exception as e:
             logger.critical("Failed to initialize MinIO presign client: %s", e, exc_info=True)
             return None
@@ -70,18 +68,17 @@ class MinioManager:
             exists = self.client.bucket_exists(bucket_name)
             logger.debug("Bucket '%s' exists? %s", bucket_name, exists)
             return exists
-        except S3Error as e:
+        except StoreError as e:
             logger.error("Error checking bucket existence '%s': %s", bucket_name, e)
             return False
 
-    def ensure_bucket(self, bucket_name: str, tags: Optional[Dict[str, str]] = None, region: Optional[str] = None) -> bool:
+    def ensure_bucket(self, bucket_name: str, tags: Optional[Dict[str, str]] = None) -> bool:
         """
         Ensure bucket exists, create it if necessary, and optionally apply tags.
 
         Args:
             bucket_name (str): Target bucket name.
             tags (Dict[str, str], optional): Tags to set on creation.
-            region (str, optional): Region for bucket creation.
 
         Returns:
             bool: True if bucket exists or was created; False on error.
@@ -92,20 +89,14 @@ class MinioManager:
 
         try:
             if not self.bucket_exists(bucket_name):
-                if region:
-                    self.client.make_bucket(bucket_name, location=region)
-                else:
-                    self.client.make_bucket(bucket_name)
-                logger.info("Created bucket '%s'%s", bucket_name, f" in region {region}" if region else "")
+                self.client.ensure_bucket(bucket_name)
+                logger.info("Created bucket '%s'", bucket_name)
                 if tags:
-                    tag_obj = Tags()
-                    for k, v in tags.items():
-                        tag_obj[k] = v
-                    self.client.set_bucket_tags(bucket_name, tag_obj)
+                    self.client.set_bucket_labels(bucket_name, tags)
                     logger.info("Applied tags to bucket '%s': %s", bucket_name, tags)
             return True
-        except S3Error as e:
-            logger.error("MinIO S3Error during ensure_bucket('%s'): %s", bucket_name, e)
+        except StoreError as e:
+            logger.error("Store error during ensure_bucket('%s'): %s", bucket_name, e)
         except Exception as e:
             logger.error("Unexpected error during ensure_bucket('%s'): %s", bucket_name, e, exc_info=True)
         return False
@@ -126,26 +117,21 @@ class MinioManager:
         try:
             with file_path.open('rb') as data:
                 size = file_path.stat().st_size
-                tag_obj = Tags() if tags else None
-                if tags:
-                    for k, v in tags.items():
-                        tag_obj[k] = v
-
-                self.client.put_object(
+                self.client.put(
                     bucket_name,
                     object_name,
                     data,
-                    size,
+                    length=size,
                     content_type="application/octet-stream",
-                    tags=tag_obj
+                    tags=tags or None,
                 )
                 logger.info("Uploaded '%s' to '%s/%s' (tags: %s)", file_path, bucket_name, object_name, tags or {})
-        except S3Error as e:
-            logger.error("S3Error uploading '%s': %s", file_path, e)
+        except StoreError as e:
+            logger.error("Store error uploading '%s': %s", file_path, e)
         except Exception as e:
             logger.error("Error uploading '%s': %s", file_path, e, exc_info=True)
 
-    def upload_directory(self, source_dir: Path, bucket_name: str, base_object_path: str = "", default_tags: Optional[Dict[str, str]] = None, region: Optional[str] = None):
+    def upload_directory(self, source_dir: Path, bucket_name: str, base_object_path: str = "", default_tags: Optional[Dict[str, str]] = None):
         """
         Upload all files in a directory to a MinIO bucket, preserving structure.
 
@@ -154,14 +140,13 @@ class MinioManager:
             bucket_name (str): Target bucket name.
             base_object_path (str): Base prefix in bucket for objects.
             default_tags (Dict[str, str], optional): Tags to apply to each file.
-            region (str, optional): Region used when creating bucket.
         """
         if not source_dir.is_dir():
             logger.error("Source '%s' is not a valid directory.", source_dir)
             return
 
         ensure_tags = {TAG_KEY_STATUS: TAG_STATUS_TODO}
-        if not self.ensure_bucket(bucket_name, tags=ensure_tags, region=region):
+        if not self.ensure_bucket(bucket_name, tags=ensure_tags):
             logger.error("Cannot upload: bucket '%s' ensure failed.", bucket_name)
             return
 
@@ -187,10 +172,11 @@ class MinioManager:
         if not self.presign_client:
             logger.error("MinIO presign client unavailable for presigned URL.")
             return None
+        expires = timedelta(seconds=expires_seconds)
         try:
             if method.lower() == "get":
-                return self.presign_client.presigned_get_object(bucket_name, object_name, expires=expires_seconds)
-            return self.presign_client.presigned_put_object(bucket_name, object_name, expires=expires_seconds)
+                return self.presign_client.presign_get(bucket_name, object_name, expires)
+            return self.presign_client.presign_put(bucket_name, object_name, expires)
         except Exception as e:
             logger.error("Failed to generate presigned URL for '%s/%s': %s", bucket_name, object_name, e)
             return None

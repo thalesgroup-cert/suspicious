@@ -26,22 +26,11 @@ class PrefixSource:
         return f"{submission_id}/{sc.STATUS_OBJECT_NAME}"
 
     def read_status(self, submission_id: str) -> dict:
-        resp = self._client.get_object(self._bucket, self._status_key(submission_id))
-        try:
-            return sc.parse_status(resp.read())
-        finally:
-            close = getattr(resp, "close", None)
-            release = getattr(resp, "release_conn", None)
-            if callable(close):
-                close()
-            if callable(release):
-                release()
+        with self._client.open(self._bucket, self._status_key(submission_id)) as stream:
+            return sc.parse_status(stream.read())
 
     def iter_pending(self) -> Iterator[str]:
-        for obj in self._client.list_objects(self._bucket, recursive=False):
-            name = obj.object_name
-            if not name.endswith("/"):
-                continue
+        for name in self._client.list_prefixes(self._bucket):
             submission_id = name.rstrip("/")
             try:
                 status = self.read_status(submission_id)
@@ -53,10 +42,10 @@ class PrefixSource:
 
     def _put_status(self, submission_id: str, manifest: dict) -> None:
         raw = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
-        self._client.put_object(
-            bucket_name=self._bucket,
-            object_name=self._status_key(submission_id),
-            data=io.BytesIO(raw),
+        self._client.put(
+            self._bucket,
+            self._status_key(submission_id),
+            io.BytesIO(raw),
             length=len(raw),
             content_type="application/json",
         )
@@ -85,20 +74,20 @@ class PrefixSource:
         os.makedirs(local_root, exist_ok=True)
         wrapper_path: str | None = None
 
-        for obj in self._client.list_objects(self._bucket, prefix=prefix, recursive=True):
-            rel = obj.object_name[len(prefix):]
+        for obj in self._client.list(self._bucket, prefix, True):
+            rel = obj.name[len(prefix):]
             if not rel or rel == sc.STATUS_OBJECT_NAME:
                 continue
             try:
                 safe_rel = _safe_object_name(rel)
             except ValueError:
                 logger.warning("Unsafe object name %r in %s, skipped",
-                               obj.object_name, submission_id)
+                               obj.name, submission_id)
                 continue
             dst = os.path.join(local_root, safe_rel)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
-            self._client.fget_object(self._bucket, obj.object_name, dst)
-            if obj.object_name.endswith(sc.SUBMISSION_EML_SUFFIX):
+            self._client.download(self._bucket, obj.name, dst)
+            if obj.name.endswith(sc.SUBMISSION_EML_SUFFIX):
                 wrapper_path = dst
 
         return wrapper_path

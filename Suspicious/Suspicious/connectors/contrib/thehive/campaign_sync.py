@@ -25,22 +25,23 @@ CONNECTOR = "thehive"
 MAX_MEMBERS = 100
 
 
-def _read_preview(minio, mail) -> bytes:
+def _read_preview(store, mail) -> bytes:
     bucket, key = mail.preview_bucket, mail.preview_object_key
     if not (bucket and key):
         return b""
     try:
-        return minio.get_object(bucket, key).read()
+        with store.open(bucket, key) as stream:
+            return stream.read()
     except Exception as exc:  # noqa: BLE001 — the preview is optional evidence
         logger.warning("mail %s: cannot read its preview %s/%s: %s", mail.mail_id, bucket, key, exc)
         return b""
 
 
-def load_member(case, minio, own_domains) -> MemberMaterial | None:
+def load_member(case, store, own_domains) -> MemberMaterial | None:
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
     if mail is None:
         return None
-    material = fetch_mail_material(minio, str(mail.mail_id))
+    material = fetch_mail_material(store, str(mail.mail_id))
     kept, skipped = select_attachments(material.attachments)
     iocs = extract_iocs(material, kept, skipped, own_domains=own_domains)
     info = MemberInfo(
@@ -48,7 +49,7 @@ def load_member(case, minio, own_domains) -> MemberMaterial | None:
         verdict=str(case.results), malscore=float(case.score_ai or 0),
         subject=mail.subject, created_at=case.creation_date,
     )
-    return MemberMaterial(info, material, kept, skipped, iocs, _read_preview(minio, mail))
+    return MemberMaterial(info, material, kept, skipped, iocs, _read_preview(store, mail))
 
 
 def _update(client, alert_id: str, content: CampaignContent, new_case_ids: list[int]) -> None:
@@ -74,7 +75,7 @@ def _update(client, alert_id: str, content: CampaignContent, new_case_ids: list[
                            + ", ".join(f"#{c}" for c in new_case_ids))
 
 
-def sync_campaign(campaign: Campaign, client, minio, *, ui_base: str, own_domains=()) -> str:
+def sync_campaign(campaign: Campaign, client, store, *, ui_base: str, own_domains=()) -> str:
     """Returns "created", "updated" or "up-to-date". Raises on any TheHive error
     so the connector framework retries; a retry is safe (observables and files
     are diffed against the alert, and alerts are unique on their sourceRef)."""
@@ -87,7 +88,7 @@ def sync_campaign(campaign: Campaign, client, minio, *, ui_base: str, own_domain
         if alert is not None and not pending:
             return "up-to-date"
 
-        loaded = [load_member(m.case, minio, own_domains) for m in members[-MAX_MEMBERS:]]
+        loaded = [load_member(m.case, store, own_domains) for m in members[-MAX_MEMBERS:]]
         content = build_content(campaign, [m for m in loaded if m], ui_base=ui_base)
         if alert is None:
             alert, outcome = client.create_alert(content), "created"
