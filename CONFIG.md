@@ -362,9 +362,13 @@ backend still reads `feeder_bucket` and the avatar, media and feeder bucket
 names from `storage.s3`. Keep a `storage.s3` section when selecting `gcs`.
 
 Bucket names are global on GCS. Set explicit, unique names and never keep the
-defaults (`suspicious-media`, `mail-previews`, `analyzer-screenshots`,
-`suspicious-avatars`), which anyone could claim; the system check
-`storage.W001` warns while they are in use. Web submissions still create one
+defaults, which anyone could claim; the system check `storage.W001` warns while
+they are in use. `suspicious-media` and `suspicious-avatars` are set with
+`storage.s3.media_bucket` and `storage.s3.avatars_bucket`. `mail-previews` and
+`analyzer-screenshots` are only the Django settings `MAIL_PREVIEW_BUCKET` and
+`SCREENSHOT_BUCKET`, which cannot be set from `settings.json` or the
+environment today (known limitation): the warning for those two cannot be
+cleared until a later stage adds configuration for them. Web submissions still create one
 bucket per submission until a prefix mode is added (known limitation, on the
 backlog).
 

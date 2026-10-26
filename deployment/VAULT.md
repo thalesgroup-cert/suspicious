@@ -18,7 +18,7 @@ config. When `VAULT_ADDR` is unset, secrets are read straight from
 
 ## The secret map
 
-These twelve keys are stored in Vault and overlaid onto the matching
+These thirteen keys are stored in Vault and overlaid onto the matching
 `settings.json` paths at boot when `VAULT_ADDR` is set. Each lives at KV v2 path
 `suspicious/<dotted-key>` with a single field, `value`.
 
