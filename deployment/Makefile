@@ -57,7 +57,7 @@ help:
 	@echo "  install-hooks    Configure git core.hooksPath -> .githooks (commit-msg validator)"
 	@echo "  provision-vault  Enable KV+AppRole in Vault, write role/secret IDs to .env"
 	@echo "  seed-vault-secrets  Write secret env vars into Vault KV (suspicious/<key>)"
-	@echo "  unseal           Unseal Vault from vault/unseal.keys (auto-run by up/deploy)"
+	@echo "  unseal           Unseal Vault: type the unseal keys at a hidden prompt (run by up/deploy)"
 	@echo "  down             Stop and remove containers (data preserved)"
 	@echo "  restart          Restart all running services"
 	@echo "  build            Build local images"
@@ -181,6 +181,7 @@ up: check-secrets
 	@$(SCRIPTS)/check-network.sh
 	@$(SCRIPTS)/replace-tls.sh
 	@echo "Starting services…"
+	@$(SCRIPTS)/gen-vault-tls.sh
 	@$(COMPOSE) up -d vault --remove-orphans
 	@$(SCRIPTS)/unseal-vault.sh
 	@$(COMPOSE) up -d elasticsearch
@@ -188,8 +189,10 @@ up: check-secrets
 	@$(COMPOSE) up -d --remove-orphans
 	$(OK) "Services started."
 
-## Unseal the Vault container from vault/unseal.keys (idempotent; no-op if
-## already unsealed or no keys file present). Auto-run by `up` and `deploy`.
+## Unseal the Vault container: type the keys at the hidden prompt (needs a
+## terminal). Idempotent; no-op if already unsealed. Auto-run by `up` and
+## `deploy`, where it leaves Vault sealed (with a message) if there is no
+## terminal. A legacy vault/unseal.keys file is still honoured.
 unseal:
 	$(call require_script,$(SCRIPTS)/unseal-vault.sh)
 	@$(SCRIPTS)/unseal-vault.sh

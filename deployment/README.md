@@ -174,7 +174,7 @@ Run from `deployment/`. Vault uses file storage and starts **sealed** on every b
 **1. Enable Vault in `.env`** (uncomment / add):
 
 ```bash
-VAULT_ADDR=http://vault:8200
+VAULT_ADDR=https://vault:8200
 VAULT_PORT=8200
 VAULT_PATH=./vault
 ```
@@ -187,19 +187,18 @@ docker compose --env-file .env exec vault vault operator init    # FIRST BOOT ON
 export VAULT_TOKEN=<root-token>                                   # used by make provision-vault / seed-vault-secrets
 ```
 
-Save the unseal keys (one per line) to `vault/unseal.keys` so every later boot
-unseals automatically — `make up` and `make deploy` run `make unseal` for you:
+Record the unseal keys and root token off the host (password manager, split
+between operators). Vault comes up sealed on every restart; unseal it from a
+terminal, typing the keys at a hidden prompt (nothing is written to disk):
 
 ```bash
-install -m 600 /dev/null vault/unseal.keys   # then paste one unseal key per line
-make unseal                                  # unseal now (idempotent)
+make unseal    # idempotent; also run by make up / make deploy when a terminal is present
 ```
 
-> `vault/unseal.keys` is gitignored and host-only. Storing unseal keys beside
-> Vault weakens the seal (a stolen disk can be unsealed) — fine for this
-> single-host deployment; use Vault auto-unseal (cloud KMS / transit) for
-> production. Without the file, Vault stays sealed and you unseal manually:
-> `docker compose --env-file .env exec vault vault operator unseal`.
+> Without a terminal (CI, cron) `make up` / `make deploy` leave Vault sealed and
+> say so. For unattended restarts use Vault auto-unseal (cloud KMS / HSM /
+> transit seal), see `VAULT.md`. A legacy `vault/unseal.keys` file (one key per
+> line) is still honoured, but anyone who can read it can unseal Vault.
 
 **3. Provision KV + AppRole** (writes `VAULT_ROLE_ID` / `VAULT_SECRET_ID` into `.env`):
 
