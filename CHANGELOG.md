@@ -203,6 +203,12 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **Backend dependency fixes.** `djangorestframework` moves from 3.18.1 to
+  3.18.3 (three published advisories, fixed in 3.18.2), and the OpenTelemetry
+  packages from 1.45.0 / 0.66b0 to 1.45.1 / 0.66b1 in the backend and the email
+  feeder (one advisory in `opentelemetry-api`, fixed in 1.45.1). `pip-audit`
+  reports nothing for the feeder requirements after the bump.
+
 - **Pillow 13.0.0.** `pillow` moves from 12.3.0 to 13.0.0, which carries the
   fixes for the published Pillow advisories (JPEG decoder overflow, TIFF, PDF
   and image-bomb issues; see the 13.0.0 release notes). The backend uses Pillow
