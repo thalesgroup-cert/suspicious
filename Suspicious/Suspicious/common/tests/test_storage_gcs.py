@@ -1,14 +1,13 @@
 import io
-from datetime import timedelta
-from urllib.parse import parse_qs, urlsplit
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlsplit
 
 import requests
-from django.test import SimpleTestCase
-from google.api_core import exceptions as gx
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from django.test import SimpleTestCase
+from google.api_core import exceptions as gx
 from google.auth import credentials as gcreds
 from google.auth import exceptions as ax
 from google.cloud import storage
@@ -527,3 +526,25 @@ class GcsPresignTests(SimpleTestCase):
         with self.assertRaises(StoreError) as ctx:
             store._signed_url(Blob(), method="GET")
         self.assertEqual(ctx.exception.code, "access_denied")
+
+    def test_non_signing_credentials_are_invalid_config_not_unavailable(self):
+        store = GcsStore(client=_real_client(), signing=Signer(credentials=gcreds.AnonymousCredentials()))
+        with self.assertRaises(StoreError) as ctx:
+            store.presign_get("b", "k", timedelta(minutes=5))
+        self.assertEqual(ctx.exception.code, "invalid")
+        self.assertIn("signing is not configured", str(ctx.exception))
+
+    def test_expiry_over_seven_days_is_invalid(self):
+        with self.assertRaises(StoreError) as ctx:
+            self._signed().presign_get("b", "k", timedelta(days=8))
+        self.assertEqual(ctx.exception.code, "invalid")
+
+    def test_filenames_are_encoded_in_disposition(self):
+        for name, expected in (("résumé.pdf", "r%C3%A9sum%C3%A9.pdf"),
+                               ('a\r\nb";c.txt', "a%0D%0Ab%22%3Bc.txt")):
+            url = self._signed().presign_get("b", "k", timedelta(minutes=5), filename=name)
+            self.assertFalse(any(c in url for c in "\r\n\" ;"), url)
+            disposition = parse_qs(urlsplit(url).query)["response-content-disposition"][0]
+            self.assertIn("filename*=UTF-8''" + expected, disposition)
+            self.assertNotIn("\r", disposition)
+            self.assertNotIn("\n", disposition)

@@ -200,11 +200,12 @@ class GcsStore(ObjectStore):
 
     def _signed_url(self, blob, **kwargs) -> str:
         s = self._signing
-        if s is None or not (s.credentials or (s.service_account_email and s.token)):
+        keyed = s is not None and isinstance(s.credentials, Signing)
+        if not keyed and (s is None or not (s.service_account_email and s.token)):
             raise StoreError("invalid", "signing is not configured: provide service account key credentials "
                              "or a service account email with a token source", bucket=blob.bucket.name, key=blob.name)
         with _errors(blob.bucket.name, blob.name):
-            if s.credentials:
+            if keyed:
                 return blob.generate_signed_url(version="v4", credentials=s.credentials, **kwargs)
             return blob.generate_signed_url(version="v4", service_account_email=s.service_account_email,
                                             access_token=s.token(), **kwargs)
