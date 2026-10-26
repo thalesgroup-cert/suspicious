@@ -26,6 +26,7 @@ put database.password                             "${DB_PASSWORD:?export DB_PASS
 put integrations.cortex.api_key                   "${CORTEX_API_KEY:?export CORTEX_API_KEY}"
 put integrations.cortex.webhook_secret            "${CORTEX_WEBHOOK_SECRET:?export CORTEX_WEBHOOK_SECRET}"
 put storage.s3.secret_key                         "${S3_SECRET_KEY:?export S3_SECRET_KEY}"
+put storage.gcs.service_account_json                "${GCS_SERVICE_ACCOUNT_JSON:-}"
 put integrations.thehive.api_key                  "${THEHIVE_API_KEY:-}"
 put integrations.misp.instances.primary.api_key   "${MISP_PRIMARY_API_KEY:-}"
 put integrations.misp.instances.secondary.api_key "${MISP_SECONDARY_API_KEY:-}"

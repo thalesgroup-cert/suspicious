@@ -126,9 +126,13 @@ management moving to HashiCorp Vault.
 - MkDocs documentation site deploy workflow.
 
 #### Storage
-- **Google Cloud Storage provider**: set `storage.provider` to `gcs` and
-  configure `storage.gcs` (ADC, service account JSON or emulator credentials,
-  V4 signed URLs with key or keyless signing). See `CONFIG.md`.
+- **Google Cloud Storage provider (partial, not usable end to end yet)**: the
+  backend `ObjectStore` can target `gcs` (`storage.gcs`: ADC, service account
+  JSON or emulator credentials, V4 signed URLs with key or keyless signing),
+  but the email feeder still writes to RustFS through `storage.s3` and the
+  backend still reads `feeder_bucket` and the avatar/media/feeder bucket names
+  from `storage.s3`. Keep a `storage.s3` section until the feeder and bucket
+  configuration move over. See `CONFIG.md`.
 
 ### Changed
 
