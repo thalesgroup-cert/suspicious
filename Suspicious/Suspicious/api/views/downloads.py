@@ -3,7 +3,7 @@ import tempfile
 import zipfile
 
 from django.http import FileResponse
-from rest_framework.exceptions import APIException, NotFound
+from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 
 from api.permissions.settings import IsAdminOrCERT
@@ -11,16 +11,10 @@ from api.permissions.settings import IsAdminOrCERT
 from case_handler.models import Case
 from mail_feeder.models import MailArchive
 from api.audit import log_cert_download
-from api.storage import StorageClient
+from api.storage import StorageClient, StorageUnavailable
 from common.storage import StoreError
 
 logger = logging.getLogger(__name__)
-
-
-class StorageUnavailable(APIException):
-    status_code = 503
-    default_detail = "Storage backend unavailable"
-    default_code = "storage_unavailable"
 
 
 def get_request_ip(request) -> str | None:
@@ -103,6 +97,8 @@ class DownloadCaseArchiveView(APIView):
                             zip_file.writestr(object_name, stream.read())
                         written_entries += 1
                     except StoreError as exc:
+                        if exc.code != "not_found":
+                            raise StorageUnavailable("Unable to read archive storage") from exc
                         logger.warning(
                             "Skipping object while building archive zip: case_id=%s bucket=%s object=%s error=%s",
                             case.pk,

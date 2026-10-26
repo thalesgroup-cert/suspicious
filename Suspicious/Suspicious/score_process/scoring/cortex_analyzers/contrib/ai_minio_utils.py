@@ -39,6 +39,8 @@ def _find_mail_bucket(client: ObjectStore, mail_id: str) -> Optional[str]:
             if any(True for _ in client.list(bucket, prefix="%s/" % mail_id)):
                 return bucket
     except StoreError as exc:
+        if exc.code != "not_found":
+            raise
         logger.error("Error listing MinIO buckets while searching for mail %s: %s", mail_id, exc)
     return None
 
@@ -78,6 +80,8 @@ def fetch_mail_files_from_minio(
                 logger.error("fetch_mail_files: could not read %s: %s", name, exc)
 
     except StoreError as exc:
+        if exc.code != "not_found":
+            raise
         logger.error("fetch_mail_files: error fetching files for mail %s: %s", mail_id, exc)
 
     return headers, eml, txt, html

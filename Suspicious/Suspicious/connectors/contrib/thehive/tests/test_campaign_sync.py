@@ -10,6 +10,7 @@ from django.utils import timezone
 from case_handler.models import Campaign, CampaignMember, Case, CaseHasFileOrMail
 from connectors.contrib.thehive.campaign_material import Attachment, MailMaterial
 from connectors.contrib.thehive.campaign_sync import sync_campaign
+from common.storage import StoreError
 from common.storage.fake import FakeObjectStore, _Stream
 from mail_feeder.models import Mail
 
@@ -200,3 +201,19 @@ class SyncTest(TestCase):
             self.assertEqual(self._sync(), "created")
         self.assertTrue(any("notice.pdf: 403 license" in line for line in logs.output))
         self.assertTrue(all("thehive" in m.synced for m in self.campaign.members.all()))
+
+
+class OutageSyncTest(TestCase):
+    def test_an_unavailable_store_creates_no_alert_and_marks_nothing_synced(self):
+        class Down(FakeObjectStore):
+            def list_buckets(self):
+                raise StoreError("unavailable", "connection refused")
+
+        hive, campaign = FakeHive(), Campaign.objects.create(title="Verify payroll")
+        _member(campaign, 1)
+        cache.clear()
+        with self.assertRaises(StoreError):
+            sync_campaign(campaign, hive, store=Down(), ui_base="https://sus.example")
+        self.assertEqual(hive.creates, 0)
+        self.assertFalse(any("thehive" in m.synced for m in campaign.members.all()))
+        self.assertNotIn("thehive", Campaign.objects.get(pk=campaign.pk).external_refs)

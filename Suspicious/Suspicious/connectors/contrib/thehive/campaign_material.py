@@ -6,6 +6,7 @@ import hashlib
 import logging
 from dataclasses import dataclass, field
 
+from common.storage import StoreError
 from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import (
     _find_mail_bucket,
     _read_object_safe,
@@ -51,6 +52,11 @@ def fetch_mail_material(client, mail_id: str) -> MailMaterial:
         rel = obj.name[len(prefix):]
         try:
             data = _read_object_safe(client, bucket, obj.name)
+        except StoreError as exc:
+            if exc.code != "not_found":
+                raise
+            logger.warning("campaign material: %s vanished: %s", obj.name, exc)
+            continue
         except Exception as exc:  # noqa: BLE001 — one unreadable object must not lose the rest
             logger.warning("campaign material: cannot read %s: %s", obj.name, exc)
             continue

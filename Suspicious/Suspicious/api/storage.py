@@ -1,24 +1,41 @@
 from django.http import StreamingHttpResponse
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import APIException, NotFound
 
 from common.storage import ObjectStore, StoreError, get_store
 
 _CHUNK_SIZE = 32 * 1024
 
 
-def open_chunks(store: ObjectStore, bucket: str, key: str):
-    """Open the object now (so a missing key raises StoreError here) and return a
-    generator that streams it and closes it when exhausted or discarded."""
-    cm = store.open(bucket, key)
-    stream = cm.__enter__()
+class StorageUnavailable(APIException):
+    status_code = 503
+    default_detail = "Storage backend unavailable"
+    default_code = "storage_unavailable"
 
-    def gen():
+
+class _Chunks:
+    """Streams an already opened object. close() releases it even if iteration
+    never started, which a bare generator would not do."""
+
+    def __init__(self, cm, stream):
+        self._cm, self._stream, self._open = cm, stream, True
+
+    def __iter__(self):
         try:
-            yield from stream.iter_chunks(_CHUNK_SIZE)
+            yield from self._stream.iter_chunks(_CHUNK_SIZE)
         finally:
-            cm.__exit__(None, None, None)
+            self.close()
 
-    return gen()
+    def close(self):
+        if self._open:
+            self._open = False
+            self._cm.__exit__(None, None, None)
+
+
+def open_chunks(store: ObjectStore, bucket: str, key: str) -> _Chunks:
+    """Open the object now, so a missing key raises StoreError before the
+    response starts."""
+    cm = store.open(bucket, key)
+    return _Chunks(cm, cm.__enter__())
 
 
 class StorageClient:
@@ -34,8 +51,10 @@ class StorageClient:
 
         try:
             chunks = open_chunks(self.client, bucket, object_name)
-        except StoreError:
-            raise NotFound("Object not found in storage")
+        except StoreError as exc:
+            if exc.code != "not_found":
+                raise StorageUnavailable("Storage backend unavailable") from exc
+            raise NotFound("Object not found in storage") from exc
 
         response = StreamingHttpResponse(
             chunks,
