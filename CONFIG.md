@@ -350,6 +350,43 @@ If a proxy is set in the container environment, list an external
 `storage.s3.endpoint` in `NO_PROXY` or storage traffic goes through the proxy.
 
 
+#### Google Cloud Storage (`storage.gcs`)
+
+Set `storage.provider` to `gcs` to use Google Cloud Storage. The provider is
+imported only when selected. The section is backend-only (the email feeder
+never receives it).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `project` | ADC project | Project used for bucket creation and listing. |
+| `location` | Google default | Location for buckets created by `ensure_bucket`. |
+| `credentials` | `adc` | `adc` (Application Default Credentials), `service_account` or `anonymous` (emulator only). |
+| `service_account_json` | none | Secret. The service account key as a JSON string; required when `credentials` is `service_account`. A parse failure names the key and never echoes the content. |
+| `api_endpoint` | Google | Emulator or private endpoint, for example `http://fake-gcs:4443`. Use with `credentials: anonymous` for an emulator. |
+| `signing_service_account_email` | ADC email | Service account used for keyless signed URLs. The ADC credential is refreshed first, because a Compute credential reports `default` until refreshed. |
+
+Signed URLs: a service account key signs offline. With ADC and no key, the
+store signs through the IAM `signBlob` API (keyless) and refreshes expired
+credentials on each use. With no signing identity (anonymous, or ADC that
+cannot resolve an email) presigning fails with an `invalid` error and the
+`presign_put` capability is not advertised. A presigned PUT created with a
+`content_type` signs that header, so the uploader must send the identical
+`Content-Type`.
+
+IAM roles:
+- Object access on the bucket (for example `roles/storage.objectAdmin`).
+- `roles/iam.serviceAccountTokenCreator` on the signing service account, for
+  keyless signed URLs.
+- Bucket creation and listing need project-level permissions (for example
+  `roles/storage.admin` on the project).
+
+Labels: bucket labels are replaced as a whole set. Keys must be lowercase
+letters, digits, `_` or `-`, start with a letter, and be at most 63
+characters. Values use the same characters and may be empty. At most 64 labels
+are allowed. A label set that breaks this is rejected before any request is
+sent.
+
+
 #### Feeder fast metadata
 
 `fast_metadata` (default `false`) controls the email-ingestion fast path. The

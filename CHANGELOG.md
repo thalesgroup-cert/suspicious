@@ -125,6 +125,11 @@ management moving to HashiCorp Vault.
   `main`.
 - MkDocs documentation site deploy workflow.
 
+#### Storage
+- **Google Cloud Storage provider**: set `storage.provider` to `gcs` and
+  configure `storage.gcs` (ADC, service account JSON or emulator credentials,
+  V4 signed URLs with key or keyless signing). See `CONFIG.md`.
+
 ### Changed
 
 - **Object storage moves from `minio-py` to `boto3`** behind a provider-agnostic
