@@ -15,8 +15,7 @@ from google.auth import exceptions as ax
 from google.cloud import storage
 from google.oauth2 import service_account
 
-from common.storage import base, gcs
-from common.storage import StorageConfigError
+from common.storage import StorageConfigError, base, gcs
 from common.storage.base import ObjectStore, StoreError
 from common.storage.gcs import GcsStore, Signer
 
@@ -641,3 +640,30 @@ class GcsFromConfigTests(SimpleTestCase):
     def test_capabilities_drop_presign_put_without_signing(self):
         self.assertNotIn(base.PRESIGN_PUT, _store().capabilities)
         self.assertTrue({base.OBJECT_TAGS, base.LIFECYCLE} <= _store().capabilities)
+
+    def test_unresolved_signing_identity_logs_warning_without_credentials(self):
+        class _Broken(_Adc):
+            def refresh(self, request):
+                raise ax.RefreshError("token=SECRET-TOKEN")
+
+        self._adc(_Broken())
+        with self.assertLogs("common.storage.gcs", "WARNING") as logs:
+            store = GcsStore.from_config({})
+        self.assertIsNone(store._signing)
+        self.assertIn("RefreshError", logs.output[0])
+        self.assertNotIn("SECRET-TOKEN", "".join(logs.output))
+
+    def test_default_email_logs_warning(self):
+        creds = _Adc()
+        creds.refresh = lambda request: None
+        self._adc(creds)
+        with self.assertLogs("common.storage.gcs", "WARNING") as logs:
+            self.assertIsNone(GcsStore.from_config({})._signing)
+        self.assertIn("signing_service_account_email", logs.output[0])
+
+    def test_missing_adc_is_a_config_error(self):
+        with mock.patch("google.auth.default", side_effect=ax.DefaultCredentialsError("path /secret/x")):
+            with self.assertRaises(StorageConfigError) as ctx:
+                GcsStore.from_config({})
+        self.assertIn("storage.gcs.credentials", str(ctx.exception))
+        self.assertNotIn("/secret/x", str(ctx.exception))

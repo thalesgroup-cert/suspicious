@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ from google.auth.credentials import Signing
 from . import base
 from .base import HealthStatus, ObjectInfo, ObjectStore, ObjectStream, StoreError
 from .util import content_disposition
+
+logger = logging.getLogger(__name__)
 
 _CHUNK = 262144
 
@@ -107,10 +110,12 @@ def _keyless(creds, email_override) -> Signer | None:
     try:
         if not email_override:
             token()  # a Compute credential reports "default" as its email until refreshed
-    except ax.GoogleAuthError:
+    except ax.GoogleAuthError as exc:
+        logger.warning("gcs: could not resolve signing identity: %s", type(exc).__name__)
         return None
     email = email_override or getattr(creds, "service_account_email", None)
     if not email or email == "default":
+        logger.warning("gcs: no signing service account email resolved; set storage.gcs.signing_service_account_email")
         return None
     return Signer(service_account_email=email, token=token)
 
@@ -142,7 +147,11 @@ class GcsStore(ObjectStore):
         elif mode == "anonymous":
             creds, signing = AnonymousCredentials(), None
         elif mode == "adc":
-            creds, adc_project = google.auth.default()
+            try:
+                creds, adc_project = google.auth.default()
+            except ax.DefaultCredentialsError:
+                raise StorageConfigError("storage.gcs.credentials is adc but no Application Default "
+                                         "Credentials were found") from None
             project = project or adc_project
             signing = (Signer(credentials=creds) if isinstance(creds, Signing)
                        else _keyless(creds, cfg.get("signing_service_account_email")))
@@ -257,7 +266,8 @@ class GcsStore(ObjectStore):
         keyed = s is not None and isinstance(s.credentials, Signing)
         if not keyed and (s is None or not (s.service_account_email and s.token)):
             raise StoreError("invalid", "signing is not configured: provide service account key credentials "
-                             "or a service account email with a token source", bucket=blob.bucket.name, key=blob.name)
+                             "or a service account email with a token source "
+                             "(storage.gcs.signing_service_account_email)", bucket=blob.bucket.name, key=blob.name)
         with _errors(blob.bucket.name, blob.name):
             if keyed:
                 return blob.generate_signed_url(version="v4", credentials=s.credentials, **kwargs)
