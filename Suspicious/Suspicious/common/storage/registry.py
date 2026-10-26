@@ -76,3 +76,12 @@ def reset_store_cache() -> None:
 
 
 register_provider("s3", lambda cfg, presign: S3Store.from_config(cfg, presign=presign))
+
+
+def _gcs(cfg: dict, presign: bool) -> ObjectStore:
+    from .gcs import GcsStore
+
+    return GcsStore.from_config(cfg, presign=presign)
+
+
+register_provider("gcs", _gcs)

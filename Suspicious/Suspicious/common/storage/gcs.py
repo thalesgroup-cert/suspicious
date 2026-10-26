@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -95,9 +96,62 @@ class Signer:
     token: Callable[[], str] | None = None
 
 
+def _keyless(creds, email_override) -> Signer | None:
+    import google.auth.transport.requests
+
+    def token() -> str:
+        if not creds.valid:
+            creds.refresh(google.auth.transport.requests.Request())
+        return creds.token
+
+    try:
+        if not email_override:
+            token()  # a Compute credential reports "default" as its email until refreshed
+    except ax.GoogleAuthError:
+        return None
+    email = email_override or getattr(creds, "service_account_email", None)
+    if not email or email == "default":
+        return None
+    return Signer(service_account_email=email, token=token)
+
+
 class GcsStore(ObjectStore):
     def __init__(self, *, client, signing=None, location: str | None = None, project: str | None = None):
         self._client, self._signing, self._location, self._project = client, signing, location, project
+
+    @classmethod
+    def from_config(cls, cfg: dict, *, presign: bool = False) -> "GcsStore":
+        import google.auth
+        from google.auth.credentials import AnonymousCredentials
+        from google.cloud import storage
+        from google.oauth2 import service_account
+
+        from .registry import StorageConfigError
+
+        mode = str(cfg.get("credentials") or "adc").strip().lower()
+        project = cfg.get("project") or None
+        if mode == "service_account":
+            try:
+                info = json.loads(cfg.get("service_account_json") or "")
+                creds = service_account.Credentials.from_service_account_info(info)
+            except (ValueError, TypeError, KeyError, AttributeError):
+                raise StorageConfigError(
+                    "storage.gcs.service_account_json is missing or not a valid service account key") from None
+            signing = Signer(credentials=creds)
+            project = project or info.get("project_id")
+        elif mode == "anonymous":
+            creds, signing = AnonymousCredentials(), None
+        elif mode == "adc":
+            creds, adc_project = google.auth.default()
+            project = project or adc_project
+            signing = (Signer(credentials=creds) if isinstance(creds, Signing)
+                       else _keyless(creds, cfg.get("signing_service_account_email")))
+        else:
+            raise StorageConfigError(
+                f"storage.gcs.credentials must be adc, service_account or anonymous, got {mode!r}")
+        options = {"api_endpoint": cfg["api_endpoint"]} if cfg.get("api_endpoint") else None
+        client = storage.Client(project=project, credentials=creds, client_options=options)
+        return cls(client=client, signing=signing, location=cfg.get("location") or None, project=project)
 
     def put(self, bucket, key, data, *, length=None, content_type=None, metadata=None, tags=None):
         custom = {**(metadata or {}), **(tags or {})}
@@ -220,7 +274,10 @@ class GcsStore(ObjectStore):
 
     @property
     def capabilities(self):
-        return frozenset({base.OBJECT_TAGS, base.LIFECYCLE, base.PRESIGN_PUT})
+        caps = {base.OBJECT_TAGS, base.LIFECYCLE}
+        if self._signing is not None:
+            caps.add(base.PRESIGN_PUT)
+        return frozenset(caps)
 
     def health(self):
         try:

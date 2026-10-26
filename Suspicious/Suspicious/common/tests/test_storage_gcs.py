@@ -1,6 +1,8 @@
 import io
+import json
 import tempfile
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
 import requests
@@ -14,6 +16,7 @@ from google.cloud import storage
 from google.oauth2 import service_account
 
 from common.storage import base, gcs
+from common.storage import StorageConfigError
 from common.storage.base import ObjectStore, StoreError
 from common.storage.gcs import GcsStore, Signer
 
@@ -414,7 +417,8 @@ class GcsBucketTests(SimpleTestCase):
         self.assertEqual(ctx.exception.code, "not_found")
 
     def test_capabilities_exclude_free_form_bucket_tags(self):
-        self.assertEqual(_store().capabilities,
+        signed = GcsStore(client=_Client(), signing=Signer(service_account_email="e", token=lambda: "t"))
+        self.assertEqual(signed.capabilities,
                          frozenset({base.OBJECT_TAGS, base.LIFECYCLE, base.PRESIGN_PUT}))
 
     def test_health_reports_access_denied(self):
@@ -445,12 +449,15 @@ def _real_client():
     return client
 
 
-def _key_credentials():
+def _key_info():
     pem = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
-    return service_account.Credentials.from_service_account_info({
-        "type": "service_account", "client_email": "sa@p.iam.gserviceaccount.com", "private_key": pem,
-        "token_uri": "https://oauth2.googleapis.com/token", "project_id": "p"})
+    return {"type": "service_account", "client_email": "sa@p.iam.gserviceaccount.com", "private_key": pem,
+            "token_uri": "https://oauth2.googleapis.com/token", "project_id": "p"}
+
+
+def _key_credentials():
+    return service_account.Credentials.from_service_account_info(_key_info())
 
 
 class GcsPresignTests(SimpleTestCase):
@@ -548,3 +555,89 @@ class GcsPresignTests(SimpleTestCase):
             self.assertIn("filename*=UTF-8''" + expected, disposition)
             self.assertNotIn("\r", disposition)
             self.assertNotIn("\n", disposition)
+
+
+class _Adc(gcreds.Credentials):
+    """Non-signing ADC credential whose email is only known after a refresh."""
+
+    def __init__(self, expired=True):
+        super().__init__()
+        self.expired_now, self.service_account_email, self.refreshes = expired, "default", 0
+
+    @property
+    def expired(self):
+        return self.expired_now
+
+    @property
+    def valid(self):
+        return not self.expired_now
+
+    def refresh(self, request):
+        self.refreshes += 1
+        self.expired_now, self.token, self.service_account_email = False, "tok", "adc@p.iam.gserviceaccount.com"
+
+
+class GcsFromConfigTests(SimpleTestCase):
+    def _adc(self, creds=None, project="adc-proj"):
+        patcher = mock.patch("google.auth.default", return_value=(creds or _Adc(), project))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_from_config_adc_default(self):
+        self._adc()
+        store = GcsStore.from_config({"location": "EU"})
+        self.assertIsInstance(store, ObjectStore)
+        self.assertEqual(store._client.project, "adc-proj")
+        self.assertEqual(store._location, "EU")
+
+    def test_from_config_service_account_json_parsed_and_invalid_json_does_not_leak(self):
+        info = json.dumps(_key_info())
+        store = GcsStore.from_config({"credentials": "service_account", "service_account_json": info})
+        self.assertEqual(store._client.project, "p")
+        self.assertIsInstance(store._signing.credentials, gcreds.Signing)
+        secret = "SECRET-NOT-JSON"
+        with self.assertRaises(StorageConfigError) as ctx:
+            GcsStore.from_config({"credentials": "service_account", "service_account_json": secret})
+        self.assertIn("service_account_json", str(ctx.exception))
+        self.assertNotIn(secret, str(ctx.exception))
+        self.assertNotIn(secret, repr(ctx.exception.__cause__))
+        with self.assertRaises(StorageConfigError):
+            GcsStore.from_config({"credentials": "service_account", "service_account_json": '{"a": "SECRET"}'})
+
+    def test_from_config_anonymous_with_api_endpoint(self):
+        store = GcsStore.from_config({"credentials": "anonymous", "api_endpoint": "http://localhost:4443",
+                                      "project": "p"})
+        self.assertEqual(store._client._connection.API_BASE_URL, "http://localhost:4443")
+        self.assertIsNone(store._signing)
+        self.assertNotIn(base.PRESIGN_PUT, store.capabilities)
+
+    def test_unknown_credentials_mode_is_rejected(self):
+        with self.assertRaises(StorageConfigError):
+            GcsStore.from_config({"credentials": "bogus"})
+
+    def test_signing_email_defaults_to_adc_email_after_refresh(self):
+        creds = _Adc()
+        self._adc(creds)
+        store = GcsStore.from_config({})
+        self.assertEqual(creds.refreshes, 1)
+        self.assertEqual(store._signing.service_account_email, "adc@p.iam.gserviceaccount.com")
+        self.assertIn(base.PRESIGN_PUT, store.capabilities)
+
+    def test_signing_email_override_wins(self):
+        self._adc()
+        store = GcsStore.from_config({"signing_service_account_email": "o@p.iam.gserviceaccount.com"})
+        self.assertEqual(store._signing.service_account_email, "o@p.iam.gserviceaccount.com")
+
+    def test_keyless_token_refreshes_expired_credentials(self):
+        creds = _Adc()
+        self._adc(creds)
+        store = GcsStore.from_config({})
+        creds.expired_now = True
+        self.assertEqual(store._signing.token(), "tok")
+        self.assertEqual(creds.refreshes, 2)
+        self.assertEqual(store._signing.token(), "tok")
+        self.assertEqual(creds.refreshes, 2)
+
+    def test_capabilities_drop_presign_put_without_signing(self):
+        self.assertNotIn(base.PRESIGN_PUT, _store().capabilities)
+        self.assertTrue({base.OBJECT_TAGS, base.LIFECYCLE} <= _store().capabilities)
