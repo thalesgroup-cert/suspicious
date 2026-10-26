@@ -3,24 +3,18 @@ import tempfile
 import zipfile
 
 from django.http import FileResponse
-from rest_framework.exceptions import APIException, NotFound
+from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 
 from api.permissions.settings import IsAdminOrCERT
-from minio.error import S3Error
 
 from case_handler.models import Case
 from mail_feeder.models import MailArchive
 from api.audit import log_cert_download
-from api.storage import StorageClient
+from api.storage import StorageClient, StorageUnavailable
+from common.storage import StoreError
 
 logger = logging.getLogger(__name__)
-
-
-class StorageUnavailable(APIException):
-    status_code = 503
-    default_detail = "Storage backend unavailable"
-    default_code = "storage_unavailable"
 
 
 def get_request_ip(request) -> str | None:
@@ -80,8 +74,8 @@ class DownloadCaseArchiveView(APIView):
 
         try:
             try:
-                objects = storage.client.list_objects(archive.bucket_name, recursive=True)
-            except S3Error as exc:
+                objects = list(storage.client.list(archive.bucket_name, recursive=True))
+            except StoreError as exc:
                 logger.warning(
                     "Failed to list objects for case archive: case_id=%s bucket=%s error=%s",
                     case.pk,
@@ -94,19 +88,17 @@ class DownloadCaseArchiveView(APIView):
 
             with zipfile.ZipFile(temp_file, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
                 for obj in objects:
-                    object_name = getattr(obj, "object_name", None)
+                    object_name = getattr(obj, "name", None)
                     if not object_name:
                         continue
 
-                    object_response = None
                     try:
-                        object_response = storage.client.get_object(
-                            archive.bucket_name,
-                            object_name,
-                        )
-                        zip_file.writestr(object_name, object_response.read())
+                        with storage.client.open(archive.bucket_name, object_name) as stream:
+                            zip_file.writestr(object_name, stream.read())
                         written_entries += 1
-                    except S3Error as exc:
+                    except StoreError as exc:
+                        if exc.code != "not_found":
+                            raise StorageUnavailable("Unable to read archive storage") from exc
                         logger.warning(
                             "Skipping object while building archive zip: case_id=%s bucket=%s object=%s error=%s",
                             case.pk,
@@ -115,14 +107,6 @@ class DownloadCaseArchiveView(APIView):
                             exc,
                         )
                         continue
-                    finally:
-                        if object_response is not None:
-                            try:
-                                object_response.close()
-                            finally:
-                                release_conn = getattr(object_response, "release_conn", None)
-                                if callable(release_conn):
-                                    release_conn()
 
             if written_entries == 0:
                 logger.warning(

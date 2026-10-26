@@ -126,6 +126,15 @@ management moving to HashiCorp Vault.
 - MkDocs documentation site deploy workflow.
 
 ### Changed
+
+- **Object storage moves from `minio-py` to `boto3`** behind a provider-agnostic
+  `ObjectStore` interface (`common/storage/`). No config change is needed:
+  `storage.provider` (or `STORAGE_PROVIDER`) is optional and defaults to `s3`.
+  The legacy bucket-per-email tag scanner now needs a provider with free-form
+  bucket tags. S3 client timeouts are now 5 s connect and 15 s read with 2
+  retries (`minio-py` used 300 s), and botocore honours `HTTP_PROXY`,
+  `HTTPS_PROXY` and `NO_PROXY` (`minio-py` did not), so an external
+  `storage.s3.endpoint` must be listed in `NO_PROXY`.
 - **Allow-lists are a weighted vote in `score_case`**: a strict majority of
   Safe plus allow-listed analyzer weight now yields Safe (rule
   `allow-list-majority`), with dissenting analyzers named in the rationale.

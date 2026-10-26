@@ -21,11 +21,10 @@ from rest_framework.views import APIView
 from api.permissions.submissions import CanAccessSubmission, submission_queryset
 from api.utils.analyzer_reports import reports_for_case
 from case_handler.models import Case
-from common.clients import get_s3_client
+from api.storage import open_chunks
+from common.storage import get_store
 
 logger = logging.getLogger(__name__)
-
-_CHUNK_SIZE = 32 * 1024
 
 
 class CaseScreenshotView(APIView):
@@ -65,31 +64,19 @@ class CaseScreenshotView(APIView):
             raise NotFound("No screenshot available")
 
         try:
-            obj = get_s3_client().get_object(
-                report.screenshot_bucket, report.screenshot_key
+            chunks = open_chunks(
+                get_store(), report.screenshot_bucket, report.screenshot_key
             )
         except Exception as exc:
             logger.warning(
-                "MinIO get_object failed: case_id=%s bucket=%s key=%s err=%s",
+                "Object store open failed: case_id=%s bucket=%s key=%s err=%s",
                 case.pk, report.screenshot_bucket, report.screenshot_key, exc,
             )
             raise NotFound("Screenshot unavailable") from exc
 
-        response = StreamingHttpResponse(_stream(obj), content_type="image/png")
+        response = StreamingHttpResponse(chunks, content_type="image/png")
         response["Cache-Control"] = "private, max-age=300"
         response["Content-Disposition"] = (
             f'inline; filename="case_{case.pk}_screenshot.png"'
         )
         return response
-
-
-def _stream(obj):
-    try:
-        for chunk in obj.stream(_CHUNK_SIZE):
-            yield chunk
-    finally:
-        try:
-            obj.close()
-            obj.release_conn()
-        except Exception:
-            pass

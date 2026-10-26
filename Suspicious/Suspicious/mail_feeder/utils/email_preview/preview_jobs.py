@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_storage_client():
-    """Build a MinIO StorageClient from the shared ``storage.s3`` runtime config."""
+    """Build a StorageClient from the shared ``storage.s3`` runtime config."""
     from api.storage import StorageClient
 
     storage = StorageClient()
@@ -37,7 +37,7 @@ def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
     prefix contract: one shared feeder bucket where the submission id is a
     *prefix*: MailArchive.bucket_name still carries that id, so when no
     bucket of that name exists we fall back to the feeder bucket + prefix
-    (otherwise list_objects raises NoSuchBucket and no preview renders).
+    (otherwise listing raises not_found and no preview renders).
 
     The archive holds both the reporter wrapper (`user_submission.eml` /
     `reporter-submission.eml`) and the reported message (any other .eml).
@@ -58,10 +58,9 @@ def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
         bucket = feeder_bucket
         prefix = bucket_name.rstrip("/") + "/"
 
-    objects = list(storage.client.list_objects(bucket, prefix=prefix, recursive=True))
+    objects = list(storage.client.list(bucket, prefix, True))
     eml_keys = [
-        getattr(o, "object_name", "") or "" for o in objects
-        if (getattr(o, "object_name", "") or "").lower().endswith(".eml")
+        o.name for o in objects if o.name.lower().endswith(".eml")
     ]
     if not eml_keys:
         return None
@@ -73,17 +72,8 @@ def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
     ]
     eml_key = sorted(non_wrapper)[0] if non_wrapper else sorted(eml_keys)[0]
 
-    response = None
-    try:
-        response = storage.client.get_object(bucket, eml_key)
-        return response.read()
-    finally:
-        if response is not None:
-            try:
-                response.close()
-                response.release_conn()
-            except Exception:
-                pass
+    with storage.client.open(bucket, eml_key) as stream:
+        return stream.read()
 
 
 def enqueue_preview_render(mail_id: int, *, dedup_window: int = 300) -> bool:

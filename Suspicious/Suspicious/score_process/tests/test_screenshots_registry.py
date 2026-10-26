@@ -2,6 +2,7 @@ from unittest.mock import patch, MagicMock
 from uuid import uuid4
 
 from django.test import TestCase
+from common.storage.fake import FakeObjectStore
 from cortex_job.models import Analyzer, AnalyzerReport
 from cortex_job.models import URL
 from score_process.scoring.screenshots import registry
@@ -39,32 +40,30 @@ class CaptureDispatchTest(TestCase):
 
 
 class StoreTest(TestCase):
-    @patch("score_process.scoring.screenshots.registry.ensure_bucket")
-    @patch("score_process.scoring.screenshots.registry.get_s3_client")
-    def test_store_puts_and_stamps(self, get_client, ensure):
-        client = MagicMock()
-        get_client.return_value = client
+    @patch("score_process.scoring.screenshots.registry.get_store")
+    def test_store_puts_and_stamps(self, get_store):
+        store = FakeObjectStore()
+        get_store.return_value = store
         r = _report("Lookyloo_Screenshot")
         registry.store(r, PNG)
-        ensure.assert_called_once()
-        args, kwargs = client.put_object.call_args
-        self.assertEqual(args[0], "analyzer-screenshots")
-        self.assertEqual(args[1], f"report-{r.id}.png")
+        with store.open("analyzer-screenshots", f"report-{r.id}.png") as s:
+            self.assertEqual(s.read(), PNG)
         r.refresh_from_db()
         self.assertEqual(r.screenshot_bucket, "analyzer-screenshots")
         self.assertEqual(r.screenshot_key, f"report-{r.id}.png")
 
-    @patch("score_process.scoring.screenshots.registry.ensure_bucket",
-           side_effect=RuntimeError("AccessDenied: ListAllMyBuckets"))
-    @patch("score_process.scoring.screenshots.registry.get_s3_client")
-    def test_store_continues_when_ensure_bucket_raises(self, get_client, ensure):
-        # A hardened MinIO service account can put/get a pre-created bucket but
-        # not bucket_exists — store() must fall through to put_object anyway.
-        client = MagicMock()
-        get_client.return_value = client
+    @patch("score_process.scoring.screenshots.registry.get_store")
+    def test_store_continues_when_ensure_bucket_raises(self, get_store):
+        # A hardened service account can put/get a pre-created bucket but
+        # not bucket_exists; store() must fall through to put anyway.
+        store = FakeObjectStore()
+        store.ensure_bucket("analyzer-screenshots")
+        store.ensure_bucket = MagicMock(side_effect=RuntimeError("AccessDenied: ListAllMyBuckets"))
+        get_store.return_value = store
         r = _report("Lookyloo_Screenshot")
         registry.store(r, PNG)
-        client.put_object.assert_called_once()
+        with store.open("analyzer-screenshots", f"report-{r.id}.png") as s:
+            self.assertEqual(s.read(), PNG)
         r.refresh_from_db()
         self.assertEqual(r.screenshot_bucket, "analyzer-screenshots")
         self.assertEqual(r.screenshot_key, f"report-{r.id}.png")

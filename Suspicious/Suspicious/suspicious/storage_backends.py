@@ -1,15 +1,10 @@
-"""Custom Django storage backends backed by the project's MinIO client.
-
-Built on the modern `minio` (7.2.x) client the rest of the app already
-uses (see api.storage.StorageClient), so there is no dependency on
-`django-minio-storage`, which caps `minio<7.2.19` and conflicts with our
-pinned `minio==7.2.20`.
+"""Custom Django storage backends backed by the project's ObjectStore.
 
 Wired in settings via STORAGES["default"] (Django 5.1+ replaced the old
 DEFAULT_FILE_STORAGE setting):
 
-    s3    -> MinioMediaStorage
-    dual  -> DualStorage   (primary=MinIO, secondary=local FS)
+    s3    -> MinioMediaStorage  (name kept; works with any ObjectStore provider)
+    dual  -> DualStorage   (primary=object store, secondary=local FS)
     local -> FileSystemStorage
 """
 from __future__ import annotations
@@ -23,6 +18,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, Storage
 from django.utils.deconstruct import deconstructible
 
+from common.storage import get_store
+
 
 def _to_bool(val, default: bool = False) -> bool:
     if val is None:
@@ -34,11 +31,11 @@ def _to_bool(val, default: bool = False) -> bool:
 
 @deconstructible
 class MinioMediaStorage(Storage):
-    """Django Storage that persists objects in a MinIO bucket.
+    """Django Storage that persists objects in an object-store bucket.
 
-    The client is built lazily from settings.MINIO_STORAGE_* on first use,
-    so instantiation is cheap and import-safe. A client may be injected
-    (tests) to bypass the network entirely.
+    The store is resolved lazily from get_store() on first use, so
+    instantiation is cheap and import-safe. A store may be injected
+    (tests) as `client`.
     """
 
     def __init__(self, *, client=None, bucket: str | None = None):
@@ -53,16 +50,9 @@ class MinioMediaStorage(Storage):
     @property
     def client(self):
         if self._client is None:
-            from minio import Minio
-
-            self._client = Minio(
-                getattr(settings, "MINIO_STORAGE_ENDPOINT", "rustfs:9000"),
-                access_key=settings.MINIO_STORAGE_ACCESS_KEY,
-                secret_key=settings.MINIO_STORAGE_SECRET_KEY,
-                secure=_to_bool(getattr(settings, "MINIO_STORAGE_USE_HTTPS", False)),
-            )
-            if self._auto_create and not self._client.bucket_exists(self._bucket):
-                self._client.make_bucket(self._bucket)
+            self._client = get_store()
+            if self._auto_create:
+                self._client.ensure_bucket(self._bucket)
         return self._client
 
     # -- Storage API ----------------------------------------------------
@@ -71,7 +61,7 @@ class MinioMediaStorage(Storage):
         data = content.read()
         if isinstance(data, str):
             data = data.encode("utf-8")
-        self.client.put_object(
+        self.client.put(
             self._bucket,
             name,
             io.BytesIO(data),
@@ -82,34 +72,25 @@ class MinioMediaStorage(Storage):
         return name
 
     def _open(self, name, mode="rb"):
-        response = None
-        try:
-            response = self.client.get_object(self._bucket, name)
-            data = response.read()
-        finally:
-            if response is not None:
-                try:
-                    response.close()
-                    response.release_conn()
-                except Exception:
-                    pass
+        with self.client.open(self._bucket, name) as stream:
+            data = stream.read()
         return ContentFile(data, name=name)
 
     def exists(self, name):
         try:
-            self.client.stat_object(self._bucket, name)
+            self.client.stat(self._bucket, name)
             return True
         except Exception:
             return False
 
     def delete(self, name):
         try:
-            self.client.remove_object(self._bucket, name)
+            self.client.delete(self._bucket, name)
         except Exception:
             pass
 
     def size(self, name):
-        return self.client.stat_object(self._bucket, name).size
+        return self.client.stat(self._bucket, name).size
 
     def url(self, name):
         base = settings.MEDIA_URL if settings.MEDIA_URL.endswith("/") else settings.MEDIA_URL + "/"
@@ -119,8 +100,8 @@ class MinioMediaStorage(Storage):
         prefix = path.rstrip("/") + "/" if path else ""
         dirs: set[str] = set()
         files: list[str] = []
-        for obj in self.client.list_objects(self._bucket, prefix=prefix, recursive=False):
-            name = getattr(obj, "object_name", "") or ""
+        for obj in self.client.list(self._bucket, prefix, False):
+            name = obj.name
             rel = name[len(prefix):]
             if not rel:
                 continue
@@ -135,11 +116,11 @@ class MinioMediaStorage(Storage):
 
 @deconstructible
 class DualStorage(Storage):
-    """Primary = MinIO, secondary = local filesystem.
+    """Primary = object store, secondary = local filesystem.
 
-    Save always writes to MinIO; with dual-write enabled it best-effort
-    mirrors to local too (useful during a local->MinIO transition).
-    Open/exists prefer MinIO and fall back to local for legacy blobs.
+    Save always writes to the object store; with dual-write enabled it best-effort
+    mirrors to local too (useful during a local->object-store transition).
+    Open/exists prefer the object store and fall back to local for legacy blobs.
     """
 
     def __init__(self, *, primary=None, secondary=None, dual_write=None):

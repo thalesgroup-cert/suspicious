@@ -1,68 +1,31 @@
 """Tests for the custom MinIO-backed Django storage backends.
 
 These exercise the real save/open/exists/delete/url orchestration against
-an in-memory fake MinIO client (the only unavoidable external boundary),
+an in-memory FakeObjectStore (the only unavoidable external boundary),
 so no live RustFS/MinIO is required. The backends wrap the project's
-modern `minio` 7.2.20 client — no `django-minio-storage` dependency.
+ObjectStore interface (FakeObjectStore here).
 """
 import tempfile
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
+from unittest import mock
+
 from django.test import TestCase
+
+from common.storage import FakeObjectStore
 
 from suspicious.storage_backends import DualStorage, MinioMediaStorage
 
 
-class _FakeObj:
-    def __init__(self, data: bytes):
-        self._data = data
-        self.size = len(data)
-
-    def read(self):
-        return self._data
-
-    def close(self):
-        pass
-
-    def release_conn(self):
-        pass
-
-
-class FakeMinio:
-    """Minimal in-memory stand-in for minio.Minio."""
-
-    def __init__(self):
-        self.store: dict[tuple[str, str], bytes] = {}
-        self.buckets: set[str] = set()
-
-    def bucket_exists(self, bucket):
-        return bucket in self.buckets
-
-    def make_bucket(self, bucket):
-        self.buckets.add(bucket)
-
-    def put_object(self, bucket, name, data, length, content_type=None):
-        payload = data.read()
-        assert length == len(payload), "length must match the streamed bytes"
-        self.store[(bucket, name)] = payload
-
-    def get_object(self, bucket, name):
-        if (bucket, name) not in self.store:
-            raise Exception("NoSuchKey")
-        return _FakeObj(self.store[(bucket, name)])
-
-    def stat_object(self, bucket, name):
-        if (bucket, name) not in self.store:
-            raise Exception("NoSuchKey")
-        return _FakeObj(self.store[(bucket, name)])
-
-    def remove_object(self, bucket, name):
-        self.store.pop((bucket, name), None)
+def _fake_store():
+    store = FakeObjectStore()
+    store.ensure_bucket("media")
+    return store
 
 
 def _minio_storage():
-    return MinioMediaStorage(client=FakeMinio(), bucket="media")
+    return MinioMediaStorage(client=_fake_store(), bucket="media")
 
 
 class MinioMediaStorageTest(TestCase):
@@ -89,6 +52,21 @@ class MinioMediaStorageTest(TestCase):
         storage.save("s.bin", ContentFile(b"12345"))
         self.assertEqual(storage.size("s.bin"), 5)
 
+    def test_listdir_splits_dirs_and_files(self):
+        storage = _minio_storage()
+        storage.save("top.txt", ContentFile(b"1"))
+        storage.save("sub/inner.txt", ContentFile(b"2"))
+        self.assertEqual(storage.listdir(""), (["sub"], ["top.txt"]))
+        self.assertEqual(storage.listdir("sub"), ([], ["inner.txt"]))
+
+    def test_default_client_comes_from_get_store_and_creates_bucket(self):
+        fake = FakeObjectStore()
+        with mock.patch("suspicious.storage_backends.get_store", return_value=fake):
+            storage = MinioMediaStorage(bucket="fresh")
+            storage.save("a.txt", ContentFile(b"x"))
+        self.assertTrue(fake.bucket_exists("fresh"))
+        self.assertTrue(storage.exists("a.txt"))
+
     def test_url_is_media_url_joined(self):
         storage = _minio_storage()
         self.assertEqual(storage.url("a/b.png"), "/media/a/b.png")
@@ -97,7 +75,7 @@ class MinioMediaStorageTest(TestCase):
 class DualStorageTest(TestCase):
     def _dual(self, *, dual_write):
         self.tmp = tempfile.mkdtemp()
-        primary = MinioMediaStorage(client=FakeMinio(), bucket="media")
+        primary = MinioMediaStorage(client=_fake_store(), bucket="media")
         secondary = FileSystemStorage(location=self.tmp, base_url="/media/")
         return DualStorage(primary=primary, secondary=secondary, dual_write=dual_write)
 

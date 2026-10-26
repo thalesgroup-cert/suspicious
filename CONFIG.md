@@ -318,6 +318,38 @@ row is updated too (Settings page in the UI, or
 `RuntimeConfig.objects.filter(key="storage.s3")` in a shell) and the cache
 entry is invalidated (`settings.config.invalidate_cache("storage.s3")`).
 
+#### Storage provider
+
+`storage.provider` selects the object-store provider behind the backend's
+`ObjectStore` interface. It is optional and defaults to `s3`, which covers
+RustFS, MinIO and AWS S3 through `boto3`; the `storage.s3` keys above are
+unchanged. Resolution order: runtime config `storage.provider`, then the
+`STORAGE_PROVIDER` environment variable, then `s3`. The provider is resolved
+lazily on first use and cached, so a change takes effect after the backend
+processes (`suspicious`, `suspicious_celery`, `suspicious_celery_beat`) are
+recreated.
+
+An unknown name raises `StorageConfigError` ("Unknown storage provider 'x';
+registered providers: s3") on first use. It is also rejected when the process
+starts: `SuspiciousConfig.ready()` raises `ImproperlyConfigured` ("Unknown
+storage provider 'x' (from env STORAGE_PROVIDER)", or "from settings.json
+storage.provider", listing the registered providers), so gunicorn, the Celery
+worker and Celery beat refuse to boot, not only `manage.py` (which also reports
+it as the system check `storage.E001`). A bad value set only through the
+runtime config (DB) is not seen at startup and still fails on first use.
+
+The legacy bucket-per-email tag scanner (`tasp/cron/fetch_emails.py`) needs a
+provider that supports free-form bucket tags.
+
+The store configuration, credentials included, is cached per process. After
+rotating `storage.s3.secret_key`, recreate the backend processes; the 60 s
+runtime-config cache no longer applies to it.
+
+botocore honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`; `minio-py` did not.
+If a proxy is set in the container environment, list an external
+`storage.s3.endpoint` in `NO_PROXY` or storage traffic goes through the proxy.
+
+
 #### Feeder fast metadata
 
 `fast_metadata` (default `false`) controls the email-ingestion fast path. The
