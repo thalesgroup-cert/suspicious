@@ -131,7 +131,7 @@ class MinioManager:
         except Exception as e:
             logger.error("Error uploading '%s': %s", file_path, e, exc_info=True)
 
-    def upload_directory(self, source_dir: Path, bucket_name: str, base_object_path: str = "", default_tags: Optional[Dict[str, str]] = None):
+    def upload_directory(self, source_dir: Path, bucket_name: str, base_object_path: str = "", default_tags: Optional[Dict[str, str]] = None, tag_bucket: bool = True):
         """
         Upload all files in a directory to a MinIO bucket, preserving structure.
 
@@ -140,12 +140,15 @@ class MinioManager:
             bucket_name (str): Target bucket name.
             base_object_path (str): Base prefix in bucket for objects.
             default_tags (Dict[str, str], optional): Tags to apply to each file.
+            tag_bucket (bool): Tag a newly created bucket Status=To Do, which the
+                legacy scanner reads as "this whole bucket is one submission".
+                Pass False for a shared bucket holding many submissions.
         """
         if not source_dir.is_dir():
             logger.error("Source '%s' is not a valid directory.", source_dir)
             return
 
-        ensure_tags = {TAG_KEY_STATUS: TAG_STATUS_TODO}
+        ensure_tags = {TAG_KEY_STATUS: TAG_STATUS_TODO} if tag_bucket else None
         if not self.ensure_bucket(bucket_name, tags=ensure_tags):
             logger.error("Cannot upload: bucket '%s' ensure failed.", bucket_name)
             return

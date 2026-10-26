@@ -203,6 +203,13 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **One bucket for web uploads.** A mail uploaded through the web form used
+  to create a bucket of its own, so the bucket count (and the legacy scanner's
+  list-and-tag pass over every bucket) grew with each submission. Uploads now go
+  to a single `storage.s3.web_bucket` (default `mail-submissions`), one key
+  prefix per submission, with no `Status` tag so the legacy scanner skips it.
+  Existing per-submission buckets are left as they are.
+
 - **Elasticsearch 8.19.7 to 8.19.23.** The pinned image was behind fixes for
   denial of service through uncontrolled recursion, stack exhaustion, ES|QL CPU
   and memory use and an indexing flaw, and an HTTP request-smuggling issue

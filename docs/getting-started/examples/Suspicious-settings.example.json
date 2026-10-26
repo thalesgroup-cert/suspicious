@@ -53,7 +53,8 @@
             "secret_key": "meridian_dev_minio_pw",
             "secure": false,
             "auto_create_bucket": true,
-            "media_bucket": "suspicious-media"
+            "media_bucket": "suspicious-media",
+            "web_bucket": "mail-submissions"
         }
     },
     "integrations": {

@@ -257,6 +257,7 @@ mismatch gives `Access denied for user 'suspicious'`.
         "secure": false,
         "auto_create_bucket": true,
         "media_bucket": "suspicious-media",
+        "web_bucket": "mail-submissions",
         "fast_metadata": false
     }
 }
@@ -266,6 +267,17 @@ mismatch gives `Access denied for user 'suspicious'`.
 does **not** require the RustFS service — handy for a minimal dev run. Set
 `"backend": "s3"` to use object storage; then `secret_key` here must match the
 RustFS credentials in `.env` (`MINIO_ROOT_PASSWORD`), and RustFS must be running.
+
+`web_bucket` (default `mail-submissions`) is the one bucket that holds every
+`.eml` / `.msg` uploaded through the web form, one key prefix per submission
+(`<user>-submission-<timestamp>-<id>/`). Earlier versions created a bucket per
+upload; those buckets keep working and are still read by the legacy scanner.
+Do not point `web_bucket` at `feeder_bucket`: the feeder scanner expects a
+`_status.json` in every prefix.
+
+On object stores with a global bucket namespace (Google Cloud Storage), the default
+name can already belong to someone else. Set `web_bucket` to a name unique to your
+deployment instead of keeping `mail-submissions`.
 
 `endpoint` is the Docker-internal host the app container uses for
 put/get/bucket calls. Presigned URLs (mail-attachment links, uploaded
