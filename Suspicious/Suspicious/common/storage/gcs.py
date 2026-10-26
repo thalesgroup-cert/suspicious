@@ -21,6 +21,8 @@ from .util import content_disposition
 logger = logging.getLogger(__name__)
 
 _CHUNK = 262144
+_UPLOAD_CHUNK = 8 * 1024 * 1024  # resumable uploads buffer one chunk; must be a multiple of 256 KiB
+_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 _LABEL_KEY = re.compile(r"[a-z][a-z0-9_-]{0,62}")
 _LABEL_VALUE = re.compile(r"[a-z0-9_-]{0,63}")
@@ -121,8 +123,15 @@ def _keyless(creds, email_override) -> Signer | None:
 
 
 class GcsStore(ObjectStore):
-    def __init__(self, *, client, signing=None, location: str | None = None, project: str | None = None):
+    def __init__(self, *, client, signing=None, location: str | None = None, project: str | None = None,
+                 keyless=None):
         self._client, self._signing, self._location, self._project = client, signing, location, project
+        self._keyless = keyless  # (credentials, email_override); resolved lazily, successes cached
+
+    def _resolve_signing(self):
+        if self._signing is None and self._keyless is not None:
+            self._signing = _keyless(*self._keyless)
+        return self._signing
 
     @classmethod
     def from_config(cls, cfg: dict, *, presign: bool = False) -> "GcsStore":
@@ -134,10 +143,12 @@ class GcsStore(ObjectStore):
         from .registry import StorageConfigError
 
         mode = str(cfg.get("credentials") or "adc").strip().lower()
+        keyless = None
         project = cfg.get("project") or None
         if mode == "service_account":
             try:
-                info = json.loads(cfg.get("service_account_json") or "")
+                raw = cfg.get("service_account_json") or ""
+                info = dict(raw) if isinstance(raw, dict) else json.loads(raw)
                 creds = service_account.Credentials.from_service_account_info(info)
             except (ValueError, TypeError, KeyError, AttributeError):
                 raise StorageConfigError(
@@ -148,19 +159,22 @@ class GcsStore(ObjectStore):
             creds, signing = AnonymousCredentials(), None
         elif mode == "adc":
             try:
-                creds, adc_project = google.auth.default()
+                creds, adc_project = google.auth.default(scopes=_SCOPES)
             except ax.DefaultCredentialsError:
                 raise StorageConfigError("storage.gcs.credentials is adc but no Application Default "
                                          "Credentials were found") from None
             project = project or adc_project
-            signing = (Signer(credentials=creds) if isinstance(creds, Signing)
-                       else _keyless(creds, cfg.get("signing_service_account_email")))
+            if isinstance(creds, Signing):
+                signing = Signer(credentials=creds)
+            else:
+                signing, keyless = None, (creds, cfg.get("signing_service_account_email"))
         else:
             raise StorageConfigError(
                 f"storage.gcs.credentials must be adc, service_account or anonymous, got {mode!r}")
         options = {"api_endpoint": cfg["api_endpoint"]} if cfg.get("api_endpoint") else None
         client = storage.Client(project=project, credentials=creds, client_options=options)
-        return cls(client=client, signing=signing, location=cfg.get("location") or None, project=project)
+        return cls(client=client, signing=signing, location=cfg.get("location") or None, project=project,
+                   keyless=keyless)
 
     def put(self, bucket, key, data, *, length=None, content_type=None, metadata=None, tags=None):
         custom = {**(metadata or {}), **(tags or {})}
@@ -175,6 +189,7 @@ class GcsStore(ObjectStore):
             kwargs["content_type"] = content_type
         with _errors(bucket, key):
             blob = self._client.bucket(bucket).blob(key)
+            blob.chunk_size = _UPLOAD_CHUNK
             if custom:
                 blob.metadata = custom
             blob.upload_from_file(data, **kwargs)
@@ -264,7 +279,7 @@ class GcsStore(ObjectStore):
             b.patch()
 
     def _signed_url(self, blob, **kwargs) -> str:
-        s = self._signing
+        s = self._resolve_signing()
         keyed = s is not None and isinstance(s.credentials, Signing)
         if not keyed and (s is None or not (s.service_account_email and s.token)):
             raise StoreError("invalid", "signing is not configured: provide service account key credentials "
@@ -287,7 +302,7 @@ class GcsStore(ObjectStore):
     @property
     def capabilities(self):
         caps = {base.OBJECT_TAGS, base.LIFECYCLE}
-        if self._signing is not None:
+        if self._signing is not None or self._keyless is not None:
             caps.add(base.PRESIGN_PUT)
         return frozenset(caps)
 

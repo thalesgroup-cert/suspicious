@@ -6,7 +6,7 @@ from unittest import mock
 from django.test import SimpleTestCase
 
 from case_handler.case_utils.form_handlers.mail.minio import MinioManager
-from common.storage import FakeObjectStore
+from common.storage import FREE_FORM_BUCKET_TAGS, FakeObjectStore
 
 MOD = "case_handler.case_utils.form_handlers.mail.minio"
 WEEK = timedelta(days=7)
@@ -57,14 +57,28 @@ class UploadDirectoryTest(SimpleTestCase):
             MinioManager().upload_directory(Path(tmp), "bkt", default_tags=default_tags)
 
     def test_new_bucket_gets_todo_label_and_objects(self):
-        store = FakeObjectStore()
+        store = FakeObjectStore({FREE_FORM_BUCKET_TAGS})
         self._upload(store)
         self.assertEqual(store.get_bucket_labels("bkt"), {"Status": "To Do"})
         with store.open("bkt", "sub/a.eml") as s:
             self.assertEqual(s.read(), b"hello")
 
-    def test_existing_bucket_labels_are_left_alone(self):
+    def test_store_without_bucket_tags_skips_labelling_but_uploads(self):
         store = FakeObjectStore()
+        with mock.patch.object(store, "set_bucket_labels") as label:
+            self._upload(store)
+            self.assertTrue(MinioManager.ensure_bucket(self._manager(store), "other", tags={"Status": "To Do"}))
+        label.assert_not_called()
+        with store.open("bkt", "sub/a.eml") as s:
+            self.assertEqual(s.read(), b"hello")
+
+    def _manager(self, store):
+        with mock.patch(f"{MOD}.get_store", return_value=store), \
+                mock.patch(f"{MOD}.get_presign_store", return_value=store):
+            return MinioManager()
+
+    def test_existing_bucket_labels_are_left_alone(self):
+        store = FakeObjectStore({FREE_FORM_BUCKET_TAGS})
         store.ensure_bucket("bkt")
         store.set_bucket_labels("bkt", {"Status": "Done"})
         self._upload(store)

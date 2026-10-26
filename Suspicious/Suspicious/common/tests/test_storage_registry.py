@@ -147,3 +147,29 @@ class GcsRegistryTests(SimpleTestCase):
             store = get_store()
         section.assert_called_once_with("storage.gcs")
         self.assertEqual(type(store).__name__, "GcsStore")
+
+
+class GcsDefaultBucketWarningTests(SimpleTestCase):
+    def _check(self, provider, s3=None):
+        from common.storage.checks import check_gcs_default_buckets
+
+        def get(key, default=None):
+            return {"storage.provider": provider}.get(key, (s3 or {}).get(key.rsplit(".", 1)[-1], default)
+                                                      if key.startswith("storage.s3.") else default)
+
+        with patch.dict(os.environ, {"STORAGE_PROVIDER": ""}), patch("common.storage.checks.settings_get", get):
+            return check_gcs_default_buckets(None)
+
+    def test_gcs_with_default_names_warns(self):
+        warnings = self._check("gcs")
+        self.assertEqual([w.id for w in warnings], ["storage.W001"])
+        for name in ("suspicious-media", "suspicious-avatars", "mail-previews", "analyzer-screenshots"):
+            self.assertIn(name, warnings[0].msg)
+
+    def test_explicit_names_are_not_listed(self):
+        msg = self._check("gcs", {"media_bucket": "acme-media", "avatars_bucket": "acme-av"})[0].msg
+        self.assertNotIn("suspicious-media", msg)
+        self.assertNotIn("suspicious-avatars", msg)
+
+    def test_s3_does_not_warn(self):
+        self.assertEqual(self._check("s3"), [])

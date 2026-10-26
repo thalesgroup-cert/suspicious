@@ -223,6 +223,13 @@ class GcsStoreTests(SimpleTestCase):
         self.assertEqual(kwargs, {"size": 5, "content_type": "text/plain"})
         self.assertEqual(metadata, {"m": "1", "t": "2"})
 
+    def test_put_sets_8mib_chunk_size(self):
+        client = _Client()
+        _store(client).put("b", "k", b"abc")
+        chunk = client.blobs["k"].chunk_size
+        self.assertEqual(chunk, 8 * 1024 * 1024)
+        self.assertEqual(chunk % 262144, 0)
+
     def test_put_bytes_without_length_or_metadata(self):
         client = _Client()
         _store(client).put("b", "k", b"abc")
@@ -625,23 +632,26 @@ class GcsFromConfigTests(SimpleTestCase):
         creds = _Adc()
         self._adc(creds)
         store = GcsStore.from_config({})
+        self.assertEqual(creds.refreshes, 0)
+        self.assertIn(base.PRESIGN_PUT, store.capabilities)
+        self.assertEqual(store._resolve_signing().service_account_email, "adc@p.iam.gserviceaccount.com")
         self.assertEqual(creds.refreshes, 1)
-        self.assertEqual(store._signing.service_account_email, "adc@p.iam.gserviceaccount.com")
         self.assertIn(base.PRESIGN_PUT, store.capabilities)
 
     def test_signing_email_override_wins(self):
         self._adc()
         store = GcsStore.from_config({"signing_service_account_email": "o@p.iam.gserviceaccount.com"})
-        self.assertEqual(store._signing.service_account_email, "o@p.iam.gserviceaccount.com")
+        self.assertEqual(store._resolve_signing().service_account_email, "o@p.iam.gserviceaccount.com")
 
     def test_keyless_token_refreshes_expired_credentials(self):
         creds = _Adc()
         self._adc(creds)
         store = GcsStore.from_config({})
+        signer = store._resolve_signing()
         creds.expired_now = True
-        self.assertEqual(store._signing.token(), "tok")
+        self.assertEqual(signer.token(), "tok")
         self.assertEqual(creds.refreshes, 2)
-        self.assertEqual(store._signing.token(), "tok")
+        self.assertEqual(signer.token(), "tok")
         self.assertEqual(creds.refreshes, 2)
 
     def test_capabilities_drop_presign_put_without_signing(self):
@@ -654,9 +664,9 @@ class GcsFromConfigTests(SimpleTestCase):
                 raise ax.RefreshError("token=SECRET-TOKEN")
 
         self._adc(_Broken())
+        store = GcsStore.from_config({})
         with self.assertLogs("common.storage.gcs", "WARNING") as logs:
-            store = GcsStore.from_config({})
-        self.assertIsNone(store._signing)
+            self.assertIsNone(store._resolve_signing())
         self.assertIn("RefreshError", logs.output[0])
         self.assertNotIn("SECRET-TOKEN", "".join(logs.output))
 
@@ -665,8 +675,37 @@ class GcsFromConfigTests(SimpleTestCase):
         creds.refresh = lambda request: None
         self._adc(creds)
         with self.assertLogs("common.storage.gcs", "WARNING") as logs:
-            self.assertIsNone(GcsStore.from_config({})._signing)
+            self.assertIsNone(GcsStore.from_config({})._resolve_signing())
         self.assertIn("signing_service_account_email", logs.output[0])
+
+    def test_failed_identity_lookup_is_retried_not_cached(self):
+        class _Flaky(_Adc):
+            fail = True
+
+            def refresh(self, request):
+                if self.fail:
+                    raise ax.RefreshError("down")
+                super().refresh(request)
+
+        creds = _Flaky()
+        self._adc(creds)
+        store = GcsStore.from_config({})
+        with self.assertLogs("common.storage.gcs", "WARNING"):
+            with self.assertRaises(StoreError):
+                store.presign_get("b", "k", timedelta(minutes=5))
+        self.assertIn(base.PRESIGN_PUT, store.capabilities)
+        creds.fail = False
+        self.assertEqual(store._resolve_signing().service_account_email, "adc@p.iam.gserviceaccount.com")
+        self.assertIs(store._resolve_signing(), store._signing)
+
+    def test_adc_requests_cloud_platform_scope(self):
+        with mock.patch("google.auth.default", return_value=(_Adc(), "p")) as default:
+            GcsStore.from_config({})
+        default.assert_called_once_with(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+
+    def test_service_account_json_accepts_a_dict(self):
+        store = GcsStore.from_config({"credentials": "service_account", "service_account_json": _key_info()})
+        self.assertEqual(store._client.project, "p")
 
     def test_missing_adc_is_a_config_error(self):
         with mock.patch("google.auth.default", side_effect=ax.DefaultCredentialsError("path /secret/x")):

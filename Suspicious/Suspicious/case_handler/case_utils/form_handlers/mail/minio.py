@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import timedelta
 from typing import Optional, Dict
 
-from common.storage import ObjectStore, StoreError, get_presign_store, get_store
+from common.storage import FREE_FORM_BUCKET_TAGS, ObjectStore, StoreError, get_presign_store, get_store
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +91,11 @@ class MinioManager:
             if not self.bucket_exists(bucket_name):
                 self.client.ensure_bucket(bucket_name)
                 logger.info("Created bucket '%s'", bucket_name)
-                if tags:
+                if tags and FREE_FORM_BUCKET_TAGS in self.client.capabilities:
                     self.client.set_bucket_labels(bucket_name, tags)
                     logger.info("Applied tags to bucket '%s': %s", bucket_name, tags)
+                elif tags:
+                    logger.debug("Store lacks free-form bucket tags; not labelling '%s'", bucket_name)
             return True
         except StoreError as e:
             logger.error("Store error during ensure_bucket('%s'): %s", bucket_name, e)
