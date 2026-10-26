@@ -49,6 +49,7 @@ jobs:
             -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
             -v "${{ github.workspace }}/docs":/docs \
             -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
+            -e REDIS_CACHE_PASSWORD=ci-only-not-secret -e REDIS_BROKER_PASSWORD=ci-only-not-secret \
             suspicious:ci \
             python manage.py spectacular \
               --settings=suspicious.settings \

@@ -235,7 +235,7 @@ class ElevatedExtrasScopeTests(CisoSubmissionScopeBase):
 
     def test_own_case_comment_is_not_internal_in_scope_comment_is(self):
         client = self.as_user(self.ciso)
-        with mock.patch("api.views.comments.sync_case_comment_to_thehive") as sync:
+        with mock.patch("api.views.comments.sync_case_comment_to_thehive"):
             mine = client.post(reverse("case-comments", kwargs={"case_id": self.own.id}), {"body": "m"}, format="json")
             scoped = client.post(reverse("case-comments", kwargs={"case_id": self.in_scope.id}), {"body": "s"}, format="json")
         self.assertEqual((mine.status_code, scoped.status_code), (201, 201))

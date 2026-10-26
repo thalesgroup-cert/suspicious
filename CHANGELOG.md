@@ -208,6 +208,13 @@ management moving to HashiCorp Vault.
   packages from 1.45.0 / 0.66b0 to 1.45.1 / 0.66b1 in the backend and the email
   feeder (one advisory in `opentelemetry-api`, fixed in 1.45.1). `pip-audit`
   reports nothing for the feeder requirements after the bump.
+
+- **Pillow 13.0.0.** `pillow` moves from 12.3.0 to 13.0.0, which carries the
+  fixes for the published Pillow advisories (JPEG decoder overflow, TIFF, PDF
+  and image-bomb issues; see the 13.0.0 release notes). The backend uses Pillow
+  only to validate and resize uploaded avatars, and through CairoSVG; none of
+  the 13.0.0 removals or behaviour changes touch those calls. Pillow 13 needs
+  Python 3.11 or newer, and the image runs 3.12.
 - **No Docker socket in Traefik or Cortex.** Both reach the daemon through a
   socket proxy on a private network: Traefik through a read-only proxy (list
   containers and events, no writes), Cortex through a proxy that allows only
