@@ -122,8 +122,10 @@ the configured region, `request_checksum_calculation="when_required"` and
 `response_checksum_validation="when_required"` (both verified against RustFS).
 Presigned URLs for browsers are signed with `public_endpoint`, the same split
 that `get_s3_presign_client()` has today; the presign client never connects.
-`capabilities` reports what the connected store supports; on RustFS
-alpha.90 that is `object_tags`, `lifecycle` and `batch_delete`.
+In stage 1 the `s3` provider reports a static `capabilities` set
+(`object_tags`, `free_form_bucket_tags`, `lifecycle`, `batch_delete`,
+`presign_put`); probing the connected store is left to the settings page test
+endpoint (stage 3).
 
 **`gcs`** uses `google-cloud-storage`. Credentials: application default
 credentials by default; optionally a service-account JSON from Vault. Signed
