@@ -171,5 +171,13 @@ class GcsDefaultBucketWarningTests(SimpleTestCase):
         self.assertNotIn("suspicious-media", msg)
         self.assertNotIn("suspicious-avatars", msg)
 
+    def test_overridden_preview_and_screenshot_buckets_are_not_listed(self):
+        from django.test import override_settings
+
+        with override_settings(MAIL_PREVIEW_BUCKET="acme-prev", SCREENSHOT_BUCKET="acme-shots"):
+            msg = self._check("gcs")[0].msg
+        self.assertNotIn("mail-previews", msg)
+        self.assertNotIn("analyzer-screenshots", msg)
+
     def test_s3_does_not_warn(self):
         self.assertEqual(self._check("s3"), [])

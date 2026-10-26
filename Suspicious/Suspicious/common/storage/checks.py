@@ -1,5 +1,6 @@
 import os
 
+from django.conf import settings as django_settings
 from django.core.checks import Error, Warning, register
 
 from suspicious._config_common import settings_get
@@ -34,7 +35,10 @@ _DEFAULT_BUCKETS = {
     "media_bucket": "suspicious-media",
     "avatars_bucket": "suspicious-avatars",
 }
-_FIXED_DEFAULT_BUCKETS = ("mail-previews", "analyzer-screenshots")
+_SETTING_DEFAULT_BUCKETS = {
+    "MAIL_PREVIEW_BUCKET": "mail-previews",
+    "SCREENSHOT_BUCKET": "analyzer-screenshots",
+}
 
 
 @register()
@@ -44,7 +48,10 @@ def check_gcs_default_buckets(app_configs, **kwargs):
         return []
     used = [name for key, name in _DEFAULT_BUCKETS.items()
             if (settings_get(f"storage.s3.{key}", None) or name) == name]
-    used += _FIXED_DEFAULT_BUCKETS
+    used += [default for key, default in _SETTING_DEFAULT_BUCKETS.items()
+             if getattr(django_settings, key, default) == default]
+    if not used:
+        return []
     return [Warning(
         f"storage.provider is gcs but default bucket names are still in use: {', '.join(used)}.",
         hint="GCS bucket names are global and can be claimed by anyone; set explicit, unique names.",
