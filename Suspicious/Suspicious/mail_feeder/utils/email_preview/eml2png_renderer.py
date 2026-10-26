@@ -32,7 +32,7 @@ from typing import Optional
 import nh3
 from django.conf import settings
 
-from common.clients import ensure_bucket
+from common.storage import get_store
 from mail_feeder.utils.email_preview.html_sanitizer import sanitize_email_html
 
 logger = logging.getLogger(__name__)
@@ -115,11 +115,12 @@ class Eml2PngRenderer:
         prod urlconf does not route. The MinIO key is keyed by Mail PK so
         previews stay unique per row; re-renders overwrite in place.
         """
-        client = _build_minio_client()
-        if client is None:
-            logger.error(
-                "Mail preview upload skipped: MinIO client not configured "
-                "(settings.MINIO_STORAGE_* missing). mail_id=%s", mail.pk,
+        try:
+            client = get_store()
+        except Exception:
+            logger.exception(
+                "Mail preview upload skipped: object store not configured. "
+                "mail_id=%s", mail.pk,
             )
             return
 
@@ -129,7 +130,7 @@ class Eml2PngRenderer:
         _ensure_bucket(client, bucket)
 
         try:
-            client.put_object(
+            client.put(
                 bucket,
                 key,
                 io.BytesIO(png_bytes),
@@ -306,52 +307,14 @@ class Eml2PngRenderer:
         return png_bytes
 
 
-# MinIO helpers
+# Object store helpers
 
-def _build_minio_client():
-    """Build the MinIO client used to store previews, or None on failure.
-
-    Prefer the platform-wide client (`storage.s3` runtime config), so
-    previews live in the same MinIO instance as every other object: the
-    same source the rest of the backend and the preview *fetch* path use.
-    Falls back to legacy django-minio-storage `MINIO_STORAGE_*` settings
-    for older deployments that still configure storage that way.
-    """
-    try:
-        from common.clients import get_s3_client
-        client = get_s3_client()
-        if client is not None:
-            return client
-    except Exception:
-        logger.exception(
-            "get_s3_client failed for previews; falling back to MINIO_STORAGE_*"
-        )
-
-    endpoint = getattr(settings, "MINIO_STORAGE_ENDPOINT", None)
-    access_key = getattr(settings, "MINIO_STORAGE_ACCESS_KEY", None)
-    secret_key = getattr(settings, "MINIO_STORAGE_SECRET_KEY", None)
-    if not (endpoint and access_key and secret_key):
-        return None
-
-    try:
-        from minio import Minio
-        return Minio(
-            endpoint=endpoint,
-            access_key=access_key,
-            secret_key=secret_key,
-            secure=bool(getattr(settings, "MINIO_STORAGE_USE_HTTPS", False)),
-        )
-    except Exception:
-        logger.exception("Failed to instantiate Minio client for previews")
-        return None
-
-
-def _ensure_bucket(client, bucket: str) -> None:
+def _ensure_bucket(store, bucket: str) -> None:
     """Create the preview bucket on first use; idempotent."""
     try:
-        ensure_bucket(client, bucket)
+        store.ensure_bucket(bucket)
     except Exception:
         logger.warning(
-            "ensure_bucket(%s) failed (continuing, put_object will retry)",
+            "ensure_bucket(%s) failed (continuing, put will retry)",
             bucket, exc_info=True,
         )

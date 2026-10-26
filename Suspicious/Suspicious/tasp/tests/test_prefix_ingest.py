@@ -21,7 +21,7 @@ from mail_feeder import submission_contract as sc
 
 class PrefixIngestTests(unittest.TestCase):
     @mock.patch.object(fe, "MinioEmailService")
-    @mock.patch.object(fe, "_init_minio_client")
+    @mock.patch.object(fe, "_init_store")
     def test_pending_prefix_is_processed_and_marked_done(self, mock_init, mock_proc_cls):
         client = mock.Mock()
         mock_init.return_value = client
@@ -53,7 +53,7 @@ class PrefixIngestTests(unittest.TestCase):
             self.assertTrue(callable(handoff.call_args.kwargs["on_email_done"]))
 
     @mock.patch.object(fe, "MinioEmailService")
-    @mock.patch.object(fe, "_init_minio_client")
+    @mock.patch.object(fe, "_init_store")
     def test_reclaimed_submission_skips_already_processed_emails(self, mock_init, mock_proc_cls):
         client = mock.Mock()
         mock_init.return_value = client

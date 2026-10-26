@@ -108,6 +108,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
             -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
+            -e REDIS_CACHE_PASSWORD=ci-only-not-secret -e REDIS_BROKER_PASSWORD=ci-only-not-secret \
             suspicious:ci \
             python manage.py makemigrations --check --dry-run --skip-checks --settings=suspicious.settings
 

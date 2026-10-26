@@ -8,10 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 from django.core.cache import cache
-from minio.commonconfig import Tags
-
-from minio import Minio
-from common.clients import get_s3_client
+from common.storage import FREE_FORM_BUCKET_TAGS, ObjectStore, get_store
 from .utils import safe_execution, load_config, ensure_dir, _safe_object_name
 from mail_feeder.minio_submission.minio import MinioEmailService
 from tasp.cron.prefix_source import PrefixSource
@@ -27,13 +24,13 @@ SUBMISSION_EML_SUFFIX = "submission.eml"
 EMAIL_DIR_PATTERN = re.compile(r"^\d{12}-[a-f0-9]+$")
 
 
-# MinIO client
+# Object store
 
-def _init_minio_client() -> Optional[Minio]:
+def _init_store() -> Optional[ObjectStore]:
     try:
-        return get_s3_client()
+        return get_store()
     except Exception:
-        logger.exception("MinIO client initialization failed")
+        logger.exception("Object store initialization failed")
         return None
 
 
@@ -97,7 +94,7 @@ def _collect_manifest_fields(
 
 
 def _write_manifest(
-    client: Minio,
+    client: ObjectStore,
     bucket_name: str,
     manifest: dict,
     bucket_path: str,
@@ -113,10 +110,10 @@ def _write_manifest(
     raw = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
 
     try:
-        client.put_object(
-            bucket_name=bucket_name,
-            object_name=MANIFEST_OBJECT_NAME,
-            data=io.BytesIO(raw),
+        client.put(
+            bucket_name,
+            MANIFEST_OBJECT_NAME,
+            io.BytesIO(raw),
             length=len(raw),
             content_type="application/json",
         )
@@ -215,7 +212,7 @@ def _process_prefix_submissions(base_path: str, bucket_name: str) -> None:
       5. Set status → done.
     On any error, rolls back to todo.  Always releases the lock.
     """
-    client = _init_minio_client()
+    client = _init_store()
     if not client:
         return
     source = PrefixSource(client, bucket_name)
@@ -287,17 +284,20 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
 
 
 def _process_minio_buckets(base_path: str) -> None:
-    client = _init_minio_client()
+    client = _init_store()
     if not client:
+        return
+    if FREE_FORM_BUCKET_TAGS not in client.capabilities:
+        logger.info("Storage provider has no free-form bucket labels; legacy bucket scanner skipped")
         return
 
     minio_processor = MinioEmailService()
 
     for bucket in client.list_buckets():
-        with safe_execution(f"process bucket {bucket.name}"):
+        with safe_execution(f"process bucket {bucket}"):
 
             try:
-                tags = client.get_bucket_tags(bucket.name)
+                tags = client.get_bucket_labels(bucket)
                 status = tags.get("Status")
                 # "Processing" is picked up too: if no live run holds the lock
                 # below, the worker that tagged it was killed mid-bucket.
@@ -306,88 +306,82 @@ def _process_minio_buckets(base_path: str) -> None:
             except Exception:
                 continue
 
-            lock_key = f"lock:minio_bucket:{bucket.name}"
+            lock_key = f"lock:minio_bucket:{bucket}"
             if not cache.add(lock_key, "1", timeout=900):
-                logger.debug("Bucket %s already locked, skipping", bucket.name)
+                logger.debug("Bucket %s already locked, skipping", bucket)
                 continue
 
             try:
                 if status == "Processing":
-                    logger.warning("Reclaiming bucket %s left in Processing by a killed run", bucket.name)
-                logger.debug("Processing bucket %s", bucket.name)
+                    logger.warning("Reclaiming bucket %s left in Processing by a killed run", bucket)
+                logger.debug("Processing bucket %s", bucket)
 
                 try:
-                    processing_tags = Tags.new_bucket_tags()
-                    processing_tags["Status"] = "Processing"
-                    client.set_bucket_tags(bucket.name, processing_tags)
+                    client.set_bucket_labels(bucket, {"Status": "Processing"})
                 except Exception:
-                    logger.warning("Failed to set Processing tag for %s", bucket.name)
+                    logger.warning("Failed to set Processing tag for %s", bucket)
 
-                bucket_path = os.path.join(base_path, bucket.name)
+                bucket_path = os.path.join(base_path, bucket)
                 ensure_dir(bucket_path)
 
                 submission_path: Optional[str] = None
 
-                for obj in client.list_objects(bucket.name, recursive=True):
+                for obj in client.list(bucket, "", True):
                     try:
-                        safe_name = _safe_object_name(obj.object_name)
+                        safe_name = _safe_object_name(obj.name)
                     except ValueError:
                         logger.warning(
                             "Skipping unsafe object name %r in bucket %s",
-                            obj.object_name, bucket.name,
+                            obj.name, bucket,
                         )
                         continue
 
                     dst = os.path.join(bucket_path, safe_name)
                     ensure_dir(os.path.dirname(dst))
-                    client.fget_object(bucket.name, obj.object_name, dst)
+                    client.download(bucket, obj.name, dst)
 
-                    if obj.object_name.endswith(SUBMISSION_EML_SUFFIX):
+                    if obj.name.endswith(SUBMISSION_EML_SUFFIX):
                         submission_path = dst
 
                 if not submission_path:
-                    logger.debug("No submission.eml found in %s, skipping", bucket.name)
+                    logger.debug("No submission.eml found in %s, skipping", bucket)
                     continue
 
-                manifest = _collect_manifest_fields(bucket_path, submission_path, bucket.name)
-                _write_manifest(client, bucket.name, manifest, bucket_path)
+                manifest = _collect_manifest_fields(bucket_path, submission_path, bucket)
+                _write_manifest(client, bucket, manifest, bucket_path)
 
                 logger.debug(
                     "Bucket %s: %d email(s), reported_by=%s",
-                    bucket.name,
+                    bucket,
                     len(manifest["emails_to_analyze"]),
                     manifest["reported_by"],
                 )
 
                 done = _already_ingested(bucket_path) if status == "Processing" else frozenset()
                 failed = _handoff_submission(
-                    bucket_path, submission_path, bucket.name,
+                    bucket_path, submission_path, bucket,
                     manifest["reported_by"], minio_processor,
                     done_emails=done,
                 )
                 if failed:
                     logger.error(
                         "Bucket %s: %d email(s) were not ingested: %s",
-                        bucket.name, len(failed), failed,
+                        bucket, len(failed), failed,
                     )
 
                 final = "Error" if failed else "Done"
                 try:
-                    done_tags = Tags.new_bucket_tags()
-                    done_tags["Status"] = final
-                    client.set_bucket_tags(bucket.name, done_tags)
+                    client.set_bucket_labels(bucket, {"Status": final})
                 except Exception:
-                    logger.exception("Failed to tag bucket %s as %s", bucket.name, final)
+                    logger.exception("Failed to tag bucket %s as %s", bucket, final)
 
             except Exception:
-                logger.exception("Error while processing bucket %s", bucket.name)
+                logger.exception("Error while processing bucket %s", bucket)
 
                 try:
-                    error_tags = Tags.new_bucket_tags()
-                    error_tags["Status"] = "To Do"
-                    client.set_bucket_tags(bucket.name, error_tags)
+                    client.set_bucket_labels(bucket, {"Status": "To Do"})
                 except Exception:
-                    logger.warning("Failed to rollback status for %s", bucket.name)
+                    logger.warning("Failed to rollback status for %s", bucket)
 
             finally:
                 shutil.rmtree(bucket_path, ignore_errors=True)

@@ -5,7 +5,7 @@ from thehive4py import TheHiveApi
 from jinja2 import Environment, FileSystemLoader
 from mail_feeder.models import Mail
 
-from common.clients import get_s3_client
+from common.storage import get_store
 from .phishing import add_comment_to_item
 from .utils import generate_ref
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
@@ -274,7 +274,7 @@ class ChallengeToTheHiveService:
 
         try:
             ui_base, own_domains = _email_settings()
-            member = load_member(case, get_s3_client(), own_domains)
+            member = load_member(case, get_store(), own_domains)
             if member is None:
                 return
             alert = send_challenge_alert(

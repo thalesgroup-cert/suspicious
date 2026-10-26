@@ -125,7 +125,7 @@ class CortexAnalyzerReports:
         from score_process.scoring.engine import mail_band_escalation
         from score_process.scoring.bands import (
             _BAND_ORDER, _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE,
-            _STICKY_IOC_LEVELS, sticky_holds,
+            sticky_holds,
         )
         from cortex_job.cortex_utils.derived_observables import score_derived_observables
 
