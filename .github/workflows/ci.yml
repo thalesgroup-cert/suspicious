@@ -184,7 +184,7 @@ jobs:
       - name: Install analyzer deps
         run: |
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements-inference.txt pytest httpx
+          pip install -r requirements-inference.txt -r requirements-client.txt pytest httpx
       # Client tests, inference-server tests (real ResNetMLP checkpoints + a fake
       # sentence-transformer, real FastAPI app) and mail_analysis tests.
       - name: pytest
