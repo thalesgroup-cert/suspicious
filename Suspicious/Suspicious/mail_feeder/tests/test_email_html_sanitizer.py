@@ -1,6 +1,5 @@
 """sanitize_email_html must leave no outbound reference in hostile mail
 bodies, and must keep an ordinary newsletter readable."""
-import re
 import time
 from html.parser import HTMLParser
 
@@ -77,7 +76,7 @@ HOSTILE = {
     "behavior": f'<div style="behavior:url(//{HOST}/b.htc)">t</div>',
     "expression": f'<div style="width:expression(document.body.innerHTML=\'{HOST}\')">t</div>',
     "style_block_binding": f"<style>div{{-moz-binding:url(//{HOST}/b.xml)}}</style>",
-    "style_block_expression": f"<style>div{{width:expression(alert(1))}}</style>",
+    "style_block_expression": "<style>div{width:expression(alert(1))}</style>",
 }
 
 _ALLOWED_ATTRS = set().union(*_ATTRIBUTES.values())
