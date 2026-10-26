@@ -112,14 +112,15 @@ ok "suspicious_ui restarted"
 # only when its configuration changed, so this is a no-op on an up-to-date stack
 # and one short restart (a few seconds of database errors) the first time.
 # It runs last so the app tier, already attached to every network, never loses them.
-step "Attaching MariaDB and RustFS to their networks, Cortex and Traefik to their Docker proxies"
+step "Attaching MariaDB and RustFS to their networks, Cortex to its Docker proxy"
 $COMPOSE up -d --no-deps db_suspicious rustfs
-# Cortex and Traefik lost the host Docker socket: start their proxies and recreate them
+# Cortex lost the host Docker socket: start its proxy and recreate it
 # (compose recreates only what changed, so this is a no-op on an up-to-date stack).
 $COMPOSE up -d --no-deps docker_proxy_cortex cortex
 if [ -n "$($COMPOSE ps -q traefik 2>/dev/null)" ]; then
-  $COMPOSE up -d --no-deps docker_proxy_traefik traefik
+  $COMPOSE up -d --no-deps traefik
 fi
+docker rm -f "${SVC_PREFIX:-}docker_proxy_traefik" >/dev/null 2>&1 || true   # retired proxy from earlier versions
 bash "${SCRIPTS}/health-wait.sh" "${SVC_PREFIX:-}cortex" 180
 if [ -n "$($COMPOSE ps -q db_suspicious_replica 2>/dev/null)" ]; then
   $COMPOSE --profile replica up -d --no-deps db_suspicious_replica

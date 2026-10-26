@@ -223,13 +223,12 @@ management moving to HashiCorp Vault.
   only to validate and resize uploaded avatars, and through CairoSVG; none of
   the 13.0.0 removals or behaviour changes touch those calls. Pillow 13 needs
   Python 3.11 or newer, and the image runs 3.12.
-- **No Docker socket in Traefik or Cortex.** Both reach the daemon through a
-  socket proxy on a private network: Traefik through a read-only proxy (list
-  containers and events, no writes), Cortex through a proxy that allows only
-  what its job runner calls. If your `traefik.yaml` defines the Docker
-  provider, set its endpoint to `tcp://docker_proxy_traefik:2375` (`make deploy`
-  checks). The Cortex proxy narrows the Docker API surface but cannot filter
-  request bodies; see `docs/operations/deploy.md`. The Django, Celery, beat and
+- **No Docker access for Traefik, no Docker socket in Cortex.** Cortex reaches the
+  daemon through a socket proxy on a private network that allows only what its
+  job runner calls; it narrows the Docker API surface but cannot filter request
+  bodies (see `docs/operations/deploy.md`). Traefik routes only from the file
+  provider, so its Docker provider and proxy were removed. If your `traefik.yaml`
+  defines `providers.docker`, remove it (`make deploy` checks). The Django, Celery, beat and
   feeder containers drop all Linux capabilities and set `no-new-privileges`; the
   UI and Cortex keep only the four they need to switch user.
 - **Network segmentation.** The flat stack network is split: MariaDB, Redis and
