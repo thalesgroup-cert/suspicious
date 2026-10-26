@@ -2,52 +2,46 @@ import json
 import os
 import tempfile
 import unittest
-from unittest import mock
 
+from common.storage import FakeObjectStore
 from tasp.cron.prefix_source import PrefixSource
 from mail_feeder import submission_contract as sc
 
-
-def _obj(name, is_dir=False):
-    m = mock.Mock()
-    m.object_name = name
-    m.is_dir = is_dir
-    return m
+BUCKET = "feeder-bucket"
 
 
-def _resp(body: bytes):
-    r = mock.Mock()
-    r.read.return_value = body
-    return r
+def _status(state, sid, **extra):
+    return sc.build_status(
+        state, submission_id=sid, reported_by="u@x",
+        emails_to_analyze=extra.pop("emails", []), attachments=[])
+
+
+def _put(store, key, body: bytes):
+    import io
+    store.put(BUCKET, key, io.BytesIO(body), length=len(body))
+
+
+def _put_status(store, sid, manifest):
+    _put(store, f"{sid}/_status.json", json.dumps(manifest).encode())
+
+
+def _read_status(store, sid):
+    with store.open(BUCKET, f"{sid}/_status.json") as s:
+        return json.loads(s.read())
 
 
 class PrefixSourceTests(unittest.TestCase):
     def setUp(self):
-        self.client = mock.Mock()
-        self.src = PrefixSource(self.client, "feeder-bucket")
+        self.store = FakeObjectStore()
+        self.store.ensure_bucket(BUCKET)
+        self.src = PrefixSource(self.store, BUCKET)
 
     def test_iter_pending_yields_todo_and_processing_not_done(self):
-        self.client.list_objects.return_value = [
-            _obj("260326141159-aaa/", is_dir=True),
-            _obj("260326141200-bbb/", is_dir=True),
-            _obj("260326141201-ccc/", is_dir=True),
-        ]
-        statuses = {
-            "260326141159-aaa/_status.json": sc.build_status(
-                sc.STATUS_TODO, submission_id="260326141159-aaa",
-                reported_by="u@x", emails_to_analyze=[], attachments=[]),
-            "260326141200-bbb/_status.json": sc.build_status(
-                sc.STATUS_DONE, submission_id="260326141200-bbb",
-                reported_by="u@x", emails_to_analyze=[], attachments=[]),
-            "260326141201-ccc/_status.json": sc.build_status(
-                sc.STATUS_PROCESSING, submission_id="260326141201-ccc",
-                reported_by="u@x", emails_to_analyze=[], attachments=[]),
-        }
-
-        def get_object(bucket, name):
-            return _resp(json.dumps(statuses[name]).encode())
-
-        self.client.get_object.side_effect = get_object
+        for sid, state in (("260326141159-aaa", sc.STATUS_TODO),
+                           ("260326141200-bbb", sc.STATUS_DONE),
+                           ("260326141201-ccc", sc.STATUS_PROCESSING)):
+            _put_status(self.store, sid, _status(state, sid))
+        _put(self.store, "260326141202-ddd/no-status.txt", b"x")
 
         self.assertEqual(
             list(self.src.iter_pending()),
@@ -55,74 +49,58 @@ class PrefixSourceTests(unittest.TestCase):
         )
 
     def test_mark_email_done_appends_and_persists(self):
-        original = sc.build_status(
-            sc.STATUS_PROCESSING, submission_id="260326141159-aaa",
-            reported_by="u@x", emails_to_analyze=["a", "b"], attachments=[])
-        self.client.get_object.return_value = _resp(json.dumps(original).encode())
+        sid = "260326141159-aaa"
+        _put_status(self.store, sid, _status(sc.STATUS_PROCESSING, sid, emails=["a", "b"]))
 
-        self.src.mark_email_done("260326141159-aaa", "260326141159-bbb")
+        self.src.mark_email_done(sid, "260326141159-bbb")
 
-        _, kwargs = self.client.put_object.call_args
-        written = json.loads(kwargs["data"].read())
+        written = _read_status(self.store, sid)
         self.assertEqual(written["processed_emails"], ["260326141159-bbb"])
         self.assertEqual(written["status"], "processing")
 
     def test_mark_email_done_is_idempotent(self):
-        original = sc.build_status(
-            sc.STATUS_PROCESSING, submission_id="260326141159-aaa",
-            reported_by="u@x", emails_to_analyze=[], attachments=[])
+        sid = "260326141159-aaa"
+        original = _status(sc.STATUS_PROCESSING, sid)
         original["processed_emails"] = ["260326141159-bbb"]
-        self.client.get_object.return_value = _resp(json.dumps(original).encode())
+        _put_status(self.store, sid, original)
+        before = self.store.stat(BUCKET, f"{sid}/_status.json")
 
-        self.src.mark_email_done("260326141159-aaa", "260326141159-bbb")
+        self.src.mark_email_done(sid, "260326141159-bbb")
 
-        self.client.put_object.assert_not_called()
+        self.assertEqual(self.store.stat(BUCKET, f"{sid}/_status.json"), before)
+        self.assertEqual(_read_status(self.store, sid)["processed_emails"], ["260326141159-bbb"])
 
     def test_set_status_overwrites_preserving_fields(self):
-        original = sc.build_status(
-            sc.STATUS_TODO, submission_id="260326141159-aaa",
-            reported_by="u@x", emails_to_analyze=["a"], attachments=[])
-        self.client.get_object.return_value = _resp(json.dumps(original).encode())
+        sid = "260326141159-aaa"
+        _put_status(self.store, sid, _status(sc.STATUS_TODO, sid, emails=["a"]))
 
-        self.src.set_status("260326141159-aaa", sc.STATUS_PROCESSING)
+        self.src.set_status(sid, sc.STATUS_PROCESSING)
 
-        args, kwargs = self.client.put_object.call_args
-        written = json.loads(kwargs["data"].read())
+        written = _read_status(self.store, sid)
         self.assertEqual(written["status"], "processing")
         self.assertEqual(written["reported_by"], "u@x")
         self.assertEqual(written["emails_to_analyze"], ["a"])
-        self.assertEqual(kwargs["object_name"], "260326141159-aaa/_status.json")
 
 
 class PrefixDownloadTests(unittest.TestCase):
     def setUp(self):
-        self.client = mock.Mock()
-        self.src = PrefixSource(self.client, "feeder-bucket")
+        self.store = FakeObjectStore()
+        self.store.ensure_bucket(BUCKET)
+        self.src = PrefixSource(self.store, BUCKET)
 
     def test_download_returns_wrapper_path_and_writes_files(self):
-        self.client.list_objects.return_value = [
-            _obj("260326141159-aaa/user-submission.eml"),
-            _obj("260326141159-aaa/260326141159-bbb/ref.eml"),
-            _obj("260326141159-aaa/_status.json"),
-        ]
-
-        def fget_object(bucket, name, dst):
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            with open(dst, "wb") as f:
-                f.write(b"x")
-
-        self.client.fget_object.side_effect = fget_object
+        for key in ("user-submission.eml", "260326141159-bbb/ref.eml", "_status.json"):
+            _put(self.store, f"260326141159-aaa/{key}", b"x")
 
         with tempfile.TemporaryDirectory() as d:
             wrapper = self.src.download_submission("260326141159-aaa", d)
             self.assertTrue(wrapper.endswith("user-submission.eml"))
             self.assertTrue(os.path.exists(
                 os.path.join(d, "260326141159-aaa", "260326141159-bbb", "ref.eml")))
+            self.assertFalse(os.path.exists(
+                os.path.join(d, "260326141159-aaa", "_status.json")))
 
     def test_download_no_wrapper_returns_none(self):
-        self.client.list_objects.return_value = [
-            _obj("260326141159-aaa/_status.json"),
-        ]
-        self.client.fget_object.side_effect = lambda *a, **k: None
+        _put(self.store, "260326141159-aaa/_status.json", b"{}")
         with tempfile.TemporaryDirectory() as d:
             self.assertIsNone(self.src.download_submission("260326141159-aaa", d))

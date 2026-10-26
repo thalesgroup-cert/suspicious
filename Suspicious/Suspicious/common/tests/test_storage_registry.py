@@ -1,0 +1,116 @@
+import os
+from unittest.mock import patch
+
+from django.apps import apps
+from django.core.exceptions import ImproperlyConfigured
+from django.test import SimpleTestCase
+
+from common.storage import (
+    StorageConfigError, configured_provider_name, get_presign_store, get_store, reset_store_cache,
+)
+from common.storage.checks import check_storage_provider
+
+S3 = {"endpoint": "rustfs:9000", "public_endpoint": "localhost:35002", "access_key": "ak",
+      "secret_key": "sk", "secure": False}
+
+
+class RegistryTests(SimpleTestCase):
+    def setUp(self):
+        reset_store_cache()
+        self.addCleanup(reset_store_cache)
+        env = patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        os.environ.pop("STORAGE_PROVIDER", None)
+        self.cfg = patch("settings.config.get_config", return_value=None)
+        self.cfg.start()
+        self.addCleanup(self.cfg.stop)
+        sec = patch("settings.config.get_section", return_value=dict(S3))
+        sec.start()
+        self.addCleanup(sec.stop)
+
+    def test_default_is_s3(self):
+        self.assertEqual(configured_provider_name(), "s3")
+
+    def test_env_overrides_default(self):
+        os.environ["STORAGE_PROVIDER"] = "nope"
+        self.assertEqual(configured_provider_name(), "nope")
+
+    def test_runtime_setting_overrides_env(self):
+        os.environ["STORAGE_PROVIDER"] = "nope"
+        with patch("settings.config.get_config", return_value="s3"):
+            self.assertEqual(configured_provider_name(), "s3")
+
+    def test_unknown_provider_raises_with_known_names(self):
+        os.environ["STORAGE_PROVIDER"] = "nope"
+        with self.assertRaisesRegex(StorageConfigError, "nope.*s3"):
+            get_store()
+
+    def test_store_is_cached_until_reset(self):
+        first = get_store()
+        self.assertIs(get_store(), first)
+        reset_store_cache()
+        self.assertIsNot(get_store(), first)
+
+    def test_db_unavailable_falls_back_to_env(self):
+        os.environ["STORAGE_PROVIDER"] = "s3"
+        with patch("settings.config.get_config", side_effect=RuntimeError("db down")):
+            self.assertEqual(configured_provider_name(), "s3")
+            os.environ["STORAGE_PROVIDER"] = "nope"
+            self.assertEqual(configured_provider_name(), "nope")
+
+    def test_presign_store_uses_public_endpoint(self):
+        self.assertIn("localhost:35002", get_presign_store()._client.meta.endpoint_url)
+        self.assertIn("rustfs:9000", get_store()._client.meta.endpoint_url)
+
+    def _check(self, env, json_value):
+        if env is None:
+            os.environ.pop("STORAGE_PROVIDER", None)
+        else:
+            os.environ["STORAGE_PROVIDER"] = env
+        with patch("common.storage.checks.settings_get", return_value=json_value):
+            return check_storage_provider(None)
+
+    def test_startup_check_both_unset_passes(self):
+        self.assertEqual(self._check(None, None), [])
+
+    def test_startup_check_both_valid_passes(self):
+        self.assertEqual(self._check("s3", "s3"), [])
+
+    def test_startup_check_reports_unknown_env_even_if_json_valid(self):
+        errors = self._check("nope", "s3")
+        self.assertEqual([e.id for e in errors], ["storage.E001"])
+        self.assertIn("env", errors[0].msg)
+
+    def test_startup_check_reports_unknown_json_even_if_env_valid(self):
+        errors = self._check("s3", "bogus")
+        self.assertEqual([e.id for e in errors], ["storage.E001"])
+        self.assertIn("settings.json", errors[0].msg)
+
+
+class ReadyValidationTests(SimpleTestCase):
+    def _ready(self, env, json_value):
+        if env is None:
+            os.environ.pop("STORAGE_PROVIDER", None)
+        else:
+            os.environ["STORAGE_PROVIDER"] = env
+        with patch("common.storage.checks.settings_get", return_value=json_value), \
+                patch("suspicious.otel.configure"):
+            apps.get_app_config("suspicious").ready()
+
+    def setUp(self):
+        env = patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_unset_and_valid_values_do_not_raise(self):
+        self._ready(None, None)
+        self._ready("s3", "s3")
+
+    def test_bad_env_value_raises_naming_value_source_and_providers(self):
+        with self.assertRaisesRegex(ImproperlyConfigured, r"'nope'.*env STORAGE_PROVIDER.*s3"):
+            self._ready("nope", None)
+
+    def test_bad_settings_json_value_raises(self):
+        with self.assertRaisesRegex(ImproperlyConfigured, r"'bogus'.*settings.json storage.provider.*s3"):
+            self._ready(None, "bogus")

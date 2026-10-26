@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from api.permissions.submissions import CanAccessSubmission, submission_queryset
 from api.utils.observable_report import assemble_observables
 from case_handler.models import Case
-from common.clients import get_s3_client
+from common.storage import get_store
 from cortex_job.models import AnalyzerReport
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def _inline_screenshots(observables):
     so the template can render a note instead.
     """
     used = 0
-    client = None
+    store = None
     for o in observables:
         url = o.get("screenshot_url")
         o["screenshot_data_uri"] = None
@@ -50,10 +50,9 @@ def _inline_screenshots(observables):
             )
             if rep is None:
                 continue
-            client = client or get_s3_client()
-            data = client.get_object(
-                rep.screenshot_bucket, rep.screenshot_key
-            ).read()
+            store = store or get_store()
+            with store.open(rep.screenshot_bucket, rep.screenshot_key) as stream:
+                data = stream.read()
         except Exception as exc:
             logger.warning("report screenshot inline failed: report=%s err=%s",
                            report_id, exc)

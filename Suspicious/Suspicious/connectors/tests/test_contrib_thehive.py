@@ -55,7 +55,7 @@ class CampaignHookTest(SimpleTestCase):
         with mock.patch(f"{self.PATH}.Campaign") as campaign_model, \
                 mock.patch(f"{self.PATH}.sync_campaign") as sync, \
                 mock.patch(f"{self.PATH}.HiveClient") as client, \
-                mock.patch(f"{self.PATH}.get_s3_client"), \
+                mock.patch(f"{self.PATH}.get_store"), \
                 mock.patch(f"{self.PATH}._email_settings", return_value=("https://sus.example", ("meridian.example",))):
             connector.on_campaign_updated(mock.Mock(campaign_id=4))
         return campaign_model, sync, client

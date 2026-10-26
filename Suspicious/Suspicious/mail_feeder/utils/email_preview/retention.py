@@ -1,6 +1,6 @@
 """Purge objects from the `mail-previews` MinIO bucket.
 
-Operates directly on the bucket via `list_objects` (one listing call,
+Operates directly on the bucket via `list` (one listing call,
 using MinIO's own `.size`/`.last_modified` per object) rather than joining
 through `Mail` rows: there are no Mail-side timestamps to trust for this
 (a `Mail.date` header is attacker-controlled input parsed from the raw
@@ -25,7 +25,7 @@ from typing import Optional
 
 from django.utils import timezone
 
-from common.clients import get_s3_client
+from common.storage import get_store
 from mail_feeder.utils.email_preview.eml2png_renderer import _DEFAULT_PREVIEW_BUCKET
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def purge_mail_previews(
     if older_than_days is None and min_size_mb is None:
         raise ValueError("purge_mail_previews requires older_than_days and/or min_size_mb")
 
-    client = get_s3_client()
+    client = get_store()
     bucket = bucket or _DEFAULT_PREVIEW_BUCKET
 
     if not client.bucket_exists(bucket):
@@ -66,7 +66,7 @@ def purge_mail_previews(
     min_size_bytes = int(min_size_mb * 1024 * 1024) if min_size_mb else None
 
     result = PurgeResult()
-    for obj in client.list_objects(bucket, recursive=True):
+    for obj in client.list(bucket, recursive=True):
         size = obj.size or 0
         last_modified = obj.last_modified
 
@@ -77,13 +77,13 @@ def purge_mail_previews(
 
         if not dry_run:
             try:
-                client.remove_object(bucket, obj.object_name)
+                client.delete(bucket, obj.name)
             except Exception:
                 logger.warning(
                     "purge_mail_previews: failed to delete %s/%s",
-                    bucket, obj.object_name, exc_info=True,
+                    bucket, obj.name, exc_info=True,
                 )
-                result.errors.append(obj.object_name)
+                result.errors.append(obj.name)
                 continue
 
         result.deleted_count += 1

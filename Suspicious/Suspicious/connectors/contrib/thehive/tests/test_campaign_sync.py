@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import closing
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -9,15 +10,17 @@ from django.utils import timezone
 from case_handler.models import Campaign, CampaignMember, Case, CaseHasFileOrMail
 from connectors.contrib.thehive.campaign_material import Attachment, MailMaterial
 from connectors.contrib.thehive.campaign_sync import sync_campaign
+from common.storage import StoreError
+from common.storage.fake import FakeObjectStore, _Stream
 from mail_feeder.models import Mail
 
 S = "connectors.contrib.thehive.campaign_sync"
 HEADERS = 'From: "HR" <hr@evil.example>\r\nSubject: Verify payroll\r\n'
 
 
-class FakeMinio:
-    def get_object(self, bucket, key):
-        return type("Obj", (), {"read": lambda self: b"PNG:" + key.encode()})()
+class FakeStore(FakeObjectStore):
+    def open(self, bucket, key):
+        return closing(_Stream(b"PNG:" + key.encode()))
 
 
 class FakeHive:
@@ -115,7 +118,7 @@ class SyncTest(TestCase):
 
     def _sync(self):
         with patch(f"{S}.fetch_mail_material", side_effect=lambda client, mail_id: self.materials[mail_id]):
-            return sync_campaign(self.campaign, self.hive, minio=FakeMinio(), ui_base="https://sus.example",
+            return sync_campaign(self.campaign, self.hive, store=FakeStore(), ui_base="https://sus.example",
                                  own_domains=("meridian.example",))
 
     def test_first_sync_creates_the_alert_and_marks_members(self):
@@ -198,3 +201,19 @@ class SyncTest(TestCase):
             self.assertEqual(self._sync(), "created")
         self.assertTrue(any("notice.pdf: 403 license" in line for line in logs.output))
         self.assertTrue(all("thehive" in m.synced for m in self.campaign.members.all()))
+
+
+class OutageSyncTest(TestCase):
+    def test_an_unavailable_store_creates_no_alert_and_marks_nothing_synced(self):
+        class Down(FakeObjectStore):
+            def list_buckets(self):
+                raise StoreError("unavailable", "connection refused")
+
+        hive, campaign = FakeHive(), Campaign.objects.create(title="Verify payroll")
+        _member(campaign, 1)
+        cache.clear()
+        with self.assertRaises(StoreError):
+            sync_campaign(campaign, hive, store=Down(), ui_base="https://sus.example")
+        self.assertEqual(hive.creates, 0)
+        self.assertFalse(any("thehive" in m.synced for m in campaign.members.all()))
+        self.assertNotIn("thehive", Campaign.objects.get(pk=campaign.pk).external_refs)

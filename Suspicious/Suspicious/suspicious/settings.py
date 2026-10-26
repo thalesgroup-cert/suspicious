@@ -394,10 +394,6 @@ _DUAL_WRITE = str(_features.get("dual_storage_write", "0")).strip().lower() in {
 }
 
 if _storage_backend in {"s3", "dual"}:
-    MINIO_STORAGE_ENDPOINT      = _minio.get("endpoint",   "rustfs:9000")
-    MINIO_STORAGE_ACCESS_KEY    = _minio["access_key"]
-    MINIO_STORAGE_SECRET_KEY    = get_secret("storage.s3.secret_key", _minio.get("secret_key", ""))
-    MINIO_STORAGE_USE_HTTPS = bool(_minio.get("secure", False))
     MINIO_STORAGE_MEDIA_BUCKET_NAME = _minio.get("media_bucket", "suspicious-media")
     MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
     SUSPICIOUS_STORAGE_DUAL_WRITE = _DUAL_WRITE

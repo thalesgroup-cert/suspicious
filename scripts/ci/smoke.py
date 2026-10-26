@@ -50,9 +50,9 @@ def _poll(fn, timeout=240, every=6, what=""):
 
 def _check_bucket():
     code = (
-        "from common.clients import get_s3_client\n"
-        f"c=get_s3_client();b='{RT['feeder_bucket']}'\n"
-        "ks=[o.object_name for o in c.list_objects(b,recursive=True)] if c.bucket_exists(b) else []\n"
+        "from common.storage import get_store\n"
+        f"c=get_store();b='{RT['feeder_bucket']}'\n"
+        "ks=[o.name for o in c.list(b,recursive=True)] if c.bucket_exists(b) else []\n"
         "import json;print('OBJS',json.dumps([k for k in ks if k.endswith('email.json')]))"
     )
     out = _dj(code)

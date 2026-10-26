@@ -17,19 +17,18 @@ from __future__ import annotations
 
 import logging
 
-from django.conf import settings
 from django.http import StreamingHttpResponse
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from api.permissions.submissions import CanAccessSubmission, submission_queryset
+from api.storage import open_chunks
 from case_handler.models import Case
+from common.storage import get_store
 from mail_feeder.utils.email_preview.preview_jobs import enqueue_preview_render
 
 logger = logging.getLogger(__name__)
-
-_CHUNK_SIZE = 32 * 1024
 
 
 class MailPreviewView(APIView):
@@ -48,22 +47,24 @@ class MailPreviewView(APIView):
             enqueue_preview_render(mail.pk)
             raise NotFound("No preview available")
 
-        client = self._minio_client()
-        if client is None:
+        try:
+            store = get_store()
+        except Exception:
+            logger.exception("get_store failed for mail preview view")
             raise NotFound("Preview storage unavailable")
 
         try:
-            obj = client.get_object(bucket, key)
+            chunks = open_chunks(store, bucket, key)
         except Exception as exc:
             logger.warning(
-                "MinIO get_object failed: case_id=%s bucket=%s key=%s err=%s",
+                "Object store open failed: case_id=%s bucket=%s key=%s err=%s",
                 case.pk, bucket, key, exc,
             )
             enqueue_preview_render(mail.pk)
             raise NotFound("Preview unavailable") from exc
 
         response = StreamingHttpResponse(
-            _stream(obj), content_type="image/png",
+            chunks, content_type="image/png",
         )
         response["Cache-Control"] = "private, max-age=60"
         response["Content-Disposition"] = (
@@ -87,46 +88,3 @@ class MailPreviewView(APIView):
         if not mail:
             raise NotFound("No mail linked to case")
         return mail
-
-    @staticmethod
-    def _minio_client():
-        try:
-            from common.clients import get_s3_client
-            client = get_s3_client()
-            if client is not None:
-                return client
-        except Exception:
-            logger.exception(
-                "get_s3_client failed for mail preview view; "
-                "falling back to MINIO_STORAGE_*"
-            )
-
-        endpoint = getattr(settings, "MINIO_STORAGE_ENDPOINT", None)
-        access_key = getattr(settings, "MINIO_STORAGE_ACCESS_KEY", None)
-        secret_key = getattr(settings, "MINIO_STORAGE_SECRET_KEY", None)
-        if not (endpoint and access_key and secret_key):
-            logger.error("MinIO storage settings missing for mail preview view")
-            return None
-        try:
-            from minio import Minio
-            return Minio(
-                endpoint=endpoint,
-                access_key=access_key,
-                secret_key=secret_key,
-                secure=bool(getattr(settings, "MINIO_STORAGE_USE_HTTPS", False)),
-            )
-        except Exception:
-            logger.exception("Failed to build MinIO client for mail preview view")
-            return None
-
-
-def _stream(obj):
-    try:
-        for chunk in obj.stream(_CHUNK_SIZE):
-            yield chunk
-    finally:
-        try:
-            obj.close()
-            obj.release_conn()
-        except Exception:
-            pass

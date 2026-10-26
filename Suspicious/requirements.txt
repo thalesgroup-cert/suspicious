@@ -4,7 +4,7 @@ django-auth-ldap==5.3.0
 django-mysql==4.19.0
 mysqlclient==2.3.0
 python-ldap==3.4.8
-djangorestframework==3.18.1
+djangorestframework==3.18.3
 django-rest-knox==5.1.0
 django-filter==26.2
 drf-spectacular==0.30.0
@@ -19,7 +19,7 @@ compoundfiles==0.3
 compressed-rtf==1.0.7
 extract-msg==0.56.1
 pyspf==2.0.14
-tldextract==5.3.2
+tldextract==5.4.0
 dkimpy==1.1.8
 email-validator==2.3.0
 # Mail preview: imgkit wraps the wkhtmltopdf binary that ships in the
@@ -42,7 +42,7 @@ django-import-export==4.4.1
 # Request Handling
 requests==2.34.2
 PyJWT==2.15.1
-minio==7.2.20
+boto3==1.43.111
 tenacity==9.1.4
 pybreaker==1.4.1
 
@@ -55,7 +55,7 @@ chardet==7.6.0
 jinja2==3.1.6
 
 # Data Analysis and Machine Learning
-numpy==2.5.3
+numpy==2.5.4
 validators==0.35.0
 hashid==3.1.4
 
@@ -73,7 +73,7 @@ elasticsearch>=8.19,<9
 python-json-logger==4.2.0  # v4.x changed the API; pin to v3 until we migrate
 
 # Image rendering (cairosvg: SVG→PNG for Outlook email previews)
-pillow==12.3.0
+pillow==13.0.0
 cairosvg==2.9.1
 
 # Task Queue
@@ -86,8 +86,8 @@ hvac==2.4.0
 # Observability
 # 1.28.0+ needed: opentelemetry-proto pins protobuf<5 below that, which
 # conflicts with the >=5.29.6 fix for PYSEC-2026-1805.
-opentelemetry-sdk==1.45.0
-opentelemetry-instrumentation-django==0.66b0
-opentelemetry-instrumentation-requests==0.66b0
-opentelemetry-instrumentation-celery==0.66b0
-opentelemetry-exporter-otlp-proto-http==1.45.0
+opentelemetry-sdk==1.45.1
+opentelemetry-instrumentation-django==0.66b1
+opentelemetry-instrumentation-requests==0.66b1
+opentelemetry-instrumentation-celery==0.66b1
+opentelemetry-exporter-otlp-proto-http==1.45.1
