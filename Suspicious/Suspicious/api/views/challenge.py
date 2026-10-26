@@ -75,10 +75,9 @@ class CaseChallengeTokenView(APIView):
                     form.validated_data["proposed_result"], form.validated_data["reason"])
         except InvalidOrExpiredChallengeToken:
             return Response({"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
-        except ValueError as exc:
-            # codeql[py/stack-trace-exposure]: the only ValueError reachable here is
-            # mark_challenged()'s fixed "Case already challenged" literal.
-            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ValueError:
+            # mark_challenged() raises ValueError only when the case is already challenged.
+            return Response({"detail": "Case already challenged"}, status=status.HTTP_409_CONFLICT)
         except Exception:
             logger.exception("Unexpected error while challenging case_id=%s", case_id)
             return Response({"detail": "Unexpected error processing challenge."},

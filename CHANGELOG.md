@@ -203,6 +203,11 @@ management moving to HashiCorp Vault.
 
 ### Security
 
+- **No upstream error text in API responses.** A failed TheHive push now returns
+  a generic "TheHive push failed." (the error, with the TheHive URL, stays in the
+  audit log), and the challenge endpoint returns its own fixed "Case already
+  challenged" message instead of the exception text. This closes two CodeQL
+  `py/stack-trace-exposure` alerts.
 - **Frontend dependency fixes.** `vite` 8.1.5 to 8.1.6, `zod` 4.4.3 to 4.6.6
   and the `vitest` family 4.1.11 to 4.1.12 (which brings `@vitest/mocker` to
   the patched 4.1.12), plus pnpm overrides for the transitive `undici`
