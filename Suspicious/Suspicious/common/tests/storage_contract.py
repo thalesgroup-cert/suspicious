@@ -3,6 +3,7 @@ import tempfile
 from datetime import timedelta
 from pathlib import Path
 
+from common.storage import base
 from common.storage.base import StoreError
 
 
@@ -11,6 +12,7 @@ class StoreContract:
     provide make_store() and bucket."""
 
     bucket = "contract-bucket"
+    labels_supported = True
 
     def make_store(self):
         raise NotImplementedError
@@ -91,8 +93,12 @@ class StoreContract:
         self.assertIn(self.bucket, self.store.list_buckets())
 
     def test_bucket_labels_roundtrip(self):
-        self.store.set_bucket_labels(self.bucket, {"Status": "To Do"})
-        self.assertEqual(self.store.get_bucket_labels(self.bucket), {"Status": "To Do"})
+        if not self.labels_supported:
+            self.skipTest("this backend does not persist bucket labels")
+        labels = ({"Status": "To Do"} if base.FREE_FORM_BUCKET_TAGS in self.store.capabilities
+                  else {"status": "to-do"})
+        self.store.set_bucket_labels(self.bucket, labels)
+        self.assertEqual(self.store.get_bucket_labels(self.bucket), labels)
 
     def test_awkward_keys_roundtrip(self):
         key = "a b/ü+#%.eml"

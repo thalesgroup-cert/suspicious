@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import io
+import re
 from contextlib import contextmanager
 
 import requests
 from google.api_core import exceptions as gx
 from google.auth import exceptions as ax
 
-from .base import ObjectInfo, ObjectStore, ObjectStream, StoreError
+from . import base
+from .base import HealthStatus, ObjectInfo, ObjectStore, ObjectStream, StoreError
 
 _CHUNK = 262144
+
+_LABEL_KEY = re.compile(r"[a-z][a-z0-9_-]{0,62}")
+_LABEL_VALUE = re.compile(r"[a-z0-9_-]{0,63}")
+_MAX_LABELS = 64
 
 _BY_TYPE = (
     (gx.NotFound, "not_found"),
@@ -65,6 +71,16 @@ class _Stream:
 def _info(blob) -> ObjectInfo:
     return ObjectInfo(name=blob.name, size=blob.size or 0, etag=blob.etag,
                       last_modified=blob.updated, metadata=dict(blob.metadata or {}))
+
+
+def _validate_labels(bucket, labels):
+    if len(labels) > _MAX_LABELS:
+        raise StoreError("invalid", f"at most {_MAX_LABELS} labels, got {len(labels)}", bucket=bucket)
+    for key, value in labels.items():
+        if not _LABEL_KEY.fullmatch(key):
+            raise StoreError("invalid", f"invalid label key: {key!r}", bucket=bucket)
+        if not _LABEL_VALUE.fullmatch(value):
+            raise StoreError("invalid", f"invalid value for label {key!r}", bucket=bucket)
 
 
 class GcsStore(ObjectStore):
@@ -137,3 +153,45 @@ class GcsStore(ObjectStore):
         with _errors(bucket):
             b = self._client.bucket(bucket)
             b.delete_blobs([b.blob(k) for k in keys], on_error=lambda blob: None)
+
+    def bucket_exists(self, bucket):
+        with _errors(bucket):
+            return self._client.bucket(bucket).exists()
+
+    def ensure_bucket(self, bucket):
+        if self.bucket_exists(bucket):
+            return
+        try:
+            with _errors(bucket):
+                self._client.create_bucket(bucket, location=self._location, project=self._project)
+        except StoreError as exc:
+            if exc.code != "already_exists" or not self.bucket_exists(bucket):
+                raise
+
+    def list_buckets(self):
+        with _errors():
+            return [b.name for b in self._client.list_buckets(project=self._project)]
+
+    def get_bucket_labels(self, bucket):
+        with _errors(bucket):
+            b = self._client.bucket(bucket)
+            b.reload()
+            return dict(b.labels or {})
+
+    def set_bucket_labels(self, bucket, labels):
+        _validate_labels(bucket, labels)
+        with _errors(bucket):
+            b = self._client.bucket(bucket)
+            b.labels = dict(labels)
+            b.patch()
+
+    @property
+    def capabilities(self):
+        return frozenset({base.OBJECT_TAGS, base.LIFECYCLE, base.PRESIGN_PUT})
+
+    def health(self):
+        try:
+            self.list_buckets()
+        except StoreError as exc:
+            return HealthStatus(ok=False, detail=f"{exc.code}: {exc}")
+        return HealthStatus(ok=True)

@@ -8,6 +8,7 @@ from google.api_core import exceptions as gx
 from google.auth import exceptions as ax
 
 from common.storage import gcs
+from common.storage import base
 from common.storage.base import ObjectStore, StoreError
 from common.storage.gcs import GcsStore
 
@@ -61,6 +62,19 @@ class _Page(list):
 class _Bucket:
     def __init__(self, client, name):
         self.client, self.name = client, name
+        self.labels = dict(client.labels)
+
+    def exists(self):
+        if self.client.exists_error:
+            raise self.client.exists_error
+        return self.name in self.client.buckets
+
+    def reload(self):
+        self.labels = dict(self.client.labels)
+
+    def patch(self):
+        self.client.patched.append(dict(self.labels))
+        self.client.labels = dict(self.labels)
 
     def blob(self, key):
         return self.client.blobs.setdefault(key, _Blob(key))
@@ -91,6 +105,20 @@ class _Iterator:
 class _Client:
     def __init__(self):
         self.blobs, self.list_calls, self.pages, self.list_error, self.deleted = {}, [], [], None, None
+        self.buckets, self.exists_error, self.create_error, self.created = set(), None, None, []
+        self.labels, self.patched, self.listed, self.list_buckets_error = {}, [], [], None
+
+    def create_bucket(self, name, **kwargs):
+        self.created.append((name, kwargs))
+        if self.create_error:
+            raise self.create_error
+        self.buckets.add(name)
+
+    def list_buckets(self, **kwargs):
+        self.listed.append(kwargs)
+        if self.list_buckets_error:
+            raise self.list_buckets_error
+        return [type("B", (), {"name": n}) for n in sorted(self.buckets)]
 
     def bucket(self, name):
         return _Bucket(self, name)
@@ -102,8 +130,7 @@ class _Client:
 
 class _TestStore(GcsStore):
     """Stubs the abstract methods that later tasks implement."""
-    bucket_exists = ensure_bucket = list_buckets = get_bucket_labels = set_bucket_labels = None
-    presign_get = presign_put = capabilities = health = None
+    presign_get = presign_put = None
 
 
 def _store(client=None):
@@ -284,3 +311,101 @@ class GcsStoreTests(SimpleTestCase):
         with self.assertRaises(StoreError) as ctx:
             _store(client).delete_many("b", ["a"])
         self.assertEqual(ctx.exception.code, "access_denied")
+
+
+class GcsBucketTests(SimpleTestCase):
+    def test_ensure_bucket_idempotent_and_conflict_rechecks(self):
+        client = _Client()
+        store = _TestStore(client=client, location="EU", project="p")
+        store.ensure_bucket("b")
+        store.ensure_bucket("b")
+        self.assertEqual(client.created, [("b", {"location": "EU", "project": "p"})])
+        self.assertTrue(store.bucket_exists("b"))
+
+        raced = _Client()
+        raced.create_error = gx.Conflict("exists")
+        raced_store = _store(raced)
+        orig = raced.create_bucket
+
+        def create_then_appear(name, **kw):
+            raced.buckets.add(name)
+            orig(name, **kw)
+
+        raced.create_bucket = create_then_appear
+        raced_store.ensure_bucket("b")
+
+        owned = _Client()
+        owned.create_error = gx.Conflict("taken")
+        with self.assertRaises(StoreError) as ctx:
+            _store(owned).ensure_bucket("b")
+        self.assertEqual((ctx.exception.code, ctx.exception.bucket), ("already_exists", "b"))
+
+    def test_bucket_exists_forbidden_is_access_denied(self):
+        client = _Client()
+        client.exists_error = gx.Forbidden("no")
+        with self.assertRaises(StoreError) as ctx:
+            _store(client).bucket_exists("b")
+        self.assertEqual(ctx.exception.code, "access_denied")
+
+    def test_label_validation_table(self):
+        cases = {
+            "upper-case key": {"Status": "x"},
+            "space in value": {"status": "to do"},
+            "digit first": {"1status": "x"},
+            "65 labels": {f"k{i}": "v" for i in range(65)},
+            "64-char value": {"k": "v" * 64},
+            "64-char key": {"k" * 64: "v"},
+            "empty key": {"": "v"},
+        }
+        for name, labels in cases.items():
+            with self.subTest(name):
+                client = _Client()
+                with self.assertRaises(StoreError) as ctx:
+                    _store(client).set_bucket_labels("b", labels)
+                self.assertEqual(ctx.exception.code, "invalid")
+                self.assertEqual(client.patched, [])
+        with self.assertRaises(StoreError) as ctx:
+            _store().set_bucket_labels("b", {"ok": "v", "Bad": "v"})
+        self.assertIn("Bad", str(ctx.exception))
+
+    def test_label_validation_accepts_limits(self):
+        client = _Client()
+        labels = {"a" + "-_0"[i % 3] + str(i): "" for i in range(63)}
+        labels["k" * 63] = "v" * 63
+        _store(client).set_bucket_labels("b", labels)
+        self.assertEqual(client.patched, [labels])
+
+    def test_labels_roundtrip_through_patch(self):
+        client = _Client()
+        store = _store(client)
+        self.assertEqual(store.get_bucket_labels("b"), {})
+        store.set_bucket_labels("b", {"status": "to-do"})
+        self.assertEqual(client.patched, [{"status": "to-do"}])
+        self.assertEqual(store.get_bucket_labels("b"), {"status": "to-do"})
+
+    def test_labels_map_errors(self):
+        client = _Client()
+        client.bucket = lambda name: (_ for _ in ()).throw(gx.NotFound("no bucket"))
+        with self.assertRaises(StoreError) as ctx:
+            _store(client).get_bucket_labels("b")
+        self.assertEqual(ctx.exception.code, "not_found")
+
+    def test_capabilities_exclude_free_form_bucket_tags(self):
+        self.assertEqual(_store().capabilities,
+                         frozenset({base.OBJECT_TAGS, base.LIFECYCLE, base.PRESIGN_PUT}))
+
+    def test_health_reports_access_denied(self):
+        client = _Client()
+        self.assertTrue(_store(client).health().ok)
+        client.list_buckets_error = gx.Forbidden("nope")
+        status = _store(client).health()
+        self.assertFalse(status.ok)
+        self.assertTrue(status.detail.startswith("access_denied: "))
+
+    def test_list_buckets_uses_project(self):
+        client = _Client()
+        client.buckets = {"b", "a"}
+        store = _store(client)
+        store._project = "p"
+        self.assertEqual(store.list_buckets(), ["a", "b"])
+        self.assertEqual(client.listed, [{"project": "p"}])
