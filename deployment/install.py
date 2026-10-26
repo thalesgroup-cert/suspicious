@@ -232,7 +232,7 @@ def section_versions(env: dict) -> None:
 
     for svc, default in [
         ("DB_SUSPICIOUS_VERSION",  "11.4"),
-        ("ELASTICSEARCH_VERSION",  "8.19.7"),
+        ("ELASTICSEARCH_VERSION",  "8.19.23"),
         ("CORTEX_VERSION",         "4.0.0-1"),
         ("CHROMADB_VERSION",       "0.6.3"),
         ("TRAEFIK_VERSION",        "v3.3.4"),

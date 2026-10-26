@@ -25,5 +25,11 @@ RUN uv pip install --system --no-cache -r requirements.txt
 
 COPY . /worker/MailHeaderAnalyzer/
 
+# Run as an unprivileged user: a compromised analyzer must not be root in its
+# container. Cortex mounts the job directory read-write; if a deployment's job
+# directory is not writable by this uid, fix the directory, not the user.
+RUN useradd --system --uid 1001 --no-create-home --shell /usr/sbin/nologin analyzer
+USER 1001:1001
+
 # Expose the application
 ENTRYPOINT ["python","MailHeaderAnalyzer/mail_header_analyzer.py"]

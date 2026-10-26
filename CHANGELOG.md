@@ -209,6 +209,14 @@ management moving to HashiCorp Vault.
   to a single `storage.s3.web_bucket` (default `mail-submissions`), one key
   prefix per submission, with no `Status` tag so the legacy scanner skips it.
   Existing per-submission buckets are left as they are.
+
+- **Elasticsearch 8.19.7 to 8.19.23.** The pinned image was behind fixes for
+  denial of service through uncontrolled recursion, stack exhaustion, ES|QL CPU
+  and memory use and an indexing flaw, and an HTTP request-smuggling issue
+  (ESA-2026-68, -74, -77, -78, -141, -185, -196). It is a patch upgrade inside
+  8.19, so data is kept. On an existing deployment set `ELASTICSEARCH_VERSION=8.19.23`
+  in `.env`, then `make deploy` (or recreate `elasticsearch`) and re-run
+  `scripts/es-security-bootstrap.sh`.
 - **No upstream error text in API responses.** A failed TheHive push now returns
   a generic "TheHive push failed." (the error, with the TheHive URL, stays in the
   audit log), and the challenge endpoint returns its own fixed "Case already
