@@ -75,6 +75,13 @@ class S3StoreTests(SimpleTestCase):
             (_client_error("403", 403), "access_denied"),
             (_client_error("InvalidArgument", 400), "invalid"),
             (_client_error("InternalError", 500), "unavailable"),
+            (_client_error("Whatever", 408), "unavailable"),
+            (_client_error("Whatever", 429), "unavailable"),
+            (_client_error("RequestTimeout", 400), "unavailable"),
+            (_client_error("SlowDown", 503), "unavailable"),
+            (_client_error("Throttling", 400), "unavailable"),
+            (_client_error("ThrottlingException", 400), "unavailable"),
+            (_client_error("InternalError", 0), "unavailable"),
             (E(endpoint_url="http://x"), "unavailable"),
             (ConnectTimeoutError(endpoint_url="http://x"), "unavailable"),
             (ParamValidationError(report="bad"), "invalid"),
@@ -120,7 +127,7 @@ class S3StoreTests(SimpleTestCase):
         with Stubber(client) as stub:
             stub.add_response("put_object", {}, {
                 "Bucket": "b", "Key": "k", "Body": b"hi", "ContentType": "text/plain",
-                "Metadata": {"a": "1"}, "Tagging": "t=v+w",
+                "Metadata": {"a": "1"}, "Tagging": "t=v%20w",
             })
             _store(client).put("b", "k", b"hi", content_type="text/plain", metadata={"a": "1"}, tags={"t": "v w"})
             stub.assert_no_pending_responses()

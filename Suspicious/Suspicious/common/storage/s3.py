@@ -20,6 +20,7 @@ _DELETE_BATCH = 1000
 _NOT_FOUND = {"NoSuchKey", "NoSuchBucket", "NotFound", "404"}
 _DENIED = {"AccessDenied", "Forbidden", "403", "AllAccessDisabled", "InvalidAccessKeyId", "SignatureDoesNotMatch"}
 _ALREADY = {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"}
+_UNAVAILABLE = {"RequestTimeout", "SlowDown", "Throttling", "ThrottlingException", "InternalError"}
 
 
 def _map(exc: Exception, bucket=None, key=None) -> StoreError:
@@ -41,7 +42,7 @@ def _map(exc: Exception, bucket=None, key=None) -> StoreError:
             code = "access_denied"
         elif name in _ALREADY:
             code = "already_exists"
-        elif status >= 500:
+        elif name in _UNAVAILABLE or status in (408, 429) or status >= 500:
             code = "unavailable"
         else:
             code = "invalid"
@@ -120,7 +121,7 @@ class S3Store(ObjectStore):
         if metadata:
             extra["Metadata"] = metadata
         if tags:
-            extra["Tagging"] = urlencode(tags)
+            extra["Tagging"] = urlencode(tags, quote_via=quote)
         with _errors(bucket, key):
             if isinstance(data, (bytes, bytearray)) or length is not None:
                 args = {"Bucket": bucket, "Key": key, "Body": data, **extra}
