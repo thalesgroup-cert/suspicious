@@ -182,6 +182,7 @@ class GcsStore(ObjectStore):
         _validate_labels(bucket, labels)
         with _errors(bucket):
             b = self._client.bucket(bucket)
+            b.reload()  # the labels setter derives removals from the loaded set; patch() only merges
             b.labels = dict(labels)
             b.patch()
 

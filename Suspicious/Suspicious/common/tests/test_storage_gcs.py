@@ -7,8 +7,7 @@ from django.test import SimpleTestCase
 from google.api_core import exceptions as gx
 from google.auth import exceptions as ax
 
-from common.storage import gcs
-from common.storage import base
+from common.storage import base, gcs
 from common.storage.base import ObjectStore, StoreError
 from common.storage.gcs import GcsStore
 
@@ -62,7 +61,16 @@ class _Page(list):
 class _Bucket:
     def __init__(self, client, name):
         self.client, self.name = client, name
-        self.labels = dict(client.labels)
+        self._labels, self._removals = {}, set()  # real buckets load labels only on reload()
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @labels.setter
+    def labels(self, mapping):
+        self._removals |= set(self._labels) - set(mapping)
+        self._labels = dict(mapping)
 
     def exists(self):
         if self.client.exists_error:
@@ -70,11 +78,16 @@ class _Bucket:
         return self.name in self.client.buckets
 
     def reload(self):
-        self.labels = dict(self.client.labels)
+        self._labels, self._removals = dict(self.client.labels), set()
 
     def patch(self):
-        self.client.patched.append(dict(self.labels))
-        self.client.labels = dict(self.labels)
+        """Server-side merge, as in the real library: only removals tracked on this
+        object delete keys."""
+        self.client.patched.append(dict(self._labels))
+        merged = {**self.client.labels, **self._labels}
+        for key in self._removals:
+            merged.pop(key, None)
+        self.client.labels = merged
 
     def blob(self, key):
         return self.client.blobs.setdefault(key, _Blob(key))
@@ -382,6 +395,20 @@ class GcsBucketTests(SimpleTestCase):
         store.set_bucket_labels("b", {"status": "to-do"})
         self.assertEqual(client.patched, [{"status": "to-do"}])
         self.assertEqual(store.get_bucket_labels("b"), {"status": "to-do"})
+
+    def test_set_labels_replaces_the_whole_set(self):
+        client = _Client()
+        store = _store(client)
+        store.set_bucket_labels("b", {"a": "1", "b": "2"})
+        store.set_bucket_labels("b", {"a": "1"})
+        self.assertEqual(client.labels, {"a": "1"})
+        self.assertEqual(store.get_bucket_labels("b"), {"a": "1"})
+
+    def test_set_empty_labels_clears_all(self):
+        client = _Client()
+        client.labels = {"a": "1", "b": "2"}
+        _store(client).set_bucket_labels("b", {})
+        self.assertEqual(client.labels, {})
 
     def test_labels_map_errors(self):
         client = _Client()
