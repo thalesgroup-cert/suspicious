@@ -182,7 +182,9 @@ class GcsStore(ObjectStore):
     @contextmanager
     def open(self, bucket, key):
         with _errors(bucket, key):
-            reader = self._client.bucket(bucket).blob(key).open("rb", chunk_size=_CHUNK)
+            blob = self._client.bucket(bucket).blob(key)
+            blob.reload()  # BlobReader is lazy; fail here, not on first read
+            reader = blob.open("rb", chunk_size=_CHUNK)
         stream: ObjectStream = _Stream(reader, bucket, key)
         try:
             yield stream

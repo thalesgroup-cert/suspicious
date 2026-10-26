@@ -1,8 +1,10 @@
 import io
 import json
+import os
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
-from unittest import mock
+from unittest import mock, skipUnless
 from urllib.parse import parse_qs, urlsplit
 
 import requests
@@ -16,6 +18,7 @@ from google.cloud import storage
 from google.oauth2 import service_account
 
 from common.storage import StorageConfigError, base, gcs
+from common.tests.storage_contract import StoreContract
 from common.storage.base import ObjectStore, StoreError
 from common.storage.gcs import GcsStore, Signer
 
@@ -45,6 +48,10 @@ class _Blob:
 
     def upload_from_file(self, fileobj, **kwargs):
         self.calls.append(("upload", fileobj.read(), kwargs, self.metadata))
+
+    def reload(self):
+        if self.error:
+            raise self.error
 
     def open(self, mode, **kwargs):
         self.calls.append(("open", mode, kwargs))
@@ -667,3 +674,26 @@ class GcsFromConfigTests(SimpleTestCase):
                 GcsStore.from_config({})
         self.assertIn("storage.gcs.credentials", str(ctx.exception))
         self.assertNotIn("/secret/x", str(ctx.exception))
+
+
+@skipUnless(os.environ.get("STORAGE_LIVE_GCS_ENDPOINT"),
+            "set STORAGE_LIVE_GCS_ENDPOINT to run against a GCS emulator")
+class LiveGcsContract(StoreContract, SimpleTestCase):
+    bucket = f"contract-{uuid.uuid4().hex[:12]}"
+    # the emulator does not persist bucket labels
+    labels_supported = os.environ.get("STORAGE_LIVE_GCS_LABELS") == "1"
+
+    def make_store(self):
+        return GcsStore.from_config({"api_endpoint": os.environ["STORAGE_LIVE_GCS_ENDPOINT"],
+                                     "credentials": "anonymous", "project": "test"})
+
+    def tearDown(self):
+        keys = [o.name for o in self.store.list(self.bucket)]
+        self.store.delete_many(self.bucket, keys)
+        self.store._client.bucket(self.bucket).delete()
+        super().tearDown()
+
+    def test_presign_get_contains_key_and_expiry(self):
+        # the emulator does not enforce signatures; signing is covered offline
+        # by GcsPresignTests
+        pass
