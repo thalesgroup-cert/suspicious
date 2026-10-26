@@ -5,7 +5,6 @@ from django.urls import reverse
 
 from api.tests.test_ciso_submission_scope import CisoSubmissionScopeBase, _user
 from case_handler.lifecycle import LifecycleState
-from case_handler.models import Case
 
 CHALLENGE_BODY = {"proposed_result": "Dangerous", "reason": "this is a real phish"}
 
