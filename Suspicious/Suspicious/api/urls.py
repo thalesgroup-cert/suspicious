@@ -31,6 +31,8 @@ from api.views.health import HealthView
 from api.views.mail_preview import MailPreviewView
 from api.views.investigations import (
     InvestigationDetailsView,
+    InvestigationBulkRedoView,
+    InvestigationBulkVerdictView,
     InvestigationGlobalEditView,
     InvestigationListView,
     InvestigationRedoAnalysisView,
@@ -145,6 +147,8 @@ urlpatterns = [
 
     path("investigations/", InvestigationListView.as_view(), name="investigation-list"),
     path("investigations/<int:case_id>/", InvestigationDetailsView.as_view(), name="investigation-details"),
+    path("investigations/bulk/verdict/", InvestigationBulkVerdictView.as_view(), name="investigation-bulk-verdict"),
+    path("investigations/bulk/redo-analysis/", InvestigationBulkRedoView.as_view(), name="investigation-bulk-redo"),
     path("investigations/<int:case_id>/edit-global/", InvestigationGlobalEditView.as_view(), name="investigation-edit-global"),
     path("investigations/<int:case_id>/redo-analysis/",
          InvestigationRedoAnalysisView.as_view(), name="investigation-redo-analysis"),
