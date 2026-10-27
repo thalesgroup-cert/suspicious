@@ -77,11 +77,12 @@ class ChallengeSendTest(SimpleTestCase):
     """Observables are what TheHive analyses (values, and files it hashes);
     the Attachments tab holds evidence files, so a file is never sent to both."""
 
-    def send(self, preview):
+    def send(self, preview, attach_result=(1, 0, [])):
         from unittest.mock import MagicMock
         from connectors.contrib.thehive.challenge_alert import send_challenge_alert
         client = MagicMock()
         client.create_alert.return_value = {"_id": "~1"}
+        client.add_attachments.return_value = attach_result
         m = member(351)
         m.preview = preview
         send_challenge_alert(client, _case(), m, CHALLENGER, ref="r", ui_base="")
@@ -97,3 +98,8 @@ class ChallengeSendTest(SimpleTestCase):
     def test_no_preview_means_nothing_to_attach(self):
         client = self.send(b"")
         self.assertEqual(client.add_attachments.call_args.args[1], [])
+
+    def test_a_rejected_preview_is_logged_not_lost(self):
+        with self.assertLogs("connectors.contrib.thehive.challenge_alert", "WARNING") as logs:
+            self.send(b"\x89PNG", attach_result=(0, 0, ["mail-preview-case-351.png: 403 manageAlert/update"]))
+        self.assertIn("403 manageAlert/update", logs.output[0])

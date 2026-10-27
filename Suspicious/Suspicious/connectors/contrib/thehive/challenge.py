@@ -284,6 +284,20 @@ class ChallengeToTheHiveService:
             _save_thehive_alert_id(case, alert)
         except Exception as e:
             logger.error(f"Failed to create TheHive alert for case #{_safe(case.id)}: {e}")
+            if not case.thehive_alert_id:
+                self._send_basic_alert(api_url, api_key, case, mail, challenger)
+
+    def _send_basic_alert(self, api_url, api_key, case, mail, challenger) -> None:
+        """The full alert could not be built; the analyst still has to hear about the challenge."""
+        try:
+            alert = create_alert_from_challenge_without_mail(
+                api_url=api_url, api_key=api_key, case=case, file=None,
+                ioc=mail.subject or f"case {case.id}", datatype="mail-subject",
+                challenger=challenger,
+            )
+            _save_thehive_alert_id(case, alert)
+        except Exception as e:
+            logger.error(f"Failed to create the basic TheHive alert for case #{_safe(case.id)}: {e}")
 
 
 # ── standalone alert helpers ────────────────────────────────────────────────
