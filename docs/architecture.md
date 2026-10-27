@@ -17,6 +17,7 @@ and a Celery worker.
 | `cortex` | Analyzer execution engine (YARA, AI, sandbox) |
 | `chromadb` / `chromadb_proxy` | Vector DB for semantic similarity search; reachable only through the token-checking nginx proxy (`CHROMA_TOKEN`) |
 | `feeder` | IMAP poller that auto-ingests emails (container `email_feeder`) |
+| `mail_renderer` | Headless Chromium that draws the mail preview PNG; isolated on an internal network with only Django and Celery, no route out |
 | `traefik` | Reverse proxy with TLS termination |
 | `tempo` / `grafana` | Optional OpenTelemetry trace store + dashboards (manual setup under `deployment/docker/monitoring/`) |
 

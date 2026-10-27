@@ -4,6 +4,7 @@
 # Order of operations:
 #   1. Pull latest images (no downtime — just downloads)
 #   2. Run database migrations (forward-compatible migrations first)
+#   2b. Start mail_renderer (isolated mail-preview browser; Django calls it)
 #   3. Restart suspicious (rolling — healthcheck gates the cutover)
 #   4. Restart suspicious_celery and suspicious_celery_beat (no web traffic)
 #   5. Restart feeder (simple restart)
@@ -55,7 +56,7 @@ ok "Vault unseal checked"
 # source the ones that fail, so a source-based stack deploys the same way.
 step "Pulling latest images"
 to_build=""
-for svc in suspicious suspicious_ui feeder; do
+for svc in suspicious suspicious_ui feeder mail_renderer; do
   if $COMPOSE pull "$svc"; then
     ok "pulled $svc"
   else
@@ -84,6 +85,12 @@ ok "Runtime config seeded"
 step "Collecting static files"
 $COMPOSE exec -T "${WEB_CONTAINER}" python manage.py collectstatic --no-input --clear
 ok "Static files collected"
+
+# ── 4b. Mail preview renderer (up before the app that calls it) ──────────
+step "Starting mail_renderer"
+$COMPOSE up -d --no-deps mail_renderer
+bash "${SCRIPTS}/health-wait.sh" "${SVC_PREFIX:-}mail_renderer" 120
+ok "mail_renderer up"
 
 # ── 5. Rolling restart: suspicious ───────────────────────────────────────
 # --no-deps: don't restart dependencies (db, cortex, etc.)

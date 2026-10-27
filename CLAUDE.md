@@ -63,6 +63,7 @@ python manage.py createsuperuser
 | `rustfs` | MinIO-compatible S3 object storage (artifacts/attachments) |
 | `cortex` | Analyzer execution engine (YARA, AI, sandbox); reports back via HMAC-signed webhook |
 | `chromadb` | Vector DB for semantic similarity search |
+| `mail_renderer` | Isolated headless Chromium (`mail-renderer/`) that draws the mail preview PNG from sanitised HTML; internal network shared only with Django and Celery, no route out |
 | `ai_inference` | AIMailAnalyzer model server (FastAPI, profile `ai`, port 8090 published on the Docker default-bridge gateway `172.17.0.1`). Holds the vectorizer + classifier weights; the Cortex `AI_Mail_Analyzer` job is a thin HTTP client to it. `make` targets enable the profile; plain compose needs `--profile ai` |
 | `email_feeder` | IMAP poller that auto-ingests emails (runs as non-root `feeder` UID) |
 | `vault` | Secrets store — connector credentials and other runtime secrets |
@@ -163,7 +164,7 @@ cd deployment
 docker network create --driver bridge --subnet 172.20.0.0/16 \
   --gateway 172.20.0.1 --ip-range 172.20.0.0/24 suspicious_net   # or `make network`
 bash scripts/gen-service-secrets.sh .env .env.data   # Redis/ES/Chroma passwords (make init does this too)
-docker compose --env-file .env build suspicious suspicious_ui feeder
+docker compose --env-file .env build suspicious suspicious_ui feeder mail_renderer
 docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb chromadb_proxy
 # AI verdicts need the model server too (weights in Analyzers/AIMailAnalyzer/models/, git-ignored):
 docker compose --env-file .env --profile ai up -d --build ai_inference

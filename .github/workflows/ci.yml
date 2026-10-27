@@ -30,6 +30,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       feeder: ${{ steps.filter.outputs.feeder }}
+      renderer: ${{ steps.filter.outputs.renderer }}
       analyzers: ${{ steps.filter.outputs.analyzers }}
       ui: ${{ steps.filter.outputs.ui }}
       ci: ${{ steps.filter.outputs.ci }}
@@ -43,6 +44,8 @@ jobs:
               - 'Suspicious/**'
             feeder:
               - 'email-feeder/**'
+            renderer:
+              - 'mail-renderer/**'
             analyzers:
               - 'Analyzers/**'
             ui:
@@ -281,3 +284,22 @@ jobs:
           tags: suspicious-feeder:ci
           cache-from: type=gha,scope=suspicious-feeder
           cache-to: type=gha,mode=max,scope=suspicious-feeder
+
+  docker-build-mail-renderer:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.renderer == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build suspicious-mail-renderer (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./mail-renderer
+          push: false
+          tags: suspicious-mail-renderer:ci
+          cache-from: type=gha,scope=suspicious-mail-renderer
+          cache-to: type=gha,mode=max,scope=suspicious-mail-renderer

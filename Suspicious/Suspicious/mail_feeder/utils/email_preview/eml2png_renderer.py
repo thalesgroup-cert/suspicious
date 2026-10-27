@@ -1,13 +1,11 @@
 """
 Render an .eml/.msg file to a PNG preview.
 
-Replaces the previous external `eml2png==0.0.2` CLI dependency with a
-pure-Python pipeline: stdlib `email` parses the message, we build a
-sanitised HTML wrapper (headers + body), then `imgkit` calls the
-already-installed `wkhtmltopdf` binary to rasterise to PNG.
-
-`wkhtmltopdf` is staying in the runtime image for now; imgkit is a
-thin Python wrapper around it.
+Pipeline: stdlib `email` parses the message, we build a sanitised HTML
+wrapper (headers + body), then post it to the `mail_renderer` service, an
+isolated headless-Chromium container with no route out (see
+`mail-renderer/server.py`), which returns the PNG. This replaced
+wkhtmltoimage, an unmaintained 2020 WebKit that ran inside this image.
 
 Storage
 -------
@@ -23,6 +21,7 @@ from __future__ import annotations
 import email
 import io
 import logging
+import os
 from email.message import EmailMessage
 from email.policy import default as email_default_policy
 from html import escape
@@ -30,6 +29,7 @@ from pathlib import Path
 from typing import Optional
 
 import nh3
+import requests
 from django.conf import settings
 
 from common.storage import get_store
@@ -42,22 +42,17 @@ _DEFAULT_PREVIEW_BUCKET = "mail-previews"
 
 _RENDER_WIDTH_PX = 900
 
-# wkhtmltoimage renders the *entire* page as one image with no pagination:
-# an email body with pathological height (a long forwarded/quoted chain, or
-# a hostile HTML payload designed to bloat the render) produces an
-# arbitrarily tall PNG with no upper bound. `--height` hard-crops the
-# render instead of scaling it, which is fine for a preview thumbnail (it
-# only needs to show the top of the email, not be a full readable
-# document). Observed in production: previews up to 1.7GB before this cap,
-# from an unbounded-height render, filling the mail-previews bucket.
-_MAX_RENDER_HEIGHT_PX = 4000
-
-# Belt-and-suspenders: even a capped-height render can still bloat past a
-# sane size (e.g. many large embedded images at full color). Drop the
-# render entirely rather than store it; MailPreviewView already treats a
-# missing preview as a 404 + lazy re-render trigger, so this degrades the
-# same way any other render failure does.
+# The renderer clips every screenshot to the content, at most 4000px tall, and
+# answers with a compressed PNG (a typical mail is tens of KB). This is the
+# belt-and-braces guard on top: drop a render that still comes back oversized
+# rather than store it; MailPreviewView already treats a missing preview as a
+# 404 + lazy re-render trigger, so this degrades like any other render failure.
 _MAX_PNG_BYTES = 15 * 1024 * 1024
+
+# Isolated renderer (compose service `mail_renderer`). Connect fast, wait longer
+# than the renderer's own per-request limit (30 s) so its answer is the one we get.
+_RENDERER_URL = os.environ.get("MAIL_RENDERER_URL", "http://mail_renderer:8080")
+_RENDER_TIMEOUT = (3, 40)
 
 _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
 
@@ -65,34 +60,12 @@ _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
 # mail cannot hide the header rows the analyst relies on.
 _KEEP_VISIBLE = "visibility:visible !important;display:{} !important"
 
-# Network containment, independent of the sanitiser: wkhtmltoimage is pointed
-# at a loopback port nothing listens on, so a reference that gets past
-# sanitize_email_html() reaches no host (the resource is simply not loaded:
-# load-error-handling=ignore renders the page without it).
-# `proxy-hostname-lookup` keeps DNS lookups off the worker's resolver too.
-_CLOSED_PROXY = "http://127.0.0.1:1"
-
-
 class Eml2PngRenderer:
-    """Render an .eml file to a PNG preview via stdlib email + imgkit."""
-
-    def __init__(self) -> None:
-        try:
-            import imgkit  # noqa: F401  (probed for availability)
-            self._imgkit_available = True
-        except Exception:
-            self._imgkit_available = False
+    """Render an .eml file to a PNG preview via stdlib email + the mail_renderer service."""
 
     # Public API
 
     def render_eml_path_to_png_bytes(self, eml_path: Path) -> Optional[bytes]:
-        if not self._imgkit_available:
-            logger.error(
-                "imgkit not importable, install imgkit and wkhtmltopdf "
-                "in the runtime image to enable mail previews"
-            )
-            return None
-
         if not eml_path.exists():
             logger.warning("EML file not found: %s", eml_path)
             return None
@@ -156,10 +129,9 @@ class Eml2PngRenderer:
         We escape every header value, prefer the HTML body when present,
         and fall back to the text/plain body wrapped in <pre>. The body
         HTML goes through sanitize_email_html() (allow-list, no resource
-        references) and is rasterised to a PNG with images, JavaScript,
-        local-file access and the network all disabled at imgkit time (see
-        _render_html_to_png), so it cannot phone home, read host files, or
-        execute script.
+        references) and is rasterised by the isolated renderer with JavaScript
+        off, every request aborted and no network route, so it cannot phone
+        home, read host files, or execute script.
         """
         header_rows = []
         for name in _VISIBLE_HEADERS:
@@ -266,44 +238,32 @@ class Eml2PngRenderer:
         return "<em>(empty body)</em>"
 
     def _render_html_to_png(self, html: str) -> Optional[bytes]:
-        import imgkit
+        # A session of our own with trust_env off: the renderer is an internal
+        # service, so HTTP(S)_PROXY from the environment must not apply to it.
+        with requests.Session() as session:
+            session.trust_env = False
+            try:
+                resp = session.post(
+                    f"{_RENDERER_URL}/render",
+                    data=html.encode("utf-8"),
+                    headers={"Content-Type": "text/html; charset=utf-8"},
+                    timeout=_RENDER_TIMEOUT,
+                )
+            except requests.RequestException as exc:
+                logger.error("mail renderer unreachable: %s", exc)
+                return None
 
-        options = {
-            "format": "png",
-            "encoding": "utf-8",
-            "width": str(_RENDER_WIDTH_PX),
-            "height": str(_MAX_RENDER_HEIGHT_PX),
-            # `--height` only sets the *viewport*: wkhtmltoimage still grows the
-            # image to the full content height (observed: 923 MB PNGs, ~600 MB
-            # RSS per render). `--crop-*` is what actually bounds the output.
-            "crop-x": "0",
-            "crop-y": "0",
-            "crop-w": str(_RENDER_WIDTH_PX),
-            "crop-h": str(_MAX_RENDER_HEIGHT_PX),
-            "quiet": "",
-            "no-images": "",
-            "disable-javascript": "",
-            "disable-local-file-access": "",
-            "proxy": _CLOSED_PROXY,
-            "proxy-hostname-lookup": "",
-            "load-error-handling": "ignore",
-            "load-media-error-handling": "ignore",
-        }
-
-        try:
-            png_bytes = imgkit.from_string(html, output_path=False, options=options)
-        except Exception as exc:
-            logger.error("imgkit failed to render preview: %s", exc)
+        if resp.status_code != 200:
+            logger.error("mail renderer answered %s: %s", resp.status_code, resp.text[:200])
             return None
 
-        if png_bytes and len(png_bytes) > _MAX_PNG_BYTES:
+        png_bytes = resp.content
+        if len(png_bytes) > _MAX_PNG_BYTES:
             logger.warning(
-                "imgkit preview render exceeded %d bytes (got %d) even after "
-                "the %dpx height cap, dropping instead of storing",
-                _MAX_PNG_BYTES, len(png_bytes), _MAX_RENDER_HEIGHT_PX,
+                "mail renderer returned %d bytes (limit %d), dropping instead of storing",
+                len(png_bytes), _MAX_PNG_BYTES,
             )
             return None
-
         return png_bytes
 
 

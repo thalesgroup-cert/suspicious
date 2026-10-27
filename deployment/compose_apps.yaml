@@ -57,6 +57,7 @@ services:
       - data
       - storage
       - cortex
+      - renderer
 
   # ── suspicious_celery (Celery worker) ─────────────────────────────────
   #
@@ -112,6 +113,7 @@ services:
       - data
       - storage
       - cortex
+      - renderer
 
   # ── suspicious_celery_beat (Celery beat scheduler) ────────────────────
 
@@ -333,6 +335,35 @@ services:
       - suspicious_network
       - storage
 
+  # ── mail_renderer (isolated headless Chromium for the mail preview) ──────
+  #
+  # Rasterises the sanitised HTML of a reported mail (mail-renderer/server.py).
+  # It sits alone with the services that call it on an `internal` network, so a
+  # browser bug has no route to anything else or to the internet. Hardened the
+  # way Playwright documents for untrusted content: non-root user, its seccomp
+  # profile (what lets Chromium's own sandbox work in a container), `shm_size`
+  # instead of the host IPC namespace, plus no capabilities, a read-only root and
+  # memory/process limits.
+  mail_renderer:
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    environment:
+      HOME: /tmp
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+    shm_size: 1gb
+    mem_limit: 1g
+    pids_limit: 512
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - "seccomp=${MAIL_RENDERER_PATH:-../mail-renderer}/seccomp_profile.json"
+    networks:
+      - renderer
+
   # ── vault (HashiCorp Vault — secrets) ──────────────────────────────────
 
   vault:
@@ -372,6 +403,8 @@ networks:
     internal: true
   storage:             # RustFS: Django, Celery and the feeder only
   cortex:              # Cortex and Elasticsearch: Django and Celery only
+  renderer:            # mail_renderer: Django and Celery only, no route out
+    internal: true
   reverse_network:
   docker_cortex:
     internal: true
