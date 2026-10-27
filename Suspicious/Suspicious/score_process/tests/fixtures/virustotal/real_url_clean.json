@@ -1,0 +1,56 @@
+{
+ "data_type": "url",
+ "expect": {
+  "confidence_min": 60,
+  "level": "safe"
+ },
+ "report_full": {
+  "attributes": {
+   "categories": {
+    "BitDefender": "business",
+    "Forcepoint ThreatSeeker": "business and economy",
+    "Google": "aerospace",
+    "Sophos": "general business"
+   },
+   "last_analysis_date": 1792609039,
+   "last_analysis_stats": {
+    "harmless": 59,
+    "malicious": 0,
+    "suspicious": 0,
+    "timeout": 0,
+    "undetected": 34
+   },
+   "reputation": -43,
+   "tags": [
+    "multiple-redirects",
+    "iframes",
+    "trackers",
+    "external-resources"
+   ],
+   "tld": "com",
+   "total_votes": {
+    "harmless": 1,
+    "malicious": 1
+   }
+  },
+  "id": "d6a481b74b07c5d2d7bb4604048ec77cb860576caaa1e5ea339742090f4b35ed",
+  "iocs": {
+   "domain": [],
+   "file": [],
+   "ip": [],
+   "other": [],
+   "url": []
+  },
+  "type": "url"
+ },
+ "summary": {
+  "taxonomies": [
+   {
+    "level": "info",
+    "namespace": "VT",
+    "predicate": "GetReport",
+    "value": "0/93"
+   }
+  ]
+ }
+}

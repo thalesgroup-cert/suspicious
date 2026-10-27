@@ -16,7 +16,7 @@ class VirustotalVerdictTests(SimpleTestCase):
             analyzer_name="VirusTotal_GetReport_3_1", data=name,
             data_type=spec["data_type"], case_id=None,
         )
-        return p.parse({}, spec["report_full"]), spec["expect"]
+        return p.parse(spec.get("summary", {}), spec["report_full"]), spec["expect"]
 
     def test_all_fixtures_hit_expected_band(self):
         for name in CASES:
@@ -56,3 +56,27 @@ class VirustotalVerdictTests(SimpleTestCase):
         )
         r = p.parse({}, {"results": {"unexpected": "shape"}})
         self.assertEqual(r.level, "info")  # DefaultTaxonomyParser with empty summary
+
+    def _from_summary(self, positives, total=92, full=None):
+        p = VirusTotalGetReportParser(
+            analyzer_name="VirusTotal_GetReport_3_1", data="http://www.example.test", data_type="url", case_id=None,
+        )
+        summary = {"taxonomies": [
+            {"level": "info", "namespace": "VT", "predicate": "GetReport", "value": f"{positives}/{total}"},
+            {"level": "suspicious", "namespace": "VT", "predicate": "GetReport", "value": "1 resolution(s)"},
+            {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "13 contacted domain(s)"},
+        ]}
+        return p.parse(summary, full if full is not None else {"results": {"unexpected": "shape"}})
+
+    def test_context_taxonomies_do_not_outvote_a_clean_detection_count(self):
+        # A big site resolves, downloads and contacts many hosts; 0/92 engines is still safe.
+        r = self._from_summary(0)
+        self.assertEqual((r.level, r.score), ("safe", 0))
+        self.assertEqual(r.category, ["0/92 engines"])
+
+    def test_detection_count_in_the_summary_still_drives_the_verdict(self):
+        self.assertEqual(self._from_summary(1).level, "suspicious")
+        self.assertEqual(self._from_summary(5).level, "malicious")
+
+    def test_a_full_report_without_results_still_uses_the_summary_count(self):
+        self.assertEqual(self._from_summary(0, full={}).level, "safe")
