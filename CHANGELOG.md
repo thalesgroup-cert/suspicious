@@ -13,6 +13,10 @@ around a `CaseAnalyzerJob` ledger, a redesigned settings UI, and secret
 management moving to HashiCorp Vault.
 
 ### Added
+- **Investigations**: CERT and Admin can select cases on the Investigation list and, from a bar
+  at the bottom of the screen, override their verdict or redo their analysis in one go
+  (`POST /api/investigations/bulk/verdict/` and `/bulk/redo-analysis/`, up to 100 cases).
+  Each case is handled on its own and the result lists what was updated, skipped or failed.
 
 #### Connectors
 - **Contrib connector architecture** — TheHive, MISP, Watcher, and SMTP

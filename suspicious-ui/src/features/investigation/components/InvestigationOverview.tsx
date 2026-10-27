@@ -28,7 +28,7 @@ import { Section, Stat } from "@/shared/components/SheetSection";
 import { humanStatus, normalizeScore } from "@/shared/lib/scoreUtils";
 import { monoStack } from "@/styles/themes";
 
-const classificationOptions = [
+export const classificationOptions = [
   "SAFE", "INCONCLUSIVE", "UNCHALLENGED", "ALLOW_LISTED",
   "FAILURE", "SUSPICIOUS", "DANGEROUS",
 ];
