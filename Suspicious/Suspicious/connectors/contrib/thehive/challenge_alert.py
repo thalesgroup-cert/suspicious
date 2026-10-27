@@ -78,7 +78,10 @@ def send_challenge_alert(client, case, member: MemberMaterial, challenger: dict,
     content = build_challenge_content(case, member, challenger, ref=ref, ui_base=ui_base)
     alert = client.create_alert(content)
     try:
-        client.add_attachments(alert["_id"], content.attachments)
+        _, _, failed = client.add_attachments(alert["_id"], content.attachments)
     except requests.RequestException as exc:
-        logger.warning("Challenge alert %s: could not attach the mail preview: %s", alert.get("_id"), exc)
+        failed = [str(exc)]
+    if failed:
+        logger.warning("Challenge alert %s: could not attach the mail preview: %s",
+                       alert.get("_id"), "; ".join(failed[:3]))
     return alert

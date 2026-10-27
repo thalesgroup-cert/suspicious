@@ -79,3 +79,19 @@ class ChallengeAlertRoutingTest(TestCase):
         mock_new_alert_nomail.assert_called_once()
         case.refresh_from_db()
         self.assertEqual(case.thehive_alert_id, "~new-alert-123")
+
+    def test_falls_back_to_a_basic_alert_when_the_full_one_cannot_be_built(self):
+        mail = type("Mail", (), {"subject": "Urgent invoice"})()
+        case = Case.objects.create(description="", reporter=self.user, challenge_proposed_result="Dangerous",
+                                   challenge_reason="phishing for sure")
+        service = self._service_for(case)
+
+        with patch("connectors.contrib.thehive.connector._email_settings", side_effect=RuntimeError("boom")), \
+             patch("connectors.contrib.thehive.challenge.create_alert_from_challenge_without_mail",
+                   return_value={"_id": "~basic"}) as basic:
+            service._send_thehive_with_mail("http://hive", "key", case, mail, {})
+
+        self.assertEqual(basic.call_args.kwargs["ioc"], "Urgent invoice")
+        self.assertEqual(basic.call_args.kwargs["datatype"], "mail-subject")
+        case.refresh_from_db()
+        self.assertEqual(case.thehive_alert_id, "~basic")

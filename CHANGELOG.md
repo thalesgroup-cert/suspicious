@@ -174,6 +174,9 @@ management moving to HashiCorp Vault.
   images and some stylesheets are dropped, and very large mails are truncated.
 
 ### Fixed
+- **TheHive challenge alerts**: a rejected rendered-mail attachment is now logged as a
+  warning, and when the full alert cannot be built a basic alert (mail subject as
+  observable) is still created so the analyst hears about the challenge.
 - **Challenge flow**: the emailed challenge link opens a form instead of
   changing the case when fetched, so mail scanners and link previews can no
   longer challenge a case or spend the token. The form and the in-app dialog
