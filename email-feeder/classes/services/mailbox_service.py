@@ -396,7 +396,8 @@ class Mailbox:
     ):
         try:
             _, response = self.__mail_client.fetch(
-                email_id=email_id, message_parts="(RFC822)"
+                # PEEK keeps the mail unseen until its upload succeeds; RFC822 would set \Seen.
+                email_id=email_id, message_parts="(BODY.PEEK[])"
             )
         except classes.models.mail_exceptions.MailboxOperationError as e:
             self.__logger.error(e)

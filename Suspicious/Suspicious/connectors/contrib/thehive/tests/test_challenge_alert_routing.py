@@ -95,3 +95,15 @@ class ChallengeAlertRoutingTest(TestCase):
         self.assertEqual(basic.call_args.kwargs["datatype"], "mail-subject")
         case.refresh_from_db()
         self.assertEqual(case.thehive_alert_id, "~basic")
+
+    def test_a_failed_basic_alert_is_raised_so_the_task_can_retry(self):
+        mail = type("Mail", (), {"subject": "Urgent invoice"})()
+        case = Case.objects.create(description="", reporter=self.user, challenge_proposed_result="Dangerous",
+                                   challenge_reason="phishing for sure")
+        service = self._service_for(case)
+
+        with patch("connectors.contrib.thehive.connector._email_settings", side_effect=RuntimeError("boom")), \
+             patch("connectors.contrib.thehive.challenge.create_alert_from_challenge_without_mail",
+                   side_effect=ConnectionError("thehive down")):
+            with self.assertRaises(ConnectionError):
+                service._send_thehive_with_mail("http://hive", "key", case, mail, {})
