@@ -174,6 +174,8 @@ management moving to HashiCorp Vault.
   images and some stylesheets are dropped, and very large mails are truncated.
 
 ### Fixed
+- **Email feeder**: mail is fetched with `BODY.PEEK[]`, so it stays unseen until its upload
+  succeeds. The plain `RFC822` fetch set `\Seen`, and a storage outage lost the mail.
 - **TheHive challenge alerts**: a rejected rendered-mail attachment is now logged as a
   warning, and when the full alert cannot be built a basic alert (mail subject as
   observable) is still created so the analyst hears about the challenge.
