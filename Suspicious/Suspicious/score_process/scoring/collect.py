@@ -150,8 +150,14 @@ def collect_votes(case, ai=None) -> tuple:
     if ai is not None and ai_name and ai.confidence >= CONF_FLOOR:
         weight = Analyzer.objects.filter(name=ai_name).values_list("weight", flat=True).first()
         if weight:
+            from score_process.scoring import trusted_sender
+
             ai_band = band(ai.score)
-            add(ai_name, weight, ai_band, False, unlisted=ai_band != Result.SAFE)
+            flagged = ai_band != Result.SAFE
+            # The AI reads the mail text, which no allow-list covers: only a provably company-authored
+            # mail with nothing but trusted links lets an allow-list overrule it.
+            overridable = flagged and trusted_sender.ai_may_be_overruled(case)
+            add(ai_name, weight, ai_band, False, unlisted=flagged and not overridable)
 
     return tuple(Vote(n, w, b, hit and b == Result.SAFE, dissent_on_listed=b != Result.SAFE and not unl)
                  for n, (w, b, hit, unl) in seen.items() if w > 0)

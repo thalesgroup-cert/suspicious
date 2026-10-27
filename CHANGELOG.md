@@ -13,6 +13,9 @@ around a `CaseAnalyzerJob` ledger, a redesigned settings UI, and secret
 management moving to HashiCorp Vault.
 
 ### Added
+- **Allow-list and the AI**: with `scoring.trusted_authserv_ids` set (off by default), an allow-list can
+  overrule the AI on a mail from a company domain that a trusted gateway reports `dmarc=pass`, when every
+  link and address in it is allow-listed or on a company domain. See `docs/operations/allow-lists.md`.
 - **Investigations**: CERT and Admin can select cases on the Investigation list and, from a bar
   at the bottom of the screen, override their verdict or redo their analysis in one go
   (`POST /api/investigations/bulk/verdict/` and `/bulk/redo-analysis/`, up to 100 cases).

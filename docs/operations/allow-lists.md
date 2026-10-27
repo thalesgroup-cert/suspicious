@@ -39,6 +39,18 @@ Allow-listing is not only a launch filter, it also takes part in the verdict:
 - A vote is marked allow-listed when its band is Safe and at least one of its reports carries an allow-list marker that is still valid: the allow-list check is re-run for the report's target at scoring time, so a removed entry or a domain that is now deny-listed, Watcher-monitored or campaign no longer counts.
 - When the Safe plus allow-listed weight is a strict majority of the voting weight, the case is Safe under the rule `allow-list-majority`, and the rationale names the dissenting analyzers.
 - The majority can only overrule dissent that is about an allow-listed target. If any analyzer flagged something else (another link, domain, IP or file, the mail headers, or the AI classifier on the mail text), the case is not overridden and the rationale says which analyzer flagged it. Otherwise an attacker could add one allow-listed link to a phishing mail and let the Safe votes of analyzers that saw nothing outvote the one that did.
+
+### Letting an allow-list overrule the AI for company mail
+
+By default the AI classifier's finding on the mail text is never overruled by an allow-list. To let a legitimate company mail that the AI got wrong through, set `scoring.trusted_authserv_ids` to the authserv-ids of your own mail gateways (a JSON list such as `["mx.example.com"]`; in `settings.json` under `scoring`, or as a Runtime config row in the Django admin). It is empty by default, which keeps this off.
+
+The AI's finding can then be overruled, through the usual majority, only when all of these hold for the reported mail:
+
+- It has exactly one `From` address, on a company domain (own domains from the contact email, SMTP login and `email.content.global_domain`, plus Watcher legit domains, subdomains included).
+- An `Authentication-Results` header whose authserv-id is in `scoring.trusted_authserv_ids` reports `dmarc=pass` (with `header.from` equal to the `From` domain when present). Results from any other authserv-id are ignored, because everything else in a forwarded mail can be written by the sender.
+- Every URL, domain, IP and address in the mail is allow-listed (exact match) or on a company domain. A mail with an attachment never qualifies.
+
+Any failure to read the stored headers or evaluate these conditions counts as "not satisfied". Your gateway must strip or replace `Authentication-Results` headers that arrive from outside under its own authserv-id, as RFC 8601 requires.
 - Reports with no recheckable target (hash, mail address, mail body, mail header) never carry a marker, so they never vote as allow-listed.
 - Reports that do not vote: failed or pending jobs, `info` level, confidence below the floor, and analyzers with weight 0.
 - Deny-listed, campaign and Watcher-monitored targets are never overridden by the majority.
