@@ -33,17 +33,27 @@ class Vote:
     weight: float
     band: str
     whitelisted: bool = False
+    # A non-Safe band that comes only from reports about allow-listed targets. Anything else
+    # (another link, the mail text, the headers, the AI) is a finding the allow-list must not hide.
+    dissent_on_listed: bool = False
 
 
 def _allow_list_majority(verdict, votes):
     """Allow-list is a vote, not an absolute override: a strict majority of Safe
-    plus allow-listed weight makes the case Safe and records the dissent.
+    plus allow-listed weight makes the case Safe and records the dissent, but only when
+    every dissenting analyzer is dissenting about an allow-listed target. Otherwise one
+    allow-listed link in a mail would hide a phishing link flagged next to it.
     Cases without a whitelisted vote, already-Safe cases and failures pass through."""
     if verdict.result in (Result.SAFE, Result.FAILURE) or not any(v.whitelisted for v in votes):
         return verdict
     total = sum(v.weight for v in votes)
     if total <= 0:
         return verdict
+    unlisted = [v.analyzer for v in votes if v.band != Result.SAFE and not v.dissent_on_listed]
+    if unlisted:
+        line = (f"Allow-listed, but {', '.join(unlisted)} flagged something that is not allow-listed; "
+                f"verdict not overridden.")
+        return replace(verdict, rationale=tuple(verdict.rationale) + (line,))
     safe = sum(v.weight for v in votes if v.band == Result.SAFE)
     exact = round(100 * safe / total, 9)
     dissent = ", ".join(f"{v.band}: {v.analyzer}" for v in votes if v.band != Result.SAFE) or "none"

@@ -179,6 +179,10 @@ management moving to HashiCorp Vault.
   images and some stylesheets are dropped, and very large mails are truncated.
 
 ### Fixed
+- **Allow-list bypass**: an allow-listed link in a mail could turn a phishing verdict into Safe 0/100:
+  the allow-list majority overruled any dissent, including an analyzer flagging another link or the
+  AI on the mail text. It now only overrules dissent about an allow-listed target; any other flag
+  keeps the verdict and the rationale names the analyzer.
 - **VirusTotal scoring**: when the full report has no engine stats, the verdict comes from the
   analyzer's own detection count ("0/92") instead of the highest taxonomy level. "N resolution(s)",
   "N downloaded file(s)" and "N contacted domain(s)" are tagged suspicious or malicious by Cortex

@@ -106,8 +106,10 @@ class ScoreCaseTest(SimpleTestCase):
         self.assertEqual(v.result, Result.SAFE)
 
 
-def vote(name, weight, band=Result.SAFE, wl=False):
-    return Vote(analyzer=name, weight=weight, band=band, whitelisted=wl)
+def vote(name, weight, band=Result.SAFE, wl=False, listed=None):
+    # dissent is about an allow-listed target unless a test says otherwise
+    return Vote(analyzer=name, weight=weight, band=band, whitelisted=wl,
+                dissent_on_listed=(band != Result.SAFE) if listed is None else listed)
 
 
 # a malicious signal elsewhere in the case: today this always means Dangerous
@@ -165,6 +167,33 @@ class AllowListMajorityTest(SimpleTestCase):
         safe = score_case(DANGEROUS_CASE, votes=[vote("A", 1, wl=True)])
         out = mail_band_escalation(safe, [ObservableVerdict("Dangerous", 80, None, {}, [])])
         self.assertEqual((out.result, out.rule), (Result.DANGEROUS, "embedded-ioc-escalation"))
+
+
+class AllowListBypassTest(SimpleTestCase):
+    """One allow-listed link in a mail must not hide something flagged elsewhere in it."""
+
+    def test_dissent_about_something_not_allow_listed_blocks_the_override(self):
+        # 80% of the weight is Safe or allow-listed, which would override, but one analyzer
+        # flagged a link that is not on the list.
+        votes = [vote("WL", 0.4, wl=True), vote("Clean", 0.4), vote("VT", 0.2, Result.DANGEROUS, listed=False)]
+        v = score_case(DANGEROUS_CASE, votes=votes)
+        self.assertEqual((v.result, v.rule), (Result.DANGEROUS, "weighted-consensus"))
+        self.assertIn("VT flagged something that is not allow-listed", v.rationale[-1])
+
+    def test_the_ai_is_not_overruled_by_an_allow_listed_link(self):
+        votes = [vote("WL", 0.5, wl=True), vote("AIMailAnalyzer", 0.1, Result.DANGEROUS, listed=False),
+                 vote("Clean", 0.4)]
+        self.assertEqual(score_case(DANGEROUS_CASE, votes=votes).result, Result.DANGEROUS)
+
+    def test_one_unlisted_dissenter_among_listed_ones_still_blocks(self):
+        votes = [vote("WL", 0.6, wl=True), vote("A", 0.1, Result.SUSPICIOUS, listed=True),
+                 vote("B", 0.1, Result.DANGEROUS, listed=False), vote("C", 0.2)]
+        self.assertEqual(score_case(DANGEROUS_CASE, votes=votes).result, Result.DANGEROUS)
+
+    def test_dissent_only_about_listed_targets_is_still_overruled(self):
+        votes = [vote("WL", 0.4, wl=True), vote("Clean", 0.4), vote("VT", 0.2, Result.DANGEROUS, listed=True)]
+        v = score_case(DANGEROUS_CASE, votes=votes)
+        self.assertEqual((v.result, v.rule), (Result.SAFE, "allow-list-majority"))
 
 
 class AllowListPercentAndSuspiciousTest(SimpleTestCase):

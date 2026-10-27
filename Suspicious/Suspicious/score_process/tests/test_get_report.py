@@ -111,7 +111,7 @@ class GetReportVotesWiringTest(TestCase):
         return case
 
     def test_majority_votes_make_the_case_safe_and_persist_the_dissent(self):
-        case = self._result(return_value=(Vote("WL", 0.6, "Safe", True), Vote("AbuseV", 0.2, "Dangerous")))
+        case = self._result(return_value=(Vote("WL", 0.6, "Safe", True), Vote("AbuseV", 0.2, "Dangerous", dissent_on_listed=True)))
         self.assertEqual(case.results, Result.SAFE)
         self.assertIn("Dangerous: AbuseV", case.verdict_rationale[-1])
 
