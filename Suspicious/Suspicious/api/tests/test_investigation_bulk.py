@@ -58,6 +58,15 @@ class BulkVerdictTest(BulkBase):
         self.assertEqual(emit.call_count, 2)
 
     @patch("api.views.investigations.emit")
+    def test_reporters_are_not_emailed_unless_asked(self, emit):
+        a, b = self.case(), self.case()
+        self.post("investigation-bulk-verdict", self.cert, case_ids=[a.id, b.id], **VERDICT)
+        self.assertEqual([c.kwargs["exclude"] for c in emit.call_args_list], [("smtp_notify",)] * 2)
+        emit.reset_mock()
+        self.post("investigation-bulk-verdict", self.cert, case_ids=[a.id], notify_reporters=True, **VERDICT)
+        self.assertEqual(emit.call_args.kwargs["exclude"], ())
+
+    @patch("api.views.investigations.emit")
     def test_a_missing_case_fails_alone(self, emit):
         a = self.case()
         resp = self.post("investigation-bulk-verdict", self.admin, case_ids=[a.id, 999999], **VERDICT)

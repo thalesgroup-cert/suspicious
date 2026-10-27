@@ -66,7 +66,7 @@ def user_is_investigator(user) -> bool:
 logger = logging.getLogger(__name__)
 
 
-def _apply_verdict(case: Case, user, validated: dict) -> None:
+def _apply_verdict(case: Case, user, validated: dict, *, notify_reporter: bool = True) -> None:
     case.final_score = validated["score"]
     case.final_confidence = validated["confidence"]
     case.results = API_RESULT_TO_INTERNAL[validated["classification"]]
@@ -84,7 +84,8 @@ def _apply_verdict(case: Case, user, validated: dict) -> None:
             "last_update",
         ]
     )
-    emit(EVENT_CASE_MODIFIED, case)
+    # The reporter's review email rides on this event; every other subscriber (search index, SIEM) still needs it.
+    emit(EVENT_CASE_MODIFIED, case, exclude=() if notify_reporter else ("smtp_notify",))
 
 
 def _redo_analysis(case: Case) -> tuple[int, dict]:
@@ -473,7 +474,7 @@ class InvestigationBulkVerdictView(_BulkView):
     serializer_class = BulkVerdictRequestSerializer
 
     def apply(self, case, user, validated) -> dict:
-        _apply_verdict(case, user, validated)
+        _apply_verdict(case, user, validated, notify_reporter=validated["notify_reporters"])
         logger.info("Bulk verdict by %s on case %s: %s", user.username, case.id, validated["classification"])
         return {"outcome": "updated"}
 

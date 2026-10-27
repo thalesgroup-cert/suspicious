@@ -456,9 +456,10 @@ export async function bulkSetVerdict(
   score: number,
   confidence: number,
   classification: string,
+  notifyReporters = false,
 ): Promise<BulkResult[]> {
   const res = await api.post("/investigations/bulk/verdict/", {
-    case_ids: caseIds, score, confidence, classification,
+    case_ids: caseIds, score, confidence, classification, notify_reporters: notifyReporters,
   });
   return res.data.results;
 }

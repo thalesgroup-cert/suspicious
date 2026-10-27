@@ -182,7 +182,8 @@ class BulkCaseIdsSerializer(serializers.Serializer):
 
 
 class BulkVerdictRequestSerializer(BulkCaseIdsSerializer, InvestigationGlobalEditRequestSerializer):
-    pass
+    # Off by default: one override must not mail up to 100 reporters unless the analyst asks for it.
+    notify_reporters = serializers.BooleanField(required=False, default=False)
 
 
 class InvestigationAnalyzerTargetSerializer(serializers.Serializer):

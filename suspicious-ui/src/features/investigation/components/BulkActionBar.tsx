@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
-  Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography,
+  Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography,
 } from "@mui/material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -34,6 +34,7 @@ export function BulkActionBar({ ids, onClear }: Props) {
   const [classification, setClassification] = React.useState("DANGEROUS");
   const [score, setScore] = React.useState("9");
   const [confidence, setConfidence] = React.useState("90");
+  const [notifyReporters, setNotifyReporters] = React.useState(false);
   const [summary, setSummary] = React.useState<{ results: BulkResult[]; verb: string } | null>(null);
 
   const refresh = () =>
@@ -43,7 +44,7 @@ export function BulkActionBar({ ids, onClear }: Props) {
     ]);
 
   const verdict = useMutation({
-    mutationFn: () => bulkSetVerdict(ids, Number(score), Number(confidence), classification),
+    mutationFn: () => bulkSetVerdict(ids, Number(score), Number(confidence), classification, notifyReporters),
     onSuccess: async (results) => {
       setOpen(false);
       setSummary({ results, verb: "updated" });
@@ -121,8 +122,12 @@ export function BulkActionBar({ ids, onClear }: Props) {
               />
             </Stack>
             <Box>
+              <FormControlLabel
+                control={<Checkbox size="small" checked={notifyReporters} onChange={(e) => setNotifyReporters(e.target.checked)} />}
+                label="Email each reporter about the new verdict"
+              />
               <Typography variant="body2" color="text.secondary">
-                Replaces the verdict on each selected case and clears its stored explanation, as the single-case edit does.
+                Replaces the verdict on each selected case and clears its stored explanation, as the single-case edit does. Reporters are only emailed if you tick the box; the search index and SIEM are always updated.
               </Typography>
             </Box>
             {verdict.isError ? <Alert severity="error">The request failed. Nothing was changed.</Alert> : null}

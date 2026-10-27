@@ -227,8 +227,19 @@ describe("InvestigationPage", () => {
       await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
       await user.click(await screen.findByRole("button", { name: "Set verdict…" }));
       await user.click(await screen.findByRole("button", { name: "Apply to 1 case" }));
-      await waitFor(() => expect(mockBulkVerdict).toHaveBeenCalledWith([7], 9, 90, "DANGEROUS"));
+      await waitFor(() => expect(mockBulkVerdict).toHaveBeenCalledWith([7], 9, 90, "DANGEROUS", false));
       expect(await screen.findByText(/Case 7: Investigation not found\./)).toBeInTheDocument();
+    });
+
+    it("ticking the box asks the server to email the reporters", async () => {
+      mockBulkVerdict.mockResolvedValue([{ case_id: 7, outcome: "updated" }]);
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
+      await user.click(await screen.findByRole("button", { name: "Set verdict…" }));
+      await user.click(await screen.findByRole("checkbox", { name: "Email each reporter about the new verdict" }));
+      await user.click(screen.getByRole("button", { name: "Apply to 1 case" }));
+      await waitFor(() => expect(mockBulkVerdict).toHaveBeenCalledWith([7], 9, 90, "DANGEROUS", true));
     });
 
     it("an out-of-range score blocks Apply", async () => {
