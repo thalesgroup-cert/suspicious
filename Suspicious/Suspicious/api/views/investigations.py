@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 
 from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -18,6 +20,8 @@ from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
     API_STATUS_TO_INTERNAL,
+    BulkCaseIdsSerializer,
+    BulkVerdictRequestSerializer,
     InvestigationDetailsSerializer,
     InvestigationGlobalEditRequestSerializer,
     InvestigationListQuerySerializer,
@@ -57,6 +61,61 @@ CASE_DETAIL_SELECT_RELATED = (
 
 def user_is_investigator(user) -> bool:
     return user.groups.filter(name__in=["CERT", "CISO", "Admin"]).exists()
+
+
+logger = logging.getLogger(__name__)
+
+
+def _apply_verdict(case: Case, user, validated: dict) -> None:
+    case.final_score = validated["score"]
+    case.final_confidence = validated["confidence"]
+    case.results = API_RESULT_TO_INTERNAL[validated["classification"]]
+    case.last_update_by = user
+    # The stored explanation described the previous verdict: drop it so a
+    # stale "why" is never emailed / shown after an analyst override.
+    case.verdict_explanation = None
+    case.save(
+        update_fields=[
+            "final_score",
+            "final_confidence",
+            "results",
+            "verdict_explanation",
+            "last_update_by",
+            "last_update",
+        ]
+    )
+    emit(EVENT_CASE_MODIFIED, case)
+
+
+def _redo_analysis(case: Case) -> tuple[int, dict]:
+    """Reset a finalised case and queue its analyzers again; (http status, body)."""
+    if case.lifecycle_state not in (LifecycleState.FINALIZED, LifecycleState.CONTESTED):
+        return status.HTTP_409_CONFLICT, {"detail": "Case is still being analyzed."}
+
+    targets = collect_case_targets(case)
+    if not targets:
+        return status.HTTP_400_BAD_REQUEST, {"detail": "No analyzable artifacts on this case."}
+
+    try:
+        transition(case, LifecycleState.ANALYZING)
+    except IllegalTransition:
+        return status.HTTP_409_CONFLICT, {"detail": "Case is still being analyzed."}
+
+    case.results = Result.INCONCLUSIVE
+    case.score = 0
+    case.final_score = 0
+    case.description = ""
+    case.verdict_explanation = None
+    case.save(update_fields=[
+        "results", "score", "final_score", "description", "verdict_explanation",
+    ])
+
+    intents = [
+        (f"{instance._meta.app_label}.{instance._meta.model_name}", instance.pk, data_type)
+        for instance, data_type in targets
+    ]
+    dispatch_case_analysis.delay(case.id, intents)
+    return status.HTTP_202_ACCEPTED, {"status": "queued", "dispatched": len(intents)}
 
 
 class IsCaseEditor(BasePermission):
@@ -352,26 +411,7 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
         payload = InvestigationGlobalEditRequestSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
 
-        validated = payload.validated_data
-        obj.final_score = validated["score"]
-        obj.final_confidence = validated["confidence"]
-        obj.results = API_RESULT_TO_INTERNAL[validated["classification"]]
-        obj.last_update_by = request.user
-        # The stored explanation described the previous verdict: drop it so a
-        # stale "why" is never emailed / shown after an analyst override.
-        obj.verdict_explanation = None
-        obj.save(
-            update_fields=[
-                "final_score",
-                "final_confidence",
-                "results",
-                "verdict_explanation",
-                "last_update_by",
-                "last_update",
-            ]
-        )
-
-        emit(EVENT_CASE_MODIFIED, obj)
+        _apply_verdict(obj, request.user, payload.validated_data)
 
         analyzer_reports_qs = self.get_analyzer_reports_queryset(obj)
         serializer = InvestigationDetailsSerializer(
@@ -398,45 +438,52 @@ class InvestigationRedoAnalysisView(InvestigationAccessMixin, APIView):
     permission_classes = [IsAuthenticated, IsInvestigator]
 
     def post(self, request, case_id: int):
-        case = self.get_case_or_404(case_id)
+        code, body = _redo_analysis(self.get_case_or_404(case_id))
+        return Response(body, status=code)
 
-        if case.lifecycle_state not in (LifecycleState.FINALIZED, LifecycleState.CONTESTED):
-            return Response(
-                {"detail": "Case is still being analyzed."},
-                status=status.HTTP_409_CONFLICT,
-            )
 
-        targets = collect_case_targets(case)
-        if not targets:
-            return Response(
-                {"detail": "No analyzable artifacts on this case."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+class _BulkView(InvestigationAccessMixin, APIView):
+    """One request, many cases, each handled on its own: a failure never rolls back the rest."""
+    permission_classes = [IsAuthenticated, IsCaseEditor]
+    serializer_class = BulkCaseIdsSerializer
 
-        try:
-            transition(case, LifecycleState.ANALYZING)
-        except IllegalTransition:
-            return Response(
-                {"detail": "Case is still being analyzed."},
-                status=status.HTTP_409_CONFLICT,
-            )
+    def post(self, request):
+        payload = self.serializer_class(data=request.data)
+        payload.is_valid(raise_exception=True)
+        ids = payload.validated_data["case_ids"]
+        cases = scoped_case_queryset(Case.objects.filter(pk__in=ids), request.user).in_bulk()
+        results = []
+        for case_id in ids:
+            case = cases.get(case_id)
+            if case is None:
+                results.append({"case_id": case_id, "outcome": "failed", "detail": "Investigation not found."})
+                continue
+            try:
+                results.append({"case_id": case_id, **self.apply(case, request.user, payload.validated_data)})
+            except Exception:
+                logger.exception("Bulk edit failed for case %s", case_id)
+                results.append({"case_id": case_id, "outcome": "failed", "detail": "Unexpected error."})
+        return Response({"results": results}, status=status.HTTP_200_OK)
 
-        case.results = Result.INCONCLUSIVE
-        case.score = 0
-        case.final_score = 0
-        case.description = ""
-        case.verdict_explanation = None
-        case.save(update_fields=[
-            "results", "score", "final_score", "description", "verdict_explanation",
-        ])
 
-        intents = [
-            (f"{instance._meta.app_label}.{instance._meta.model_name}", instance.pk, data_type)
-            for instance, data_type in targets
-        ]
-        dispatch_case_analysis.delay(case.id, intents)
+@extend_schema(tags=["Investigations"], request=BulkVerdictRequestSerializer,
+               responses={200: OpenApiResponse(description="Per-case outcome."),
+                          400: OpenApiResponse(description="Validation error.")})
+class InvestigationBulkVerdictView(_BulkView):
+    serializer_class = BulkVerdictRequestSerializer
 
-        return Response(
-            {"status": "queued", "dispatched": len(intents)},
-            status=status.HTTP_202_ACCEPTED,
-        )
+    def apply(self, case, user, validated) -> dict:
+        _apply_verdict(case, user, validated)
+        logger.info("Bulk verdict by %s on case %s: %s", user.username, case.id, validated["classification"])
+        return {"outcome": "updated"}
+
+
+@extend_schema(tags=["Investigations"], request=BulkCaseIdsSerializer,
+               responses={200: OpenApiResponse(description="Per-case outcome."),
+                          400: OpenApiResponse(description="Validation error.")})
+class InvestigationBulkRedoView(_BulkView):
+    def apply(self, case, user, validated) -> dict:
+        code, body = _redo_analysis(case)
+        if code == status.HTTP_202_ACCEPTED:
+            return {"outcome": "queued"}
+        return {"outcome": "skipped", "detail": body["detail"]}
