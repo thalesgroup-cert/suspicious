@@ -56,3 +56,14 @@ services:
         - NO_PROXY=localhost,rustfs,chromadb
         - HTTP_PROXY=${HTTP_PROXY:-}
         - HTTPS_PROXY=${HTTPS_PROXY:-}
+
+  # Built from the repo's Analyzers/AIMailAnalyzer tree (the build context is
+  # that folder so requirements*.txt / vectorizers/ resolve). Only built when
+  # the `ai` profile is active.
+  ai_inference:
+    build:
+      context: ${CUSTOM_ANALYZERS_PATH:-../Analyzers}/AIMailAnalyzer
+      dockerfile: inference_server/Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}

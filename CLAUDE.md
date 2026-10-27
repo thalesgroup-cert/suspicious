@@ -64,6 +64,7 @@ python manage.py createsuperuser
 | `cortex` | Analyzer execution engine (YARA, AI, sandbox); reports back via HMAC-signed webhook |
 | `chromadb` | Vector DB for semantic similarity search |
 | `mail_renderer` | Isolated headless Chromium (`mail-renderer/`) that draws the mail preview PNG from sanitised HTML; internal network shared only with Django and Celery, no route out |
+| `ai_inference` | AIMailAnalyzer model server (FastAPI, profile `ai`, port 8090 published on the Docker default-bridge gateway `172.17.0.1`). Holds the vectorizer + classifier weights; the Cortex `AI_Mail_Analyzer` job is a thin HTTP client to it. `make` targets enable the profile; plain compose needs `--profile ai` |
 | `email_feeder` | IMAP poller that auto-ingests emails (runs as non-root `feeder` UID) |
 | `vault` | Secrets store — connector credentials and other runtime secrets |
 | `traefik` | Reverse proxy with TLS termination |
@@ -106,6 +107,8 @@ Standalone Python service using Pydantic v2. Polls IMAP/IMAPS mailboxes, extract
 ### AI / ML (`Analyzers/AIMailAnalyzer/`)
 
 Sentence Transformers model (`paraphrase-multilingual-mpnet-base-v2`) for embeddings. Custom ResNetMLP binary classifier for phishing detection. Vector store is ChromaDB for similarity search against prior cases.
+
+**Inference path.** `ai_mail_classifier.py` (the one-shot Cortex analyzer, torch-free image) POSTs the mail body to the persistent `inference_server/` (`/classify`, `/health`, `/reload`), which keeps the vectorizer and the `models/` (`personal`) and `models_public/` (`public`) weights resident and hot-reloads them when the retrain pipeline overwrites them. Cortex job containers sit on Docker's default bridge (no DNS), hence the gateway-IP URL (`inference_url` config item / `INFERENCE_SERVER_URL`). If AI verdicts are missing, `curl http://172.17.0.1:8090/health` first — it names the missing vectorizer/model file. Details and a troubleshooting table: `docs/components/analyzers.md`. Tests: `cd Analyzers/AIMailAnalyzer && python -m pytest tests`.
 
 ## Key Configuration Files
 
@@ -163,6 +166,8 @@ docker network create --driver bridge --subnet 172.20.0.0/16 \
 bash scripts/gen-service-secrets.sh .env .env.data   # Redis/ES/Chroma passwords (make init does this too)
 docker compose --env-file .env build suspicious suspicious_ui feeder mail_renderer
 docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb chromadb_proxy
+# AI verdicts need the model server too (weights in Analyzers/AIMailAnalyzer/models/, git-ignored):
+docker compose --env-file .env --profile ai up -d --build ai_inference
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev-extras.yml \
   up -d greenmail openldap
 ```

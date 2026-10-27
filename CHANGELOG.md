@@ -113,6 +113,22 @@ management moving to HashiCorp Vault.
   XSOAR playbook submitted; records the incident per case in the new generic
   `ConnectorLink` table so a replayed event opens nothing.
 
+#### AI mail analyzer
+- **Persistent inference server.** `AI_Mail_Analyzer` is now a thin, torch-free
+  Cortex client that POSTs the mail body to a long-running FastAPI service
+  (`Analyzers/AIMailAnalyzer/inference_server/`, compose service `ai_inference`,
+  profile `ai`) which keeps the vectorizer and the `personal`/`public` weights in
+  memory instead of cold-loading them for every job. Weights are bind-mounted and
+  hot-reloaded (periodic mtime check, `POST /reload`) so the monthly retrain no
+  longer needs a restart; a half-written or corrupt `.pth` never replaces a
+  working model. `/health` is `503` with per-file errors until the vectorizer and
+  `personal` models are usable.
+- Client hardening: retries on `502/503/504` and connection errors, server error
+  detail surfaced in the Cortex error, proxy variables ignored for the private
+  bridge-gateway call, `variant`/`inference_url` analyzer config items.
+- New `analyzers-test` CI job; tests cover the client, the server (real
+  `ResNetMLP` checkpoints, real FastAPI app) and the archive helpers.
+
 #### CI/CD
 - CI consolidated onto a single matrix workflow (ruff, Django suite, feeder
   pytest, UI lint/typecheck/vitest-browser/build, docker build matrix) and a
@@ -127,6 +143,11 @@ management moving to HashiCorp Vault.
 
 ### Changed
 
+- **A CISO can challenge a case from the Investigations page.** The drawer has a
+  Challenge verdict button for a CISO when the case can be challenged and has not
+  been yet. It opens the same dialog as the Submissions page, which is now one
+  shared component. The Edit verdict button is no longer shown to a CISO, because
+  the API refuses case edits from that role; CERT and Admin keep it.
 - **Object storage moves from `minio-py` to `boto3`** behind a provider-agnostic
   `ObjectStore` interface (`common/storage/`). No config change is needed:
   `storage.provider` (or `STORAGE_PROVIDER`) is optional and defaults to `s3`.

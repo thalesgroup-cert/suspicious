@@ -1,70 +1,75 @@
 #!/usr/bin/env python3
 """
-Standalone model-load probe for AIMailAnalyzer (P7).
+Standalone probe for the AIMailAnalyzer *thin client* image (P7).
 
-This image runs as a Cortex one-shot analyzer (ENTRYPOINT
-ai_mail_classifier.py), so there is no long-running HTTP service to
-expose a /health endpoint on. The architectural recommendation in the
-2026-04-15 review (persistent HTTP service + /health) does not match
-the current Cortex contract, and a refactor would break that contract.
+ai_mail_classifier.py no longer loads models itself - it is an HTTP client to
+inference_server/, which owns the vectorizer + both model variants and stays
+running (see that folder's docstring for why: Cortex spawns this image fresh
+per job, so anything it loaded itself was reloaded from disk on every single
+mail; the persistent server loads once instead).
 
-What this script does instead:
-  * Loads the paraphrase-multilingual-mpnet-base-v2 vectoriser
-  * Loads both ResNetMLP weight files
-  * Prints "ok" and exits 0 on full success
-  * Prints the failure reason and exits 1 on any error
+What this script does:
+  * Confirms this image's own deps (cortexutils, requests) import cleanly -
+    the only two things ai_mail_classifier.py needs now.
+  * Pings the inference server's /health endpoint and prints which variants
+    and models it has loaded. By default that is informational only, so the
+    image can be smoke-tested in isolation (CI) without the server running.
+  * With --require-server (or INFERENCE_REQUIRE_SERVER=1) an unreachable or
+    not-ready server is a failure (exit 1). Use that as the operator probe
+    for "does inference work from where Cortex runs analyzers".
 
 Use cases:
   * CI / container build smoke test:
         docker run --rm --entrypoint python <image> AIMailAnalyzer/health.py
-  * Operator probe after pushing a new image
-  * Foundation for a future HTTP wrapper if the analyzer is ever
-    promoted to a long-running service
+  * Operator probe from the default bridge network, the same place Cortex's
+    per-job containers run:
+        docker run --rm --entrypoint python <image> AIMailAnalyzer/health.py --require-server
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import traceback
 
 
-from mail_analysis import MODEL_SPECS
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
+    parser.add_argument(
+        "--require-server",
+        action="store_true",
+        default=os.environ.get("INFERENCE_REQUIRE_SERVER", "").lower() in ("1", "true", "yes"),
+        help="fail (exit 1) when the inference server is unreachable or not ready",
+    )
+    args = parser.parse_args(argv)
 
-VECTORIZER_PATH = (
-    "/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2"
-)
-MODEL_DIR = "/worker/AIMailAnalyzer/models"
-
-
-def main() -> int:
     try:
-        import torch
-        from sentence_transformers import SentenceTransformer
+        import cortexutils.analyzer  # noqa: F401
+        import requests  # noqa: F401
 
-        from ResNetMLP import ResNetMLP
+        from ai_mail_classifier import INFERENCE_SERVER_URL, build_session
     except Exception as exc:
         print(f"import_error: {exc}", file=sys.stderr)
         traceback.print_exc()
         return 1
 
+    url = f"{INFERENCE_SERVER_URL.rstrip('/')}/health"
     try:
-        SentenceTransformer(VECTORIZER_PATH)
+        resp = build_session().get(url, timeout=5)
+        body = resp.json()
+        if resp.ok:
+            print(f"inference_server: ready at {url}, {body}")
+        else:
+            print(f"inference_server: reachable at {url} but NOT ready (HTTP {resp.status_code}), {body}",
+                  file=sys.stderr)
+            if args.require_server:
+                return 1
     except Exception as exc:
-        print(f"vectorizer_load_error: {exc}", file=sys.stderr)
-        traceback.print_exc()
-        return 1
-
-    try:
-        device = torch.device("cpu")
-        for spec in MODEL_SPECS:
-            path = os.path.join(MODEL_DIR, spec.filename)
-            model = ResNetMLP(768, spec.output_dim).to(device)
-            model.load_state_dict(torch.load(path, weights_only=True))
-    except Exception as exc:
-        print(f"model_load_error: {exc}", file=sys.stderr)
-        traceback.print_exc()
-        return 1
+        print(f"inference_server: unreachable at {url} ({exc})", file=sys.stderr)
+        if args.require_server:
+            return 1
+        print("(informational only - pass --require-server to make this a failure)")
 
     print("ok")
     return 0

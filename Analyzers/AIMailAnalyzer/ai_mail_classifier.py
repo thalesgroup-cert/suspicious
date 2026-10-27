@@ -1,24 +1,112 @@
 #!/usr/bin/env python3
-# Author : THA-CERT //ECR
+# Author : THA-CERT //GCL
 
 import os
 import email
 
-import numpy as np
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from cortexutils.analyzer import Analyzer
-import torch
-from sentence_transformers import SentenceTransformer
 
-import mail_analysis
-from ResNetMLP import ResNetMLP
+import mail_archive
+
+# Cortex spawns this analyzer in its own ephemeral, one-shot container per
+# job (its docker job runner has no config to join spawned containers to
+# this compose stack's network - checked /opt/cortex/conf/reference.conf,
+# no such key). That network is Docker's default bridge, which has no DNS,
+# so the persistent inference_server/ (see that folder) can't be reached by
+# Compose service name here - only by the default bridge's gateway IP,
+# which any container on it can always reach regardless of DNS. 172.17.0.1
+# is that gateway on a stock Docker install; override via the analyzer's
+# `inference_url` config item or this env var if a deployment's bridge subnet
+# differs (`docker network inspect bridge`).
+INFERENCE_SERVER_URL = os.environ.get("INFERENCE_SERVER_URL", "http://172.17.0.1:8090")
+INFERENCE_TIMEOUT = int(os.environ.get("INFERENCE_TIMEOUT", "60"))
+# Attempts on connection errors / 502-504 (the server answers 503 while it is
+# still loading weights after a restart). Classification is idempotent, so
+# retrying a POST is safe.
+INFERENCE_RETRIES = int(os.environ.get("INFERENCE_RETRIES", "3"))
+
+# Keys the report is built from; checked up front so a server/client version
+# skew surfaces as one clear error instead of a KeyError traceback.
+REQUIRED_RESULT_KEYS = (
+    "malscore", "classification", "confidence", "classification_probabilities",
+    "classification_breakdown", "sub_classification", "sub_classification_confidence",
+    "sub_classification_probabilities", "sub_classification_breakdown",
+    "contributing_phrases", "main_probabilities", "sub_probabilities", "email_embedding",
+)
+
+
+def build_session():
+    """requests session for talking to the inference server.
+
+    trust_env is off on purpose: the target is a private bridge-gateway IP, but
+    HTTP(S)_PROXY is commonly injected into containers on corporate hosts and
+    `requests` would then send this call through the proxy (which can't reach
+    172.17.0.1 and answers 403/502). Set INFERENCE_USE_PROXY=1 to opt back in
+    for a server that really is only reachable through one.
+    """
+    session = requests.Session()
+    session.trust_env = os.environ.get("INFERENCE_USE_PROXY", "").lower() in ("1", "true", "yes")
+    retry = Retry(
+        total=INFERENCE_RETRIES,
+        backoff_factor=1,
+        status_forcelist=(502, 503, 504),
+        allowed_methods=frozenset({"POST"}),
+        raise_on_status=False,
+    )
+    session.mount("http://", HTTPAdapter(max_retries=retry))
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    return session
+
+
+def classify_remote(session, server_url, mail_body, variant, timeout=INFERENCE_TIMEOUT):
+    """POST the mail body to the inference server and return its JSON result.
+
+    Raises RuntimeError with a message that includes the server's own `detail`
+    (e.g. "Required models unavailable for variant 'public'") rather than a bare
+    "503 Service Unavailable".
+    """
+    url = f"{server_url.rstrip('/')}/classify"
+    try:
+        resp = session.post(url, json={"mail_body": mail_body, "variant": variant}, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"cannot reach inference server at {url}: {exc}") from exc
+
+    if not resp.ok:
+        try:
+            detail = resp.json().get("detail", resp.text)
+        except ValueError:
+            detail = resp.text
+        raise RuntimeError(f"inference server returned HTTP {resp.status_code}: {str(detail)[:500]}")
+
+    try:
+        result = resp.json()
+    except ValueError as exc:
+        raise RuntimeError(f"inference server returned a non-JSON body: {resp.text[:200]!r}") from exc
+
+    missing = [key for key in REQUIRED_RESULT_KEYS if key not in result]
+    if missing:
+        raise RuntimeError(f"inference server response is missing {missing} (server/client version mismatch?)")
+    return result
+
 
 class AIMailClassifier(Analyzer):
-    def __init__(self):
-        Analyzer.__init__(self)
-        
+    def __init__(self, job_directory=None):
+        Analyzer.__init__(self, job_directory)
+
         # filename of the observable
         self.filename = self.getParam("attachment.name", "noname.ext")
         self.filepath = self.getParam("file", None, "File is missing")
+
+        # "personal" (this deployment's own trained weights) or "public"
+        # (see Analyzers/AIMailAnalyzer/models_public/) - set per Cortex
+        # analyzer entry in its configuration, NOT per job. Purely
+        # comparative: the public variant must never feed case.results_ai,
+        # only its own report.
+        self.variant = self.getParam("config.variant", "personal")
+        self.server_url = self.getParam("config.inference_url", INFERENCE_SERVER_URL)
 
     def summary(self, raw):
         return {
@@ -29,41 +117,9 @@ class AIMailClassifier(Analyzer):
 
     def run(self):
         Analyzer.run(self)
-        
-        # Use CPU (because no gpu)
-        device = torch.device("cpu")
-
-        # Initialize vectorizer
-        try:
-            vectorizer = SentenceTransformer(
-                '/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2',
-                device=str(device),
-            )
-        except Exception as e:
-            self.error(f"Error loading vectorizer: {e}")
-            return
-        
-        # Load models (MODEL_SPECS is the single source of truth for output
-        # dims, shared with health.py's load probe)
-        try:
-            models_by_file = {}
-            for spec in mail_analysis.MODEL_SPECS:
-                model = ResNetMLP(768, spec.output_dim).to(device)
-                path = f"/worker/AIMailAnalyzer/models/{spec.filename}"
-                model.load_state_dict(torch.load(path, weights_only=True))
-                models_by_file[spec.filename] = model
-
-            safe_suspicious_model = models_by_file["safe_suspicious_30_epochs_model.pth"]
-            spam_dangerous_model = models_by_file["spam_dangerous_30_epochs_model.pth"]
-            safe_model = models_by_file["safe_30_epochs_model.pth"]
-            spam_model = models_by_file["unwanted_30_epochs_model.pth"]
-            dangerous_model = models_by_file["dangerous_30_epochs_model.pth"]
-        except Exception as e:
-            self.error(f"Error loading models: {e}")
-            return
 
         # Untar file
-        if not mail_analysis.untar_file(self.filepath, './tmp/'):
+        if not mail_archive.untar_file(self.filepath, './tmp/'):
             self.error(f"Error extracting archive: {self.filepath}")
             return
 
@@ -77,54 +133,48 @@ class AIMailClassifier(Analyzer):
             if file.endswith('.headers'):
                 with open('./tmp/' + file, 'r', encoding='utf-8', errors='replace') as f:
                     msg = email.message_from_file(f)
-                    mail_headers = mail_analysis.get_header_dict_list(msg)
+                    mail_headers = mail_archive.get_header_dict_list(msg)
 
         if mail_body is None or mail_headers is None:
             self.error(f"Archive {self.filepath} is missing the expected .txt/.headers member")
             return
 
-        # Get mail embedding
-        email_embedding = vectorizer.encode([mail_body], show_progress_bar=False)
-
-        # Classify mail
-        classification_probabilities = mail_analysis.getMainClassificationProbabilities(device, safe_suspicious_model, spam_dangerous_model, email_embedding)
-        classification_info = mail_analysis.getMainClassificationInfo(classification_probabilities)
-
-        # Get sub classification
-        sub_classification_probabilities = mail_analysis.getSubClassificationProbabilities(device, [safe_model, spam_model, dangerous_model], email_embedding, classification_probabilities)
-        sub_classification_info = mail_analysis.getSubClassificationInfo(sub_classification_probabilities)
-
-        # Explainability: labeled probability breakdowns + which sentences drove the call
-        classification_breakdown = mail_analysis.get_classification_breakdown(classification_probabilities)
-        sub_classification_breakdown = mail_analysis.get_sub_classification_breakdown(sub_classification_probabilities)
-        contributing_phrases = mail_analysis.get_contributing_phrases(
-            device, safe_suspicious_model, spam_dangerous_model, vectorizer,
-            mail_body,
-            classification_index=int(np.argmax(classification_probabilities)),
-            baseline_probability=float(np.max(classification_probabilities)),
-        )
+        # Classify via the persistent inference server, which owns the
+        # vectorizer and every model variant (see inference_server/server.py
+        # for why: this image is spawned fresh per Cortex job, so loading a
+        # full SentenceTransformer + 5 ResNetMLP checkpoints here every time
+        # would reload them from disk on every single mail).
+        try:
+            result = classify_remote(build_session(), self.server_url, mail_body, self.variant)
+        except RuntimeError as e:
+            self.error(f"Error calling inference server: {e}")
+            return
 
         # Build report
         self.report({
-            'malscore': str(classification_info['score']),
-            'classification': classification_info['classification'],
-            'confidence': str(classification_info['confidence']),
-            'classification_probabilities': str(classification_probabilities),
-            'classification_breakdown': classification_breakdown,
-            'sub_classification': sub_classification_info['classification'],
-            'sub_classification_confidence': str(sub_classification_info['confidence']),
-            'sub_classification_probabilities': str(sub_classification_probabilities),
-            'sub_classification_breakdown': sub_classification_breakdown,
-            'contributing_phrases': contributing_phrases,
+            'malscore': result['malscore'],
+            'classification': result['classification'],
+            'confidence': result['confidence'],
+            'classification_probabilities': result['classification_probabilities'],
+            'classification_breakdown': result['classification_breakdown'],
+            'sub_classification': result['sub_classification'],
+            'sub_classification_confidence': result['sub_classification_confidence'],
+            'sub_classification_probabilities': result['sub_classification_probabilities'],
+            'sub_classification_breakdown': result['sub_classification_breakdown'],
+            'contributing_phrases': result['contributing_phrases'],
+
             'report': {
                 'mail_file_name': self.filename,
                 'mail_file_path': self.filepath,
-                'classification_probabilities': str(classification_probabilities),
+                'classification_probabilities': result['classification_probabilities'],
+                'main_probabilities': result['main_probabilities'],
+                'sub_probabilities': result['sub_probabilities'],
                 'analyzed_mail_content': mail_body,
                 'analyzed_mail_headers': str(mail_headers),
-                'email_embedding': str(email_embedding.tolist()[0])
+                'email_embedding': result['email_embedding'],
             }
         })
+
 
 if __name__ == "__main__":
     AIMailClassifier().run()

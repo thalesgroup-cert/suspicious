@@ -182,6 +182,18 @@ services:
       retries: 10
       start_period: 60s
 
+  # AI_Mail_Analyzer's persistent model server. Behind the `ai` profile so a
+  # bare `docker compose up` (e.g. the CI stack, which stubs Cortex) does not
+  # build/pull the torch image; the Makefile enables the profile for every
+  # `make` target. Plain compose users: `docker compose --profile ai up -d`.
+  ai_inference:
+    profiles: ["ai"]
+    extends:
+      file: compose_apps.yaml
+      service: ai_inference
+    image: aimailanalyzer-inference:${AI_INFERENCE_VERSION:-local}
+    container_name: ${SVC_PREFIX:-}ai_inference
+
   # ── Email feeder ──────────────────────────────────────────────────────────
 
   feeder:

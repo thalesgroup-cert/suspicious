@@ -1,10 +1,9 @@
 from enum import Enum
-import os
 import re
 from typing import NamedTuple
 import numpy as np
-from collections import defaultdict
-import tarfile
+
+from mail_archive import get_header_dict_list, untar_file  # noqa: F401 (re-exported)
 
 class ClassificationName(Enum):
     SAFE = 0
@@ -43,73 +42,6 @@ MODEL_SPECS = (
     ModelSpec("unwanted_30_epochs_model.pth", 2, "sub"),
     ModelSpec("dangerous_30_epochs_model.pth", 4, "sub"),
 )
-
-# Limits for safe extraction. The archive holds an email's parsed parts
-# (body .txt, .headers) — kilobytes in practice — so these caps are generous
-# while still defeating a tarbomb that aims to exhaust the worker's disk.
-_TAR_MAX_MEMBERS = 1_000
-_TAR_MAX_TOTAL_UNCOMPRESSED = 200 * 1024 * 1024  # 200 MB
-
-
-def _is_within_directory(directory, target):
-    """True if `target` resolves inside `directory` (defeats ../ traversal)."""
-    abs_directory = os.path.realpath(directory)
-    abs_target = os.path.realpath(target)
-    prefix = os.path.join(abs_directory, "")
-    return abs_target == abs_directory or abs_target.startswith(prefix)
-
-
-def _safe_extract(tar_ref, extract_to):
-    """Extract a tar archive defensively.
-
-    Guards against:
-      * Path traversal (CVE-2007-4559) — members with ``../`` or absolute
-        paths that would write outside ``extract_to``.
-      * Symlink/hardlink/device members that could redirect a later write or
-        leak host files.
-      * Tarbombs — too many members or too much total uncompressed data.
-    """
-    os.makedirs(extract_to, exist_ok=True)
-    members = tar_ref.getmembers()
-
-    if len(members) > _TAR_MAX_MEMBERS:
-        raise ValueError(
-            f"Archive has too many entries ({len(members)} > {_TAR_MAX_MEMBERS})."
-        )
-
-    total = 0
-    for member in members:
-        # Only ever extract regular files and directories. Symlinks, hardlinks,
-        # FIFOs and device nodes have no business in an email-parts archive.
-        if not (member.isreg() or member.isdir()):
-            raise ValueError(f"Archive contains an unsupported entry type: {member.name}")
-
-        total += max(member.size, 0)
-        if total > _TAR_MAX_TOTAL_UNCOMPRESSED:
-            raise ValueError("Archive uncompressed size exceeds the allowed limit.")
-
-        target = os.path.join(extract_to, member.name)
-        if not _is_within_directory(extract_to, target):
-            raise ValueError(f"Archive entry escapes the extraction directory: {member.name}")
-
-    tar_ref.extractall(path=extract_to, members=members)
-
-
-def untar_file(filepath, extract_to):
-    try:
-        with tarfile.open(filepath, 'r:*') as tar_ref:
-            _safe_extract(tar_ref, extract_to)
-            print(f"File {filepath} untarred to {extract_to}")
-        return True
-    except Exception as e:
-        print(f"Error untarring file: {e}")
-        return False
-
-def get_header_dict_list(msg):
-    headers = defaultdict(list)
-    for key, value in msg.items():
-        headers[key].append(value)
-    return headers
 
 def getMainClassificationProbabilities(device, safe_suspicious_model, spam_dangerous_model, email_embedding):
     import torch
@@ -161,6 +93,14 @@ def getMainClassificationInfo(global_probabilities):
 
     return result
 
+# Output width of each sub-model, in the [safe_model, spam_model, dangerous_model]
+# order getSubClassificationProbabilities is called with. Fixed by that calling
+# convention (see y_dangerous_encoder in retrain_model_monthly/Re_Train_Model/
+# variable.py) - not derivable from main_classification_probabilities, which
+# holds one scalar weight per model position, not each model's own output width.
+SUB_MODEL_WIDTHS = (2, 2, 4)
+
+
 def getSubClassificationProbabilities(device, models, email_embedding, main_classification_probabilities):
     import torch
     email_tensor = torch.tensor(email_embedding, dtype=torch.float32).to(device)
@@ -168,6 +108,13 @@ def getSubClassificationProbabilities(device, models, email_embedding, main_clas
     global_sub_probabilities = []
 
     for i, model in enumerate(models):
+        if model is None:
+            # Sub-model not available (e.g. not enough labeled samples yet to
+            # train it). Contribute an all-zero slice so the concatenated
+            # vector keeps its expected width and the downstream argmax never
+            # picks a sub-class we have no signal for.
+            global_sub_probabilities.append(np.zeros(SUB_MODEL_WIDTHS[i]))
+            continue
         model.eval()
         with torch.no_grad():
             output = model(email_tensor)

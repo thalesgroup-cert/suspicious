@@ -5,13 +5,15 @@ No torch/sentence_transformers required — these two files are the only
 thing in AIMailAnalyzer that don't need the ML stack to import, so this is
 what's testable without the full Docker image.
 """
+import io
 import sys
+import tarfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import mail_analysis  # noqa: E402
-import health  # noqa: E402
+import mail_archive  # noqa: E402
 
 
 def test_subclassification_enum_matches_trained_model_capacity():
@@ -31,11 +33,12 @@ def test_dangerous_model_spec_has_four_outputs():
     assert dangerous.output_dim == 4
 
 
-def test_health_probe_uses_the_same_model_specs_as_the_classifier():
-    """health.py previously hardcoded output_dim=2 for every model, including
-    the 4-output dangerous model, so load_state_dict always raised a shape
-    mismatch there. Guard against a re-drifted, independently declared copy."""
-    assert health.MODEL_SPECS is mail_analysis.MODEL_SPECS
+def test_archive_helpers_are_reexported_for_existing_callers():
+    """untar_file / get_header_dict_list moved to the stdlib-only mail_archive
+    module (the Cortex client image has no numpy); mail_analysis keeps the old
+    names working."""
+    assert mail_analysis.untar_file is mail_archive.untar_file
+    assert mail_analysis.get_header_dict_list is mail_archive.get_header_dict_list
 
 
 def test_get_classification_breakdown_labels_by_enum_name():
@@ -79,3 +82,51 @@ def test_rank_phrase_impacts_respects_top_n():
     ranked = mail_analysis.rank_phrase_impacts(sentences, impacts, top_n=2)
     assert len(ranked) == 2
     assert ranked[0]["text"] == "a"
+
+
+# --- mail_archive.untar_file ---------------------------------------------------
+
+
+def _tar_with(path, *members):
+    """members: (name, TarInfo-kwargs-or-bytes). Bytes -> regular file."""
+    with tarfile.open(path, "w") as tar:
+        for name, spec in members:
+            info = tarfile.TarInfo(name)
+            if isinstance(spec, bytes):
+                info.size = len(spec)
+                tar.addfile(info, io.BytesIO(spec))
+            else:
+                info.type = spec["type"]
+                info.linkname = spec.get("linkname", "")
+                tar.addfile(info)
+    return str(path)
+
+
+def test_untar_extracts_a_normal_mail_archive(tmp_path):
+    archive = _tar_with(tmp_path / "ok.tar", ("mail.txt", b"body"), ("mail.headers", b"From: a@b\n"))
+    out = tmp_path / "out"
+    assert mail_archive.untar_file(archive, str(out)) is True
+    assert (out / "mail.txt").read_bytes() == b"body"
+
+
+def test_untar_rejects_path_traversal(tmp_path):
+    archive = _tar_with(tmp_path / "evil.tar", ("../escaped.txt", b"x"))
+    assert mail_archive.untar_file(archive, str(tmp_path / "out")) is False
+    assert not (tmp_path / "escaped.txt").exists()
+
+
+def test_untar_rejects_symlinks(tmp_path):
+    archive = _tar_with(tmp_path / "link.tar", ("l", {"type": tarfile.SYMTYPE, "linkname": "/etc/passwd"}))
+    assert mail_archive.untar_file(archive, str(tmp_path / "out")) is False
+
+
+def test_untar_rejects_a_tarbomb_by_member_count(tmp_path, monkeypatch):
+    monkeypatch.setattr(mail_archive, "_TAR_MAX_MEMBERS", 3)
+    archive = _tar_with(tmp_path / "bomb.tar", *[(f"f{i}.txt", b"x") for i in range(5)])
+    assert mail_archive.untar_file(archive, str(tmp_path / "out")) is False
+
+
+def test_untar_reports_a_non_archive_as_failure(tmp_path):
+    bogus = tmp_path / "bogus.tar"
+    bogus.write_bytes(b"this is not a tar file")
+    assert mail_archive.untar_file(str(bogus), str(tmp_path / "out")) is False

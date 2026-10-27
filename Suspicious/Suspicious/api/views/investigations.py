@@ -59,6 +59,15 @@ def user_is_investigator(user) -> bool:
     return user.groups.filter(name__in=["CERT", "CISO", "Admin"]).exists()
 
 
+class IsCaseEditor(BasePermission):
+    """CERT and Admin edit case details; a CISO reads and challenges but does not edit."""
+    message = "Not authorized."
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        return bool(user and user.is_authenticated and user.groups.filter(name__in=["CERT", "Admin"]).exists())
+
+
 class IsInvestigator(BasePermission):
     message = "Not authorized."
 
@@ -335,7 +344,7 @@ class InvestigationDetailsView(InvestigationAccessMixin, APIView):
     },
 )
 class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
-    permission_classes = [IsAuthenticated, IsInvestigator]
+    permission_classes = [IsAuthenticated, IsCaseEditor]
 
     def patch(self, request, case_id: int):
         obj = self.get_case_or_404(case_id)

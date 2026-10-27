@@ -15,7 +15,9 @@ from rest_framework.views import APIView
 from api.permissions.submissions import (
     CanAccessSubmission,
     CanChallengeSubmission,
+    can_challenge_submission,
     has_elevated_view,
+    submission_list_queryset,
     submission_queryset,
     user_has_submission_elevated_access,
 )
@@ -92,7 +94,7 @@ class SubmissionListView(ListAPIView):
         return Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
 
     def get_queryset(self):
-        queryset = submission_queryset(self.get_base_queryset(), self.request.user)
+        queryset = submission_list_queryset(self.get_base_queryset(), self.request.user)
 
         mine = self.request.query_params.get("mine")
         if self._is_truthy(mine):
@@ -218,8 +220,9 @@ class SubmissionChallengeView(APIView):
         obj = get_object_or_404(
             Case.objects.only("id", "reporter_id", "is_challenged", "is_challengeable", "status"),
             pk=submission_id,
-            reporter_id=self.request.user.id,  # someone else's id is a 404, like a missing one
         )
+        if not can_challenge_submission(self.request.user, obj):
+            raise Http404  # a case the user may not challenge looks like a missing one
         self.check_object_permissions(self.request, obj)
         return obj
 
@@ -236,13 +239,13 @@ class SubmissionChallengeView(APIView):
             raise ValidationError({"detail": "Submission cannot be challenged."})
 
         try:
-            CaseChallengeService(obj, logger).mark_challenged(
+            CaseChallengeService(obj, logger, challenger=request.user).mark_challenged(
                 serializer.validated_data["proposed_result"], serializer.validated_data["reason"])
         except ValueError:  # lost a race with another challenge of the same case
             raise ValidationError({"detail": "Submission already challenged."})
 
         try:
-            notify_and_record_challenge(obj, logger)
+            notify_and_record_challenge(obj, logger, challenger=request.user)
         except Exception:
             logger.exception("Challenge notify failed for case %s", obj.id)
 

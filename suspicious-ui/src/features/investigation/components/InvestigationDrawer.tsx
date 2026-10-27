@@ -69,6 +69,10 @@ export type InvestigationDrawerProps = {
   editClassification: string;
   setEditClassification: (v: string) => void;
   onRedo: () => void;
+  /** CERT and Admin edit the verdict; a CISO does not (the API refuses it). */
+  canEdit?: boolean;
+  /** Set when the user may challenge this case: shows the Challenge verdict button. */
+  onChallenge?: () => void;
   commentsQuery: UseQueryResult<CaseComment[]>;
   addCommentMutation: UseMutationResult<unknown, unknown, string>;
   /** IDs of the current page's rows, in order: previous/next step through them. */
@@ -79,7 +83,7 @@ export type InvestigationDrawerProps = {
 export function InvestigationDrawer({
   open, onClose, drawerRow, caseId, detailsQuery: rawDetailsQuery, editMutation, editMode, setEditMode,
   editScore, setEditScore, editConfidence, setEditConfidence, editClassification, setEditClassification,
-  onRedo, commentsQuery, addCommentMutation,
+  onRedo, canEdit = true, onChallenge, commentsQuery, addCommentMutation,
   siblings = [], onNavigate,
 }: InvestigationDrawerProps) {
   const theme = useTheme();
@@ -207,7 +211,7 @@ export function InvestigationDrawer({
               <Stack direction="row" useFlexGap sx={{ mt: 1.25, alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                 <ResultChip result={drawerRow.result} minWidth={BADGE_W} size="medium" behind={[flatten(headerTint(theme), theme.palette.background.paper)]} />
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center", ml: isPhone ? 0 : "auto" }}>
-                  <PrimaryActions key={caseId} id={caseId} detailsReady={detailsReady} onEdit={startEdit} compact={isPhone} />
+                  <PrimaryActions key={caseId} id={caseId} detailsReady={detailsReady} canEdit={canEdit} onEdit={startEdit} onChallenge={onChallenge} compact={isPhone} />
                 </Stack>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

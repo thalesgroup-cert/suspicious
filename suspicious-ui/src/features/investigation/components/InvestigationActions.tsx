@@ -13,6 +13,7 @@ import {
   DescriptionOutlined,
   DownloadOutlined,
   EditOutlined,
+  GavelOutlined,
   LinkOutlined,
   MoreHoriz,
   NorthEastOutlined,
@@ -25,12 +26,19 @@ import { pushSubmissionToTheHive } from "@/features/submissions/api";
 import { getEnabledConnectors } from "@/features/settings/components/connectors";
 import { ensureContrast, flatten } from "@/shared/lib/contrast";
 
-/** The decision actions: Edit verdict and, when the TheHive connector is enabled, Push to TheHive. */
-export function PrimaryActions({ id, detailsReady, onEdit, compact }: {
+/**
+ * The decision actions: Edit verdict (CERT and Admin), Challenge verdict (a CISO, for a user in their scope)
+ * and, when the TheHive connector is enabled, Push to TheHive.
+ */
+export function PrimaryActions({ id, detailsReady, canEdit = true, onEdit, onChallenge, compact }: {
   id: number;
-  /** Details loaded without error: editing and pushing need them. */
+  /** Details loaded without error: editing, challenging and pushing need them. */
   detailsReady: boolean;
+  /** The API refuses case edits from a CISO, so the button is not offered to them. */
+  canEdit?: boolean;
   onEdit: () => void;
+  /** Set only when the user may challenge this case; it also decides whether the button shows. */
+  onChallenge?: () => void;
   /** Phones: small buttons so both fit beside the verdict chip more often. */
   compact?: boolean;
 }) {
@@ -65,13 +73,27 @@ export function PrimaryActions({ id, detailsReady, onEdit, compact }: {
 
   return (
     <>
-      <Tooltip title={detailsReady ? "" : "Available once the details load."} disableHoverListener={detailsReady}>
-        <span>
-          <Button variant="contained" size={size} startIcon={<EditOutlined />} disabled={!detailsReady} onClick={onEdit} sx={{ whiteSpace: "nowrap" }}>
-            Edit verdict
-          </Button>
-        </span>
-      </Tooltip>
+      {canEdit ? (
+        <Tooltip title={detailsReady ? "" : "Available once the details load."} disableHoverListener={detailsReady}>
+          <span>
+            <Button variant="contained" size={size} startIcon={<EditOutlined />} disabled={!detailsReady} onClick={onEdit} sx={{ whiteSpace: "nowrap" }}>
+              Edit verdict
+            </Button>
+          </span>
+        </Tooltip>
+      ) : null}
+      {onChallenge ? (
+        <Button
+          variant={canEdit ? "outlined" : "contained"}
+          size={size}
+          startIcon={<GavelOutlined />}
+          disabled={!detailsReady}
+          onClick={onChallenge}
+          sx={{ whiteSpace: "nowrap" }}
+        >
+          Challenge verdict
+        </Button>
+      ) : null}
       {theHiveEnabled ? (
         <Button
           variant="outlined"
