@@ -127,6 +127,11 @@ management moving to HashiCorp Vault.
 
 ### Changed
 
+- **A CISO can challenge a case from the Investigations page.** The drawer has a
+  Challenge verdict button for a CISO when the case can be challenged and has not
+  been yet. It opens the same dialog as the Submissions page, which is now one
+  shared component. The Edit verdict button is no longer shown to a CISO, because
+  the API refuses case edits from that role; CERT and Admin keep it.
 - **Object storage moves from `minio-py` to `boto3`** behind a provider-agnostic
   `ObjectStore` interface (`common/storage/`). No config change is needed:
   `storage.provider` (or `STORAGE_PROVIDER`) is optional and defaults to `s3`.

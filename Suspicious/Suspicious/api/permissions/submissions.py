@@ -46,6 +46,25 @@ def submission_queryset(queryset, user):
     return queryset.filter(own)
 
 
+def submission_list_queryset(queryset, user):
+    """The Submissions page: what the user reported themselves. A CISO's scope
+    lives on the Investigations page, so only the global groups see beyond their own."""
+    if not user or not user.is_authenticated:
+        return queryset.none()
+    if set(user.groups.values_list("name", flat=True)) & _GLOBAL_GROUPS:
+        return queryset
+    return queryset.filter(reporter=user)
+
+
+def can_challenge_submission(user, case) -> bool:
+    """The reporter, or a CISO challenging for a user inside their scope."""
+    if case.reporter_id == user.id:
+        return True
+    if not user.groups.filter(name="CISO").exists():
+        return False
+    return scoped_case_queryset(type(case).objects.filter(pk=case.pk), user).exists()
+
+
 def can_access_submission(user, case) -> bool:
     if case.reporter_id == user.id:
         return True
@@ -69,10 +88,11 @@ class CanAccessSubmission(BasePermission):
 class CanChallengeSubmission(BasePermission):
     """
     Object-level permission:
-    - only reporter can challenge own submission
+    - the reporter can challenge their own submission
+    - a CISO can challenge for a user inside their scope
     """
 
     message = "Not authorized."
 
     def has_object_permission(self, request, view, obj) -> bool:
-        return obj.reporter_id == request.user.id
+        return can_challenge_submission(request.user, obj)

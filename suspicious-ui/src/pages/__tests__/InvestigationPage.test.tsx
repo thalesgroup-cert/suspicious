@@ -31,6 +31,7 @@ vi.mock("@/features/comments/api", () => ({
 
 vi.mock("@/features/submissions/api", () => ({
   pushSubmissionToTheHive: vi.fn(),
+  challengeSubmission: vi.fn(),
 }));
 
 vi.mock("@/features/settings/components/connectors", () => ({
@@ -116,10 +117,11 @@ import {
 import InvestigationPage from "@/pages/InvestigationPage";
 import { editGlobalCase } from "@/features/investigation/api";
 import { getCaseComments, addCaseComment } from "@/features/comments/api";
-import { pushSubmissionToTheHive } from "@/features/submissions/api";
+import { pushSubmissionToTheHive, challengeSubmission } from "@/features/submissions/api";
 import { getEnabledConnectors } from "@/features/settings/components/connectors";
 
 const mockPush = vi.mocked(pushSubmissionToTheHive);
+const mockChallenge = vi.mocked(challengeSubmission);
 const mockEnabledConnectors = vi.mocked(getEnabledConnectors);
 const mockGetMe = vi.mocked(getMe);
 const mockGetAll = vi.mocked(getAllInvestigations);
@@ -1111,6 +1113,93 @@ describe("InvestigationPage", () => {
       await close();
       await waitFor(() => expect(drawerHeading(9)).toBeNull());
       expect(screen.getByTestId("loc")).toHaveTextContent(/^\/investigation$/);
+    });
+  });
+
+  describe("CISO: challenge for a user in scope, no case edits", () => {
+    const challengeable = { ...mockRow, is_challengeable: true, is_challenged: false };
+
+    function asRole(groups: string[], row: Record<string, unknown> = challengeable) {
+      mockGetMe.mockResolvedValue({ ...mockMe, groups, ciso_scope: "EMEA" } as never);
+      mockGetAll.mockResolvedValue({ ...mockListResponse, results: [row] } as never);
+      mockGetDetails.mockResolvedValue({ ...mockDetails, ...row } as never);
+    }
+
+    async function open() {
+      const user = userEvent.setup();
+      renderInvestigation();
+      await openRow(user);
+      await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+      return user;
+    }
+
+    it("a CISO can challenge but is not offered Edit verdict", async () => {
+      asRole(["CISO"]);
+      await open();
+      expect(screen.getByRole("button", { name: "Challenge verdict" })).toBeEnabled();
+      expect(screen.queryByRole("button", { name: "Edit verdict" })).toBeNull();
+    });
+
+    it("CERT edits but is not offered Challenge verdict (the API only lets the reporter or a CISO)", async () => {
+      asRole(["CERT"]);
+      await open();
+      expect(screen.getByRole("button", { name: "Edit verdict" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Challenge verdict" })).toBeNull();
+    });
+
+    it("a user who is both CISO and CERT gets both", async () => {
+      asRole(["CISO", "CERT"]);
+      await open();
+      expect(screen.getByRole("button", { name: "Edit verdict" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Challenge verdict" })).toBeInTheDocument();
+    });
+
+    it("no Challenge verdict once the case is challenged, or when it cannot be", async () => {
+      for (const row of [
+        { ...challengeable, is_challenged: true },
+        { ...challengeable, is_challengeable: false },
+      ]) {
+        asRole(["CISO"], row);
+        const { unmount } = renderInvestigation();
+        const user = userEvent.setup();
+        await openRow(user);
+        await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+        expect(screen.queryByRole("button", { name: "Challenge verdict" })).toBeNull();
+        unmount();
+        vi.clearAllMocks();
+      }
+    });
+
+    it("sends the challenge for that case and refreshes it", async () => {
+      asRole(["CISO"]);
+      mockChallenge.mockResolvedValue({ detail: "Challenge submitted." } as never);
+      const user = await open();
+      const detailsCalls = mockGetDetails.mock.calls.length;
+
+      await user.click(screen.getByRole("button", { name: "Challenge verdict" }));
+      expect(screen.getByRole("dialog", { name: /challenge/i })).toHaveTextContent("#7");
+      await user.click(screen.getByRole("button", { name: "Dangerous" }));
+      await user.type(screen.getByLabelText(/why is the verdict wrong/i), "reported by a user in my scope");
+      await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+      await waitFor(() => expect(mockChallenge).toHaveBeenCalledWith(7, {
+        proposed_result: "Dangerous", reason: "reported by a user in my scope",
+      }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: /challenge/i })).toBeNull());
+      expect(await screen.findByText(/challenge (was )?submitted|challenged/i)).toBeInTheDocument();
+      await waitFor(() => expect(mockGetDetails.mock.calls.length).toBeGreaterThan(detailsCalls));
+    });
+
+    it("keeps the dialog open and says so when the API refuses", async () => {
+      asRole(["CISO"]);
+      mockChallenge.mockRejectedValue(new Error("nope"));
+      const user = await open();
+      await user.click(screen.getByRole("button", { name: "Challenge verdict" }));
+      await user.click(screen.getByRole("button", { name: "Safe" }));
+      await user.type(screen.getByLabelText(/why is the verdict wrong/i), "a long enough reason");
+      await user.click(screen.getByRole("button", { name: "Confirm" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(/failed to challenge/i);
+      expect(screen.getByRole("dialog", { name: /challenge/i })).toBeInTheDocument();
     });
   });
 });

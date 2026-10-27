@@ -21,9 +21,14 @@ def get_submissions_url() -> str:
 
 
 class CaseChallengeService:
-    def __init__(self, case, logger):
+    def __init__(self, case, logger, challenger=None):
         self.case = case
         self.logger = logger
+        # Who pressed the button: the reporter, or a CISO acting for them.
+        self.challenger = challenger or case.reporter
+
+    def _on_behalf(self) -> str:
+        return "" if self.challenger.pk == self.case.reporter_id else f" on behalf of {self.case.reporter.username}"
 
     def validate(self):
         if self.case.is_challenged or self.case.status == "Challenged":
@@ -50,9 +55,9 @@ class CaseChallengeService:
             else:
                 self.case.status = "Challenged"
                 self.case.save(update_fields=["status"])
-            body = f"Challenged the {was} verdict"
+            body = f"Challenged the {was} verdict{self._on_behalf()}"
             body += f", proposing {proposed}" if proposed else ""
-            CaseComment.objects.create(case=self.case, author=self.case.reporter,
+            CaseComment.objects.create(case=self.case, author=self.challenger,
                                        body=body + (f": {reason}" if reason else "."))
 
     def update_user_stats(self):
@@ -60,7 +65,7 @@ class CaseChallengeService:
 
     def notify(self):
         send_to_thehive = _load_thehive_config().get("enabled", False)
-        mail_header = f"Case ID {self.case.id} challenged by {self.case.reporter.username}"
+        mail_header = f"Case ID {self.case.id} challenged by {self.challenger.username}{self._on_behalf()}"
         proposed = getattr(self.case, "challenge_proposed_result", "")
         if proposed:
             mail_header += f" (reporter says it should be {proposed})"
@@ -90,11 +95,11 @@ def run_case_challenge(case, logger, proposed: str = "", reason: str = "") -> No
     service.notify()
 
 
-def notify_and_record_challenge(case, logger) -> None:
+def notify_and_record_challenge(case, logger, challenger=None) -> None:
     """Stats + CERT/TheHive notification for an already-marked challenge.
     Unlike run_case_challenge, does NOT validate/mark: the caller (in-app
     view) has already marked the case, including the proposed verdict."""
-    service = CaseChallengeService(case, logger)
+    service = CaseChallengeService(case, logger, challenger=challenger)
     service.update_user_stats()
     service.notify()
 
