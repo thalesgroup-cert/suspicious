@@ -45,10 +45,11 @@ def _summary_counts(summary: Any) -> Optional[tuple[int, int]]:
     return None
 
 
-def _band(m: int, s: int, total: int, reputation: Any = None, has_class: bool = False) -> tuple[str, int]:
+def _band(m: int, s: int, total: int, has_class: bool = False) -> tuple[str, int]:
+    # VirusTotal's community reputation is deliberately not a signal: a few votes can sink a legitimate site.
     if m >= 2 or (m >= 1 and has_class):
         return "malicious", max(55, min(95, round(50 + 45 * m / max(total, 1))))
-    if m == 1 or s >= 1 or (isinstance(reputation, (int, float)) and reputation <= -25 and m == 0):
+    if m == 1 or s >= 1:
         return "suspicious", 60
     return "safe", 90 if total >= 10 else 60
 
@@ -92,10 +93,9 @@ class VirusTotalGetReportParser(AnalyzerParser):
             m = int(enr.get("malicious_count", malicious) or 0)
             s = int(enr.get("suspicious_count", suspicious) or 0)
             total_e = int(enr.get("total", total) or 0)
-            reputation = enr.get("reputation")
             has_class = bool(enr.get("threat_label") or enr.get("threat_category"))
 
-            level, confidence = _band(m, s, total_e, reputation, has_class)
+            level, confidence = _band(m, s, total_e, has_class)
             score, _ = get_level_score_confidence(level)   # keep the level->score column
             malicious, total = m, total_e                  # for the category string below
         else:

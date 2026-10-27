@@ -168,9 +168,10 @@ class GetCortexJobsResultsScoringTests(TestCase):
 
         self.report.refresh_from_db()
         self.assertEqual(self.report.status, "Success")
-        self.assertEqual(self.report.level, "malicious")
-        self.assertEqual(self.report.score, 10)
-        self.assertEqual(self.report.confidence, 100)
+        # 0/91 engines: the resolution and download counts are context, not detections.
+        self.assertEqual(self.report.level, "safe")
+        self.assertEqual(self.report.score, 0)
+        self.assertEqual(self.report.confidence, 90)
 
     def test_no_score_written_when_inprogress(self):
         job = MagicMock(status="InProgress", dataType="domain")
