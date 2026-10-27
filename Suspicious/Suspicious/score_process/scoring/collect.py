@@ -128,24 +128,30 @@ def collect_votes(case, ai=None) -> tuple:
     from score_process.scoring.cortex_analyzers.allow_list import is_allow_listed_category
 
     ai_name = _get_cortex_config().get("analyzers", {}).get("ai")
-    seen: dict = {}   # analyzer name -> [weight, worst band, any allow-list hit]
+    seen: dict = {}   # analyzer name -> [weight, worst band, any allow-list hit, any non-Safe report on an unlisted target]
 
-    def add(name, weight, report_band, hit):
-        cur = seen.setdefault(name, [weight, Result.SAFE, False])
+    def add(name, weight, report_band, hit, unlisted=False):
+        cur = seen.setdefault(name, [weight, Result.SAFE, False, False])
         if _BAND_RANK[report_band] > _BAND_RANK[cur[1]]:
             cur[1] = report_band
         cur[2] = cur[2] or hit
+        cur[3] = cur[3] or unlisted
 
     for r in _dedup_analyzer_reports(reports_for_case(case, defer_full=True)):
         if (r.status != "Success" or r.level == "info" or r.confidence < CONF_FLOOR
                 or r.analyzer.name == ai_name):
             continue
-        add(r.analyzer.name, r.analyzer.weight, band(r.score),
-            is_allow_listed_category(r.category) and _marker_still_valid(r))
+        report_band = band(r.score)
+        flagged = report_band != Result.SAFE
+        add(r.analyzer.name, r.analyzer.weight, report_band,
+            is_allow_listed_category(r.category) and _marker_still_valid(r),
+            unlisted=flagged and not _marker_still_valid(r))
 
     if ai is not None and ai_name and ai.confidence >= CONF_FLOOR:
         weight = Analyzer.objects.filter(name=ai_name).values_list("weight", flat=True).first()
         if weight:
-            add(ai_name, weight, band(ai.score), False)
+            ai_band = band(ai.score)
+            add(ai_name, weight, ai_band, False, unlisted=ai_band != Result.SAFE)
 
-    return tuple(Vote(n, w, b, hit and b == Result.SAFE) for n, (w, b, hit) in seen.items() if w > 0)
+    return tuple(Vote(n, w, b, hit and b == Result.SAFE, dissent_on_listed=b != Result.SAFE and not unl)
+                 for n, (w, b, hit, unl) in seen.items() if w > 0)

@@ -179,6 +179,10 @@ management moving to HashiCorp Vault.
   images and some stylesheets are dropped, and very large mails are truncated.
 
 ### Fixed
+- **Allow-list bypass**: an allow-listed link in a mail could turn a phishing verdict into Safe 0/100:
+  the allow-list majority overruled any dissent, including an analyzer flagging another link or the
+  AI on the mail text. It now only overrules dissent about an allow-listed target; any other flag
+  keeps the verdict and the rationale names the analyzer.
 - **TheHive challenge push**: runs as a Celery task with retries (1 to 16 minutes) instead of
   inside the challenge request. A TheHive outage no longer stalls the request for ~30 s, and
   the alert is no longer lost, nor reported as sent.

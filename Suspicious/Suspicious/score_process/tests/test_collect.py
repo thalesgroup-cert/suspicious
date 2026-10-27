@@ -288,3 +288,25 @@ class CollectVotesTest(TestCase):
         self.assertEqual((ai.band, ai.weight), ("Dangerous", 0.4))
         self.assertNotIn("AIMailAnalyzer", self._votes(AiSignal(score=9, confidence=10)))
         self.assertNotIn("AIMailAnalyzer", self._votes(None))
+
+    def test_dissent_on_an_allow_listed_target_is_marked_as_such(self):
+        self._allow("a.test")
+        self._report("VT", 0.5, level="malicious", score=10)
+        vote = self._votes()["VT"]
+        self.assertEqual((vote.band, vote.dissent_on_listed), ("Dangerous", True))
+
+    def test_dissent_on_a_target_that_is_not_allow_listed_is_not(self):
+        self._allow("a.test")
+        self._report("VT", 0.5, url=self.url2, level="malicious", score=10)
+        vote = self._votes()["VT"]
+        self.assertEqual((vote.band, vote.dissent_on_listed), ("Dangerous", False))
+
+    def test_one_flag_on_an_unlisted_target_wins_over_a_flag_on_a_listed_one(self):
+        self._allow("a.test")
+        self._report("VT", 0.5, level="malicious", score=10)
+        self._report("VT", 0.5, url=self.url2, level="suspicious", score=7, job="2")
+        self.assertFalse(self._votes()["VT"].dissent_on_listed)
+
+    def test_the_ai_dissent_is_never_about_an_allow_listed_target(self):
+        Analyzer.objects.create(name="AIMailAnalyzer", analyzer_cortex_id="ai", weight=0.4)
+        self.assertFalse(self._votes(AiSignal(score=9, confidence=90))["AIMailAnalyzer"].dissent_on_listed)
