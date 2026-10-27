@@ -78,13 +78,17 @@ class CaseChallengeService:
             send_to_thehive,
         )
         if send_to_thehive:
-            self.logger.info("Sending challenge notification to TheHive for case ID %s", self.case.id)
-            ChallengeToTheHiveService(self.case, None, mail_header).send_to_thehive()
-            self.logger.info("Challenge notification sent to TheHive for case ID %s", self.case.id)
+            from tasp.tasks import push_challenge_to_thehive
+            push_challenge_to_thehive.delay(self.case.id, mail_header)
+            self.logger.info("Challenge notification to TheHive queued for case ID %s", self.case.id)
         else:
             cert_users = User.objects.filter(groups__name="CERT", is_active=True).exclude(email="")
             for cert_user in cert_users:
                 ChallengeToTheHiveService(self.case, cert_user, mail_header).send()
+
+
+def send_challenge_to_thehive(case, mail_header: str) -> None:
+    ChallengeToTheHiveService(case, None, mail_header).send_to_thehive()
 
 
 def run_case_challenge(case, logger, proposed: str = "", reason: str = "") -> None:
