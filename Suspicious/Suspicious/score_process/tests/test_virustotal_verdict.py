@@ -16,7 +16,7 @@ class VirustotalVerdictTests(SimpleTestCase):
             analyzer_name="VirusTotal_GetReport_3_1", data=name,
             data_type=spec["data_type"], case_id=None,
         )
-        return p.parse({}, spec["report_full"]), spec["expect"]
+        return p.parse(spec.get("summary", {}), spec["report_full"]), spec["expect"]
 
     def test_all_fixtures_hit_expected_band(self):
         for name in CASES:

@@ -1,0 +1,52 @@
+{
+ "data_type": "fqdn",
+ "expect": {
+  "confidence_min": 60,
+  "level": "safe"
+ },
+ "report_full": {
+  "attributes": {
+   "categories": {},
+   "last_analysis_date": 1793108998,
+   "last_analysis_stats": {
+    "harmless": 56,
+    "malicious": 0,
+    "suspicious": 0,
+    "timeout": 0,
+    "undetected": 36
+   },
+   "reputation": 0,
+   "tags": [],
+   "tld": "com",
+   "total_votes": {
+    "harmless": 0,
+    "malicious": 0
+   }
+  },
+  "id": "www.thalesgroup.com",
+  "iocs": {
+   "domain": [],
+   "file": [],
+   "ip": [],
+   "other": [],
+   "url": []
+  },
+  "type": "domain"
+ },
+ "summary": {
+  "taxonomies": [
+   {
+    "level": "info",
+    "namespace": "VT",
+    "predicate": "GetReport",
+    "value": "0/92"
+   },
+   {
+    "level": "malicious",
+    "namespace": "VT",
+    "predicate": "GetReport",
+    "value": "103 resolution(s)"
+   }
+  ]
+ }
+}
