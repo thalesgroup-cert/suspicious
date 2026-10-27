@@ -23,7 +23,7 @@
     "malicious": 0
    }
   },
-  "id": "www.thalesgroup.com",
+  "id": "www.corp.example",
   "iocs": {
    "domain": [],
    "file": [],
