@@ -179,6 +179,11 @@ management moving to HashiCorp Vault.
   images and some stylesheets are dropped, and very large mails are truncated.
 
 ### Fixed
+- **VirusTotal scoring**: when the full report has no engine stats, the verdict comes from the
+  analyzer's own detection count ("0/92") instead of the highest taxonomy level. "N resolution(s)",
+  "N downloaded file(s)" and "N contacted domain(s)" are tagged suspicious or malicious by Cortex
+  and made a clean, well-known site (0/92) score 7 to 10. VirusTotal's community reputation no
+  longer turns a clean 0-detection result into suspicious.
 - **TheHive challenge push**: runs as a Celery task with retries (1 to 16 minutes) instead of
   inside the challenge request. A TheHive outage no longer stalls the request for ~30 s, and
   the alert is no longer lost, nor reported as sent.
