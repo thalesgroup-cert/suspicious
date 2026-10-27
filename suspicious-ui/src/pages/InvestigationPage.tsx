@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Collapse,
@@ -46,6 +47,7 @@ import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 
 import { getMe, type Me } from "@/api/auth";
+import { BulkActionBar } from "@/features/investigation/components/BulkActionBar";
 import {
   getAllInvestigations,
   getInvestigationDetails,
@@ -180,6 +182,18 @@ export default function InvestigationPage() {
         : undefined,
     };
   }, [page, pageSize, qDebounced, status, type, result, from, to, sort, sortField, sortDir]);
+
+  // Bulk selection is per view: a new page, filter or sort starts empty so no one acts on rows they can't see.
+  const viewKey = JSON.stringify(investigationListParams);
+  const [selection, setSelection] = React.useState<{ key: string; ids: Set<number> }>(
+    () => ({ key: viewKey, ids: new Set() }),
+  );
+  const selected = React.useMemo(
+    () => (selection.key === viewKey ? selection.ids : new Set<number>()),
+    [selection, viewKey],
+  );
+  const setSelected = (update: (ids: Set<number>) => Set<number>) =>
+    setSelection((prev) => ({ key: viewKey, ids: update(prev.key === viewKey ? prev.ids : new Set()) }));
 
   const investigationsQuery = useQuery<InvestigationListResponse>({
     queryKey: ["investigation", investigationListParams],
@@ -575,6 +589,17 @@ export default function InvestigationPage() {
               <Table sx={{ minWidth: 1060 }}>
                 <TableHead>
                   <TableRow>
+                    {canEditCase ? (
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          slotProps={{ input: { "aria-label": "Select all cases on this page" } }}
+                          checked={rows.length > 0 && selected.size === rows.length}
+                          indeterminate={selected.size > 0 && selected.size < rows.length}
+                          onChange={(e) => setSelected(() => (e.target.checked ? new Set(rows.map((r) => r.id)) : new Set()))}
+                        />
+                      </TableCell>
+                    ) : null}
                     <TableCell sx={{ fontWeight: 700, width: 140 }}>
                       <TableSortLabel
                         active={sortField === "id"}
@@ -632,6 +657,20 @@ export default function InvestigationPage() {
                         }
                       }}
                     >
+                      {canEditCase ? (
+                        <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            size="small"
+                            slotProps={{ input: { "aria-label": `Select case ${r.id}` } }}
+                            checked={selected.has(r.id)}
+                            onChange={(e) => setSelected((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(r.id); else next.delete(r.id);
+                              return next;
+                            })}
+                          />
+                        </TableCell>
+                      ) : null}
                       <TableCell>
                         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                           <Button
@@ -784,6 +823,7 @@ export default function InvestigationPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      {canEditCase ? <BulkActionBar ids={[...selected]} onClear={() => setSelected(() => new Set())} /> : null}
     </Box>
     </Skeleton>
   );

@@ -169,6 +169,23 @@ class InvestigationGlobalEditRequestSerializer(serializers.Serializer):
         return value.upper()
 
 
+BULK_MAX_CASES = 100
+
+
+class BulkCaseIdsSerializer(serializers.Serializer):
+    case_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), min_length=1, max_length=BULK_MAX_CASES,
+    )
+
+    def validate_case_ids(self, value: list[int]) -> list[int]:
+        return list(dict.fromkeys(value))
+
+
+class BulkVerdictRequestSerializer(BulkCaseIdsSerializer, InvestigationGlobalEditRequestSerializer):
+    # Off by default: one override must not mail up to 100 reporters unless the analyst asks for it.
+    notify_reporters = serializers.BooleanField(required=False, default=False)
+
+
 class InvestigationAnalyzerTargetSerializer(serializers.Serializer):
     kind = serializers.CharField()
     id = serializers.IntegerField(allow_null=True)

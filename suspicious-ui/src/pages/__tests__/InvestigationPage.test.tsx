@@ -21,6 +21,8 @@ vi.mock("@/features/investigation/api", () => ({
   getInvestigationDetails: vi.fn(),
   editGlobalCase: vi.fn(),
   redoAnalysis: vi.fn(),
+  bulkSetVerdict: vi.fn(),
+  bulkRedoAnalysis: vi.fn(),
   buildSortOrdering: vi.fn((field: string, dir: string) => `${dir === "asc" ? "" : "-"}${field}`),
 }));
 
@@ -113,6 +115,8 @@ import {
   getAllInvestigations,
   getInvestigationDetails,
   redoAnalysis,
+  bulkSetVerdict,
+  bulkRedoAnalysis,
 } from "@/features/investigation/api";
 import InvestigationPage from "@/pages/InvestigationPage";
 import { editGlobalCase } from "@/features/investigation/api";
@@ -130,6 +134,8 @@ const mockGetComments = vi.mocked(getCaseComments);
 const mockAddComment = vi.mocked(addCaseComment);
 const mockRedoAnalysis = vi.mocked(redoAnalysis);
 const mockEdit = vi.mocked(editGlobalCase);
+const mockBulkVerdict = vi.mocked(bulkSetVerdict);
+const mockBulkRedo = vi.mocked(bulkRedoAnalysis);
 
 async function openRow(user: ReturnType<typeof userEvent.setup>) {
   await user.click((await screen.findByText(mockRow.info)).closest("tr")!);
@@ -193,6 +199,85 @@ describe("InvestigationPage", () => {
     ]);
     mockAddComment.mockResolvedValue({
       id: 2, author_email: "analyst@corp.test", body: "looks clean", is_internal: true, created_at: "2026-07-09T11:00:00Z",
+    });
+  });
+
+  describe("bulk edit", () => {
+    it("selecting a row shows the bar, and a row click still opens the drawer only from the row", async () => {
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
+      expect(await screen.findByText("1 selected")).toBeInTheDocument();
+      expect(mockGetDetails).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Clear" }));
+      expect(screen.queryByText("1 selected")).not.toBeInTheDocument();
+    });
+
+    it("the header checkbox selects every case on the page", async () => {
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select all cases on this page" }));
+      expect(await screen.findByText("1 selected")).toBeInTheDocument();
+    });
+
+    it("Set verdict sends the selected ids and reports a skipped case", async () => {
+      mockBulkVerdict.mockResolvedValue([{ case_id: 7, outcome: "failed", detail: "Investigation not found." }]);
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
+      await user.click(await screen.findByRole("button", { name: "Set verdict…" }));
+      await user.click(await screen.findByRole("button", { name: "Apply to 1 case" }));
+      await waitFor(() => expect(mockBulkVerdict).toHaveBeenCalledWith([7], 9, 90, "DANGEROUS", false));
+      expect(await screen.findByText(/Case 7: Investigation not found\./)).toBeInTheDocument();
+    });
+
+    it("ticking the box asks the server to email the reporters", async () => {
+      mockBulkVerdict.mockResolvedValue([{ case_id: 7, outcome: "updated" }]);
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
+      await user.click(await screen.findByRole("button", { name: "Set verdict…" }));
+      await user.click(await screen.findByRole("checkbox", { name: "Email each reporter about the new verdict" }));
+      await user.click(screen.getByRole("button", { name: "Apply to 1 case" }));
+      await waitFor(() => expect(mockBulkVerdict).toHaveBeenCalledWith([7], 9, 90, "DANGEROUS", true));
+    });
+
+    it("an out-of-range score blocks Apply", async () => {
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
+      await user.click(await screen.findByRole("button", { name: "Set verdict…" }));
+      const score = await screen.findByLabelText("Score (0-10)");
+      await user.clear(score);
+      await user.type(score, "11");
+      expect(screen.getByRole("button", { name: "Apply to 1 case" })).toBeDisabled();
+      expect(mockBulkVerdict).not.toHaveBeenCalled();
+    });
+
+    it("Redo analysis sends the selected ids", async () => {
+      mockBulkRedo.mockResolvedValue([{ case_id: 7, outcome: "queued" }]);
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
+      await user.click(await screen.findByRole("button", { name: "Redo analysis" }));
+      await waitFor(() => expect(mockBulkRedo).toHaveBeenCalledWith([7]));
+      expect(await screen.findByText(/1 queued for analysis/)).toBeInTheDocument();
+    });
+
+    it("changing the search clears the selection", async () => {
+      const user = userEvent.setup();
+      renderInvestigation();
+      await user.click(await screen.findByRole("checkbox", { name: "Select case 7" }));
+      expect(await screen.findByText("1 selected")).toBeInTheDocument();
+      await user.type(screen.getByPlaceholderText(/id, user mail, status/i), "phish");
+      await waitFor(() => expect(screen.queryByText("1 selected")).not.toBeInTheDocument());
+    });
+
+    it("a CISO gets no checkboxes and no bar", async () => {
+      mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CISO"], ciso_scope: "EMEA" } as never);
+      renderInvestigation();
+      await screen.findByText(mockRow.info);
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     });
   });
 

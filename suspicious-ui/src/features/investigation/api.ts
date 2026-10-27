@@ -448,3 +448,23 @@ export async function redoAnalysis(
   const res = await api.post(`/investigations/${caseId}/redo-analysis/`);
   return res.data;
 }
+export type BulkOutcome = "updated" | "queued" | "skipped" | "failed";
+export type BulkResult = { case_id: number; outcome: BulkOutcome; detail?: string };
+
+export async function bulkSetVerdict(
+  caseIds: number[],
+  score: number,
+  confidence: number,
+  classification: string,
+  notifyReporters = false,
+): Promise<BulkResult[]> {
+  const res = await api.post("/investigations/bulk/verdict/", {
+    case_ids: caseIds, score, confidence, classification, notify_reporters: notifyReporters,
+  });
+  return res.data.results;
+}
+
+export async function bulkRedoAnalysis(caseIds: number[]): Promise<BulkResult[]> {
+  const res = await api.post("/investigations/bulk/redo-analysis/", { case_ids: caseIds });
+  return res.data.results;
+}
