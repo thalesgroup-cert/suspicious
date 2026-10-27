@@ -1,6 +1,7 @@
 """VirusTotal GetReport — verdict from last_analysis_stats (v3) or positives/total (legacy)."""
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
 from ..base import AnalyzerParser, AnalyzerManifest
@@ -29,6 +30,29 @@ def _stats(full: Any) -> Optional[dict]:
     return None
 
 
+def _summary_counts(summary: Any) -> Optional[tuple[int, int]]:
+    """(positives, total) from the analyzer's own "0/92" taxonomy, when the full report has no stats.
+
+    The other taxonomies ("1 resolution(s)", "3 downloaded file(s)") are context, not detections:
+    Cortex tags them suspicious or malicious, and the default parser would let them outvote 0/92.
+    """
+    if not isinstance(summary, dict):
+        return None
+    for tax in summary.get("taxonomies") or []:
+        m = re.fullmatch(r"(\d+)/(\d+)", str((tax or {}).get("value", "")).strip())
+        if m:
+            return int(m[1]), int(m[2])
+    return None
+
+
+def _band(m: int, s: int, total: int, reputation: Any = None, has_class: bool = False) -> tuple[str, int]:
+    if m >= 2 or (m >= 1 and has_class):
+        return "malicious", max(55, min(95, round(50 + 45 * m / max(total, 1))))
+    if m == 1 or s >= 1 or (isinstance(reputation, (int, float)) and reputation <= -25 and m == 0):
+        return "suspicious", 60
+    return "safe", 90 if total >= 10 else 60
+
+
 class VirusTotalGetReportParser(AnalyzerParser):
     manifest = AnalyzerManifest(name="virustotal_getreport", cortex_names=("VirusTotal_GetReport_3_1",),
                                 data_types=("hash", "file", "url", "domain", "ip"))
@@ -38,6 +62,12 @@ class VirusTotalGetReportParser(AnalyzerParser):
         positives = None
         if stats is None and isinstance(full, dict) and isinstance(full.get("results"), dict):
             positives = full["results"].get("positives")
+
+        total_hint = None
+        if stats is None and positives is None:
+            counts = _summary_counts(summary)
+            if counts is not None:
+                positives, total_hint = counts
 
         if stats is None and positives is None:
             return DefaultTaxonomyParser(
@@ -52,7 +82,7 @@ class VirusTotalGetReportParser(AnalyzerParser):
             details = {"last_analysis_stats": stats}
         else:
             malicious, suspicious = int(positives or 0), 0
-            total = int(full["results"].get("total", 0) or 0)
+            total = total_hint if total_hint is not None else int(full["results"].get("total", 0) or 0)
             details = {"positives": malicious, "total": total}
 
         from score_process.scoring.enrichment.virustotal import extract as _vt_extract
@@ -65,26 +95,22 @@ class VirusTotalGetReportParser(AnalyzerParser):
             reputation = enr.get("reputation")
             has_class = bool(enr.get("threat_label") or enr.get("threat_category"))
 
-            if m >= 2 or (m >= 1 and has_class):
-                level = "malicious"
-                confidence = max(55, min(95, round(50 + 45 * m / max(total_e, 1))))
-            elif m == 1 or s >= 1 or (isinstance(reputation, (int, float)) and reputation <= -25 and m == 0):
-                level = "suspicious"
-                confidence = 60
-            else:
-                level = "safe"
-                confidence = 90 if total_e >= 10 else 60
+            level, confidence = _band(m, s, total_e, reputation, has_class)
             score, _ = get_level_score_confidence(level)   # keep the level->score column
             malicious, total = m, total_e                  # for the category string below
         else:
             # extraction unavailable — current behaviour verbatim
-            if malicious > 0:
-                level = "malicious"
-            elif suspicious > 0:
-                level = "suspicious"
+            if total_hint is not None:
+                level, confidence = _band(malicious, suspicious, total)
+                score, _ = get_level_score_confidence(level)
             else:
-                level = "safe"
-            score, confidence = get_level_score_confidence(level)
+                if malicious > 0:
+                    level = "malicious"
+                elif suspicious > 0:
+                    level = "suspicious"
+                else:
+                    level = "safe"
+                score, confidence = get_level_score_confidence(level)
 
         return AnalyzerResult(
             analyzer_name=self.analyzer_name, data=self.data_name,
