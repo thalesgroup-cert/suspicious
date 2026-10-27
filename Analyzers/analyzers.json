@@ -9,7 +9,24 @@
         "dataTypeList": ["file"],
         "command": "AIMailAnalyzer/ai_mail_classifier.py",
         "baseConfig": "-",
-        "configurationItems": [],
+        "configurationItems": [
+            {
+                "name": "variant",
+                "description": "Model set the inference server answers with: 'personal' (this deployment's own trained weights, models/) or 'public' (comparison weights, models_public/). Leave as 'personal' for the analyzer that drives the case verdict.",
+                "type": "string",
+                "multi": false,
+                "required": false,
+                "defaultValue": "personal"
+            },
+            {
+                "name": "inference_url",
+                "description": "Base URL of the AIMailAnalyzer inference server as seen FROM a Cortex job container (Docker default bridge, no DNS): normally the bridge gateway, http://172.17.0.1:8090. See deployment/compose_apps.yaml (ai_inference).",
+                "type": "string",
+                "multi": false,
+                "required": false,
+                "defaultValue": "http://172.17.0.1:8090"
+            }
+        ],
         "dockerImage": "aimailanalyzer:local"
     },
     {

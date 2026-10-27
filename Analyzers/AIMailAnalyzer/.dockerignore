@@ -21,10 +21,20 @@ vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
 vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling/
 
-# models/ is NOT ignored: unlike the vectorizer there is no fixed public
-# source for it — it's whatever train_models.ipynb / train_test_models.py
-# produced, and the Dockerfile has no way to fetch it. It must be present in
-# the build context (see AIMailAnalyzer.pdf's Setup section).
+# models/ and models_public/ hold the trained weights (models/ is git-ignored,
+# there is no fixed public source for it: it's whatever train_models.ipynb /
+# train_test_models.py or the retrain pipeline produced). Neither image bakes
+# them in any more: the inference server bind-mounts them at runtime so
+# promoted weights are picked up without a rebuild, and the Cortex client
+# image needs no weights at all.
+models/
+models_public/*.pth
+# promote.py's pre-overwrite weight backups - never read at runtime.
+models_backup/
+
+# Not needed in either image.
+tests/
+retrain_model_monthly/
 
 # Secrets / logs / OS cruft
 *.env

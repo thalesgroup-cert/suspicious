@@ -14,7 +14,9 @@
 
 -include .env
 
-COMPOSE         := docker compose --env-file .env
+# --profile ai: include ai_inference (AIMailAnalyzer's model server), which the
+# AI_Mail_Analyzer Cortex client needs; see docker-compose.yml.
+COMPOSE         := docker compose --env-file .env --profile ai
 SCRIPTS         := ./scripts
 
 BACKUP_DIR      := ./backups

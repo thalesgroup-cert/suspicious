@@ -273,6 +273,35 @@ services:
       docker_cortex:
         aliases: [docker-proxy-cortex]
 
+  # ── ai_inference (persistent AIMailAnalyzer model server) ───────────────
+  #
+  # Holds the sentence-transformer + ResNetMLP weights in memory so each Cortex
+  # AI_Mail_Analyzer job (a thin, one-shot client container) only has to POST
+  # the mail body here (Analyzers/AIMailAnalyzer/inference_server/).
+  #
+  # Cortex runs analyzers on Docker's DEFAULT bridge network, which has no DNS
+  # and is not suspicious_net — so the service name is unresolvable from a job
+  # container. The port is therefore published on the default bridge's gateway
+  # (docker0, 172.17.0.1 on a stock install; `docker network inspect bridge`),
+  # which every container on that bridge can reach. Binding 127.0.0.1 here would
+  # NOT work: loopback is not reachable from another container. Override
+  # AI_INFERENCE_BIND if your bridge uses another gateway, and set the same
+  # address as the analyzer's `inference_url` config item.
+  ai_inference:
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${AI_INFERENCE_BIND:-172.17.0.1}:${AI_INFERENCE_PORT:-8090}:8090"
+    environment:
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+    volumes:
+      # Weights are bind-mounted (not baked into the image) so the retrain
+      # pipeline can promote new ones in place; the server hot-reloads them.
+      - "${CUSTOM_ANALYZERS_PATH}/AIMailAnalyzer/models:/worker/AIMailAnalyzer/models:ro"
+      - "${CUSTOM_ANALYZERS_PATH}/AIMailAnalyzer/models_public:/worker/AIMailAnalyzer/models_public:ro"
+    networks:
+      - suspicious_network
+
   # ── feeder (Python — email-feeder/) ──────────────────────────────────────
 
   feeder:
