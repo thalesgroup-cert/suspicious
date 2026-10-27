@@ -33,6 +33,22 @@ def fetch_emails(self):
         cache.delete(_FETCH_EMAILS_LOCK_KEY)
 
 
+@shared_task(bind=True, max_retries=5, acks_late=True)
+def push_challenge_to_thehive(self, case_id: int, mail_header: str):
+    """Off the request path: TheHive being down must not stall the challenge, and the
+    alert is retried (1, 2, 4, 8, 16 minutes) instead of being lost."""
+    from tasp.services.challenge import send_challenge_to_thehive
+    case = Case.objects.filter(id=case_id).first()
+    if case is None:
+        return
+    try:
+        send_challenge_to_thehive(case, mail_header)
+    except Exception as exc:
+        logger.warning("TheHive challenge push for case %s failed (attempt %s): %s",
+                       case_id, self.request.retries + 1, exc)
+        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
+
+
 @shared_task(bind=True, **_RETRY)
 def sync_cortex(self):
     from tasp.cron.sync_cortex import sync_cortex_analyzers

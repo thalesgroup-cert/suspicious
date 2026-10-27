@@ -298,6 +298,7 @@ class ChallengeToTheHiveService:
             _save_thehive_alert_id(case, alert)
         except Exception as e:
             logger.error(f"Failed to create the basic TheHive alert for case #{_safe(case.id)}: {e}")
+            raise
 
 
 # ── standalone alert helpers ────────────────────────────────────────────────
