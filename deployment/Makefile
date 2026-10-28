@@ -242,6 +242,7 @@ redeploy: check-secrets
 ## Build local images
 build:
 	@$(COMPOSE) build
+	@$(SCRIPTS)/build-analyzers.sh
 	$(OK) "Build complete."
 
 ## Pull remote images without restarting

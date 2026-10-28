@@ -52,7 +52,8 @@ the analyzer is only a client:
 ```bash
 # 1. put the trained weights where the container mounts them
 ls Analyzers/AIMailAnalyzer/models/*_30_epochs_model.pth     # 5 files
-# 2. build + start (the Makefile enables the `ai` compose profile)
+# 2. build + start (the Makefile enables the `ai` compose profile; `make build` and
+#    `make deploy` also rebuild the aimailanalyzer:local image Cortex runs)
 cd deployment && make build && make up
 # 3. check from where Cortex runs analyzers (the default bridge)
 curl -s http://172.17.0.1:8090/health | python3 -m json.tool

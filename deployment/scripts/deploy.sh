@@ -3,6 +3,7 @@
 #
 # Order of operations:
 #   1. Pull latest images (no downtime — just downloads)
+#   1b. Build the Cortex analyzer images and the AI inference server
 #   2. Run database migrations (forward-compatible migrations first)
 #   2b. Start mail_renderer (isolated mail-preview browser; Django calls it)
 #   3. Restart suspicious (rolling — healthcheck gates the cutover)
@@ -68,6 +69,9 @@ if [ -n "${to_build}" ]; then
   step "Building from source:${to_build}"
   $COMPOSE build ${to_build}
 fi
+step "Building the Cortex analyzer images and the AI inference server"
+bash "${SCRIPTS}/build-analyzers.sh"
+$COMPOSE --profile ai build ai_inference
 ok "Images ready"
 
 # ── 3. Migrations (before web restart — forward-compatible required) ──────
@@ -91,6 +95,11 @@ step "Starting mail_renderer"
 $COMPOSE up -d --no-deps mail_renderer
 bash "${SCRIPTS}/health-wait.sh" "${SVC_PREFIX:-}mail_renderer" 120
 ok "mail_renderer up"
+
+# ── 4c. AI inference server (the AI_Mail_Analyzer client calls it) ───────
+step "Starting ai_inference"
+$COMPOSE --profile ai up -d --no-deps ai_inference
+ok "ai_inference up"
 
 # ── 5. Rolling restart: suspicious ───────────────────────────────────────
 # --no-deps: don't restart dependencies (db, cortex, etc.)
