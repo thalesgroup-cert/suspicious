@@ -32,8 +32,9 @@ class HandleCaseWithoutArtifactTests(SimpleTestCase):
             self.assertIsNone(self.handler.handle_case(allow_listed=True, allow_reason="x"))
         creator.assert_not_called()
 
+    @patch.object(CaseHandler, "_case_for_mail", return_value=None)
     @patch("case_handler.case_utils.case_handler.CaseCreator")
-    def test_any_single_artifact_still_creates_a_case(self, creator):
+    def test_any_single_artifact_still_creates_a_case(self, creator, _no_mail_case):
         case = object()
         creator.return_value.create_case.return_value = case
         for kwarg in ("file_inst", "mail_inst", "ip_inst", "url_inst", "hash_inst"):

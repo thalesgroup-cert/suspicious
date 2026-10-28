@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A mail uploaded through the web UI no longer creates two cases. The mail pipeline already opens
+  the case and launches its analyzers; the submit view then opened a second, empty case for the
+  same mail, which is the one the UI showed. It finalised as Safe in seconds with no analyzer
+  results and no AI score. The submit now adopts the pipeline's case.
+
 ## [1.7.0] - 2026-10-27
 
 A connector framework rewrite (pluggable contrib connectors, lifecycle events, a
