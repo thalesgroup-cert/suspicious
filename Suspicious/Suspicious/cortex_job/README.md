@@ -142,7 +142,7 @@ docker exec suspicious bash -c "cd /app/Suspicious && python manage.py test cort
 
 ## 🔧 Operational notes
 
-- `STALE_JOB_TIMEOUT_SECONDS` is read from `settings.json` → `integrations.cortex.stale_job_timeout_seconds` (default 86400). Tune it to your slowest analyzer (sandbox detonation is the typical upper bound).
+- `STALE_JOB_TIMEOUT_SECONDS` is read from `settings.json` → `integrations.cortex.stale_job_timeout_seconds` (default 7200). Tune it to your slowest analyzer (sandbox detonation is the typical upper bound).
 - `CORTEX_WEBHOOK_SECRET` (from `integrations.cortex.webhook_secret`) must be set in production; when empty the webhook returns 503 by design.
 - Per-case Redis lock key: `case_update_lock:<case_id>`, TTL 120 s.
 - jobId dedup key: `cortex_job_processed:<jobId>`, TTL 1 h.

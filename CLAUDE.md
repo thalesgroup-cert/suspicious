@@ -77,7 +77,7 @@ python manage.py createsuperuser
 3. Cortex runs analyzers asynchronously (YARA rules, AIMailAnalyzer ML classifier, sandboxing, metadata, FileInfo) and POSTs to `/api/cortex/webhook/` (HMAC-signed, jobId-deduped) when each job finishes.
 4. The webhook view looks up the case via a single indexed read on `CaseAnalyzerJob`, then enqueues `tasp.tasks.reconcile_case(case_id)` on Celery; the task takes a per-case Redis lock and calls `reconcile_case_core` (`cortex_job/cortex_utils/reconciliation.py`), the single entrypoint that syncs the ledger and advances the case's lifecycle state machine.
 5. Once `reconcile_case_core` aggregates the final score (Safe / Inconclusive / Suspicious / Dangerous) and the case reaches its terminal state, it emits a `case_finalised` event via `connectors.dispatch.emit`. Every connector subscribed to that event (MISP, SMTP-notify, ChromaDB, `ai_narration`) fires independently (TheHive no longer subscribes: its alerts come from the challenge flow, the push button, and campaign detection), and dashboard KPIs are updated — see the `connectors` app row below.
-6. Celery beat runs `update_ongoing_cases` every 300s as a webhook-delivery fallback, and `fail_stale_jobs` every 600s to auto-fail any `CaseAnalyzerJob` rows pending beyond `STALE_JOB_TIMEOUT_SECONDS` (24h default).
+6. Celery beat runs `update_ongoing_cases` every 300s as a webhook-delivery fallback, and `fail_stale_jobs` every 600s to auto-fail any `CaseAnalyzerJob` rows pending beyond `STALE_JOB_TIMEOUT_SECONDS` (2h default).
 
 ### Django Apps (`Suspicious/Suspicious/`)
 

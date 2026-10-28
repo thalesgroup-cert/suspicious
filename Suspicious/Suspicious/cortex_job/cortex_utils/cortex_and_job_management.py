@@ -30,6 +30,11 @@ def _get_cortex_config() -> dict:
         return {}
 
 
+# Cortex keeps a job InProgress forever when it restarts mid-run, so this is the only thing that
+# frees a case in that state. Long enough for a sandbox detonation, short enough to notice a lost job.
+DEFAULT_STALE_JOB_TIMEOUT_SECONDS = 7200
+
+
 def __getattr__(name):
     if name in ("API_URL", "API_KEY", "STALE_JOB_TIMEOUT_SECONDS"):
         cc = _get_cortex_config()
@@ -37,7 +42,7 @@ def __getattr__(name):
             return cc.get("url", "https://cortex.example.com")
         if name == "API_KEY":
             return cc.get("api_key", "your_api_key_here")
-        return int(cc.get("stale_job_timeout_seconds", 86400))
+        return int(cc.get("stale_job_timeout_seconds", DEFAULT_STALE_JOB_TIMEOUT_SECONDS))
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -622,7 +627,7 @@ class CortexJobManager:
             ) or report_instance.creation_date
             if submitted_at is not None:
                 age = (timezone.now() - submitted_at).total_seconds()
-                stale_timeout = int(_get_cortex_config().get("stale_job_timeout_seconds", 86400))
+                stale_timeout = int(_get_cortex_config().get("stale_job_timeout_seconds", DEFAULT_STALE_JOB_TIMEOUT_SECONDS))
                 if age > stale_timeout:
                     update_cases_logger.warning(
                         "Auto-failing stale %s report cortex_job_id=%s after %.0fs",
