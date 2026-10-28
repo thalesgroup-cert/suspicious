@@ -30,6 +30,10 @@ services:
       - "${SUSPICIOUS_PATH}/logs:/app/log"
       - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json:ro"
       - "${SUSPICIOUS_PATH}/gunicorn.conf.py:/app/gunicorn.conf.py:ro"
+      # Shared with suspicious_celery: the web upload writes the mail body, attachments and
+      # archive here and the worker reads them when it launches the Cortex jobs.
+      - "mail_case_data:/app/case"
+      - "mail_work_data:/tmp/mail_feeder_global_submission"
     env_file:
       - ".env"
     environment:
@@ -89,6 +93,8 @@ services:
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
       - "${SUSPICIOUS_PATH}/logs:/app/log"
       - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json:ro"
+      - "mail_case_data:/app/case"
+      - "mail_work_data:/tmp/mail_feeder_global_submission"
     env_file:
       - ".env"
     environment:

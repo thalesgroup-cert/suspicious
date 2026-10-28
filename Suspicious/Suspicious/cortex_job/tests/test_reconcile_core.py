@@ -82,3 +82,34 @@ class ReconcileCoreTest(TestCase):
         self.case.refresh_from_db()
         self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
         mock_finalise.assert_called_once()
+
+
+class DispatchGraceTest(TestCase):
+    """A case waits for its launch task before it may finalise on "no jobs".
+
+    Regression risk of launching a web mail's jobs in Celery: a busy or restarting worker
+    can take longer than a couple of minutes, and the case must not close empty meanwhile.
+    """
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(username="dg_u", password="x")
+        self.case = Case.objects.create(description="", reporter=user)
+
+    def _age(self, minutes):
+        from datetime import timedelta
+        from django.utils import timezone
+        self.case.creation_date = timezone.now() - timedelta(minutes=minutes)
+        self.case.save(update_fields=["creation_date"])
+
+    @patch("cortex_job.cortex_utils.reconciliation.finalise")
+    def test_waits_well_past_two_minutes_for_the_launch(self, mock_finalise):
+        self._age(10)
+        reconcile_case_core(self.case)
+        mock_finalise.assert_not_called()
+
+    @patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
+    @patch("cortex_job.cortex_utils.reconciliation.finalise")
+    def test_gives_up_when_the_launch_never_comes(self, mock_finalise, _emit):
+        self._age(30)
+        reconcile_case_core(self.case)
+        mock_finalise.assert_called_once()

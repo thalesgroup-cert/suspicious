@@ -76,7 +76,7 @@ class GlobalSubmissionService:
             instance.save()
 
             mail_zip = self._get_mail_zip_path(config.workdir, email_id)
-            self._handle_common_tasks(instance, email_id, mail_zip, bucket_name="")
+            self._handle_common_tasks(instance, email_id, mail_zip, bucket_name="", defer_launch=True)
             fetch_mail_logger.info(f"Finalized web submission for email_id={email_id}")
 
     def _get_mail_zip_path(self, workdir: str, email_id: str) -> str:
@@ -125,11 +125,17 @@ class GlobalSubmissionService:
         all_files = os.listdir(workdir)
         return [f for f in all_files if f.endswith(".eml") and not f.startswith(prefix)]
 
-    def _handle_common_tasks(self, instance, email_id: str, mail_zip: str, bucket_name: str):
+    def _handle_common_tasks(self, instance, email_id: str, mail_zip: str, bucket_name: str,
+                             defer_launch: bool = False):
         """
         Handle artifacts, attachments, headers, bodies, and case creation.
         Collects dispatch intents first, creates the Case, then replays intents
         with case= so CaseAnalyzerJob rows have a valid FK.
+
+        `defer_launch` hands the launching to a Celery task and returns once the case
+        exists. The web upload uses it: a link-heavy mail took longer than the gunicorn
+        timeout when every job was launched inside the request. The IMAP feeder already
+        runs in a worker and keeps launching inline.
         """
 
         user = UserCreationService().get_or_create_user(instance.reportedBy)
@@ -161,6 +167,10 @@ class GlobalSubmissionService:
             fetch_mail_logger.error("Case creation failed for email %s; skipping dispatch", email_id)
             return
 
+        if defer_launch:
+            self._defer_launch(case, artifact_service, attachment_result, header_intents + body_intents)
+            return
+
         artifact_service.dispatch_pending(case)
         for service in attachment_result.services:
             service.dispatch_pending(case)
@@ -188,3 +198,30 @@ class GlobalSubmissionService:
         case.save(update_fields=["dispatched_at"])
         from tasp.tasks import reconcile_case
         reconcile_case.delay(case.id)
+
+    @staticmethod
+    def _defer_launch(case, artifact_service, attachment_result, mail_intents):
+        """Queue every launch of a mail case as one `dispatch_case_analysis` task.
+
+        The task re-fetches model instances by pk, takes file paths as plain values
+        (the worker shares /app/case and the mail work dir with the web container),
+        and runs the AI analyzer last, as the inline path does.
+        """
+        from django.db import transaction
+        from tasp.tasks import AI_ARCHIVE_INTENT, PATH_INTENT, dispatch_case_analysis
+
+        def serialise(value, data_type):
+            if isinstance(value, str):
+                return (PATH_INTENT, value, data_type)
+            return (f"{value._meta.app_label}.{value._meta.model_name}", value.pk, data_type)
+
+        pending = list(artifact_service.pending_dispatch_intents)
+        for service in attachment_result.services:
+            pending.extend(service.pending_dispatch_intents)
+        intents = [serialise(value, data_type) for value, data_type in pending + list(mail_intents)]
+        if attachment_result.ai_archive is not None:
+            intents.append(serialise(attachment_result.ai_archive, AI_ARCHIVE_INTENT))
+
+        transaction.on_commit(
+            lambda: dispatch_case_analysis.delay(case.id, intents, use_sender_domain=True)
+        )

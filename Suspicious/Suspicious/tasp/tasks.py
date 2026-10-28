@@ -2,7 +2,8 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.core.cache import cache
 
-from case_handler.models import Case
+from case_handler.lifecycle import LifecycleState, transition
+from case_handler.models import Case, Result
 from cortex_job.cortex_utils.reconciliation import reconcile_case_core
 
 logger = get_task_logger(__name__)
@@ -260,8 +261,14 @@ def sweep_missing_mail_previews(self, limit: int = 200):
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
+# Intent labels that are not a model: the value travels as-is (a file path the worker
+# shares with the web container), or the intent is the mail archive for the AI analyzer.
+PATH_INTENT = "__path__"
+AI_ARCHIVE_INTENT = "ai_archive"
+
+
 @shared_task(bind=True, **_RETRY)
-def dispatch_case_analysis(self, case_id: int, intents: list):
+def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain: bool = False):
     """Launch Cortex analyzers for a just-submitted case in the background.
 
     Moved off the request/response path: the synchronous Cortex round-trips
@@ -269,7 +276,10 @@ def dispatch_case_analysis(self, case_id: int, intents: list):
     in the submit view, so users waited on Cortex for every submission.
     `intents` is a JSON-safe list of (app_label.model, pk, data_type) triples
     (model instances aren't JSON-serializable, so callers resolve+serialize
-    them before enqueueing); we re-fetch the objects here.
+    them before enqueueing); we re-fetch the objects here. A `PATH_INTENT` entry
+    carries its value in the pk slot, and an `AI_ARCHIVE_INTENT` entry runs the AI
+    analyzer after every other job. `use_sender_domain` lets the URL planner see the
+    mail's sender, as the inline mail path did.
     """
     from django.apps import apps
     from django.utils import timezone
@@ -281,14 +291,28 @@ def dispatch_case_analysis(self, case_id: int, intents: list):
         logger.warning("dispatch_case_analysis: case %s no longer exists", case_id)
         return
 
-    resolved = []
+    resolved, ai_archives = [], []
     for label, pk, data_type in intents:
         try:
-            resolved.append((apps.get_model(label).objects.get(pk=pk), data_type))
+            value = pk if label == PATH_INTENT else apps.get_model(label).objects.get(pk=pk)
         except Exception:
             logger.exception("dispatch_case_analysis: failed to resolve %s pk=%s", label, pk)
+            continue
+        (ai_archives if data_type == AI_ARCHIVE_INTENT else resolved).append((value, data_type))
 
-    filtered = filter_dispatch_intents(resolved, sender_domain=None)
+    if case.dispatched_at is None and case.lifecycle_state == LifecycleState.FINALIZED:
+        # Closed on "no jobs" before this task ran (worker down past the grace): reopen it
+        # so the jobs launched now are scored instead of stranded behind a finished case.
+        transition(case, LifecycleState.ANALYZING)
+        case.results = Result.INCONCLUSIVE
+        case.score = case.final_score = 0
+        case.save(update_fields=["results", "score", "final_score"])
+
+    sender_domain = None
+    if use_sender_domain:
+        from mail_feeder.job_handler.artifacts.artifacts import _sender_domain_for_case
+        sender_domain = _sender_domain_for_case(case)
+    filtered = filter_dispatch_intents(resolved, sender_domain=sender_domain)
     cortex = CortexJob()
     for value, data_type in filtered:
         try:
@@ -297,6 +321,11 @@ def dispatch_case_analysis(self, case_id: int, intents: list):
             logger.exception(
                 "Failed to launch Cortex jobs (case=%s data_type=%s)", case_id, data_type
             )
+    for archive, _data_type in ai_archives:
+        try:
+            cortex.launch_cortex_ai_jobs(archive, "file", case=case)
+        except Exception:
+            logger.exception("Failed to launch the Cortex AI job (case=%s)", case_id)
 
     case.dispatched_at = timezone.now()
     case.save(update_fields=["dispatched_at"])
