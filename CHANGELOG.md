@@ -16,20 +16,27 @@ management moving to HashiCorp Vault.
 
 ### Upgrading from 1.6.x
 
-Run `make deploy` (alias `make upgrade`) as usual. It applies the single new migration
-(`settings` 0013) and handles most of what follows; check these first.
+Run `make db-auth-migrate` once (step 1), then `make deploy` (alias `make upgrade`). Deploy applies
+the single new migration (`settings` 0013) and handles most of what follows; check these first.
 
-1. **Vault now serves TLS.** `make up` and `make deploy` generate a Vault-only CA and server
+1. **Data services now require authentication. Do this first.** `make deploy` refuses to run
+   until Redis, Elasticsearch and ChromaDB enforce passwords, and a 1.6.x stack stops at
+   "Data service chromadb_proxy is not running". Back up (`make backup-db`), then run
+   `make db-auth-migrate` once. It takes the app down for about 2 minutes, drops sessions, the
+   Redis cache and queued tasks (cases in flight are re-synced by the 5-minute sweep), backs up
+   `.env`/`.env.data` as `*.pre-db-auth.<epoch>` and generates the service secrets. Details and
+   rollback: `docs/operations/deploy.md`.
+2. **Vault now serves TLS.** `make up` and `make deploy` generate a Vault-only CA and server
    certificate (`deployment/vault/tls` and `deployment/vault/ca`), switch `VAULT_ADDR` in `.env`
    to `https://` (the old file is kept as `.env.bak-vault-tls`) and restart Vault, which then has
    to be unsealed, so have the unseal keys ready (the script asks at a terminal and otherwise
    leaves Vault sealed with a message). Stored secrets are kept. Anything else that talks to
    Vault must use https and trust `vault/ca/ca.pem` (`VAULT_CACERT`).
-2. **New `mail_renderer` container.** Mail previews are drawn by an isolated Chromium, and
+3. **New `mail_renderer` container.** Mail previews are drawn by an isolated Chromium, and
    `wkhtmltoimage` is gone from the Django image. Compose pulls
    `ghcr.io/thalesgroup-cert/suspicious-mail-renderer`. Existing previews keep working; shrink
    them with `manage.py regenerate_mail_previews --all` (about 20 KB each instead of 14 MB).
-3. **The AI analyzer needs its inference server.** `AI_Mail_Analyzer` is a thin client of the
+4. **The AI analyzer needs its inference server.** `AI_Mail_Analyzer` is a thin client of the
    `ai_inference` service (compose profile `ai`; the `make` targets include it, plain
    `docker compose` needs `--profile ai`). It is built locally from `Analyzers/AIMailAnalyzer`
    and bind-mounts the model weights (`models/` and `models_public/`, not in git). `make deploy`
@@ -37,12 +44,12 @@ Run `make deploy` (alias `make upgrade`) as usual. It applies the single new mig
    images Cortex runs; before, nothing did, so an upgraded host kept the old self-contained AI
    analyzer and never called the inference server. If AI verdicts go missing after the upgrade,
    run `curl http://172.17.0.1:8090/health` first. See `docs/components/analyzers.md`.
-4. **Traefik and Docker access.** If your `traefik.yaml` defines `providers.docker`, remove it
+5. **Traefik and Docker access.** If your `traefik.yaml` defines `providers.docker`, remove it
    (`make deploy` checks). Cortex reaches the Docker daemon through a socket proxy, and the stack
    network is split into `data`, `storage` and `cortex`; `make network-check` verifies it.
-5. **Elasticsearch 8.19.23.** Set `ELASTICSEARCH_VERSION=8.19.23` in `.env`, run `make deploy`
+6. **Elasticsearch 8.19.23.** Set `ELASTICSEARCH_VERSION=8.19.23` in `.env`, run `make deploy`
    and re-run `scripts/es-security-bootstrap.sh`. Data is kept.
-6. **Object storage.** No config change is needed (`storage.provider` defaults to `s3`). With an
+7. **Object storage.** No config change is needed (`storage.provider` defaults to `s3`). With an
    HTTP proxy configured, an external `storage.s3.endpoint` must be listed in `NO_PROXY`. Web uploads now
    go to one bucket, `storage.s3.web_bucket` (default `mail-submissions`); existing buckets are
    left alone.
