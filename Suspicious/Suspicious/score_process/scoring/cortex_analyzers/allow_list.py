@@ -46,13 +46,17 @@ def check_allow_list(data: str, data_type: str) -> AllowListResult:
                     result.FiletypeAllowList = SAFE_FTW
 
         elif data_type in ("url", "domain"):
-            domain = extract_domain(data) if data_type == "url" else data
+            host = (extract_domain(data) if data_type == "url" else data) or ""
+            # A URL is stored against its host without "www." (URLHandler.get_domain), so
+            # listing example.com must cover www.example.com. An entry added as "www.example.com"
+            # still matches, and a deny-listed or monitored bare domain still overrides.
+            names = {host.lower(), host.lower().removeprefix("www.")} - {""}
 
-            if domain and not overrides_allow_list(Domain.objects.filter(value=domain).first()):
-                if AllowListDomain.objects.filter(domain__value=domain).exists():
+            if names and not any(overrides_allow_list(d) for d in Domain.objects.filter(value__in=names)):
+                if AllowListDomain.objects.filter(domain__value__in=names).exists():
                     result.DomainAllowList = SAFE_DW
 
-                elif WatcherLegitDomain.objects.filter(domain__value=domain).exists():
+                elif WatcherLegitDomain.objects.filter(domain__value__in=names).exists():
                     result.DomainAllowList = SAFE_WL
 
         elif data_type == "ip":

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Allow-listing a domain now covers its `www.` URLs when scoring. Only the bare host matched, so a
+  link to `www.<listed domain>` kept its analyzer scores (VirusTotal, MISP), counted as a finding on
+  an unlisted target and could turn a clean internal mail Dangerous. Other subdomains are still not
+  covered.
 - A mail uploaded through the web UI no longer creates two cases. The mail pipeline already opens
   the case and launches its analyzers; the submit view then opened a second, empty case for the
   same mail, which is the one the UI showed. It finalised as Safe in seconds with no analyzer
