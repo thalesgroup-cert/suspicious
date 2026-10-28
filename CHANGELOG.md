@@ -59,6 +59,9 @@ Behaviour changes you may notice:
   retried, instead of being lost.
 - A CISO sees only their own submissions and challenges for users in their scope; editing a
   case is limited to CERT and Admin.
+- `integrations.cortex.stale_job_timeout_seconds` now defaults to 7200 (2 h, was 86400). A Cortex
+  restart leaves its running jobs InProgress for good, and this timeout is what frees the case;
+  raise it only if an analyzer legitimately runs longer than that.
 
 ### Added
 - **Allow-list and the AI**: with `scoring.trusted_authserv_ids` set (off by default), an allow-list can

@@ -91,3 +91,13 @@ class StaleJobClockTest(TestCase):
         report.refresh_from_db()
         self.assertEqual(status, "Waiting")
         self.assertEqual(report.status, "Waiting")
+
+
+class StaleJobTimeoutDefaultTest(TestCase):
+    def test_default_is_two_hours_and_config_overrides_it(self):
+        from cortex_job.cortex_utils import cortex_and_job_management as m
+
+        with patch.object(m, "_get_cortex_config", return_value={}):
+            self.assertEqual(m.STALE_JOB_TIMEOUT_SECONDS, 7200)
+        with patch.object(m, "_get_cortex_config", return_value={"stale_job_timeout_seconds": 90}):
+            self.assertEqual(m.STALE_JOB_TIMEOUT_SECONDS, 90)
