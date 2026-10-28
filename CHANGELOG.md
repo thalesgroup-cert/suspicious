@@ -32,9 +32,11 @@ Run `make deploy` (alias `make upgrade`) as usual. It applies the single new mig
 3. **The AI analyzer needs its inference server.** `AI_Mail_Analyzer` is a thin client of the
    `ai_inference` service (compose profile `ai`; the `make` targets include it, plain
    `docker compose` needs `--profile ai`). It is built locally from `Analyzers/AIMailAnalyzer`
-   and bind-mounts the model weights (`models/` and `models_public/`, not in git). If AI
-   verdicts go missing after the upgrade, run `curl http://172.17.0.1:8090/health` first. See
-   `docs/components/analyzers.md`.
+   and bind-mounts the model weights (`models/` and `models_public/`, not in git). `make deploy`
+   and `make build` now rebuild the `aimailanalyzer:local` and `mailheaderanalyzer:local`
+   images Cortex runs; before, nothing did, so an upgraded host kept the old self-contained AI
+   analyzer and never called the inference server. If AI verdicts go missing after the upgrade,
+   run `curl http://172.17.0.1:8090/health` first. See `docs/components/analyzers.md`.
 4. **Traefik and Docker access.** If your `traefik.yaml` defines `providers.docker`, remove it
    (`make deploy` checks). Cortex reaches the Docker daemon through a socket proxy, and the stack
    network is split into `data`, `storage` and `cortex`; `make network-check` verifies it.
