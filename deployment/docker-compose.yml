@@ -264,6 +264,11 @@ volumes:
     driver: local
   chromadb_data:
     driver: local
+  # Mail upload files shared by suspicious (web) and suspicious_celery (worker)
+  mail_case_data:
+    driver: local
+  mail_work_data:
+    driver: local
 
 # ── Networks ──────────────────────────────────────────────────────────────
 

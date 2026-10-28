@@ -236,3 +236,57 @@ class HandleCommonTasksOrderingTest(django.test.TestCase):
         self.assertIsNotNone(fake_case.dispatched_at)
         fake_case.save.assert_any_call(update_fields=["dispatched_at"])
         mock_reconcile.delay.assert_called_once_with(42)
+
+
+class DeferredLaunchTest(django.test.TestCase):
+    """The web mail upload must not launch Cortex jobs inside the request.
+
+    Regression: launching every job inline took longer than the 120 s gunicorn
+    timeout on a link-heavy mail. The worker was killed mid-launch (AI job last,
+    never started) and the user got "Internal Server Error".
+    """
+
+    @patch("tasp.tasks.reconcile_case")
+    @patch("tasp.tasks.dispatch_case_analysis")
+    @patch("mail_feeder.global_submission.gsubmission.CortexJob")
+    @patch("mail_feeder.global_submission.gsubmission.CaseCreatorService")
+    @patch("mail_feeder.global_submission.gsubmission.UserCreationService")
+    @patch("mail_feeder.global_submission.gsubmission.Handlers")
+    def test_defer_launch_queues_the_task_instead_of_launching(
+        self, mock_handlers_cls, mock_user_cls, mock_case_cls, mock_cortex_cls,
+        mock_dispatch, mock_reconcile,
+    ):
+        from django.contrib.auth import get_user_model
+        from ip_process.models import IP
+
+        user = get_user_model().objects.create_user(username="defer_u", password="x")
+        mock_user_cls.return_value.get_or_create_user.return_value = user
+        ip = IP.objects.create(address="203.0.113.7")
+        handlers = _make_handlers_mock(mock_handlers_cls)
+        handlers.handle_artifacts.return_value.pending_dispatch_intents = [(ip, "ip")]
+        handlers.handle_mail_body.return_value = [("/tmp/m/body.txt", "mail_body")]
+        ai_archive = IP.objects.create(address="203.0.113.8")
+        handlers.handle_attachments.return_value.ai_archive = ai_archive
+        case = MagicMock()
+        case.id = 7
+        mock_case_cls.return_value.create_case.return_value = case
+        instance = MagicMock()
+        instance.reportedBy = "x@example.com"
+
+        with self.captureOnCommitCallbacks(execute=True):
+            GlobalSubmissionService()._handle_common_tasks(
+                instance, "email-1", "mail.tar.gz", "", defer_launch=True
+            )
+
+        mock_cortex_cls.return_value.launch_cortex_jobs.assert_not_called()
+        mock_cortex_cls.return_value.launch_cortex_ai_jobs.assert_not_called()
+        mock_dispatch.delay.assert_called_once_with(
+            7,
+            [
+                ("ip_process.ip", ip.pk, "ip"),
+                ("__path__", "/tmp/m/body.txt", "mail_body"),
+                ("ip_process.ip", ai_archive.pk, "ai_archive"),
+            ],
+            use_sender_domain=True,
+        )
+        mock_reconcile.delay.assert_not_called()

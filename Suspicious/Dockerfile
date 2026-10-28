@@ -132,8 +132,11 @@ COPY . .
 # Logs directory must be writable by the runtime user; settings.json is
 # bind-mounted read-only at /app/settings.json so its host permissions
 # (chmod 600 expected) govern access.
-RUN mkdir -p /app/log \
-    && chown -R suspicious:suspicious /app /var/log/cron.log
+# /app/case and the mail work dir are shared with the Celery worker through named
+# volumes (see deployment/compose_apps.yaml), so they must exist here with the runtime
+# owner for a fresh volume to inherit it.
+RUN mkdir -p /app/log /app/case /tmp/mail_feeder_global_submission \
+    && chown -R suspicious:suspicious /app /var/log/cron.log /tmp/mail_feeder_global_submission
 
 WORKDIR /app/Suspicious
 

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A mail uploaded through the web UI no longer launches its Cortex jobs inside the request. A mail
+  with many links could pass the 120 s gunicorn timeout, so the worker was killed mid-launch: the user
+  saw "Internal Server Error" and the later jobs, the AI analyzer included, never started. The upload
+  now returns once the case exists and a Celery task launches the jobs. This needs the new shared
+  volumes `mail_case_data` and `mail_work_data` (`/app/case` and the mail work dir, mounted in
+  `suspicious` and `suspicious_celery`); `make deploy` creates them. The image must be the new one
+  when the volumes are first created, so they inherit the runtime user as owner.
 - Allow-listing a domain now covers its `www.` URLs when scoring. Only the bare host matched, so a
   link to `www.<listed domain>` kept its analyzer scores (VirusTotal, MISP), counted as a finding on
   an unlisted target and could turn a clean internal mail Dangerous. Other subdomains are still not
