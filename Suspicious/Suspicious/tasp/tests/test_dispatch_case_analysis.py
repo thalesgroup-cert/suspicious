@@ -129,3 +129,49 @@ class DispatchMailIntentsTest(TestCase):
             self.assertIsNone(flt.call_args.kwargs["sender_domain"])
             dispatch_case_analysis.run(self.case.id, intents, use_sender_domain=True)
             self.assertEqual(flt.call_args.kwargs["sender_domain"], "corp.example")
+
+
+class DispatchReopensPrematureCaseTest(TestCase):
+    """A case finalised before its jobs were launched is reopened so they count."""
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(username="dro_u", password="x")
+        self.case = Case.objects.create(description="", reporter=user)
+        self.ip = IP.objects.create(address="203.0.113.11")
+
+    def _finalise_empty(self):
+        from case_handler.lifecycle import LifecycleState
+        self.case.lifecycle_state = LifecycleState.FINALIZED
+        self.case.results = "Failure"
+        self.case.save(update_fields=["lifecycle_state", "results"])
+
+    @patch("tasp.tasks.reconcile_case.delay")
+    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    def test_finalised_without_dispatch_is_reopened_before_launching(self, mock_cortex_cls, mock_reconcile):
+        from case_handler.lifecycle import LifecycleState
+        self._finalise_empty()
+        states = []
+        mock_cortex_cls.return_value.launch_cortex_jobs.side_effect = (
+            lambda **kw: states.append(Case.objects.get(pk=self.case.pk).lifecycle_state)
+        )
+
+        dispatch_case_analysis.run(self.case.id, [("ip_process.ip", self.ip.pk, "ip")])
+
+        self.assertEqual(states, [LifecycleState.ANALYZING])
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.results, "Inconclusive")
+        mock_reconcile.assert_called_once_with(self.case.id)
+
+    @patch("tasp.tasks.reconcile_case.delay")
+    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    def test_already_dispatched_finalised_case_is_left_alone(self, mock_cortex_cls, mock_reconcile):
+        from django.utils import timezone
+        from case_handler.lifecycle import LifecycleState
+        self._finalise_empty()
+        self.case.dispatched_at = timezone.now()
+        self.case.save(update_fields=["dispatched_at"])
+
+        dispatch_case_analysis.run(self.case.id, [("ip_process.ip", self.ip.pk, "ip")])
+
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)

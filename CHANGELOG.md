@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   volumes `mail_case_data` and `mail_work_data` (`/app/case` and the mail work dir, mounted in
   `suspicious` and `suspicious_celery`); `make deploy` creates them. The image must be the new one
   when the volumes are first created, so they inherit the runtime user as owner.
+  A case now waits 15 minutes (was 2) for that launch before it finalises on whatever jobs exist, and
+  one finalised before the launch task ran is reopened when the task does run, so its jobs are scored.
 - Allow-listing a domain now covers its `www.` URLs when scoring. Only the bare host matched, so a
   link to `www.<listed domain>` kept its analyzer scores (VirusTotal, MISP), counted as a finding on
   an unlisted target and could turn a clean internal mail Dangerous. Other subdomains are still not

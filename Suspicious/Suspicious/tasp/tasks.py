@@ -2,7 +2,8 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.core.cache import cache
 
-from case_handler.models import Case
+from case_handler.lifecycle import LifecycleState, transition
+from case_handler.models import Case, Result
 from cortex_job.cortex_utils.reconciliation import reconcile_case_core
 
 logger = get_task_logger(__name__)
@@ -298,6 +299,14 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
             logger.exception("dispatch_case_analysis: failed to resolve %s pk=%s", label, pk)
             continue
         (ai_archives if data_type == AI_ARCHIVE_INTENT else resolved).append((value, data_type))
+
+    if case.dispatched_at is None and case.lifecycle_state == LifecycleState.FINALIZED:
+        # Closed on "no jobs" before this task ran (worker down past the grace): reopen it
+        # so the jobs launched now are scored instead of stranded behind a finished case.
+        transition(case, LifecycleState.ANALYZING)
+        case.results = Result.INCONCLUSIVE
+        case.score = case.final_score = 0
+        case.save(update_fields=["results", "score", "final_score"])
 
     sender_domain = None
     if use_sender_domain:

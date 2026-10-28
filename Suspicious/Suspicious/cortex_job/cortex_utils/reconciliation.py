@@ -45,7 +45,9 @@ from cortex_job.models import CaseAnalyzerJob
 
 _TERMINAL = {LifecycleState.FINALIZED, LifecycleState.CONTESTED}
 
-RECONCILE_DISPATCH_GRACE = timedelta(seconds=120)
+# How long a case may sit without a recorded launch before it finalises on whatever jobs exist.
+# A web mail's jobs are launched by a Celery task, so a busy or restarting worker needs room.
+RECONCILE_DISPATCH_GRACE = timedelta(minutes=15)
 
 
 def reconcile_case_core(case) -> None:
