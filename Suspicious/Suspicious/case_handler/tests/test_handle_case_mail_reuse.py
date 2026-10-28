@@ -1,4 +1,6 @@
 from django.contrib.auth.models import User
+from unittest.mock import patch
+
 from django.test import RequestFactory, TestCase
 
 from case_handler.case_utils.case_creator import CaseCreator
@@ -34,6 +36,26 @@ class WebMailCaseReuseTests(TestCase):
         case.refresh_from_db()
         self.assertEqual(case.reporter, self.user)
         self.assertEqual(case.external_ref, "ref-1")
+
+    @patch("tasp.tasks.dispatch_case_analysis")
+    def test_adopted_case_gets_no_second_dispatch(self, dispatch):
+        """The mail pipeline owns the launch. An empty dispatch task would stamp the case as
+        launched and finalise it as Failure before the real task has started a single job."""
+        CaseCreator(self.feeder_user).create_case(description="", mail_instance=self.mail)
+
+        case = self.handler.handle_case(mail_inst=self.mail)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.handler.dispatch_pending(case)
+
+        dispatch.delay.assert_not_called()
+
+    @patch("tasp.tasks.dispatch_case_analysis")
+    def test_new_case_still_gets_its_dispatch(self, dispatch):
+        case = self.handler.handle_case(mail_inst=self.mail)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.handler.dispatch_pending(case)
+
+        dispatch.delay.assert_called_once_with(case.id, [])
 
     def test_creates_a_case_when_the_pipeline_made_none(self):
         case = self.handler.handle_case(mail_inst=self.mail)
