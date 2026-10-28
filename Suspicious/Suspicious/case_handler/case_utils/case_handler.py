@@ -4,6 +4,7 @@ from typing import Any, Optional, Tuple, Dict, Union
 
 from cortex_job.models import AnalyzerReport
 from case_handler.case_utils.case_creator import CaseCreator
+from case_handler.models import Case
 
 from hash_process.hash_utils.hash_handler import HashHandler
 from file_process.file_utils.file_handler import FileHandler
@@ -216,6 +217,9 @@ class CaseHandler:
         if self.other_form.is_valid():
             description = self.other_form.cleaned_data.get("context") or description
         try:
+            case = self._case_for_mail(mail_inst)
+            if case is not None:
+                return self._adopt_mail_case(case, description, external_ref)
             case = CaseCreator(self.request.user).create_case(
                 description=description, reporter_context=description,
                 external_ref=external_ref, **ctx,
@@ -225,6 +229,28 @@ class CaseHandler:
         except Exception:
             logger.exception("Failed to create case")
             return None
+
+    @staticmethod
+    def _case_for_mail(mail_inst):
+        """The case the mail pipeline already opened for this mail, if any.
+
+        The upload goes through the same pipeline as the IMAP feeder, which
+        creates the case and launches its analyzers; a second case for the
+        same mail would be an empty shell that finalises as Safe at once.
+        """
+        if mail_inst is None:
+            return None
+        return Case.objects.filter(fileOrMail__mail=mail_inst).order_by("id").first()
+
+    def _adopt_mail_case(self, case, description, external_ref):
+        case.reporter = self.request.user
+        case.reporter_context = description
+        case.external_ref = external_ref or ""
+        if description:
+            case.description = description
+        case.save(update_fields=["reporter", "reporter_context", "external_ref", "description"])
+        logger.info("Reusing case %s for the submitted mail", case)
+        return case
 
     def _launch_analysis(self, instance, hash_inst, data_type: str) -> None:
         """
