@@ -33,6 +33,9 @@ def finalise(case) -> None:
 
     Does NOT change status/lifecycle_state: the caller owns transitions.
     """
+    from api.utils.analyzer_reports import reports_for_case
+    from score_process.scoring.collect import reapply_allow_list
+    reapply_allow_list(reports_for_case(case, defer_full=True))
     agg = aggregate_case(case)
     CortexAnalyzerReports.get_report(case)
     case.description = _describe(agg, case.analysis_done)
