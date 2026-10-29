@@ -93,7 +93,7 @@ function serverMessage(error: unknown): string {
   return "";
 }
 
-// The guard only covers the total; scoring divides per kind of evidence, so zeroing all analyzers of one kind (e.g. file) scores it Safe.
+// The table only checks the total. The server also refuses to zero the last weighted analyzer of one kind of evidence (e.g. file), which would score it Safe.
 const ZERO_TOTAL_MESSAGE =
   "At least one active analyzer needs a weight above 0. Zeroing every analyzer that handles one kind of evidence (for example all file analyzers) makes that evidence score as Safe.";
 
