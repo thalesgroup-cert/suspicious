@@ -77,7 +77,21 @@ export type AnalyzerReportRow = {
   report_taxonomy?: unknown;
   target: { kind: string; id?: number | string | null; value: string | null } | null;
   created_at?: string;
+  /** The target is on the allow-list, so this result was set to Safe. */
+  allow_listed?: boolean;
+  /** The result this report had before the allow-list overrode it; null when it was never overridden. */
+  pre_allowlist?: { level?: string | null; score?: number | null; confidence?: number | null; category?: string | null } | null;
 };
+
+function WasLine({ pre }: { pre: NonNullable<AnalyzerReportRow["pre_allowlist"]> }) {
+  const was = getRiskTone(pre.score ?? undefined).label;
+  const detail = [
+    typeof pre.score === "number" ? `score ${pre.score}` : null,
+    typeof pre.confidence === "number" ? `confidence ${Math.round(pre.confidence)}%` : null,
+    pre.category || null,
+  ].filter(Boolean).join(", ");
+  return <>{`Before the allow-list: ${was}${detail ? ` (${detail})` : ""}.`}</>;
+}
 
 export function AnalyzerReportCard({
   report,
@@ -163,6 +177,11 @@ export function AnalyzerReportCard({
             {ok ? `${readType(report.type)} · ${readStatus(report.status)}` : readType(report.type)}
           </Typography>
         </Box>
+        {report.allow_listed ? (
+          <Chip size="small" variant="outlined" label="Allow-listed"
+            title={report.pre_allowlist ? "Overridden by the allow-list; the original result is in the details" : "Target is on the allow-list"}
+            sx={{ flexShrink: 0, color: "text.secondary", borderColor: "text.disabled" }} />
+        ) : null}
         {ok ? <RiskChip label={risk.label} tone={tone} /> : <NoResultChip label={unfinished} />}
         <ExpandMoreOutlined
           aria-hidden
@@ -189,6 +208,16 @@ export function AnalyzerReportCard({
                 {readableSummary || plainSummary}
               </Typography>
             </Box>
+
+            {report.allow_listed ? (
+              <Box sx={{ p: 1.5, ...sectionSx }}>
+                <Typography variant="body2" sx={{ mb: 0.75, fontWeight: 600 }}>Allow-list</Typography>
+                <Typography variant="body2" sx={{ lineHeight: 1.6, overflowWrap: "anywhere" }}>
+                  {report.target?.value ? `${report.target.value} is` : "This target is"} on the allow-list, so this result counts as Safe.
+                  {report.pre_allowlist ? <> <WasLine pre={report.pre_allowlist} /></> : null}
+                </Typography>
+              </Box>
+            ) : null}
 
             {ok ? (
             <Stack spacing={1.25}>

@@ -71,6 +71,10 @@ export type SubmissionAnalyzerReport = {
     value: string | null;
   };
   created_at: string;
+  allow_listed?: boolean;
+  pre_allowlist?: {
+    level?: string | null; score?: number | null; confidence?: number | null; category?: string | null;
+  } | null;
 };
 
 type SubmissionRawDetails = {

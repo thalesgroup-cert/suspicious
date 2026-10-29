@@ -72,3 +72,43 @@ class AllowListWwwHostTests(TestCase):
     def test_deny_listed_bare_domain_still_overrides_for_www_urls(self):
         DenyListDomain.objects.create(domain=self.d, user=self.u)
         self.assertIsNone(check_allow_list("https://www.corp.example/", "url").DomainAllowList)
+
+
+class ReapplyAllowListTests(TestCase):
+    """An allow-list entry added after a report was scored rewrites it and keeps the original."""
+
+    def setUp(self):
+        from cortex_job.models import Analyzer, AnalyzerReport
+        from url_process.models import URL
+        self.u = User.objects.create_user("re", password="p")
+        self.url = URL.objects.create(address="https://reapply.example")
+        analyzer = Analyzer.objects.create(name="VT", analyzer_cortex_id="vt")
+        self.report = AnalyzerReport.objects.create(
+            cortex_job_id="j1", type="url", status="Success", analyzer=analyzer, url=self.url,
+            level="malicious", confidence=100, score=10, category="7 contacted domain(s)",
+            report_summary={}, report_taxonomy={}, report_full={},
+        )
+
+    def _run(self):
+        from score_process.scoring.collect import reapply_allow_list
+        from cortex_job.models import AnalyzerReport
+        reapply_allow_list(AnalyzerReport.objects.filter(pk=self.report.pk).select_related("url", "domain", "ip", "file"))
+        self.report.refresh_from_db()
+
+    def test_rewrites_then_restores(self):
+        entry = AllowListDomain.objects.create(domain=Domain.objects.create(value="reapply.example"), user=self.u)
+        self._run()
+        self.assertEqual((self.report.level, self.report.score, self.report.confidence), ("safe", 0, 100))
+        self.assertEqual(self.report.pre_allowlist["level"], "malicious")
+        self.assertEqual(self.report.pre_allowlist["score"], 10)
+
+        entry.delete()
+        self._run()
+        self.assertEqual((self.report.level, self.report.score), ("malicious", 10))
+        self.assertEqual(self.report.category, "7 contacted domain(s)")
+        self.assertIsNone(self.report.pre_allowlist)
+
+    def test_unlisted_report_untouched(self):
+        self._run()
+        self.assertEqual(self.report.level, "malicious")
+        self.assertIsNone(self.report.pre_allowlist)
