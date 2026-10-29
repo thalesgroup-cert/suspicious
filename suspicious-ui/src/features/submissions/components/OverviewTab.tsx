@@ -3,6 +3,7 @@ import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import type { SubmissionAnalyzerReport, SubmissionCaseInfos, SubmissionResult, SubmissionRow } from "@/features/submissions/api";
 import { prettyResult, reportSucceeded, riskPalette } from "@/features/submissions/utils";
 import { RiskChip } from "@/features/submissions/components/AnalyzerReportCard";
+import { AllowListSection } from "@/features/submissions/components/AllowListSection";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
 import { Section, Stat } from "@/shared/components/SheetSection";
@@ -77,6 +78,8 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
           </Button>
         </Section>
       ) : null}
+
+      <AllowListSection reports={reports} />
 
       {ci ? (
         <Section title="Sources">

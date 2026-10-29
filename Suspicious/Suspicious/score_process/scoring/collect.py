@@ -99,22 +99,58 @@ def _compute_deny_listed(case) -> tuple[bool, str]:
     return False, ""
 
 
+def _report_target(r):
+    """(data, kind) the allow-list is checked against, or None for targets it never covers."""
+    if r.url_id:
+        return r.url.address, "url"
+    if r.domain_id:
+        return r.domain.value, "domain"
+    if r.ip_id:
+        return r.ip.address, "ip"
+    if r.file_id:
+        return r.file.file_path, "file"
+    return None
+
+
 def _marker_still_valid(r) -> bool:
     """Re-run the allow-list check for the report's target: a marker stored in
     category lapses when the entry was removed or the domain is now overridden."""
     from score_process.scoring.cortex_analyzers.allow_list import check_allow_list
 
-    if r.url_id:
-        data, kind = r.url.address, "url"
-    elif r.domain_id:
-        data, kind = r.domain.value, "domain"
-    elif r.ip_id:
-        data, kind = r.ip.address, "ip"
-    elif r.file_id:
-        data, kind = r.file.file_path, "file"
-    else:
-        return False
-    return any(check_allow_list(data, kind).model_dump().values())
+    target = _report_target(r)
+    return bool(target) and any(check_allow_list(*target).model_dump().values())
+
+
+def reapply_allow_list(reports) -> int:
+    """Rewrite stored reports to the current allow-list. A report scored before its
+    target was listed is set to safe/0/100 and its original result kept in
+    `pre_allowlist`; one whose listing has since lapsed gets the original back.
+    Returns how many reports changed."""
+    from score_process.scoring.cortex_analyzers.allow_list import check_allow_list, is_allow_listed_category
+
+    changed = 0
+    for r in reports:
+        if r.status != "Success":
+            continue
+        target = _report_target(r)
+        if target is None:
+            continue
+        marker = next((v for v in check_allow_list(*target).model_dump().values() if v), None)
+        marked = is_allow_listed_category(r.category)
+        if marker and not marked:
+            r.pre_allowlist = {"level": r.level, "score": r.score,
+                               "confidence": r.confidence, "category": r.category}
+            r.level, r.score, r.confidence, r.category = "safe", 0, 100, marker
+        elif not marker and marked and r.pre_allowlist:
+            old = r.pre_allowlist
+            r.level, r.score, r.confidence, r.category = (
+                old["level"], old["score"], old["confidence"], old["category"])
+            r.pre_allowlist = None
+        else:
+            continue
+        r.save(update_fields=["level", "score", "confidence", "category", "pre_allowlist"])
+        changed += 1
+    return changed
 
 
 def collect_votes(case, ai=None) -> tuple:
