@@ -326,6 +326,7 @@ OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 # Django REST Framework
 
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "api.exceptions.broker_aware_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "api.authentication.KnoxCookieAuthentication",
         "knox.auth.TokenAuthentication",
