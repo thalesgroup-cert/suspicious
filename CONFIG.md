@@ -342,7 +342,7 @@ processes (`suspicious`, `suspicious_celery`, `suspicious_celery_beat`) are
 recreated.
 
 An unknown name raises `StorageConfigError` ("Unknown storage provider 'x';
-registered providers: s3") on first use. It is also rejected when the process
+registered providers: gcs, s3") on first use. It is also rejected when the process
 starts: `SuspiciousConfig.ready()` raises `ImproperlyConfigured` ("Unknown
 storage provider 'x' (from env STORAGE_PROVIDER)", or "from settings.json
 storage.provider", listing the registered providers), so gunicorn, the Celery
@@ -360,6 +360,71 @@ runtime-config cache no longer applies to it.
 botocore honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`; `minio-py` did not.
 If a proxy is set in the container environment, list an external
 `storage.s3.endpoint` in `NO_PROXY` or storage traffic goes through the proxy.
+
+
+#### Google Cloud Storage (`storage.gcs`)
+
+Set `storage.provider` to `gcs` to use Google Cloud Storage. The provider is
+imported only when selected. The section is backend-only (the email feeder
+never receives it).
+
+**Not usable end to end yet.** Until the feeder and bucket-configuration
+stages land, the email feeder still writes to RustFS via `storage.s3`, and the
+backend still reads `feeder_bucket` and the avatar, media and feeder bucket
+names from `storage.s3`. Keep a `storage.s3` section when selecting `gcs`.
+
+Bucket names are global on GCS. Set explicit, unique names and never keep the
+defaults, which anyone could claim; the system check `storage.W001` warns while
+they are in use. `suspicious-media` and `suspicious-avatars` are set with
+`storage.s3.media_bucket` and `storage.s3.avatars_bucket`. `mail-previews` and
+`analyzer-screenshots` are only the Django settings `MAIL_PREVIEW_BUCKET` and
+`SCREENSHOT_BUCKET`, which cannot be set from `settings.json` or the
+environment today (known limitation): the warning for those two cannot be
+cleared until a later stage adds configuration for them. Web submissions still create one
+bucket per submission until a prefix mode is added (known limitation, on the
+backlog).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `project` | ADC project | Project used for bucket creation and listing. |
+| `location` | US multi-region | Location for buckets created by `ensure_bucket`. Google creates them in the US multi-region when this is unset, so set it explicitly. |
+| `credentials` | `adc` | `adc` (Application Default Credentials), `service_account` or `anonymous` (emulator only). |
+| `service_account_json` | none | Secret. The service account key as a JSON string; required when `credentials` is `service_account`. A parse failure names the key and never echoes the content. |
+| `api_endpoint` | Google | Emulator or private endpoint, for example `http://fake-gcs:4443`. Use with `credentials: anonymous` for an emulator. Signed URLs use this host, so a private endpoint yields URLs browsers cannot reach, and the bearer token is sent to it: set it only to trusted endpoints. |
+| `signing_service_account_email` | ADC email | Service account used for keyless signed URLs. The ADC credential is refreshed first, because a Compute credential reports `default` until refreshed. |
+
+Signed URLs: a service account key signs offline. With ADC and no key, the
+store signs through the IAM `signBlob` API (keyless) and refreshes expired
+credentials on each use. With no signing identity (anonymous, or ADC that
+cannot resolve an email) presigning fails with an `invalid` error and the
+`presign_put` capability is not advertised. A presigned PUT created with a
+`content_type` signs that header, so the uploader must send the identical
+`Content-Type`.
+
+IAM permissions:
+- Object access on each bucket (for example `roles/storage.objectAdmin`).
+  `objectAdmin` alone is not enough: `storage.buckets.get` on each bucket is
+  also required (existence checks, labels).
+- `storage.buckets.list` at project level for the health check. Under least
+  privilege without it, the store reports unhealthy.
+- `storage.buckets.create` if the application creates buckets.
+- `roles/iam.serviceAccountTokenCreator` on the signing service account, for
+  keyless signed URLs.
+
+Proxy: the storage, IAM Credentials, OAuth2 and metadata hosts
+(`storage.googleapis.com`, `iamcredentials.googleapis.com`,
+`oauth2.googleapis.com`, `metadata.google.internal`) must be reachable
+through the proxy or listed in `NO_PROXY`.
+
+The secret `storage.gcs.service_account_json` can be seeded into Vault with
+`deployment/scripts/seed-vault-secrets.sh` (`GCS_SERVICE_ACCOUNT_JSON`). It may
+also be given as a JSON object instead of a string.
+
+Labels: bucket labels are replaced as a whole set. Keys must be lowercase
+letters, digits, `_` or `-`, start with a letter, and be at most 63
+characters. Values use the same characters and may be empty. At most 64 labels
+are allowed. A label set that breaks this is rejected before any request is
+sent.
 
 
 #### Feeder fast metadata

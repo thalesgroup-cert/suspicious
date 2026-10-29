@@ -224,6 +224,15 @@ Behaviour changes you may notice:
   `main`.
 - MkDocs documentation site deploy workflow.
 
+#### Storage
+- **Google Cloud Storage provider (partial, not usable end to end yet)**: the
+  backend `ObjectStore` can target `gcs` (`storage.gcs`: ADC, service account
+  JSON or emulator credentials, V4 signed URLs with key or keyless signing),
+  but the email feeder still writes to RustFS through `storage.s3` and the
+  backend still reads `feeder_bucket` and the avatar/media/feeder bucket names
+  from `storage.s3`. Keep a `storage.s3` section until the feeder and bucket
+  configuration move over. See `CONFIG.md`.
+
 ### Changed
 
 - **A CISO can challenge a case from the Investigations page.** The drawer has a

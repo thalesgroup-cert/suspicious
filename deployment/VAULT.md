@@ -18,7 +18,7 @@ config. When `VAULT_ADDR` is unset, secrets are read straight from
 
 ## The secret map
 
-These twelve keys are stored in Vault and overlaid onto the matching
+These thirteen keys are stored in Vault and overlaid onto the matching
 `settings.json` paths at boot when `VAULT_ADDR` is set. Each lives at KV v2 path
 `suspicious/<dotted-key>` with a single field, `value`.
 
@@ -29,6 +29,7 @@ These twelve keys are stored in Vault and overlaid onto the matching
 | `integrations.cortex.api_key` | `integrations.cortex.api_key` | yes |
 | `integrations.cortex.webhook_secret` | `integrations.cortex.webhook_secret` | yes |
 | `storage.s3.secret_key` | `storage.s3.secret_key` | yes |
+| `storage.gcs.service_account_json` | `storage.gcs.service_account_json` | optional (only with `storage.gcs.credentials: service_account`) |
 | `integrations.thehive.api_key` | `integrations.thehive.api_key` | optional |
 | `integrations.misp.instances.primary.api_key` | `integrations.misp.instances.primary.api_key` | optional |
 | `integrations.misp.instances.secondary.api_key` | `integrations.misp.instances.secondary.api_key` | optional |

@@ -57,3 +57,13 @@ class GetScopeConfigTest(TestCase):
         self.assertEqual(email["links"]["portal"], "p")
         self.assertEqual(email["socials"]["x"], "@acme")
         self.assertEqual(email["logos"]["header"], "logo.png")
+
+
+class GcsScopeTests(TestCase):
+    def test_gcs_section_is_backend_only_and_its_key_is_secret(self):
+        from settings.config import SCOPE_SECTIONS, SECRET_FIELDS
+
+        self.assertIn("storage.gcs", SCOPE_SECTIONS["backend"])
+        self.assertNotIn("storage.gcs", SCOPE_SECTIONS["shared"])
+        self.assertNotIn("storage.gcs", SCOPE_SECTIONS["feeder"])
+        self.assertIn("service_account_json", SECRET_FIELDS["storage.gcs"])
