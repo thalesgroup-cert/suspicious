@@ -17,6 +17,7 @@ import { CloseOutlined, SaveOutlined } from "@mui/icons-material";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 
 import type { InvestigationDetails, InvestigationListResponse } from "@/features/investigation/api";
+import { AllowListSection } from "@/features/submissions/components/AllowListSection";
 import { VerdictExplanation } from "@/features/investigation/VerdictExplanation";
 import { ThreatBadge } from "@/features/investigation/ThreatBadge";
 import { AnalysisHealthBanner } from "@/features/investigation/AnalysisHealthBanner";
@@ -137,6 +138,8 @@ export function InvestigationOverview({
           </Stack>
         )}
       </Section>
+
+      <AllowListSection reports={d?.analyzer_reports ?? []} />
 
       {ci?.verdict_explanation ? (
         <Section title="Why this verdict">

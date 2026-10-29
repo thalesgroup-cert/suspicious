@@ -159,6 +159,7 @@ class AnalyzerReportTargetSerializer(serializers.Serializer):
 
 
 class SubmissionAnalyzerReportSerializer(serializers.ModelSerializer):
+    allow_listed = serializers.SerializerMethodField()
     analyzer_name = serializers.CharField(source="analyzer.name", read_only=True)
     analyzer_id = serializers.CharField(source="analyzer.analyzer_cortex_id", read_only=True)
     categories = serializers.SerializerMethodField()
@@ -184,7 +185,13 @@ class SubmissionAnalyzerReportSerializer(serializers.ModelSerializer):
             "report_full",
             "target",
             "created_at",
+            "allow_listed",
+            "pre_allowlist",
         ]
+
+    def get_allow_listed(self, obj) -> bool:
+        from score_process.scoring.cortex_analyzers.allow_list import is_allow_listed_category
+        return is_allow_listed_category(obj.category)
 
     def get_categories(self, obj):
         return obj.get_category()
