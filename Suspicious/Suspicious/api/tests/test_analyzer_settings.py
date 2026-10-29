@@ -1,7 +1,9 @@
 from django.contrib.auth.models import Group, User
 from rest_framework.test import APITestCase
 
-from cortex_job.models import Analyzer
+from cortex_job.models import Analyzer, AnalyzerReport
+from ip_process.models import IP
+from url_process.models import URL
 
 
 class AnalyzerTierApiTests(APITestCase):
@@ -95,3 +97,51 @@ class AnalyzerWeightGuardTests(APITestCase):
         other = User.objects.create_user("plain", password="p")
         self.client.force_authenticate(other)
         self.assertEqual(self._patch(self.a, {"weight": 0.2}).status_code, 403)
+
+
+class AnalyzerWeightGuardPerKindTests(APITestCase):
+    """Scoring divides per kind of evidence, so zeroing the last weighted analyzer of one kind
+    would score that evidence Safe even while other kinds keep a positive total."""
+
+    def setUp(self):
+        user = User.objects.create_user("u", password="p")
+        user.groups.add(Group.objects.get_or_create(name="Admin")[0])
+        self.client.force_authenticate(user)
+        self.url = URL.objects.create(address="https://kind.example")
+        self.ip = IP.objects.create(address="7.7.7.7")
+        self.url_a = self._analyzer("url_a", 0.5, url=self.url)
+        self.url_b = self._analyzer("url_b", 0.0, url=self.url)
+        self.ip_c = self._analyzer("ip_c", 0.5, ip=self.ip)  # keeps the global sum positive
+
+    def _analyzer(self, name, weight, **target):
+        analyzer = Analyzer.objects.create(name=name, analyzer_cortex_id=name, weight=weight)
+        AnalyzerReport.objects.create(
+            cortex_job_id=name, type="url" if "url" in target else "ip", status="Success",
+            analyzer=analyzer, level="safe", confidence=100, score=0,
+            report_summary={}, report_taxonomy={}, report_full={}, **target,
+        )
+        return analyzer
+
+    def _patch(self, analyzer, weight):
+        return self.client.patch(f"/api/settings/analyzers/{analyzer.id}/", {"weight": weight}, format="json")
+
+    def test_zeroing_the_last_weighted_analyzer_of_a_kind_is_rejected(self):
+        r = self._patch(self.url_a, 0.0)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("url", r.json()["weight"][0])
+        self.url_a.refresh_from_db()
+        self.assertEqual(self.url_a.weight, 0.5)
+
+    def test_allowed_while_another_analyzer_of_the_kind_keeps_weight(self):
+        self.url_b.weight = 0.3
+        self.url_b.save()
+        self.assertEqual(self._patch(self.url_a, 0.0).status_code, 200)
+
+    def test_a_kind_that_is_already_unweighted_does_not_block_other_edits(self):
+        self.url_a.weight = 0.0
+        self.url_a.save()
+        self.assertEqual(self._patch(self.url_a, 0.0).status_code, 200)
+
+    def test_analyzer_without_reports_is_only_held_to_the_global_rule(self):
+        fresh = Analyzer.objects.create(name="fresh", analyzer_cortex_id="fresh", weight=0.4)
+        self.assertEqual(self._patch(fresh, 0.0).status_code, 200)

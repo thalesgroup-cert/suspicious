@@ -1,5 +1,6 @@
 import { api } from "@/api/client";
 import { parseObservableGroup, type ObservableGroup } from "./observableGroup";
+import type { AnalyzerReportRow } from "@/features/submissions/components/AnalyzerReportCard";
 
 export type InvestigationStatus =
   | "NEW"
@@ -74,6 +75,8 @@ type InvestigationAnalyzerReport = {
   enrichment?: unknown;
   target: InvestigationAnalyzerTarget | null;
   created_at?: string;
+  allow_listed?: boolean;
+  pre_allowlist?: AnalyzerReportRow["pre_allowlist"];
 };
 
 export type VerdictSourceLine = {
@@ -307,6 +310,8 @@ function normalizeAnalyzerReport(input: unknown): InvestigationAnalyzerReport {
     enrichment: report.enrichment,
     target: normalizeAnalyzerTarget(report.target),
     created_at: typeof report.created_at === "string" ? report.created_at : undefined,
+    allow_listed: report.allow_listed === true,
+    pre_allowlist: (report.pre_allowlist as AnalyzerReportRow["pre_allowlist"]) ?? null,
   };
 }
 

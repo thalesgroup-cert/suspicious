@@ -51,6 +51,10 @@ class AnalyzerReport(models.Model):
     confidence = models.FloatField()
     score = models.FloatField()
     category = models.TextField(null=True, blank=True)
+    # Original level/score/confidence/category, kept when an allow-list entry later
+    # rewrote this report to safe (score_process.scoring.collect.reapply_allow_list).
+    # None = never rewritten.
+    pre_allowlist = models.JSONField(null=True, blank=True, default=None)
     report_summary = models.JSONField()
     report_taxonomy = models.JSONField()
     report_full = models.JSONField()

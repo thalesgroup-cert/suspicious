@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   30 minutes. The run lock now has a 120 s TTL that the running task renews every 30 s, so a dead
   worker's lock expires within two minutes while a long poll keeps it. A run also no longer
   releases a lock another run has since taken.
+- A report scored before its target was allow-listed no longer keeps a malicious score. `finalise()`
+  now re-applies the allow-list to the case's stored reports: a match is rewritten to safe and the
+  original result is kept in the new `AnalyzerReport.pre_allowlist` field (migration
+  `cortex_job/0016`); if the entry is later removed the original is restored. The case Overview of
+  both drawers gets an Allow-list section and each report an Allow-listed chip, with the original
+  result in the expanded row. Cases already finalised need "Redo analysis" to pick this up.
+- Submitting while the Celery broker is down now returns 503 `broker_unavailable` with a
+  `Retry-After` header instead of a 500, so automations can back off. `/api/health/` also reports
+  `checks.broker`; it is informational and never fails the Docker healthcheck.
+- The analyzer weight guard now also protects each kind of evidence. Zeroing the last weighted
+  analyzer of one kind (all URL analyzers, say) used to be accepted as long as another kind kept a
+  positive total, and that evidence then always scored Safe. The weight update is now refused when it
+  would take a kind's weight from above 0 to 0, with a message naming the kind. A kind is known from
+  the report types an analyzer has produced; one that never ran is held only to the existing total check.
 - A mail uploaded through the web UI no longer ends as Failure with "No analyzers ran". The submit
   view queued a second, empty launch task for the case the mail pipeline had already opened; it
   stamped the case as launched and finalised it before the real launch started. That second task is

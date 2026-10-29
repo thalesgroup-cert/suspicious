@@ -156,6 +156,28 @@ describe("SubmissionDrawer - overview", () => {
     expect(screen.queryByText("Highest-risk results")).toBeNull();
   });
 
+  it("allow-list section counts allow-listed reports and names what was overridden", async () => {
+    const reports = [
+      { ...rep(1, "VirusTotal", 0), allow_listed: true, category: "Safe DW triggered",
+        pre_allowlist: { level: "malicious", score: 10, confidence: 100, category: "7 contacted domain(s)" } },
+      { ...rep(2, "Abuse", 0), allow_listed: true },
+      rep(3, "Other", 1),
+    ];
+    renderWithProviders(<SubmissionDrawer {...multi({
+      details: { data: { ...multiRow, analyzer_reports: reports, case_infos: ci() }, isLoading: false, isError: false } as never,
+    })} />);
+    const section = (await screen.findByRole("heading", { name: "Allow-list" })).closest("section")!;
+    expect(within(section).getByText(/2 of 3 analyzer reports are for allow-listed targets/)).toBeInTheDocument();
+    expect(within(section).getByText("VirusTotal: was High risk before the allow-list")).toBeInTheDocument();
+    expect(within(section).queryByText(/Abuse:/)).toBeNull();
+  });
+
+  it("allow-list section is absent when nothing is allow-listed", async () => {
+    renderWithProviders(<SubmissionDrawer {...multi()} />);
+    await screen.findByText("9/10");
+    expect(screen.queryByRole("heading", { name: "Allow-list" })).toBeNull();
+  });
+
   it("AI classifier with score 0 and confidence 0 reads Not classified", async () => {
     renderWithProviders(<SubmissionDrawer {...multi()} />);
     expect(await screen.findByText("Not classified")).toBeInTheDocument();
