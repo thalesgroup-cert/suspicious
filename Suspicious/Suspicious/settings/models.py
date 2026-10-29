@@ -23,7 +23,7 @@ class AllowListDomain(models.Model):
         null=True,
         blank=True,
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -43,7 +43,7 @@ class AllowListIp(models.Model):
         null=True,
         blank=True,
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -88,7 +88,7 @@ class DenyListDomain(models.Model):
         null=True,
         blank=True,
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -133,7 +133,7 @@ class CampaignDomainAllowList(models.Model):
         null=True,
         blank=True,
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -153,7 +153,7 @@ class AllowListFile(models.Model):
         null=True,
         blank=True,
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -167,7 +167,7 @@ class AllowListFile(models.Model):
 class AllowListFiletype(models.Model):
     id = models.AutoField(primary_key=True)
     filetype = models.CharField(max_length=200)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 

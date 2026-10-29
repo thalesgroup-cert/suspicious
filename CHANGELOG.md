@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Deleting a user no longer deletes the allow-list, deny-list and campaign-list entries they added.
+  The `user` link on those six list tables is now nullable and set to empty on deletion, so the
+  entries stay and only lose their author (migration `settings/0014`). Before, the entries vanished
+  with the account and left no row in the Settings change history.
 - A `fetch_emails` worker killed mid-run (SIGKILL, OOM) no longer stops email polling for up to
   30 minutes. The run lock now has a 120 s TTL that the running task renews every 30 s, so a dead
   worker's lock expires within two minutes while a long poll keeps it. A run also no longer
