@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Deleting a user no longer deletes the allow-list, deny-list and campaign-list entries they added.
+  The `user` link on those six list tables is now nullable and set to empty on deletion, so the
+  entries stay and only lose their author (migration `settings/0014`). Before, the entries vanished
+  with the account and left no row in the Settings change history.
 - A mail uploaded through the web UI no longer ends as Failure with "No analyzers ran". The submit
   view queued a second, empty launch task for the case the mail pipeline had already opened; it
   stamped the case as launched and finalised it before the real launch started. That second task is
