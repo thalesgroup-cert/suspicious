@@ -1,3 +1,7 @@
+import threading
+import uuid
+from contextlib import contextmanager
+
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.core.cache import cache
@@ -14,24 +18,50 @@ CASE_LOCK_TTL = 120
 
 
 _FETCH_EMAILS_LOCK_KEY = "fetch_emails_lock"
-_FETCH_EMAILS_LOCK_TTL = 1800  # dead-man's switch: run has been seen taking 90-180s+
-                                # and growing (legacy per-bucket tag scan cost rises
-                                # with total bucket count); TTL just bounds a worker
-                                # crash mid-run, not the expected runtime.
+# A run renews the lock while it lives, so the TTL only has to outlast a missed beat:
+# a worker killed mid-run (SIGKILL, OOM) frees the lock within one TTL, not the old 30 minutes.
+_FETCH_EMAILS_LOCK_TTL = 120
+_FETCH_EMAILS_HEARTBEAT = 30
+
+
+@contextmanager
+def _fetch_emails_lock():
+    """Yield True when this run owns the lock, False when another run holds it."""
+    token = uuid.uuid4().hex
+    if not cache.add(_FETCH_EMAILS_LOCK_KEY, token, timeout=_FETCH_EMAILS_LOCK_TTL):
+        yield False
+        return
+    stop = threading.Event()
+
+    def beat():
+        while not stop.wait(_FETCH_EMAILS_HEARTBEAT):
+            try:
+                if cache.get(_FETCH_EMAILS_LOCK_KEY) == token:
+                    cache.touch(_FETCH_EMAILS_LOCK_KEY, _FETCH_EMAILS_LOCK_TTL)
+            except Exception:
+                logger.warning("fetch_emails: lock heartbeat failed", exc_info=True)
+
+    threading.Thread(target=beat, name="fetch-emails-heartbeat", daemon=True).start()
+    try:
+        yield True
+    finally:
+        stop.set()
+        # ponytail: get-then-delete is not atomic; a lock lost to expiry and retaken in this window is rare
+        if cache.get(_FETCH_EMAILS_LOCK_KEY) == token:
+            cache.delete(_FETCH_EMAILS_LOCK_KEY)
 
 
 @shared_task(bind=True, **_RETRY)
 def fetch_emails(self):
     from tasp.cron.fetch_emails import fetch_and_process_emails
-    if not cache.add(_FETCH_EMAILS_LOCK_KEY, 1, timeout=_FETCH_EMAILS_LOCK_TTL):
-        logger.info("fetch_emails: previous run still in flight, skipping this tick")
-        return
-    try:
-        fetch_and_process_emails()
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
-    finally:
-        cache.delete(_FETCH_EMAILS_LOCK_KEY)
+    with _fetch_emails_lock() as owned:
+        if not owned:
+            logger.info("fetch_emails: previous run still in flight, skipping this tick")
+            return
+        try:
+            fetch_and_process_emails()
+        except Exception as exc:
+            raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
 @shared_task(bind=True, max_retries=5, acks_late=True)

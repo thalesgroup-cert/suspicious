@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `fetch_emails` worker killed mid-run (SIGKILL, OOM) no longer stops email polling for up to
+  30 minutes. The run lock now has a 120 s TTL that the running task renews every 30 s, so a dead
+  worker's lock expires within two minutes while a long poll keeps it. A run also no longer
+  releases a lock another run has since taken.
 - A mail uploaded through the web UI no longer ends as Failure with "No analyzers ran". The submit
   view queued a second, empty launch task for the case the mail pipeline had already opened; it
   stamped the case as launched and finalised it before the real launch started. That second task is
