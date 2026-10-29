@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cortex_job/0016`); if the entry is later removed the original is restored. The case Overview of
   both drawers gets an Allow-list section and each report an Allow-listed chip, with the original
   result in the expanded row. Cases already finalised need "Redo analysis" to pick this up.
+- Submitting while the Celery broker is down now returns 503 `broker_unavailable` with a
+  `Retry-After` header instead of a 500, so automations can back off. `/api/health/` also reports
+  `checks.broker`; it is informational and never fails the Docker healthcheck.
 - A mail uploaded through the web UI no longer ends as Failure with "No analyzers ran". The submit
   view queued a second, empty launch task for the case the mail pipeline had already opened; it
   stamped the case as launched and finalised it before the real launch started. That second task is

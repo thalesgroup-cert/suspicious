@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+from kombu.exceptions import OperationalError
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -162,7 +163,7 @@ class BaseSubmitView(APIView):
                 request, file_form, url_form, other_form, external_ref=external_ref,
             )
             return self.handle_success(case, results)
-        except serializers.ValidationError:
+        except (serializers.ValidationError, OperationalError):
             raise
         except Exception:
             logger.exception(

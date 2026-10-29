@@ -9,6 +9,7 @@ Cheap liveness + dependency probe used by:
 Subsystem probes:
 - db     : `SELECT 1` against the Django default connection
 - redis  : `cache.set` + `cache.get` round-trip on the Django cache (Valkey)
+- broker : connect to the Celery broker (informational, never fails the probe)
 - cortex : HTTP HEAD against the configured Cortex base URL (informational)
 
 HTTP status:
@@ -48,6 +49,7 @@ class HealthView(APIView):
     def get(self, request, *args, **kwargs):
         db_ok = _check_db()
         redis_ok = _check_redis()
+        broker_ok = _check_broker()
         cortex_ok = _check_cortex()
 
         critical_failed = [
@@ -60,6 +62,7 @@ class HealthView(APIView):
             "checks": {
                 "db": db_ok,
                 "redis": redis_ok,
+                "broker": broker_ok,
                 "cortex": cortex_ok,
             },
             "failed": critical_failed,
@@ -83,6 +86,19 @@ def _check_redis() -> bool:
         return cache.get("health:probe") == "pong"
     except Exception:
         logger.warning("health: redis probe failed", exc_info=True)
+        return False
+
+
+def _check_broker() -> bool:
+    """Informational: a down broker stalls submissions, but restarting the web
+    container would not fix it, so it must not fail the Docker healthcheck."""
+    try:
+        from celery import current_app
+        with current_app.connection_for_read() as conn:
+            conn.ensure_connection(max_retries=0, timeout=_CORTEX_PROBE_TIMEOUT_S)
+        return True
+    except Exception:
+        logger.warning("health: broker probe failed", exc_info=True)
         return False
 
 
