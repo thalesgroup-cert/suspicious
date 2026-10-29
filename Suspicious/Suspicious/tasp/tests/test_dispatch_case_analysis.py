@@ -164,14 +164,33 @@ class DispatchReopensPrematureCaseTest(TestCase):
 
     @patch("tasp.tasks.reconcile_case.delay")
     @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
-    def test_already_dispatched_finalised_case_is_left_alone(self, mock_cortex_cls, mock_reconcile):
+    def test_finalised_case_is_reopened_even_when_a_launch_time_was_recorded(self, mock_cortex_cls, mock_reconcile):
+        """An empty dispatch can stamp dispatched_at and finalise the case first; the jobs of
+        the real launch still have to count."""
+        from django.utils import timezone
+        from case_handler.lifecycle import LifecycleState
+        self._finalise_empty()
+        self.case.dispatched_at = timezone.now()
+        self.case.save(update_fields=["dispatched_at"])
+        states = []
+        mock_cortex_cls.return_value.launch_cortex_jobs.side_effect = (
+            lambda **kw: states.append(Case.objects.get(pk=self.case.pk).lifecycle_state)
+        )
+
+        dispatch_case_analysis.run(self.case.id, [("ip_process.ip", self.ip.pk, "ip")])
+
+        self.assertEqual(states, [LifecycleState.ANALYZING])
+
+    @patch("tasp.tasks.reconcile_case.delay")
+    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    def test_dispatch_with_nothing_to_launch_leaves_a_finalised_case_alone(self, mock_cortex_cls, mock_reconcile):
         from django.utils import timezone
         from case_handler.lifecycle import LifecycleState
         self._finalise_empty()
         self.case.dispatched_at = timezone.now()
         self.case.save(update_fields=["dispatched_at"])
 
-        dispatch_case_analysis.run(self.case.id, [("ip_process.ip", self.ip.pk, "ip")])
+        dispatch_case_analysis.run(self.case.id, [])
 
         self.case.refresh_from_db()
         self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)

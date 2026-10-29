@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A mail uploaded through the web UI no longer ends as Failure with "No analyzers ran". The submit
+  view queued a second, empty launch task for the case the mail pipeline had already opened; it
+  stamped the case as launched and finalised it before the real launch started. That second task is
+  no longer queued, and the launch task now reopens a finalised case whenever it has jobs to launch.
 - A mail uploaded through the web UI no longer launches its Cortex jobs inside the request. A mail
   with many links could pass the 120 s gunicorn timeout, so the worker was killed mid-launch: the user
   saw "Internal Server Error" and the later jobs, the AI analyzer included, never started. The upload

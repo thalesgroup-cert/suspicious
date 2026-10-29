@@ -55,6 +55,7 @@ class CaseHandler:
         self.other_form = other_form
         self.base_case_path = Path(base_case_path)
         self.pending_dispatch_intents: list[tuple[Any, str]] = []
+        self._adopted_case_pk = None
 
     def validate_forms(self) -> Dict[str, Optional[object]]:
         """
@@ -250,6 +251,7 @@ class CaseHandler:
             case.description = description
         case.save(update_fields=["reporter", "reporter_context", "external_ref", "description"])
         logger.info("Reusing case %s for the submitted mail", case)
+        self._adopted_case_pk = case.pk
         return case
 
     def _launch_analysis(self, instance, hash_inst, data_type: str) -> None:
@@ -276,6 +278,12 @@ class CaseHandler:
                     "Dropping %d pending Cortex dispatch intents because no Case was created",
                     len(self.pending_dispatch_intents),
                 )
+            self.pending_dispatch_intents = []
+            return
+
+        if case.pk == self._adopted_case_pk:
+            # The mail pipeline launches this case's jobs. An empty dispatch here would stamp the
+            # case as launched and let it finalise before the real launch has started.
             self.pending_dispatch_intents = []
             return
 

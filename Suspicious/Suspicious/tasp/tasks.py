@@ -300,9 +300,10 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
             continue
         (ai_archives if data_type == AI_ARCHIVE_INTENT else resolved).append((value, data_type))
 
-    if case.dispatched_at is None and case.lifecycle_state == LifecycleState.FINALIZED:
-        # Closed on "no jobs" before this task ran (worker down past the grace): reopen it
-        # so the jobs launched now are scored instead of stranded behind a finished case.
+    if intents and case.lifecycle_state == LifecycleState.FINALIZED:
+        # Closed on "no jobs" before this task ran (a worker down past the grace, or an
+        # earlier empty dispatch): reopen it so the jobs launched now are scored instead of
+        # stranded behind a finished case. A redo reopens its own case before dispatching.
         transition(case, LifecycleState.ANALYZING)
         case.results = Result.INCONCLUSIVE
         case.score = case.final_score = 0
