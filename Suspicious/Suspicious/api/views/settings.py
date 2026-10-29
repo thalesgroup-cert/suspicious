@@ -18,7 +18,7 @@ from api.serializers.settings import (
     SettingsListBulkCreateSerializer,
 )
 from api.utils.settings_service import SettingsListSectionService
-from cortex_job.models import Analyzer
+from cortex_job.models import Analyzer, AnalyzerReport
 from profiles.models import CISOProfile
 from settings.models import EmailFeederState
 
@@ -28,6 +28,29 @@ READ_ONLY_SECTIONS = {
     "watcher_monitored_domains",
     "ciso_users",
 }
+
+
+def _evidence_kinds_left_unweighted(analyzer: Analyzer, new_weight: float, active_weight: dict) -> list[str]:
+    """Kinds of evidence this analyzer covers where the weight sum goes from above 0 to 0.
+
+    A kind is known from the report types the analyzer has produced.
+    ponytail: an analyzer that never ran counts as covering nothing, so only the global
+    guard protects a kind whose other analyzers have no reports yet.
+    """
+    kinds = list(
+        AnalyzerReport.objects.filter(analyzer=analyzer).values_list("type", flat=True).distinct()
+    )
+    if not kinds:
+        return []
+    others = {k: 0.0 for k in kinds}
+    for kind, analyzer_id in (
+        AnalyzerReport.objects.filter(type__in=kinds).values_list("type", "analyzer_id").distinct()
+    ):
+        others[kind] += active_weight.get(analyzer_id, 0.0)
+    return sorted(
+        k for k, rest in others.items()
+        if rest + float(analyzer.weight) > 0 and rest + new_weight <= 0
+    )
 
 
 class SettingsPagination(PageNumberPagination):
@@ -167,28 +190,33 @@ class AnalyzerSettingsDetailView(generics.UpdateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # At least one active analyzer must keep a weight above 0. This guards the
-        # total over ALL active analyzers only: scoring divides per kind of
-        # evidence, so zeroing every analyzer that handles one kind (e.g. all file
-        # analyzers) is still accepted and makes that evidence score as Safe.
-        # Inactive analyzers are never scheduled and so cannot hold the sum up. The
+        # Scoring divides per kind of evidence (url, ip, domain, hash, file, ...), so the
+        # weight must stay above 0 in total and for every kind this analyzer covers:
+        # zeroing the last weighted analyzer of one kind would make that evidence score as
+        # Safe. Inactive analyzers are never scheduled and so cannot hold a sum up. The
         # active rows are locked in pk order (one query, own row included, so two
-        # concurrent updates serialise instead of deadlocking) and the check and
-        # the save share one transaction, so two requests cannot each see the
-        # other's old weight and together zero the sum.
+        # concurrent updates serialise instead of deadlocking) and the check and the save
+        # share one transaction, so two requests cannot each see the other's old weight.
         with transaction.atomic():
             if "weight" in serializer.validated_data and analyzer.is_active:
-                locked = (
+                new_weight = float(serializer.validated_data["weight"])
+                locked = list(
                     Analyzer.objects.select_for_update()
                     .filter(Q(is_active=True) | Q(pk=analyzer.pk))
                     .order_by("pk")
                     .values_list("pk", "weight", "is_active")
                 )
-                others = sum(w for pk, w, active in locked if active and pk != analyzer.pk)
-                if others + float(serializer.validated_data["weight"]) <= 0:
+                active_weight = {pk: w for pk, w, active in locked if active and pk != analyzer.pk}
+                if sum(active_weight.values()) + new_weight <= 0:
                     raise ValidationError(
                         {"weight": ["At least one active analyzer must keep a weight above 0."]}
                     )
+                emptied = _evidence_kinds_left_unweighted(analyzer, new_weight, active_weight)
+                if emptied:
+                    raise ValidationError({"weight": [
+                        "No other active analyzer would keep a weight above 0 for "
+                        + ", ".join(emptied) + " evidence, which would then always score Safe."
+                    ]})
 
             update_fields = ["last_update"]
             for field in ("weight", "tier"):
