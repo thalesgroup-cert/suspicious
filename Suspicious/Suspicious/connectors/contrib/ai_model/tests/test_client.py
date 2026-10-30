@@ -51,10 +51,11 @@ class ClassifyTest(SimpleTestCase):
                 self.assertTrue(caught.exception.retryable)
                 self.assertIn(str(status), str(caught.exception))
 
-    def test_a_503_for_missing_models_or_vectorizer_is_not_retryable(self):
+    def test_a_503_that_only_an_operator_can_fix_is_not_retryable(self):
         details = (
             "Required models unavailable for variant 'personal': safe_model (looked in /m)",
             "Vectorizer unavailable: boom",
+            "token not configured",
         )
         for detail in details:
             with self.subTest(detail=detail):
@@ -64,18 +65,33 @@ class ClassifyTest(SimpleTestCase):
                 self.assertFalse(caught.exception.retryable)
                 self.assertIn(detail[:20], str(caught.exception))
 
-    def test_a_503_for_anything_else_stays_retryable(self):
-        client = client_with(post=mock.Mock(return_value=reply(503, {"detail": "token not configured"})))
+    def test_any_other_503_stays_retryable(self):
+        client = client_with(post=mock.Mock(return_value=reply(503, {"detail": "busy"})))
         with self.assertRaises(ProviderUnavailable) as caught:
             client.classify("x")
         self.assertTrue(caught.exception.retryable)
 
-    def test_other_4xx_is_a_value_error_and_never_echoes_the_token(self):
-        for status in (400, 401, 403, 404, 413, 422):
+    def test_a_refused_setup_fails_at_once_without_retry_and_without_the_token(self):
+        for status in (401, 403, 404, 407, 408, 429):
+            with self.subTest(status=status):
+                client = client_with(post=mock.Mock(return_value=reply(status, {"detail": "nope"})))
+                with self.assertRaises(ProviderUnavailable) as caught:
+                    client.classify("x")
+                self.assertFalse(caught.exception.retryable)
+                self.assertIn(f"HTTP {status}", str(caught.exception))
+                self.assertNotIn("s3cret", str(caught.exception))
+        client = client_with(post=mock.Mock(return_value=reply(401, {"detail": "x"})))
+        with self.assertRaises(ProviderUnavailable) as caught:
+            client.classify("x")
+        self.assertEqual(str(caught.exception), "inference server rejected the token (HTTP 401)")
+
+    def test_a_refusal_of_this_request_is_a_value_error_and_never_echoes_the_token(self):
+        for status in (400, 409, 413, 422):  # 409: an unlisted 4xx counts as request-specific
             with self.subTest(status=status):
                 client = client_with(post=mock.Mock(return_value=reply(status, {"detail": "nope"})))
                 with self.assertRaises(ValueError) as caught:
                     client.classify("x")
+                self.assertNotIsInstance(caught.exception, ProviderUnavailable)
                 self.assertIn(str(status), str(caught.exception))
                 self.assertNotIn("s3cret", str(caught.exception))
 

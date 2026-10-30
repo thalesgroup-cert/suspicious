@@ -9,17 +9,22 @@ from django.utils import timezone
 
 from ai_model.models import AiAssessment
 from case_handler.models import Case, CaseHasFileOrMail
+from common.http_client import BREAKERS
 from connectors.base import ProviderResult
 from connectors.contrib.ai_model import connector as module
 from connectors.contrib.ai_model.connector import AiModelConnector, result_from_server
-from connectors.providers import ProviderUnavailable
 from connectors.contrib.ai_model.tests.test_mailtext import GOOD, build_tar
-from connectors.registry import registry
+from connectors.models import ConnectorDelivery, ConnectorState
+from connectors.providers import ProviderUnavailable, queue_provider_analysis
+from connectors.registry import ConnectorRegistry, registry
+from connectors.tasks import run_provider_analysis
+from connectors.tests.test_provider_dispatch import make_mail_case
+from cortex_job.models import CaseAnalyzerJob
 from file_process.models import File
 from hash_process.models import Hash
 from mail_feeder.models import Mail, MailArchive
 
-CONFIG = {"url": "http://ai_inference:8090", "token": "tok", "timeout_seconds": 9}
+CONFIG = {"url": "http://ai_inference:8090", "token": "s3cret-token", "timeout_seconds": 9}
 # The classes the inference server emits (Analyzers/AIMailAnalyzer/mail_analysis.py).
 SERVER_CLASSES = ("SAFE", "UNWANTED", "DANGEROUS", "INCONCLUSIVE")
 
@@ -103,7 +108,7 @@ class HealthCheckTest(SimpleTestCase):
     def test_health_check_ok_and_not_ok(self):
         status, client_class = self.check(CONFIG, (True, "ready, token accepted"))
         self.assertEqual((status.ok, status.detail), (True, "ready, token accepted"))
-        client_class.assert_called_once_with("http://ai_inference:8090", "tok", 9.0)
+        client_class.assert_called_once_with("http://ai_inference:8090", "s3cret-token", 9.0)
         status, _ = self.check(CONFIG, (False, "not ready (HTTP 503)"))
         self.assertEqual((status.ok, status.detail), (False, "not ready (HTTP 503)"))
 
@@ -114,8 +119,8 @@ class HealthCheckTest(SimpleTestCase):
         client_class.assert_not_called()
 
     def test_defaults_apply_when_url_and_timeout_are_unset(self):
-        _, client_class = self.check({"token": "tok"}, (True, ""))
-        client_class.assert_called_once_with("http://ai_inference:8090", "tok", 20.0)
+        _, client_class = self.check({"token": "s3cret-token"}, (True, ""))
+        client_class.assert_called_once_with("http://ai_inference:8090", "s3cret-token", 20.0)
 
 
 class AnalyzeTest(TestCase):
@@ -157,7 +162,7 @@ class AnalyzeTest(TestCase):
                 mock.patch.object(module, "AiInferenceClient") as client_class:
             client_class.return_value.classify.return_value = payload()
             self.connector.analyze("mail_ai", self.case.id)
-        client_class.assert_called_once_with("http://ai_inference:8090", "tok", 9.0)
+        client_class.assert_called_once_with("http://ai_inference:8090", "s3cret-token", 9.0)
 
     def test_a_4xx_becomes_an_inconclusive_result_and_never_trips_the_breaker(self):
         breaker = pybreaker.CircuitBreaker(fail_max=1, reset_timeout=60)
@@ -198,3 +203,67 @@ class AnalyzeTest(TestCase):
             result = self.connector.analyze("mail_ai", other.id)
         self.assertEqual((result.result, result.reason), ("INCONCLUSIVE", "no_mail_archive"))
         call.assert_not_called()
+
+
+class RejectedTokenEndToEndTest(TestCase):
+    """The real connector and client, only the HTTP layer faked, driven by the Celery task."""
+
+    def setUp(self):
+        private = ConnectorRegistry()
+        private.register(AiModelConnector)
+        for target in ("connectors.providers.registry", "connectors.delivery.registry"):
+            patcher = mock.patch(target, private)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        patcher = mock.patch.object(private, "instantiate", return_value=AiModelConnector(CONFIG))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.breaker = pybreaker.CircuitBreaker(fail_max=5, reset_timeout=60)
+        patcher = mock.patch.dict(BREAKERS, {"ai_model": self.breaker})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = mock.patch("tasp.tasks.reconcile_case")
+        self.reconcile = patcher.start()
+        self.addCleanup(patcher.stop)
+        ConnectorState.objects.create(name="ai_model", enabled=True)
+        self.case, _ = make_mail_case(n=50)
+
+    def run_with_status(self, status, detail="invalid or missing bearer token"):
+        response = mock.Mock(status_code=status, text=detail)
+        response.json.return_value = {"detail": detail}
+        session = mock.Mock()
+        session.post.return_value = response
+        with mock.patch("connectors.contrib.ai_model.client.make_session", return_value=session), \
+                mock.patch.object(module, "read_archive_body", return_value="the mail"):
+            with self.captureOnCommitCallbacks(execute=True):
+                job = queue_provider_analysis(self.case, "mail_ai")
+            with self.captureOnCommitCallbacks(execute=True):
+                run_provider_analysis.apply(args=(self.case.id, "mail_ai", job.id))
+        job.refresh_from_db()
+        self.case.refresh_from_db()
+        return job, session
+
+    def test_a_rejected_token_fails_the_row_at_once_and_says_why(self):
+        job, session = self.run_with_status(401)
+        self.assertEqual(session.post.call_count, 1)  # no retry
+        self.assertEqual(job.status, CaseAnalyzerJob.STATUS_FAILURE)
+        self.assertEqual(self.case.results_ai, "Inconclusive")
+        delivery = ConnectorDelivery.objects.get()
+        self.assertEqual(
+            (delivery.connector, delivery.event, delivery.status, delivery.attempt),
+            ("ai_model", "analyze", ConnectorDelivery.STATUS_FAILED, 1),
+        )
+        self.assertIn("rejected the token", delivery.error)
+        self.assertIn("HTTP 401", delivery.error)
+        self.assertNotIn(CONFIG["token"], delivery.error)
+        self.reconcile.delay.assert_called_once_with(self.case.id)
+        self.assertEqual(self.breaker.fail_counter, 1)  # a refused setup counts toward the breaker
+
+    def test_a_422_still_closes_the_row_as_a_successful_inconclusive_verdict(self):
+        job, _ = self.run_with_status(422, "bad body")
+        self.assertEqual(job.status, CaseAnalyzerJob.STATUS_SUCCESS)
+        delivery = ConnectorDelivery.objects.get()
+        self.assertEqual(delivery.status, ConnectorDelivery.STATUS_SUCCESS)
+        self.assertIn("HTTP 422", delivery.error)
+        self.assertEqual(self.breaker.fail_counter, 0)
+        self.assertEqual(self.case.ai_assessment.result, "INCONCLUSIVE")

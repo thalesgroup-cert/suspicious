@@ -1,12 +1,16 @@
 import io
+import os
 import tarfile
+import tempfile
 from types import SimpleNamespace
+from unittest import mock
 
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
 
 from connectors.contrib.ai_model import mailtext
 from connectors.contrib.ai_model.mailtext import read_archive_body
+from suspicious.storage_backends import MinioMediaStorage
 
 
 def build_tar(members, mode="w:gz"):
@@ -98,3 +102,44 @@ class ReadArchiveBodyTest(SimpleTestCase):
         self.assertIsNone(read_archive_body(archive(b"this is not a tar file")))
         self.assertIsNone(read_archive_body(SimpleNamespace(archive=None)))
         self.assertIsNone(read_archive_body(None))
+
+
+class ArchiveLocationTest(SimpleTestCase):
+    """Where the bytes come from: the shared disk path first, the storage backend second."""
+
+    def stored(self, tmp_path, file_path):
+        return SimpleNamespace(archive=SimpleNamespace(tmp_path=tmp_path, file_path=file_path))
+
+    def test_a_submitted_mail_is_read_from_tmp_path_not_from_storage(self):
+        # Production shape: file_path is just the file's name, nothing is stored under it.
+        broken_storage = mock.Mock()
+        broken_storage.open.side_effect = FileNotFoundError("no such object")
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "mail.tar.gz")
+            with open(path, "wb") as handle:
+                handle.write(build_tar(GOOD))
+            body = read_archive_body(self.stored(path, broken_storage))
+        self.assertEqual(body, GOOD["m1.txt"].decode())
+        broken_storage.open.assert_not_called()
+
+    def test_a_missing_or_relative_tmp_path_falls_back_to_storage(self):
+        data = build_tar(GOOD)
+        for tmp_path in ("", "/no/such/dir/mail.tar.gz", "mail.tar.gz"):
+            with self.subTest(tmp_path=tmp_path):
+                body = read_archive_body(self.stored(tmp_path, ContentFile(data, name="mail.tar.gz")))
+                self.assertEqual(body, GOOD["m1.txt"].decode())
+
+    def test_neither_location_readable_gives_none(self):
+        broken_storage = mock.Mock()
+        broken_storage.open.side_effect = FileNotFoundError("no such object")
+        self.assertIsNone(read_archive_body(self.stored("/no/such/mail.tar.gz", broken_storage)))
+
+    def test_a_file_from_the_s3_backend_is_seekable_enough_for_tarfile(self):
+        class Store:  # the object-store client MinioMediaStorage wraps
+            def open(self, bucket, name):
+                return io.BytesIO(build_tar(GOOD))
+
+        storage = MinioMediaStorage(client=Store(), bucket="media")
+        self.assertEqual(
+            read_archive_body(self.stored("", storage.open("mail.tar.gz"))), GOOD["m1.txt"].decode()
+        )

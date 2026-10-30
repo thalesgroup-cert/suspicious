@@ -6,6 +6,7 @@ extracts the same archive for the Cortex analyzer."""
 from __future__ import annotations
 
 import logging
+import os
 import tarfile
 import zlib
 from pathlib import PurePosixPath
@@ -25,6 +26,17 @@ def _top_level_name(name: str) -> str | None:
     return path.name if len(path.parts) == 1 else None
 
 
+def _open_archive(stored):
+    """Seekable binary handle on the archive. A submitted mail's tar.gz sits on the disk shared by
+    the web and worker containers at ``File.tmp_path`` (the path the Cortex job is handed); its
+    ``file_path`` is only the file's name. Fall back to the storage backend for an archive kept there
+    (local, or the s3 backend, whose files are BytesIO-backed)."""
+    path = getattr(stored, "tmp_path", "") or ""
+    if os.path.isabs(path) and os.path.isfile(path):
+        return open(path, "rb")
+    return stored.file_path.open("rb")
+
+
 def read_archive_body(mail_archive) -> str | None:
     """The mail's ``.txt`` text, or None when the archive is missing, unreadable, unsafe,
     lacks a ``.txt`` or a ``.headers`` member, or the text is blank."""
@@ -32,7 +44,7 @@ def read_archive_body(mail_archive) -> str | None:
     if stored is None:
         return None
     try:
-        with stored.file_path.open("rb") as handle, tarfile.open(fileobj=handle, mode="r:*") as tar:
+        with _open_archive(stored) as handle, tarfile.open(fileobj=handle, mode="r:*") as tar:
             members = tar.getmembers()
             if len(members) > MAX_MEMBERS:
                 raise ValueError(f"archive has too many entries ({len(members)})")

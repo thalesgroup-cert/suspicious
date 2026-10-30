@@ -10,8 +10,19 @@ from common.http_client import make_session
 from connectors.providers import ProviderUnavailable
 
 _MODEL_PATH = "/v2/models/ai_mail"
-# The 503 details the server gives when it has no weights / vectorizer to classify with.
-_NOT_LOADED = re.compile(r"(models|vectorizer) unavailable", re.IGNORECASE)
+# The 503 details the server gives when only an operator can fix it: no weights or vectorizer
+# to classify with, or no AI_INFERENCE_TOKEN set (it fails closed). A retry changes nothing.
+_NEEDS_OPERATOR = re.compile(r"(models|vectorizer) unavailable|token not configured", re.IGNORECASE)
+# 4xx statuses that say the setup is wrong (token, url, proxy, limits), not this one mail: every
+# case would fail the same way, so they fail the row (and count against the breaker) at once.
+_SETUP_REFUSED = {
+    401: "rejected the token",
+    403: "forbade the request, check the token",
+    404: "has no ai_mail endpoint, check the url",
+    407: "needs proxy authentication",
+    408: "timed out waiting for the request",
+    429: "is rate limiting requests",
+}
 
 
 def _detail(response) -> str:
@@ -48,8 +59,9 @@ class AiInferenceClient:
 
     def classify(self, mail_body: str) -> dict:
         """The server's JSON answer. ProviderUnavailable for what a retry may fix (connection,
-        timeout, 5xx) or what only an operator can (models/vectorizer not loaded); ValueError
-        when the server refused this request (4xx)."""
+        timeout, 5xx), and, with retryable=False, for what only an operator can (models or
+        vectorizer not loaded, token missing or rejected, wrong url, rate limit); ValueError
+        when the server refused just this request (400, 413, 422 and other 4xx)."""
         try:
             response = self.session.post(
                 self.url + _MODEL_PATH + "/classify",
@@ -61,8 +73,12 @@ class AiInferenceClient:
         status = response.status_code
         if status >= 500:
             detail = _detail(response)
-            retryable = not (status == 503 and _NOT_LOADED.search(detail))
+            retryable = not (status == 503 and _NEEDS_OPERATOR.search(detail))
             raise ProviderUnavailable(f"inference server HTTP {status}: {detail}", retryable=retryable)
+        if status in _SETUP_REFUSED:
+            raise ProviderUnavailable(
+                f"inference server {_SETUP_REFUSED[status]} (HTTP {status})", retryable=False
+            )
         if status != 200:
             raise ValueError(f"inference server refused the request (HTTP {status}): {_detail(response)}")
         try:
