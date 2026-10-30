@@ -65,16 +65,9 @@ Names later plans rely on; Plan A defines the first four.
 
 Detailed in `docs/plans/2026-10-30-ai-model-connector-a-provider-slot.md` (8 tasks: server v2 health and token, v2 classify, `ai_model` app and `AiAssessment`, provider extension point, dispatch with ledger row and Celery task, the connector, parity with the Cortex report, wiring and a dev-stack check).
 
-## Plan B: Campaigns in the connector and the Cortex cutover (outline)
+## Plan B: Campaigns in the connector and the Cortex cutover
 
-Deliverable: with the connector enabled, campaign membership and the TheHive campaign alert are identical to the Cortex path; then the Cortex AI path is deleted.
-
-1. **Campaign profile**: create `ai_model/campaign_profile.py` with `CampaignProfile` and `current_profile()`; record `embedding_version` on documents written to the collection; the profile carries `allow_list_digest` (digest of the campaign sender allow-list). Tests: the profile values equal the spec table.
-2. **Detection port**: create `connectors/contrib/ai_model/campaigns.py` with `detect_campaign(case, assessment, profile, collection, *, dry_run=False) -> CampaignOutcome`, a port of `case_handler.campaigns.detect_campaign` reading `AiAssessment` and the stored `Mail` (text from `Mail.mail_body`, headers from `Mail.mail_header`). Port the existing campaign tests and keep them green against the new function.
-3. **Subscription**: `AiModelConnector` subscribes to `case_finalised`; `on_case_finalised` runs detection under the existing `campaign:detect` lock and emits `campaign_updated`. Tests: finalising a case with a Dangerous assessment creates the campaign once; a second delivery is a no-op; the TheHive connector (fake) receives `campaign_updated`.
-4. **Parity replay**: management command `ai_model_campaign_replay <campaign_ref>` that replays a campaign's cases through the new path and diffs membership and the `campaign_updated` payload against the stored result. Acceptance test on a fixture campaign.
-5. **Collection-name check**: a startup warning (and a health-check detail) when the `chromadb` cleanup connector's `collection_name` differs from the detection collection.
-6. **Cutover removal** (after step 4 passes on the dev stack): delete the call to `case_handler.campaigns.run_for_case` in `reconcile_case_core` and the module; delete `launch_cortex_ai_jobs`, `manage_ai_jobs`, `get_sub_class` and the AI branches in `cortex_and_job_management.py` and `reports.py`; delete `Analyzers/AIMailAnalyzer/AIMailAnalyzer.json`, `ai_mail_classifier.py`, the thin-client `Dockerfile` and `requirements-client.txt`; drop the `inference_url` setting and the host port binding of `ai_inference`; remove the legacy `/classify`; update `docs/components/analyzers.md`, `docs/components/backend/connectors.md`, `CLAUDE.md`. Tests: nothing imports a removed name; a full backend run is green.
+Detailed in `docs/plans/2026-10-30-ai-model-connector-b-campaigns.md` (10 tasks: campaign profile, mail material reader, detection port, subscription and task, collection-name check, parity replay command, dev-stack acceptance, then the cutover removal in three tasks that run only if the replay matches).
 
 ## Plan C: Case view, AI assessment section (outline)
 
