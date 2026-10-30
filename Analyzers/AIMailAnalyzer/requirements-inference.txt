@@ -3,5 +3,5 @@
 # for the same reason noted in requirements-train.txt).
 -r requirements.txt
 
-fastapi>=0.115
+fastapi>=0.162.0
 uvicorn[standard]>=0.32
