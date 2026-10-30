@@ -152,9 +152,11 @@ both in a later change.
   rows fail at once without calling the server, and their delivery `error` starts with
   `CircuitBreakerError:` followed by the breaker's own message.
 - **A rejected token (`401` or `403`)**, a wrong url (`404`), a proxy, timeout or rate-limit answer
-  (`407`, `408`, `429`), and a `503` that says the token, models or vectorizer are missing, fail the row at once, without
-  retries. They are setup errors that every case would hit, so they show as a `Failure` row and count
-  against the breaker. They are never turned into a quiet `Inconclusive` success.
+  (`407`, `408`, `429`), and a `503` that says the token or models are missing or the vectorizer failed to
+  load, fail the row at once, without retries. They are setup errors that every case would hit, so they
+  show as a `Failure` row and count against the breaker. They are never turned into a quiet `Inconclusive`
+  success. The `503` that says the vectorizer is still loading (the server restarting) is retried like any
+  other `5xx`; a restart that outlasts the two waits still ends as a `Failure` row.
 - **A refusal of one mail (`400`, `413`, `422`)** is a verdict of "cannot tell": the row closes as
   `Success` with an `Inconclusive` result. A mail with no readable text, in the store or in the archive,
   ends the same way.

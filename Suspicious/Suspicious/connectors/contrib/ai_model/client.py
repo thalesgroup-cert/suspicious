@@ -12,7 +12,10 @@ from connectors.providers import ProviderUnavailable
 _MODEL_PATH = "/v2/models/ai_mail"
 # The 503 details the server gives when only an operator can fix it: no weights or vectorizer
 # to classify with, or no AI_INFERENCE_TOKEN set (it fails closed). A retry changes nothing.
-_NEEDS_OPERATOR = re.compile(r"(models|vectorizer) unavailable|token not configured", re.IGNORECASE)
+# "Vectorizer unavailable: still loading" is the server starting up, so it is left retryable.
+_NEEDS_OPERATOR = re.compile(
+    r"(models unavailable|vectorizer unavailable(?!: still loading))|token not configured", re.IGNORECASE
+)
 # 4xx statuses that say the setup is wrong (token, url, proxy, limits), not this one mail: every
 # case would fail the same way, so they fail the row (and count against the breaker) at once.
 _SETUP_REFUSED = {

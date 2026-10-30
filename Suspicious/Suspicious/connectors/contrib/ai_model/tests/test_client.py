@@ -66,10 +66,17 @@ class ClassifyTest(SimpleTestCase):
                 self.assertIn(detail[:20], str(caught.exception))
 
     def test_any_other_503_stays_retryable(self):
-        client = client_with(post=mock.Mock(return_value=reply(503, {"detail": "busy"})))
-        with self.assertRaises(ProviderUnavailable) as caught:
-            client.classify("x")
-        self.assertTrue(caught.exception.retryable)
+        details = (
+            "busy",
+            # The server restarting: the vectorizer is loading and the next try may find it ready.
+            "Vectorizer unavailable: still loading, try again shortly",
+        )
+        for detail in details:
+            with self.subTest(detail=detail):
+                client = client_with(post=mock.Mock(return_value=reply(503, {"detail": detail})))
+                with self.assertRaises(ProviderUnavailable) as caught:
+                    client.classify("x")
+                self.assertTrue(caught.exception.retryable)
 
     def test_a_refused_setup_fails_at_once_without_retry_and_without_the_token(self):
         for status in (401, 403, 404, 407, 408, 429):
