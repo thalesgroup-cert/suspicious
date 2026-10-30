@@ -10,6 +10,8 @@ Shared HTTP client utilities:
 """
 from __future__ import annotations
 
+import logging
+
 import requests
 from requests.adapters import HTTPAdapter
 
@@ -60,11 +62,27 @@ from tenacity import (
 BREAKER_FAIL_MAX: int      = 5
 BREAKER_RESET_TIMEOUT: int = 60
 
+logger = logging.getLogger(__name__)
+
+
+class _LogStateChange(pybreaker.CircuitBreakerListener):
+    """Log each state change of a breaker: an opening at WARNING, the rest at INFO."""
+
+    def state_change(self, cb, old_state, new_state):
+        level = logging.WARNING if new_state.name == pybreaker.STATE_OPEN else logging.INFO
+        logger.log(level, "circuit breaker %s: %s -> %s",
+                   cb.name, getattr(old_state, "name", None), new_state.name)
+
+
+def _new_breaker(name: str) -> pybreaker.CircuitBreaker:
+    return pybreaker.CircuitBreaker(
+        fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT,
+        name=name, listeners=[_LogStateChange()],
+    )
+
+
 BREAKERS: dict[str, pybreaker.CircuitBreaker] = {
-    "cortex":     pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
-    "thehive":    pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
-    "misp":       pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
-    "virustotal": pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
+    name: _new_breaker(name) for name in ("cortex", "thehive", "misp", "virustotal")
 }
 
 
@@ -73,9 +91,7 @@ def ensure_breaker(name: str) -> pybreaker.CircuitBreaker:
     if absent. Used by the connector registry so dynamically discovered
     connectors get isolation without editing this module."""
     if name not in BREAKERS:
-        BREAKERS[name] = pybreaker.CircuitBreaker(
-            fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT
-        )
+        BREAKERS[name] = _new_breaker(name)
     return BREAKERS[name]
 
 

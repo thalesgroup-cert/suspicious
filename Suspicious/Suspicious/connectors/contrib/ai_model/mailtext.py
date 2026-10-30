@@ -13,7 +13,10 @@ from pathlib import PurePosixPath
 
 from common.storage import StoreError, get_store
 from connectors.providers import ProviderUnavailable
-from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import fetch_mail_text_from_minio
+from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import (
+    MAIL_TEXT_MAX_BYTES,
+    fetch_mail_text_from_minio,
+)
 
 logger = logging.getLogger("connectors.contrib.ai_model")
 
@@ -106,7 +109,8 @@ def _read_tar(mail_archive) -> str | None:
                     has_headers = True
             if body is None or not has_headers:
                 return None
-            text = tar.extractfile(body).read().decode("utf-8", errors="replace")
+            # Capped like the store read: a worker killed on memory would get this message again.
+            text = tar.extractfile(body).read(MAIL_TEXT_MAX_BYTES).decode("utf-8", errors="replace")
     except (tarfile.TarError, OSError, EOFError, zlib.error, ValueError) as exc:
         logger.warning("mail archive %s not readable: %s", getattr(stored, "pk", "?"), exc)
         return None

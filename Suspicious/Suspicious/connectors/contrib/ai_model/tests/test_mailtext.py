@@ -100,6 +100,13 @@ class ReadArchiveBodyTest(SimpleTestCase):
         self.addCleanup(setattr, mailtext, "MAX_TOTAL_BYTES", original)
         self.assertIsNone(read_archive_body(archive(build_tar(members))))
 
+    def test_a_txt_over_the_cap_is_cut_at_the_cap(self):
+        original = mailtext.MAIL_TEXT_MAX_BYTES
+        mailtext.MAIL_TEXT_MAX_BYTES = 1024
+        self.addCleanup(setattr, mailtext, "MAIL_TEXT_MAX_BYTES", original)
+        members = {"m1.txt": b"A" * 4096, "m1.headers": b"H: v\n"}
+        self.assertEqual(read_archive_body(archive(build_tar(members))), "A" * 1024)
+
     def test_garbage_and_missing_archives_give_none(self):
         self.assertIsNone(read_archive_body(archive(b"this is not a tar file")))
         self.assertIsNone(read_archive_body(SimpleNamespace(archive=None)))

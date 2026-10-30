@@ -37,6 +37,10 @@ from mail_feeder.models import Mail, MailArchive, MailInfo
 DANGEROUS = ProviderResult(
     "DANGEROUS", 7, 81, "Classic_phishing", "v0", {"sub_class": "CLASSIC_PHISHING"}
 )
+# What the ai_model connector returns when the model gave no answer (model_version "").
+NO_ANSWER = ProviderResult(
+    "INCONCLUSIVE", 0, 0, "No subclass found", "", {}, reason="archive_unreadable"
+)
 
 
 def ai_name():
@@ -167,16 +171,58 @@ class ProviderDispatchTest(TestCase):
         )
         self.reconcile.delay.assert_called_once_with(self.case.id)
 
-    def test_inconclusive_result_is_a_success_without_mail_flags(self):
-        DummyProviderConnector.result = ProviderResult(
-            "INCONCLUSIVE", 0, 0, "No subclass found", "v0", {}, reason="empty body"
-        )
+    def test_a_no_answer_result_leaves_the_case_ai_fields_at_their_defaults(self):
+        DummyProviderConnector.result = NO_ANSWER
         job = self.run_task(self.queue())
         self.assertEqual(job.status, CaseAnalyzerJob.STATUS_SUCCESS)
+        defaults = {name: Case._meta.get_field(name).get_default()
+                    for name in ("score_ai", "confidence_ai", "category_ai")}
+        self.assertEqual(defaults["category_ai"], "Uncategorized")  # what the dashboard counts
+        self.assertEqual(
+            {name: getattr(self.case, name) for name in defaults}, defaults
+        )
         self.assertEqual(self.case.results_ai, "Inconclusive")
         self.assertEqual(AiAssessment.objects.get(case=self.case).result, "INCONCLUSIVE")
         self.assertFalse(MailInfo.objects.get(mail=self.archive.mail).is_analyzed)
-        self.assertEqual(ConnectorDelivery.objects.get().error, "empty body")
+        self.assertEqual(ConnectorDelivery.objects.get().error, "archive_unreadable")
+
+    def test_a_model_inconclusive_result_is_written_like_any_class(self):
+        DummyProviderConnector.result = ProviderResult(
+            "INCONCLUSIVE", 3, 45, "Clone", "v0", {"sub_class": "CLONE"}
+        )
+        job = self.run_task(self.queue())
+        self.assertEqual(job.status, CaseAnalyzerJob.STATUS_SUCCESS)
+        self.assertEqual(
+            (self.case.results_ai, self.case.score_ai, self.case.confidence_ai,
+             self.case.category_ai),
+            ("Inconclusive", 3, 45, "Clone"),
+        )
+        info = MailInfo.objects.get(mail=self.archive.mail)
+        self.assertEqual((info.is_analyzed, info.is_phishing, info.is_dangerous), (True, True, False))
+
+    def test_a_no_answer_result_replaces_a_stale_assessment_completely(self):
+        AiAssessment.objects.create(
+            case=self.case, model_version="v0", result="DANGEROUS", sub_class="CLONE",
+            score=9, confidence=97, probabilities={"DANGEROUS": 0.97},
+            sub_probabilities={"CLONE": 0.9}, tier="high", contributing_phrases=["verify"],
+            similar_cases=[1], campaign_embedding="[0.1]", embedding_version="old",
+            latency_ms=12,
+        )
+        DummyProviderConnector.result = NO_ANSWER
+        self.run_task(self.queue())
+        assessment = AiAssessment.objects.get(case=self.case)
+        self.assertEqual(assessment.result, "INCONCLUSIVE")
+        for field in AiAssessment._meta.concrete_fields:
+            if field.name in ("id", "case", "result", "score", "confidence",
+                              "created_at", "updated_at"):
+                continue
+            with self.subTest(field=field.name):
+                self.assertEqual(getattr(assessment, field.name), field.get_default())
+
+    def test_the_task_is_acked_late_and_redelivered_on_worker_loss(self):
+        self.assertIs(run_provider_analysis.acks_late, True)
+        self.assertIs(run_provider_analysis.reject_on_worker_lost, True)
+        self.assertEqual(run_provider_analysis.max_retries, 2)
 
     def test_unavailable_after_retries_marks_inconclusive_and_the_row_failed(self):
         job = self.queue()
@@ -269,7 +315,7 @@ class ProviderDispatchTest(TestCase):
     @mock.patch("cortex_job.cortex_utils.reconciliation.run_campaign_detection")
     @mock.patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
     @mock.patch("cortex_job.cortex_utils.reconciliation.finalise")
-    def test_reconcile_waits_for_the_provider_row_then_finalises(self, finalise, *_):
+    def test_reconcile_waits_for_the_provider_row_then_finalises(self, finalise, *_, result=DANGEROUS):
         job = self.queue()
         reconcile_case_core(self.case)
         self.case.refresh_from_db()
@@ -277,11 +323,14 @@ class ProviderDispatchTest(TestCase):
         finalise.assert_not_called()
 
         with self.captureOnCommitCallbacks(execute=True):
-            self.assertTrue(finish_provider_analysis(job.id, DANGEROUS, connector="dummy_provider"))
+            self.assertTrue(finish_provider_analysis(job.id, result, connector="dummy_provider"))
         reconcile_case_core(self.case)
         self.case.refresh_from_db()
         self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
         finalise.assert_called_once()
+
+    def test_a_no_answer_inconclusive_row_also_lets_the_case_finalise(self):
+        self.test_reconcile_waits_for_the_provider_row_then_finalises(result=NO_ANSWER)
 
     @mock.patch("cortex_job.cortex_utils.reconciliation.run_campaign_detection")
     @mock.patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")

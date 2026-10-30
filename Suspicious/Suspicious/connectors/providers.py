@@ -102,27 +102,35 @@ def finish_provider_analysis(job_id: int, result, *, error: str = "", attempt: i
         if not claimed:
             return False
         case = Case.objects.get(analyzer_jobs__pk=job_id)
-        if result is None:
-            case.results_ai = Result.INCONCLUSIVE
-            case.save(update_fields=["results_ai"])
-            logger.warning("mail AI provider failed for case %s: %s", case.id, error)
-        else:
+        # A result without a model_version is the provider's "no answer" (unreadable mail, a
+        # refusal): like a failure, it leaves the case's AI fields and MailInfo as they are.
+        if result is not None and result.model_version:
             case.results_ai = result.result.capitalize()
             case.score_ai = result.score
             case.confidence_ai = result.confidence
             case.category_ai = result.category[:Case._meta.get_field("category_ai").max_length]
             case.save(update_fields=["results_ai", "score_ai", "confidence_ai", "category_ai"])
+            mail = getattr(case.fileOrMail, "mail", None)
+            mail_info = MailInfo.objects.filter(mail=mail).first() if mail else None
+            apply_mail_info(mail_info, case.category_ai, case.results_ai)
+        else:
+            case.results_ai = Result.INCONCLUSIVE
+            case.save(update_fields=["results_ai"])
+        if result is None:
+            logger.warning("mail AI provider failed for case %s: %s", case.id, error)
+        else:
+            # Every field, the model's default where the result has none: nothing of an older
+            # assessment survives under the new result.
+            fresh = {f.name: f.get_default() for f in AiAssessment._meta.concrete_fields
+                     if not f.primary_key and f.name not in ("case", "created_at", "updated_at")}
             AiAssessment.objects.update_or_create(case=case, defaults={
+                **fresh,
                 **result.assessment,
                 "model_version": result.model_version,
                 "result": result.result,
                 "score": result.score,
                 "confidence": result.confidence,
             })
-            if result.result != AiAssessment.Result.INCONCLUSIVE:
-                mail = getattr(case.fileOrMail, "mail", None)
-                mail_info = MailInfo.objects.filter(mail=mail).first() if mail else None
-                apply_mail_info(mail_info, case.category_ai, case.results_ai)
         ConnectorDelivery.objects.create(
             connector=connector, event="analyze", case_id=case.id,
             status=ConnectorDelivery.STATUS_FAILED if result is None
