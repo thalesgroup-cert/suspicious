@@ -183,6 +183,20 @@ class ModelStore:
     def variant_ready(self, variant: str) -> bool:
         return not self.missing_required(variant)
 
+    def unavailable(self, variant: str) -> Optional[str]:
+        """The 503 detail for a classify call that cannot be served, else None.
+        Shared by the legacy /classify and the /v2 classify route."""
+        if self.vectorizer is None:
+            return f"Vectorizer unavailable: {self.vectorizer_error or 'still loading, try again shortly'}"
+        self.maybe_refresh()
+        missing = self.missing_required(variant)
+        if missing:
+            return (
+                f"Required models unavailable for variant {variant!r}: {', '.join(missing)} "
+                f"(looked in {self.model_dirs[variant]})"
+            )
+        return None
+
     def ready(self) -> bool:
         """Serving requires the vectorizer and the default ("personal") variant.
         "public" is comparative only, so it being incomplete is not an outage."""
@@ -320,18 +334,9 @@ app.include_router(
 def classify(req: ClassifyRequest):
     if req.variant not in MODEL_DIRS:
         raise HTTPException(400, f"Unknown variant {req.variant!r}, expected one of {list(MODEL_DIRS)}")
-    if store.vectorizer is None:
-        detail = store.vectorizer_error or "still loading, try again shortly"
-        raise HTTPException(503, f"Vectorizer unavailable: {detail}")
-
-    store.maybe_refresh()
-    missing = store.missing_required(req.variant)
-    if missing:
-        raise HTTPException(
-            503,
-            f"Required models unavailable for variant {req.variant!r}: {', '.join(missing)} "
-            f"(looked in {MODEL_DIRS[req.variant]})",
-        )
+    detail = store.unavailable(req.variant)
+    if detail:
+        raise HTTPException(503, detail)
 
     models = store.models(req.variant)
     with _inference_slots:

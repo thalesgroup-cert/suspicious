@@ -15,7 +15,7 @@ pytest.importorskip("httpx")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from inference_server import server  # noqa: E402
-from test_inference_server import FakeVectorizer, write_models  # noqa: E402
+from test_inference_server import BODY, FakeVectorizer, write_models  # noqa: E402
 
 TOKEN = "s3cret-test-token"
 
@@ -114,3 +114,64 @@ def test_metadata_with_token(client, token_env):
     assert body["name"] == "ai_mail"
     assert body["versions"]["active"] == {"id": "v0", "preprocessing": "legacy-first128",
                                           "campaign_embedding_version": "cmp-e1", "calibrated": False}
+
+
+# --- classify (version 0) -----------------------------------------------------------
+
+
+def post_v2(client, headers, body=BODY, versions=("active",), raw=False):
+    resp = client.post("/v2/models/ai_mail/classify",
+                       json={"mail_body": body, "versions": list(versions)}, headers=headers)
+    return resp if raw else resp.json()
+
+
+def test_v2_classify_matches_the_legacy_endpoint(client, token_env):
+    legacy = client.post("/classify", json={"mail_body": BODY}).json()
+    new = client.post("/v2/models/ai_mail/classify",
+                      json={"mail_body": BODY, "versions": ["active"]}, headers=token_env).json()
+    r = new["results"]["active"]
+    assert r["class"] == legacy["classification"] and r["score"] == float(legacy["malscore"])
+    assert r["confidence"] == float(legacy["confidence"]) and r["sub_class"] == legacy["sub_classification"]
+    assert r["sub_class_confidence"] == float(legacy["sub_classification_confidence"])
+    assert r["probabilities"] == legacy["classification_breakdown"]
+    assert r["sub_probabilities"] == legacy["sub_classification_breakdown"]
+    assert r["contributing_phrases"] == legacy["contributing_phrases"]
+    assert new["campaign_embedding"] == legacy["email_embedding"]
+    assert new["campaign_embedding_version"] == "cmp-e1"
+    assert isinstance(new["latency_ms"], int) and new["latency_ms"] >= 0
+
+
+def test_v0_has_no_tier_and_no_similar_cases(client, token_env):
+    r = post_v2(client, token_env)["results"]["active"]
+    assert r["tier"] is None and r["similar_cases"] == [] and r["version"] == "v0"
+
+
+def test_unknown_version_is_400(client, token_env):
+    assert post_v2(client, token_env, versions=["shadow"], raw=True).status_code == 400
+    assert post_v2(client, token_env, versions=["active", "shadow"], raw=True).status_code == 400
+
+
+def test_classify_is_401_without_a_token(client, token_env):
+    resp = client.post("/v2/models/ai_mail/classify", json={"mail_body": BODY, "versions": ["active"]})
+    assert resp.status_code == 401
+
+
+def test_a_body_far_over_max_chars_is_truncated_not_rejected(client, token_env):
+    FakeVectorizer.reset()
+    assert post_v2(client, token_env, body="x " * server.MAX_MAIL_CHARS, raw=True).status_code == 200
+    assert FakeVectorizer.max_len_seen <= server.MAX_MAIL_CHARS
+
+
+def test_503_when_models_are_missing(client_without_models, token_env):
+    legacy = client_without_models.post("/classify", json={"mail_body": BODY})
+    resp = post_v2(client_without_models, token_env, raw=True)
+    assert resp.status_code == 503
+    assert resp.json() == legacy.json()  # the legacy detail text, verbatim
+
+
+def test_503_when_the_vectorizer_is_missing(client, token_env, monkeypatch):
+    monkeypatch.setattr(server.store, "vectorizer", None)
+    monkeypatch.setattr(server.store, "vectorizer_error", "boom")
+    resp = post_v2(client, token_env, raw=True)
+    assert resp.status_code == 503
+    assert resp.json() == {"detail": "Vectorizer unavailable: boom"}

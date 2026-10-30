@@ -1,6 +1,9 @@
 """Token-protected /v2 API, mounted beside the legacy /classify (untouched)."""
-from fastapi import APIRouter, Depends
+import time
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from .auth import require_token
 
@@ -13,9 +16,14 @@ ACTIVE_VERSION = {
 }
 
 
+class ClassifyRequest(BaseModel):
+    mail_body: str
+    versions: list[str] = ["active"]
+
+
 def make_v2_router(*, store, classify, slots, max_chars) -> APIRouter:
-    """classify, slots and max_chars are for the classify route added next;
-    taking them here keeps server.py's wiring call stable."""
+    """classify is the legacy server._classify(models, mail_body) dict-returning
+    function; slots is the concurrency semaphore shared with the legacy route."""
     router = APIRouter(prefix="/v2")
 
     @router.get("/health/live")
@@ -30,5 +38,37 @@ def make_v2_router(*, store, classify, slots, max_chars) -> APIRouter:
     @router.get("/models/ai_mail", dependencies=[Depends(require_token)])
     def metadata():
         return {"name": "ai_mail", "versions": {"active": ACTIVE_VERSION}}
+
+    @router.post("/models/ai_mail/classify", dependencies=[Depends(require_token)])
+    def classify_mail(req: ClassifyRequest):
+        # Only the active version exists until the registry lands.
+        if req.versions != ["active"]:
+            raise HTTPException(400, f"Unsupported versions {req.versions!r}, expected ['active']")
+        detail = store.unavailable("personal")
+        if detail:
+            raise HTTPException(503, detail)
+
+        models = store.models("personal")
+        started = time.perf_counter()
+        with slots:
+            legacy = classify(models, req.mail_body[:max_chars])
+        return {
+            "results": {"active": {
+                "version": ACTIVE_VERSION["id"],
+                "class": legacy["classification"],
+                "score": float(legacy["malscore"]),
+                "confidence": float(legacy["confidence"]),
+                "probabilities": legacy["classification_breakdown"],
+                "sub_class": legacy["sub_classification"],
+                "sub_class_confidence": float(legacy["sub_classification_confidence"]),
+                "sub_probabilities": legacy["sub_classification_breakdown"],
+                "contributing_phrases": legacy["contributing_phrases"],
+                "tier": None,
+                "similar_cases": [],
+            }},
+            "campaign_embedding": legacy["email_embedding"],
+            "campaign_embedding_version": ACTIVE_VERSION["campaign_embedding_version"],
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+        }
 
     return router
