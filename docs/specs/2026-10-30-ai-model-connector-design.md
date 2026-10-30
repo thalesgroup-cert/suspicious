@@ -347,8 +347,8 @@ Stored results of earlier cases are not recomputed.
 **Today.** At finalisation `reconcile_case_core` calls `case_handler.campaigns.run_for_case`.
 Detection finds the AI analyzer's report by its analyzer name (prefix `AI_Mail`) and reads the score,
 confidence, class, sub-class, the mail embedding, the mail text and the decoded headers from it.
-Every analysed mail goes into the rolling `suspicious` similarity collection in ChromaDB (the
-existing `chromadb` connector deletes items older than 15 days). For a mail scored above 6.5, which
+Every analysed mail goes into the rolling `suspicious_mails` similarity collection in ChromaDB
+(cosine space; the existing `chromadb` connector deletes items older than 15 days). For a mail scored above 6.5, which
 means Dangerous, detection asks the collection for the 20 nearest Dangerous mails. Three or more
 within cosine distance 0.25 make a `Campaign`, or join an existing one; the documents are tagged
 with the campaign reference and `campaign_updated` is emitted. The TheHive connector turns that
@@ -381,6 +381,12 @@ alerts. D10 requires that this keeps working.
   versioned with the model, labelled mails only. They are not the campaign collection.
 - No new alert types. The challenge alert and the push button are unchanged and keep reading the AI
   classification from the case fields.
+
+**Check before relying on the 15-day window.** Detection writes to `suspicious_mails` (hard-coded
+in `get_suspicious_collection`), while the cleanup connector defaults to a collection named
+`suspicious` unless its own config sets `collection_name`. The example settings set it to
+`suspicious_mails` for the Campaigns API only. If the cleanup connector's config does not, its
+nightly run fails and old documents are never removed. Verify on each deployment.
 
 **Acceptance.** Replaying a recent real campaign through the new path gives the same campaign
 membership and the same `campaign_updated` payload as the Cortex path did, and the TheHive alert is
