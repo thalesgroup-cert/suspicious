@@ -1,0 +1,543 @@
+# AI Model Connector: Design
+
+Status: draft for approval. Nothing in this document is built. Marks used below:
+**Decided** is the owner's decision; **Call** is a choice made while writing, listed again in
+[Calls made in this document](#calls-made-in-this-document) so it can be reversed.
+
+## Context
+
+The AI mail analyzer classifies a mail body as Safe, Unwanted or Dangerous and, for Dangerous and
+Unwanted mails, a sub-type. Today it runs as a Cortex analyzer (`AI_Mail_Analyzer`) that is a thin
+HTTP client to a separate model server (`ai_inference`). Retraining is a set of scripts under
+`Analyzers/AIMailAnalyzer/retrain_model_monthly/` that nobody schedules, and the weights are
+git-ignored and copied around by hand.
+
+What the owner wants: simplify and improve the analyzer and its server so that training and
+retraining become a module of Suspicious, a connector, not a Cortex job. An admin can launch a
+retrain from Suspicious, on demand or on a schedule, and sees what the model is, how old it is and
+how it behaves.
+
+Measurements on the existing labelled data (505 mails) and on 269 production challenged cases
+show three problems this design has to fix, not just move:
+
+1. The reported test scores are inflated. About half the mails have a near-identical twin, and the
+   random train/test split puts twins on both sides.
+2. The confidence is not usable. The model reports 96-98% on average while being right 78-80% of
+   the time on unseen groups.
+3. The current production answer barely predicts what analysts decide on challenged mails.
+
+The evidence is in [Evidence](#evidence). Its limits are stated there.
+
+## Goals
+
+- Run the AI step as an `ai_model` connector. The Cortex AI job, its image and the hard-coded
+  gateway address go away.
+- An admin starts a retrain from Settings, or schedules it. Retraining is one code path.
+- A retrained model is checked on data it has not seen, runs in shadow on live mail, and goes live
+  only when an admin promotes it. Rollback is one click.
+- Confidence is calibrated and shown as High, Medium or Low, with the meaning of each level.
+- Labels come from the analysts' existing process (review folders, verdict edits, challenges) and
+  are recorded in a ledger with provenance.
+- The AI result has its own section in the case view, shown only while the module is enabled.
+- Failure of the model server never blocks a case for long and never fakes a result.
+
+## Non-goals
+
+- No automatic promotion. No retraining on every verdict edit.
+- No change to scoring weights or to how the engine combines votes.
+- No Cortex or allow-list results as inputs to the model (see [Evidence](#evidence), E5).
+- No public corpora in training. They are used only as an optional check.
+- No sender, subject or link features in the model in v1. The ledger records them so a later
+  version can use them without a backfill.
+- No SetFit, no local language-model triage, no per-user models.
+- No external services: everything runs locally on CPU hosts.
+
+## Anti-goals
+
+- A model that looks sure and is wrong. Uncalibrated numbers must not reach the screen.
+- A silent change of verdicts. A new model never counts before it has run in shadow.
+- Labels an attacker can write. The ledger has to survive someone filing a mail in the wrong folder.
+- A second retrain path. Scripts, notebooks and the connector must not drift apart.
+
+## Decisions
+
+| # | Decision |
+|---|---|
+| D1 | **Decided.** Full connector in v1; the Cortex `AI_Mail_Analyzer` job is removed. |
+| D2 | **Decided.** A button in Suspicious launches a retrain, on demand or scheduled. |
+| D3 | **Decided.** Both label sources are used, with provenance: analyst-filed review folders and Suspicious verdicts and challenges. Labels are read on the connector's own schedule. |
+| D4 | **Decided.** The AI result has its own section in the case view; it is not rendered when the module is disabled. |
+| D5 | **Decided.** Confidence is shown as High, Medium or Low, not as a percentage. |
+| D6 | **Decided.** A passing candidate waits for an admin to promote it. |
+| D7 | **Decided.** A candidate runs in shadow on live mail before it can be promoted. |
+| D8 | **Decided.** v1 shows similar past cases as a hint. The hint itself does not change a verdict. The promoted model's answer does feed the AI score. |
+| D9 | **Decided.** No Cortex results as model inputs in v1. v1 shows a deterministic cross-check instead. |
+
+Volumes given by the owner: about 2,550 mails analysed per month (about 85 a day) and 20 to 30
+challenged mails per month.
+
+## Design
+
+### Overview
+
+```
+IMAP review folders --nightly--> label ledger (DB) <--- Suspicious verdicts / challenges
+                                      |
+                  Retrain (button / schedule) --HTTP--> ai_inference (training job)
+                                      |                      |
+                              ModelVersion registry <-- bundle in object storage
+                                      |
+case pipeline --> analysis provider --> ai_inference /classify (active [+ shadow])
+                       |                              |
+              score_ai fields, ledger row      similar cases, tier, sub-type
+                       |
+                reconcile_case (unchanged) --> engine --> verdict
+```
+
+Four pieces: the **analysis-provider slot** in the case pipeline, the **`ai_model` connector**
+(settings, health, labels, retrain control), the **inference server** (classify, train, health),
+and the **UI** (case section, Settings card).
+
+### 1. The analysis-provider slot
+
+Connector events are notifications after the fact; none of them can return a result into scoring.
+The AI step needs one. This design adds a small extension point to the connector framework:
+
+- A connector may declare `provides = "mail_ai"`. At most one enabled connector provides each kind.
+- Where the pipeline launched the Cortex AI job (`CortexJob`, `cortex_and_job_management.py`),
+  it asks the registry for the `mail_ai` provider. If there is none, nothing is queued and the case
+  proceeds without an AI vote, as it does today when the AI job fails.
+- Queuing writes the same ledger row the webhook flow relies on (`CaseAnalyzerJob`, status
+  in-progress) for a virtual analyzer whose name is the configured AI analyzer name
+  (`cortex.analyzers.ai`). `reconcile_case_core` already waits for pending ledger rows, so the
+  case waits for the AI step exactly as it waits for a Cortex job. The analyzer's weight stays on
+  its `Analyzer` row in Settings.
+- A Celery task, `run_provider_analysis(case_id, kind)`, calls the connector, writes the result and
+  closes the ledger row, then enqueues `reconcile_case` as the webhook view does.
+
+**What gets written.** The same fields `manage_ai_jobs` writes today: `case.results_ai`,
+`score_ai`, `confidence_ai`, `category_ai`, and the `MailInfo` flags. A new field records the model
+version that produced the result. Everything that reads the AI result today must keep working:
+`collect_votes` (`AiSignal`), the `ai-classifier-decisive` explanation rule, the reconcile wait,
+and the existing analyzer card until the new section replaces it. Whether the result is also kept
+as an `AnalyzerReport` row is left to the builder, within that constraint.
+
+**Failure behaviour.**
+
+- One HTTP call to the model server with a total timeout of 20 seconds (**Call**).
+- Retry only on transient errors (connection, 5xx), at most 2 times, with exponential backoff and
+  jitter. A 4xx or "model not ready" answer is not retried.
+- After the last attempt, or immediately when the circuit breaker is open: `results_ai =
+  Inconclusive`, ledger row closed as failure, reason recorded. The case must not wait more than
+  about a minute for the AI step. `fail_stale_jobs` remains the backstop.
+- The existing connector circuit breaker is reused. Its state changes are logged and visible, and
+  an admin can reset it from the Settings card.
+- The task is idempotent: for a given case and model version it writes the same values again and
+  closes the same row. It is declared with `acks_late` and `reject_on_worker_lost`, so a killed
+  worker re-delivers it instead of dropping it.
+
+### 2. The inference server
+
+The existing FastAPI server (`Analyzers/AIMailAnalyzer/inference_server/`) becomes the only place
+that holds the encoder, the classifier heads and the training code. It already ships torch.
+
+**API** (shape borrowed from the Open Inference Protocol, not its tensor format):
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /v2/health/live`, `GET /v2/health/ready` | Liveness; readiness only when encoder and active bundle are loaded |
+| `GET /v2/models/ai_mail` | Metadata: active and shadow version, preprocessing version, encoder id, trained-at |
+| `POST /v2/models/ai_mail/classify` | Body plus the versions to score with (`active`, optionally `shadow`) |
+| `POST /v2/embed` | Embedding of a text under a named preprocessing version (used by label sync) |
+| `POST /v2/train`, `GET /v2/train/{id}`, `POST /v2/train/{id}/cancel` | Start, poll, cancel a training job |
+| `POST /v2/reload` | Load bundles named by the registry |
+
+**Authentication.** A bearer token from the connector config (stored in Vault). The server rejects
+requests without it. The host port on the Docker bridge gateway is dropped: Celery reaches the
+server by service name on the internal network, which removes the gateway-IP URL. Only the
+`ai_inference` service and Celery share that network.
+
+**Classify.** For each requested version the server returns the class probabilities after
+calibration, the tier, the sub-type with its probabilities, up to 5 similar past cases (case id,
+similarity, label, provenance), the version ids and the latency. The legacy `/classify` endpoint is
+removed with the Cortex job.
+
+**Input.** The model version names its preprocessing. v1 of the recipe reads the whole body in
+chunks of about 90 words (at most 8) and averages the chunk embeddings. The legacy preprocessing
+(first 128 tokens) stays available, because the imported legacy model needs it.
+
+**One text function.** The text the model sees must come from one function, used for live cases
+and for ledger mails alike, and its name goes into the preprocessing version. Today they differ:
+the Cortex job classifies the parsed body (`.txt`) from the mail archive, while the retrain scripts
+embed the `html2text` rendering (links kept, images dropped) of the text and HTML parts of the filed
+mail, and every figure in this document was measured on that second form. The builder first embeds
+the same mails both ways and measures the gap, then picks the canonical form. Version 0 keeps its
+legacy extraction so cutover stays neutral.
+
+**Resources.** CPU only. One training job at a time; a second request gets 409. Training uses a
+bounded number of torch threads and must not starve classify (builder to set limits).
+
+### 3. Model versions and the registry
+
+A **model version** is a bundle in object storage (existing `ObjectStore` layer, a bucket for
+models, prefix per version):
+
+| File | Content |
+|---|---|
+| `heads/*.pth` | The five heads: safe/unwanted split, spam/dangerous split, internal/external, spam/newsletter, phishing sub-type |
+| `calibration.json` | Temperature for the main decision and the tier cutoffs derived from held-out data |
+| `knn_index.npz` | Embeddings, label ids and case ids of the labelled mails used |
+| `manifest.json` | Version id, recipe id, preprocessing version, encoder id and hash, ledger snapshot digest, metrics and gate results, parent version, trainer revision |
+
+The DB registry (`ModelVersion`) holds status `candidate`, `shadow`, `active`, `previous` or
+`discarded`, a pointer to the bundle, who and what triggered the training, and the manifest.
+`active` and `shadow` are pointers that can be moved; every move writes an audit row (`ModelEvent`)
+with the user, the time and a note. Models for these tables live in a new Django app, `ai_model`,
+so its migrations are isolated (**Call**).
+
+**Version 0.** On first enable, the connector imports the weights that run in production today as
+version 0, with the legacy preprocessing and the legacy decision rule. Cutover therefore changes no
+verdict. Version 0 has no calibration, so its tier is computed by fitting a temperature on the
+ledger once enough labels exist; until then the UI shows "confidence not calibrated" for it.
+
+### 4. The label ledger
+
+One row per label observation, append-only. A correction adds a row that supersedes the old one.
+
+| Field | Notes |
+|---|---|
+| `message_id` | Normalised `Message-ID` header of the original mail, and its hash |
+| `case` | FK to the Suspicious case, null until matched |
+| `source` | `imap_folder`, `analyst_verdict`, `challenge` |
+| `source_ref` | Folder name and IMAP UID/UIDVALIDITY, or the user |
+| `label` | The 8-folder taxonomy value, with the derived Safe/Unwanted/Dangerous class |
+| `trust` | `folder` (filed by an analyst), `verdict` (edit in Suspicious), `proposal` (reporter, never trained on) |
+| `observed_at` | When the label was seen |
+| `embedding`, `preprocessing_version` | Vector computed by the model server |
+| `snapshot` | Sender domain (from the stored headers), subject length, link domains, SPF/DKIM/DMARC, Cortex band per analyzer, allow/deny hits, the AI answer at that time. Not used in v1 |
+| `status` | `active`, `superseded`, `flagged` |
+| `flag_reason` | For example `folder_verdict_mismatch`, `duplicate` |
+
+**Sync.** A scheduled sync (nightly, **Call**) reads the 8 review folders read-only, opens the
+forwarded `message/rfc822` attachment, extracts its `Message-ID` header, and matches it to the
+`Message-ID` in the stored mail headers (`Mail.mail_header`). `Mail.mail_id` cannot be used: it is
+the feeder's generated id, not the Message-ID (checked on the dev stack). A mail without a
+Message-ID is matched on sender, date and subject; the builder details that. The first run
+backfills the whole history. Verdict rows come from cases an analyst edited (`last_update_by` set),
+recorded when the edit happens.
+
+**Precedence.** The folder is the label of record and the only source the model trains on. The
+verdict and the challenge are provenance, used for cross-checks and shadow comparisons (**Call**).
+Only a hard conflict counts as a mismatch: a Dangerous folder against a Safe verdict, or a Safe
+folder against a Dangerous verdict. A mismatch sets `flagged` and keeps the row out of training
+until an admin resolves it in Settings (**Call**). The folder taxonomy has 8 values and the
+analyst verdict has 4, so a Suspicious verdict is never converted into a training label.
+
+**Poisoning controls** (the feedback loop is an attack surface):
+
+- Folder labels exist only if the mail sits in a folder of the review mailbox; access to that
+  mailbox is the control. Verdict labels exist only through the investigator-only verdict API.
+- Every row, resolution and promotion is audited.
+- Near-duplicate mails count once in training and evaluation (see the gate).
+- The Settings card shows the label mix and warns when one source or one class jumps.
+
+The ledger stores an embedding, not the mail text. Re-embedding under a new preprocessing version
+re-fetches the mail by its stored locator.
+
+### 5. Retraining
+
+**Trigger.** A button and a schedule on the Settings card (default monthly, **Call**), both
+admin-only. The request starts a Celery task that calls `POST /v2/train` and then polls with short
+tasks; no Celery task runs for the length of the training, so the broker's visibility timeout
+never redelivers it. Training itself runs in the `ai_inference` image.
+
+**Recipe** (what the evidence supports):
+
+- Inputs: all `active` ledger rows with trust `folder` or `verdict`, embedded under the recipe's
+  preprocessing version.
+- Heads: the existing `ResNetMLP`, same hyper-parameters (30 epochs, Adam 1e-3), **class weights
+  only**. No SMOTE, no random oversampling.
+- Main decision: the mean of the calibrated probabilities of the head hierarchy and of a 5-nearest-
+  neighbour vote over the labelled embeddings (cosine, distance-weighted). Sub-types come from
+  the heads.
+- Calibration: one temperature fitted on predictions for groups the model did not train on.
+- Tier cutoffs: chosen on the same held-out predictions so the High tier meets a precision target.
+
+**Groups.** Mails whose embeddings have cosine similarity of 0.95 or more are one group (connected
+components). Splits, calibration and the shadow comparison never separate a group. The threshold
+was checked on the legacy embedding space; chunk-averaged embeddings are more similar to each
+other, so the builder re-checks it (random-split versus grouped-split accuracy should still
+differ). A live case that is already in the ledger, for example after "Redo analysis", is excluded
+from its own neighbour list.
+
+**Cost.** In the test bed, the repeated grouped evaluation took about 10 minutes on 10 cores and a
+final fit about a minute. The gate runs 3 repeats by default (**Call**); the builder measures it on
+the production host.
+
+**The gate (offline checks).** A candidate is eligible for shadow only if, on held-out groups
+(5-fold, repeated), all of these hold. The comparison baseline is the active version's recipe
+retrained on the same folds, because the active weights may have seen those mails (version 0 did):
+
+1. Dangerous mails called Safe: the rate is not above the baseline's rate on the same folds,
+   plus a small tolerance (**Call**).
+2. Macro-F1 on the three classes is not more than 0.02 below the baseline's.
+3. Calibration error is below 0.12 (**Call**).
+4. Every head has at least 8 samples in every class. A head that cannot train fails the whole
+   candidate; nothing is silently skipped (**Call**, a change from today's behaviour).
+5. The High tier is right at least 90% of the time (**Call**).
+
+The report stores per-class results with Wilson intervals, the confusion matrix, the tier table and
+the comparison with the active model. Optionally, an admin-supplied check set of recent public
+phishing (see Evidence, E6) can add a recall floor; it is off by default.
+
+**Failure.** A failed or cancelled job leaves the active model untouched and records why.
+
+### 6. Shadow mode
+
+A candidate that passes the gate becomes `shadow`. From then on, every new mail case is scored by
+the active and the shadow version in one classify call. The shadow answer is stored (`ShadowResult`)
+and never reaches `score_ai` or the engine. A shadow failure or timeout is logged and ignored, with
+a shorter timeout than the real one.
+
+Each stored shadow result also records the verdict the case would have received had the shadow
+model's answer been the AI vote. The engine is pure (`score_process/scoring/engine.py`), so this is
+a recomputation on the stored votes. Verdict flips matter more than class flips, because the
+retrained model's confidence is calibrated and will not look like the legacy numbers (see
+[Risks](#risks)).
+
+**Promotion conditions** (all **Call**; an admin can extend the shadow period):
+
+- At least 7 days and at least 500 mails scored. At about 85 mails a day this is about a week.
+- Every Safe-to-Dangerous or Dangerous-to-Safe flip of the case verdict has been reviewed by an
+  admin, with a note.
+- The gate still passes when re-run with the labels that arrived during shadow.
+
+Shadow shows agreement, the table of differences, and which version was closer when the case has an
+analyst verdict. At the owner's volume only about six cases a week have one, so most of the
+evidence is the reviewed differences, not an accuracy figure.
+
+**Promote** moves the `active` pointer to the shadow version, keeps the old one as `previous`, and
+tells the inference server to reload. **Rollback** moves it back. Both are admin-only and audited.
+Stored results of earlier cases are not recomputed.
+
+### 7. User interface
+
+**Case section ("AI model assessment").** Replaces the one-line AI caption in the submission drawer
+(`OverviewTab`) and the investigation overview. It is not rendered when the module is disabled.
+Content: the class and sub-type; the confidence as High, Medium or Low with its meaning; the
+runner-up class when the tier is Low; the model version and age; the similar past cases with
+their label and provenance (shown only for cases the viewer may already open); a short statement of
+what the model reads (the body only) and does not read; and the **cross-check**: the other evidence in plain facts, built from the existing verdict
+explanation (decisive rule, sources, allow/deny hits, flagged links), with an "AI disagrees with the
+evidence" flag when they conflict. No numeric confidence is shown. Cases analysed while the module
+was on keep their stored section, read-only and labelled with the version; with the module off they
+are hidden too (**Call**).
+
+**Settings "AI model" card.** Admin-only and hidden when disabled. It shows: server health and
+breaker state with a reset; the active version, age, label counts by class and source; the
+schedule and the Retrain button; the latest candidate and its gate results; the shadow comparison
+and the review list; the version history with rollback; the label ledger summary and the list of
+flagged labels. A queue lists mails where the AI and the other evidence disagree, as candidates for
+review and labelling.
+
+**Connector gallery.** The standard card (enabled, configuration, health, last sync). It shows a
+read-only line pointing to the AI model card (**Call**).
+
+**API.** Read endpoints for status, versions, candidate, shadow comparison, ledger summary; write
+endpoints for retrain, promote, discard, rollback, extend shadow, review a flip, resolve a flag.
+Writes are admin-only, reads Admin and CISO (**Call**).
+
+### 8. Confidence tiers and scoring
+
+The tier comes from the calibrated probability of the predicted class with cutoffs stored in the
+bundle. The illustrative starting points, from the evidence, are High at 0.85 and above, Medium from
+0.60, Low below. The tier is shown to people; the engine keeps receiving numbers.
+
+`confidence_ai` and `score_ai` are produced from the calibrated probability using the existing
+mapping (Safe 0-5, Unwanted 5-6.5, Dangerous 6.5-10, linear in confidence) (**Call**). Because the
+legacy confidence is inflated and the calibrated one is not, the same mail will have a lower
+`confidence_ai` than before. The builder must measure the engine's sensitivity to this (see Risks).
+
+### 9. Health and observability
+
+- Connector `health_check`: server ready, active bundle loaded, token accepted.
+- The circuit breaker logs and exposes state changes; an open breaker is a visible state.
+- Metrics: classify latency and error rate, shadow agreement, label counts per source, model age
+  with a warning at 60 days (**Call**).
+- No mail content in logs.
+
+### 10. Migration and rollout
+
+1. Publish an `ai_inference` image that holds no classifier weights. Bundles come from object
+   storage. The encoder is baked in at build time or mounted (see Assumptions).
+2. Deploy with the connector disabled. Enable it: version 0 is imported from the weights directory
+   the current `ai_inference` service mounts (a path in the connector config), and the provider slot
+   takes over the AI step. Acceptance: on a sample of recent cases version 0 returns the same class
+   and score as the Cortex job did. An instance that never enables the connector runs without an AI
+   vote, as an instance with the AI job failing does today.
+3. Remove the Cortex `AI_Mail_Analyzer` (catalog entry, thin-client image and its client script),
+   the AI launch and `manage_ai_jobs` in the cortex_job code, the gateway-IP URL setting, and
+   update `docs/components/analyzers.md`, `docs/components/backend/connectors.md` and `CLAUDE.md`.
+   This is done in the same release as step 2 (D1).
+4. Run the label backfill, then the first retrain, shadow, review, promote.
+
+Archiving the old `retrain model monthly/` data and the large local vectorizer directories before
+deleting them is a separate task for the owner, not part of this design.
+
+## Evidence
+
+All numbers come from a throwaway test bed (scripts kept in `~/ai-experiment/testbed/`, outside the
+repository), run on the 505 labelled mails and on a read-only export of 269 production challenged
+cases. They are the basis for the recipe and the gate; the builder re-runs them.
+
+**E1. Near-duplicates inflate scores.** 55% of mails have a twin at cosine 0.97 or higher; 94.6% of
+those twins share the label. 263 independent groups for 505 mails. The production recipe on the real
+`ResNetMLP`, 5 seeds, 5 folds: accuracy 0.889 on a random split and 0.777 on a split by group;
+Dangerous mails called Safe 11.6 versus 32 of 241.
+
+**E2. Rebalancing.** `smote_ros` scales every class by the same factor, so only the class weights
+rebalance. Class weights alone: accuracy 0.798 and 18 ± 2 Dangerous called Safe, against 32 ± 11.5
+with the production recipe.
+
+**E3. Confidence.** Mean confidence 0.96-0.98 against accuracy 0.78-0.80. A single temperature
+(about 5), fitted on half the groups and scored on the other half, takes calibration error from
+0.17-0.20 to 0.09-0.10. After scaling, High (0.85 and above) covers about 40% of mails and is right
+95% of the time; Medium about 40% and about 75%; Low about 20% and 43-51%.
+
+**E4. Structure and input** (grouped, held-out halves, accuracy / Dangerous called Safe):
+
+| Setup | Result |
+|---|---|
+| Five heads, first 128 tokens, class weights | 0.794 / 7.6% |
+| Five heads, whole body in chunks | 0.828 / 8.5% |
+| One single three-class head | 0.752 / 43.6 of 241 (raw) |
+| Logistic regression | 0.728-0.760 |
+| 5-nearest-neighbour vote, whole body in chunks | 0.861 / 4.0% |
+| Blend of heads and neighbour vote, whole body in chunks | 0.861 / 4.7%, High tier 54% of mails right 95% |
+
+The sub-heads still earn their place: phishing sub-type 0.657 (heads) against 0.583 (neighbours);
+newsletter recall 0.60 against 0.22. Stripping markup helped the heads and slightly hurt the
+neighbour vote, so it is not part of the recipe. The top rows are within noise of each other, and the
+variant was chosen on the same data, so the figures are slightly optimistic.
+
+**E5. More information.** Link structure and domain names alone reach 0.791; added to the text blend
+they leave accuracy unchanged and lower Dangerous called Safe from 4.7% to 2.6%. On 187
+analyst-edited production cases, against analyst verdicts: the stored AI answer has AUC 0.58 for
+"Dangerous" (precision 0.39, recall 0.13 as a rule); adding Cortex and list features gives 0.66
+(difference +0.07, 95% interval -0.02 to +0.17); for "not Safe", header and link features raise
+0.55 to 0.66-0.69 (+0.13, interval +0.04 to +0.22). On the later 54 cases, Cortex features alone
+reach 0.81 and the AI alone 0.45. On the 66 cases whose verdict the engine set, the AI alone
+predicts it at 0.86, so any test against engine verdicts is circular. Caveats: challenged cases are
+a selected, hard subset; the baseline is a weak production model; analysts saw the same Cortex
+reports; many variants were compared. Hence D9.
+
+**E6. Public corpora.** Apache SpamAssassin public corpus (2003-05, English) and the Nazario
+phishing corpus 2023-25 (CC BY 4.0). A model trained on the labelled mails puts 83-84% of the
+recent Nazario phishing in Dangerous but only 45-47% of old SpamAssassin ham in Safe, while
+reporting 0.92-0.97 confidence. Trained on public data alone it scores 0.54 on the labelled mails.
+Adding 150 or 600 public mails per class to training gave no reliable gain (0.80, 0.79, 0.75).
+Public data is therefore a stress test, not training data. The SpamAssassin maintainers ask that
+the messages never be sent into a live mail system.
+
+**E7. Data facts that shape the ledger.** `Mail.mail_from` is blank on 254 of 269 production
+challenged cases; the sender must be parsed from the stored headers (`Mail.mail_header`, stored as
+the repr of a dict, which also holds the real `Message-ID`; `Mail.mail_id` is a generated id). `Case.results` is overwritten on an analyst edit with no history; the only
+markers are `last_update_by`, `final_score` and `final_confidence`. Authentication-Results headers
+are present on about a third of reported mails.
+
+### Sources
+
+Google, MLOps continuous delivery and automation pipelines (levels, validation, rollback); Google,
+Rules of Machine Learning; MLflow Model Registry (aliases); NIST AI RMF; OWASP ML08 Model Skewing;
+scikit-learn (grouped and time-aware cross-validation, calibration); Microsoft HAX guidelines;
+Google PAIR, Explainability and Trust; KServe Open Inference Protocol; Azure circuit-breaker
+pattern; Celery task and Redis broker documentation; SetFit documentation; Guo et al., On
+Calibration of Modern Neural Networks; imbalanced-learn common pitfalls; Google Machine Learning
+Crash Course (imbalanced data, dividing datasets); the `paraphrase-multilingual-mpnet-base-v2`
+model card (128-token limit). Datasets: Apache SpamAssassin public corpus; Nazario phishing corpus.
+
+## Assumptions to confirm
+
+- The Suspicious Celery worker can reach the review mailbox over IMAPS, as the email feeder can. If
+  it cannot, the label sync runs from the feeder side and posts labels to an API; the ledger and
+  the rest are unchanged.
+- The `ai_inference` image can fetch the `paraphrase-multilingual-mpnet-base-v2` encoder from its
+  official Hugging Face repository at build time. If the build hosts are offline, the encoder is a
+  mounted file, as the weights directory is today.
+
+## Risks
+
+- **Train/serve skew in the text.** If the live text form differs from the one the model trained on,
+  live results will be worse than the figures here. See "One text function".
+- **Engine sensitivity to calibrated confidence.** The engine compares `ai.confidence` with the base
+  confidence and applies `CONF_FLOOR`. Lower, honest confidences may change which signal decides.
+  Shadow records would-be verdicts to measure this before promotion; the builder should also replay
+  recent cases through the engine offline before the first promotion.
+- **Small data.** 505 labels, 263 independent groups, 20 to 30 new labels a month. Retrains change
+  little, which is why the gate is conservative and promotion is manual. Intervals on any figure in
+  this document are wide.
+- **Feedback loop.** Verdict labels come from analysts who read the same Cortex output as the
+  engine. Gains from learning on them partly mean imitating that output.
+- **First-class heads with few samples.** Newsletter (10 labelled mails) and whaling and blackmail
+  (about 18 each) are barely learnable; sub-type output is advisory.
+- **Operations.** Training and classify share the `ai_inference` host. Resource limits and
+  scheduling keep a monthly training from slowing live classification.
+- **Redis visibility timeout** (default one hour) redelivers tasks that run longer. The design keeps
+  every Celery task short for that reason.
+
+## Test approach
+
+- Unit: provider contract and failure paths; ledger matching and supersession; group assignment;
+  gate arithmetic; tier derivation; score mapping; permission checks.
+- Integration (dev stack with a fake inference server): idempotent redelivery; breaker open gives
+  Inconclusive within the time limit; a shadow failure never changes a case; promote and rollback
+  are atomic and audited; the Cortex job is not launched.
+- Evaluation regression: re-run the grouped evaluation on the 505-mail dataset and require the
+  recipe to reproduce the reported figures within seed noise (grouped accuracy about 0.85 or
+  better, Dangerous called Safe about 5% or lower). It needs torch and the encoder, so it runs as a
+  separate manual or scheduled job, not in the default CI. The default CI uses a fake inference
+  server.
+- UI: the section is absent when the module is disabled; tiers and cross-check render; admin-only
+  controls hidden from others; Playwright path through retrain, shadow, promote.
+- Chaos: stop the inference container mid-case and during training.
+
+## Left to the builder
+
+Table and column names, URL shapes, exact layout and copy, the number of neighbours (3 or 5; the
+data does not separate them) and tier cutoffs after re-running the evaluation, container resource
+limits, how to compute groups efficiently as the ledger grows, whether the AI result also stays an
+`AnalyzerReport`, how version 0's tier is shown, the bucket name, and the packaging of the
+`ai_inference` image.
+
+## Deferred
+
+Sender, subject and link features in the model (E5 shows link domains help); learning analyzer
+reliability from analyst-edited verdicts, which may be a better use of Cortex data than feeding it
+to the text model; SetFit; automatic promotion; an active-learning queue beyond the simple
+disagreement list; re-testing Cortex-as-input once about 300 edited labels with snapshots exist.
+
+## Calls made in this document
+
+| # | Call | Why |
+|---|---|---|
+| C1 | 20 s total timeout, 2 retries on transient errors only | Keeps a case from waiting; matches the breaker guidance |
+| C2 | New Django app `ai_model` for the tables | Isolated migrations, removable |
+| C3 | Nightly label sync; monthly default retrain | Volume is low; labels arrive slowly |
+| C4 | A folder-versus-verdict mismatch is flagged and kept out of training | Cheapest guard against a mislabelled mail |
+| C5 | Gate thresholds: no more Dangerous-called-Safe than the active model, macro-F1 within 0.02, calibration error below 0.12, High tier at least 90% right | Taken from the test bed; tune on re-run |
+| C6 | A head that cannot train fails the whole candidate | Today a failed head is skipped silently |
+| C7 | Shadow minimum 7 days and 500 mails; every verdict flip reviewed; gate re-run | At 85 mails a day this is about a week |
+| C8 | Any admin reviews flips; writes admin-only; reads Admin and CISO | Existing roles |
+| C9 | Tier cutoffs 0.85 and 0.60, stored per version | Illustrative, from E3 |
+| C10 | Existing score mapping applied to the calibrated confidence | Keeps the engine interface unchanged |
+| C11 | Model age warning at 60 days | Arbitrary; a staleness alert is the point |
+| C12 | With the module off, old cases' AI section is hidden too | Matches D4 literally; easy to flip |
+| C13 | Connector card shows a read-only line pointing to the AI model card | One home for controls |
+| C14 | Markup stripping is not in the recipe | Mixed result in E4 |
+| C15 | Version 0 imported from current weights so cutover changes no verdict | Safest cutover |
+| C16 | Cortex job removed in the same release as the provider (D1) | Avoids two AI paths |
+| C17 | Only folder labels train; verdicts and challenges are provenance and cross-checks | The verdict has 4 values, the folders 8; every challenged mail is also filed in a folder |
+| C18 | Only hard conflicts (Dangerous against Safe) flag a label | Spam and newsletters are judged Safe or Suspicious by different analysts |
+| C19 | Gate baseline is the active recipe retrained on the same folds | The active weights may have seen the held-out mails |
+| C20 | Gate runs 3 repeats by default | Keeps a retrain to minutes, not hours |
+| C21 | Similar past cases are shown only for cases the viewer may already open | Respects existing access rules |
