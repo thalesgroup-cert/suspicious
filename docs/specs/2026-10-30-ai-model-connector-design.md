@@ -28,6 +28,12 @@ show three problems this design has to fix, not just move:
 
 The evidence is in [Evidence](#evidence). Its limits are stated there.
 
+The AI analyzer is also the input of the phishing-campaign detection: at finalisation, campaign
+detection reads the analyzer's report (score, class, embedding, mail text), groups similar
+Dangerous mails into a campaign and emits the event that makes the TheHive connector raise a
+phishing-campaign alert. Removing the Cortex job without carrying that over would stop campaigns and
+those alerts silently. See section 7.
+
 ## Goals
 
 - Run the AI step as an `ai_model` connector. The Cortex AI job, its image and the hard-coded
@@ -40,6 +46,8 @@ The evidence is in [Evidence](#evidence). Its limits are stated there.
   are recorded in a ledger with provenance.
 - The AI result has its own section in the case view, shown only while the module is enabled.
 - Failure of the model server never blocks a case for long and never fakes a result.
+- Phishing-campaign detection and the TheHive phishing-campaign alert keep working with the same
+  behaviour, and belong to the connector.
 
 ## Non-goals
 
@@ -50,6 +58,8 @@ The evidence is in [Evidence](#evidence). Its limits are stated there.
 - No sender, subject or link features in the model in v1. The ledger records them so a later
   version can use them without a backfill.
 - No SetFit, no local language-model triage, no per-user models.
+- No new TheHive alert types. The campaign alert, the challenge alert and the push button keep their
+  current behaviour.
 - No external services: everything runs locally on CPU hosts.
 
 ## Anti-goals
@@ -72,6 +82,9 @@ The evidence is in [Evidence](#evidence). Its limits are stated there.
 | D7 | **Decided.** A candidate runs in shadow on live mail before it can be promoted. |
 | D8 | **Decided.** v1 shows similar past cases as a hint. The hint itself does not change a verdict. The promoted model's answer does feed the AI score. |
 | D9 | **Decided.** No Cortex results as model inputs in v1. v1 shows a deterministic cross-check instead. |
+| D10 | **Decided.** The phishing alert to TheHive that depends on the AI analyzer (campaign detection and its alert) moves to the connector and keeps working. |
+| D11 | **Decided.** The Celery worker can reach the review mailbox over IMAPS, as the email feeder does. |
+| D12 | **Decided.** The `ai_inference` image can download the encoder from Hugging Face at build time. |
 
 Volumes given by the owner: about 2,550 mails analysed per month (about 85 a day) and 20 to 30
 challenged mails per month.
@@ -89,14 +102,18 @@ IMAP review folders --nightly--> label ledger (DB) <--- Suspicious verdicts / ch
                                       |
 case pipeline --> analysis provider --> ai_inference /classify (active [+ shadow])
                        |                              |
-              score_ai fields, ledger row      similar cases, tier, sub-type
+          score_ai fields, AiAssessment      similar cases, tier, sub-type, campaign embedding
                        |
-                reconcile_case (unchanged) --> engine --> verdict
+                reconcile_case --> engine --> verdict --> case_finalised
+                                                              |
+                          ai_model connector: campaign detection (ChromaDB "suspicious")
+                                                              |
+                                  campaign_updated --> TheHive connector --> phishing alert
 ```
 
 Four pieces: the **analysis-provider slot** in the case pipeline, the **`ai_model` connector**
-(settings, health, labels, retrain control), the **inference server** (classify, train, health),
-and the **UI** (case section, Settings card).
+(settings, health, labels, retrain control, campaign detection), the **inference server** (classify,
+train, health), and the **UI** (case section, Settings card).
 
 ### 1. The analysis-provider slot
 
@@ -117,10 +134,13 @@ The AI step needs one. This design adds a small extension point to the connector
 
 **What gets written.** The same fields `manage_ai_jobs` writes today: `case.results_ai`,
 `score_ai`, `confidence_ai`, `category_ai`, and the `MailInfo` flags. A new field records the model
-version that produced the result. Everything that reads the AI result today must keep working:
-`collect_votes` (`AiSignal`), the `ai-classifier-decisive` explanation rule, the reconcile wait,
-and the existing analyzer card until the new section replaces it. Whether the result is also kept
-as an `AnalyzerReport` row is left to the builder, within that constraint.
+version that produced the result. A new per-case **AI assessment record** (`AiAssessment`, in the
+`ai_model` app) holds the rest: class and sub-class, calibrated probabilities, tier, the campaign
+embedding and the similar past cases. The UI section and campaign detection read it. Everything
+that reads the AI result today must keep working: `collect_votes` (`AiSignal`), the
+`ai-classifier-decisive` explanation rule, the reconcile wait, and the existing analyzer card until
+the new section replaces it. Whether the result is also kept as an `AnalyzerReport` row is left to
+the builder, within that constraint.
 
 **Failure behaviour.**
 
@@ -159,7 +179,9 @@ server by service name on the internal network, which removes the gateway-IP URL
 
 **Classify.** For each requested version the server returns the class probabilities after
 calibration, the tier, the sub-type with its probabilities, up to 5 similar past cases (case id,
-similarity, label, provenance), the version ids and the latency. The legacy `/classify` endpoint is
+similarity, label, provenance), the version ids and the latency. Once per call it also returns the
+**campaign embedding**, computed with a fixed preprocessing (first 128 tokens of the same encoder)
+that does not change with the classifier recipe (section 7). The legacy `/classify` endpoint is
 removed with the Cortex job.
 
 **Input.** The model version names its preprocessing. v1 of the recipe reads the whole body in
@@ -320,7 +342,52 @@ evidence is the reviewed differences, not an accuracy figure.
 tells the inference server to reload. **Rollback** moves it back. Both are admin-only and audited.
 Stored results of earlier cases are not recomputed.
 
-### 7. User interface
+### 7. Phishing campaigns and the TheHive alert
+
+**Today.** At finalisation `reconcile_case_core` calls `case_handler.campaigns.run_for_case`.
+Detection finds the AI analyzer's report by its analyzer name (prefix `AI_Mail`) and reads the score,
+confidence, class, sub-class, the mail embedding, the mail text and the decoded headers from it.
+Every analysed mail goes into the rolling `suspicious` similarity collection in ChromaDB (the
+existing `chromadb` connector deletes items older than 15 days). For a mail scored above 6.5, which
+means Dangerous, detection asks the collection for the 20 nearest Dangerous mails. Three or more
+within cosine distance 0.25 make a `Campaign`, or join an existing one; the documents are tagged
+with the campaign reference and `campaign_updated` is emitted. The TheHive connector turns that
+event into a phishing-campaign alert with observables, files and comments. Sender domains on the
+campaign allow-list are skipped.
+
+**The trap.** Detection is tied to the Cortex analyzer report. If the Cortex AI job is removed, the
+lookup finds nothing and detection stops without an error: no campaigns and no TheHive phishing
+alerts. D10 requires that this keeps working.
+
+**Design.**
+
+- Campaign detection moves into the `ai_model` connector. It subscribes to `case_finalised`, reads
+  the case's AI assessment record, runs the same logic (same collection, thresholds, allow-list,
+  lock, `Campaign` and `CampaignMember` rows) and emits `campaign_updated` itself (**Call**). The
+  call from `reconcile_case_core` is removed. The TheHive connector, the Campaigns page and the
+  15-day cleanup do not change. With the module disabled there is no detection, as there is none
+  today when the AI job is off.
+- The assessment record replaces the lookup of an analyzer report by name. The mail text and headers
+  come from the stored mail (`Mail.mail_body`, `Mail.mail_header`).
+- The campaign embedding is separate from the classifier's input. The server returns it with every
+  classify call, computed with the fixed preprocessing used today. When the classifier recipe moves
+  to whole-body chunks, the campaign embedding does not change, so new mails keep matching the
+  15-day window and the 0.25 threshold stays valid (**Call**). Changing the encoder or this
+  preprocessing is a separate migration: the window refills in 15 days or is re-embedded.
+- The check runs for a case whose AI class is Dangerous. That equals today's "score above 6.5" for a
+  Dangerous result (**Call**). Mails of other classes are still added to the collection, as today.
+- Shadow results never write to the collection and never emit campaign events.
+- The labelled neighbours behind the "similar past cases" hint are a different store: long-lived,
+  versioned with the model, labelled mails only. They are not the campaign collection.
+- No new alert types. The challenge alert and the push button are unchanged and keep reading the AI
+  classification from the case fields.
+
+**Acceptance.** Replaying a recent real campaign through the new path gives the same campaign
+membership and the same `campaign_updated` payload as the Cortex path did, and the TheHive alert is
+created (against a fake TheHive in tests). With the connector disabled, no detection runs and
+nothing else breaks.
+
+### 8. User interface
 
 **Case section ("AI model assessment").** Replaces the one-line AI caption in the submission drawer
 (`OverviewTab`) and the investigation overview. It is not rendered when the module is disabled.
@@ -347,18 +414,20 @@ read-only line pointing to the AI model card (**Call**).
 endpoints for retrain, promote, discard, rollback, extend shadow, review a flip, resolve a flag.
 Writes are admin-only, reads Admin and CISO (**Call**).
 
-### 8. Confidence tiers and scoring
+### 9. Confidence tiers and scoring
 
 The tier comes from the calibrated probability of the predicted class with cutoffs stored in the
 bundle. The illustrative starting points, from the evidence, are High at 0.85 and above, Medium from
 0.60, Low below. The tier is shown to people; the engine keeps receiving numbers.
 
-`confidence_ai` and `score_ai` are produced from the calibrated probability using the existing
-mapping (Safe 0-5, Unwanted 5-6.5, Dangerous 6.5-10, linear in confidence) (**Call**). Because the
+As today, a class is decided only when its calibrated probability is at least 0.5; below that the
+result is Inconclusive (**Call**). The builder measures how often that happens with calibrated
+numbers. `confidence_ai` and `score_ai` are produced from the calibrated probability using the
+existing mapping (Safe 0-5, Unwanted 5-6.5, Dangerous 6.5-10, linear in confidence) (**Call**). Because the
 legacy confidence is inflated and the calibrated one is not, the same mail will have a lower
 `confidence_ai` than before. The builder must measure the engine's sensitivity to this (see Risks).
 
-### 9. Health and observability
+### 10. Health and observability
 
 - Connector `health_check`: server ready, active bundle loaded, token accepted.
 - The circuit breaker logs and exposes state changes; an open breaker is a visible state.
@@ -366,19 +435,22 @@ legacy confidence is inflated and the calibrated one is not, the same mail will 
   with a warning at 60 days (**Call**).
 - No mail content in logs.
 
-### 10. Migration and rollout
+### 11. Migration and rollout
 
 1. Publish an `ai_inference` image that holds no classifier weights. Bundles come from object
-   storage. The encoder is baked in at build time or mounted (see Assumptions).
+   storage. The encoder is downloaded from its official Hugging Face repository at build time (D12).
 2. Deploy with the connector disabled. Enable it: version 0 is imported from the weights directory
    the current `ai_inference` service mounts (a path in the connector config), and the provider slot
    takes over the AI step. Acceptance: on a sample of recent cases version 0 returns the same class
    and score as the Cortex job did. An instance that never enables the connector runs without an AI
    vote, as an instance with the AI job failing does today.
 3. Remove the Cortex `AI_Mail_Analyzer` (catalog entry, thin-client image and its client script),
-   the AI launch and `manage_ai_jobs` in the cortex_job code, the gateway-IP URL setting, and
-   update `docs/components/analyzers.md`, `docs/components/backend/connectors.md` and `CLAUDE.md`.
-   This is done in the same release as step 2 (D1).
+   the AI launch and `manage_ai_jobs` in the cortex_job code, the call to
+   `case_handler.campaigns.run_for_case` in `reconcile_case_core` (campaign detection now runs in
+   the connector, section 7), the gateway-IP URL setting, and update
+   `docs/components/analyzers.md`, `docs/components/backend/connectors.md` and `CLAUDE.md`. This
+   is done in the same release as step 2 (D1). Campaign detection is verified in step 2 before the
+   Cortex path is removed.
 4. Run the label backfill, then the first retrain, shadow, review, promote.
 
 Archiving the old `retrain model monthly/` data and the large local vectorizer directories before
@@ -456,17 +528,11 @@ Calibration of Modern Neural Networks; imbalanced-learn common pitfalls; Google 
 Crash Course (imbalanced data, dividing datasets); the `paraphrase-multilingual-mpnet-base-v2`
 model card (128-token limit). Datasets: Apache SpamAssassin public corpus; Nazario phishing corpus.
 
-## Assumptions to confirm
-
-- The Suspicious Celery worker can reach the review mailbox over IMAPS, as the email feeder can. If
-  it cannot, the label sync runs from the feeder side and posts labels to an API; the ledger and
-  the rest are unchanged.
-- The `ai_inference` image can fetch the `paraphrase-multilingual-mpnet-base-v2` encoder from its
-  official Hugging Face repository at build time. If the build hosts are offline, the encoder is a
-  mounted file, as the weights directory is today.
-
 ## Risks
 
+- **Silent loss of phishing campaigns.** Campaign detection and the TheHive alert depend on the AI
+  analyzer today (section 7). The acceptance replay is the guard; it must run before the Cortex path
+  is removed.
 - **Train/serve skew in the text.** If the live text form differs from the one the model trained on,
   live results will be worse than the figures here. See "One text function".
 - **Engine sensitivity to calibrated confidence.** The engine compares `ai.confidence` with the base
@@ -499,6 +565,9 @@ model card (128-token limit). Datasets: Apache SpamAssassin public corpus; Nazar
   server.
 - UI: the section is absent when the module is disabled; tiers and cross-check render; admin-only
   controls hidden from others; Playwright path through retrain, shadow, promote.
+- Campaigns: replay a recent campaign and compare membership and the `campaign_updated` payload with
+  the Cortex path; a shadow result writes nothing to the collection; with the module disabled no
+  detection runs; the TheHive alert is created against a fake TheHive.
 - Chaos: stop the inference container mid-case and during training.
 
 ## Left to the builder
@@ -506,8 +575,9 @@ model card (128-token limit). Datasets: Apache SpamAssassin public corpus; Nazar
 Table and column names, URL shapes, exact layout and copy, the number of neighbours (3 or 5; the
 data does not separate them) and tier cutoffs after re-running the evaluation, container resource
 limits, how to compute groups efficiently as the ledger grows, whether the AI result also stays an
-`AnalyzerReport`, how version 0's tier is shown, the bucket name, and the packaging of the
-`ai_inference` image.
+`AnalyzerReport`, how version 0's tier is shown, the bucket name, the fields and indexes of `AiAssessment`, how the connector's `case_finalised`
+subscription keeps detection off the finalisation path, and the packaging of the `ai_inference`
+image.
 
 ## Deferred
 
@@ -541,3 +611,8 @@ disagreement list; re-testing Cortex-as-input once about 300 edited labels with 
 | C19 | Gate baseline is the active recipe retrained on the same folds | The active weights may have seen the held-out mails |
 | C20 | Gate runs 3 repeats by default | Keeps a retrain to minutes, not hours |
 | C21 | Similar past cases are shown only for cases the viewer may already open | Respects existing access rules |
+| C22 | Campaign detection runs in the connector on `case_finalised` and emits `campaign_updated` itself | D10 says the phishing alert part belongs to the connector; the TheHive connector stays unchanged |
+| C23 | The campaign check keys on the AI class being Dangerous, not on a score above 6.5 | The two are equivalent for a Dangerous result and the class survives recalibration |
+| C24 | The campaign embedding uses a fixed preprocessing, separate from the classifier's | Keeps the 15-day window and the 0.25 threshold valid when the recipe changes |
+| C25 | A class is decided only at a calibrated probability of at least 0.5, else Inconclusive | Same rule as today, applied to calibrated numbers |
+| C26 | A per-case `AiAssessment` record holds the full AI result | Campaign detection and the UI read one record instead of an analyzer report found by name |
