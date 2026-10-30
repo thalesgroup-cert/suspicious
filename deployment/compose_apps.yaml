@@ -302,6 +302,8 @@ services:
       - "${AI_INFERENCE_BIND:-172.17.0.1}:${AI_INFERENCE_PORT:-8090}:8090"
     environment:
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      # Bearer token for the /v2 API (used by the ai_model connector). Empty = /v2 answers 503.
+      AI_INFERENCE_TOKEN: "${AI_INFERENCE_TOKEN:-}"
     volumes:
       # Weights are bind-mounted (not baked into the image) so the retrain
       # pipeline can promote new ones in place; the server hot-reloads them.

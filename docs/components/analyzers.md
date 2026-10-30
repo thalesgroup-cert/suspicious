@@ -64,7 +64,7 @@ Plain compose users add the profile: `docker compose --profile ai up -d`.
 
 ### Troubleshooting "inference does not work"
 
-| Symptom (Cortex job error) | Cause / fix |
+| Symptom (Cortex job error, or connector failure) | Cause / fix |
 |---|---|
 | `cannot reach inference server at http://172.17.0.1:8090` | Server not running, or published on `127.0.0.1`, or the bridge gateway differs. `docker ps`, `docker network inspect bridge`, then set `AI_INFERENCE_BIND` and the analyzer's `inference_url`. |
 | `HTTP 503 … Vectorizer unavailable` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy). `/health` shows the exact error. |
@@ -72,6 +72,60 @@ Plain compose users add the profile: `docker compose --profile ai up -d`.
 | `HTTP 503 … variant 'public'` | Expected until real public weights are added to `models_public/`. |
 | Verdicts never change after retraining | Weights were baked into an old image instead of mounted, or the mount is not `models/`. Check `/health`, then `POST /reload`. |
 | Works from the host, fails from Cortex | A corporate `HTTP(S)_PROXY` inside the job container: the client bypasses proxies by default (`INFERENCE_USE_PROXY=1` re-enables). |
+| `401` or `503` on `/v2` (the `ai_model` connector row fails) | From a container on `suspicious_net`, run `curl -H "Authorization: Bearer $AI_INFERENCE_TOKEN" http://ai_inference:8090/v2/models/ai_mail`. `401` = the token the connector sends is not the server's `AI_INFERENCE_TOKEN`. `503` = the token is not set on the server, or the models or vectorizer are not loaded; the response `detail` says which (`token not configured` or the unavailable model). |
+
+## v2 API and the ai_model connector
+
+The inference server has a second, token-protected API under `/v2`, next to the legacy `/classify`,
+`/health` and `/reload` routes (those are unchanged and still serve the Cortex analyzer). The
+`ai_model` connector uses it so the AI verdict can come from the platform itself instead of a Cortex job.
+
+| Route | Token | What it does |
+|---|---|---|
+| `GET /v2/health/live` | no | `{"live": true}` while the process is up. |
+| `GET /v2/health/ready` | no | The same body as `/health`: `200` when the vectorizer and the `personal` models are loaded, otherwise `503`. |
+| `GET /v2/models/ai_mail` | yes | Model metadata: the versions the server holds. Today one, `active` (id `v0`), the legacy classifier. |
+| `POST /v2/models/ai_mail/classify` | yes | Body `{"mail_body": "...", "versions": ["active"]}`. Returns the verdict under `results.active` (class, score, confidence, class and sub-class probabilities, contributing phrases) plus the campaign embedding, its version and the latency. `400` for any other `versions`, `503` when models or vectorizer are not loaded. |
+
+### The token
+
+The server reads `AI_INFERENCE_TOKEN` from its environment (`deployment/.env`, passed to the
+`ai_inference` service by compose). The `/v2` routes that need a token fail closed: with the variable
+unset or empty they answer `503 token not configured`, they never run unauthenticated. A missing or
+wrong `Authorization: Bearer ...` header answers `401`. Generate one with `openssl rand -hex 32`.
+
+### Enabling the connector
+
+1. Set `AI_INFERENCE_TOKEN` in `deployment/.env` and recreate `ai_inference`.
+2. Put the same value in the connector's `token` (Settings, or `integrations.ai_model.token` in
+   `settings.json`). `url` defaults to `http://ai_inference:8090` and `timeout_seconds` to 20.
+3. Enable `ai_model` in Settings, or `PATCH /api/connectors/ai_model/` with `{"enabled": true}`. It is off by
+   default.
+
+Only one connector may provide `mail_ai` at a time. Enabling a second answers `409`
+(`<name> already provides mail_ai`); disable the first one before enabling the other.
+
+With the connector enabled, a mail's AI verdict comes from it and the Cortex AI job is not created. The
+AI analyzer gets a ledger row (`CaseAnalyzerJob`) with a `provider-` id instead of a Cortex job id. The
+Celery worker (`suspicious_celery`) reads the mail archive from the shared case volume, posts the body
+to `/v2/models/ai_mail/classify` over `suspicious_net`, stores the answer as one `AiAssessment` per case
+(with the model version, `v0` today), fills the case's AI result, score, confidence and category, closes
+the row and queues the case's reconcile. With the connector disabled nothing changes: the Cortex
+`AI_Mail_Analyzer` runs as before.
+
+### When it fails
+
+- **Server unreachable, timeout or 5xx.** The task retries twice with a short backoff. Each call waits
+  at most `timeout_seconds` (20 s), so the row closes as `Failure` within about 75 seconds. The case gets
+  `results_ai = Inconclusive` and still finalises.
+- **Repeated failures** open the connector's circuit breaker (see `GET /api/connectors/`). While it is
+  open, new rows fail at once without calling the server.
+- **A rejected token (`401` or `403`)**, a wrong url (`404`), and a `503` that says the token, models or
+  vectorizer are missing, fail the row at once, without retries. They are setup errors that every case
+  would hit, so they show as a `Failure` row and count against the breaker. They are never turned into a
+  quiet `Inconclusive` success.
+- **A refusal of one mail (`400`, `413`, `422`)** is a verdict of "cannot tell": the row closes as
+  `Success` with an `Inconclusive` result. A mail with no readable archive ends the same way.
 
 ## Source
 
@@ -79,6 +133,7 @@ Plain compose users add the profile: `docker compose --profile ai up -d`.
 |---|---|
 | `ai_mail_classifier.py` | Thin Cortex client: untar mail, call the server, build the report |
 | `inference_server/server.py` | FastAPI model server (`/classify`, `/health`, `/reload`) |
+| `inference_server/v2.py`, `auth.py` | Token-protected `/v2` router and its bearer check |
 | `mail_analysis.py` | Classification maths, taxonomy, explainability (needs numpy/torch) |
 | `mail_archive.py` | Safe mail-archive extraction (stdlib only, used by the client) |
 | `ResNetMLP.py` | The neural network definition |

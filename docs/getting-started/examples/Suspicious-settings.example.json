@@ -140,6 +140,11 @@
             "verify_tls": true,
             "timeout_seconds": 10,
             "ui_base_url": "https://suspicious.meridian.example"
+        },
+        "ai_model": {
+            "url": "http://ai_inference:8090",
+            "token": "",
+            "timeout_seconds": 20
         }
     },
     "authentication": {

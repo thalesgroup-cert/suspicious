@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The AI mail analyzer can now run as a connector, `ai_model`, instead of a Cortex job. It is off
+  by default and the Cortex path is unchanged for instances that do not enable it. With the
+  connector enabled, a mail's AI verdict comes from the connector, the Cortex AI job is not created,
+  and the result is stored as an `AiAssessment` per case (model version `v0` today). The model
+  server gets a token-protected `/v2` API (`AI_INFERENCE_TOKEN`; without a token it answers 503
+  rather than serving unauthenticated). Set the same token in `integrations.ai_model.token`. See
+  `docs/components/analyzers.md`.
+- The provider is chosen per mail through the connector settings, and only one may be enabled:
+  `PATCH /api/connectors/<name>/` answers 409 when another `mail_ai` provider is already enabled.
+- With the connector enabled, an `.eml` archive now gets a provider row too (the analyzer ledger
+  shows a connector-run AI row) and still ends Inconclusive, as it did before.
+
 ### Fixed
 
 - Deleting a user no longer deletes the allow-list, deny-list and campaign-list entries they added.
