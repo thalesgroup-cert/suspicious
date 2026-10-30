@@ -55,7 +55,7 @@ class ManifestTest(SimpleTestCase):
         m = AiModelConnector.manifest
         m.validate()
         self.assertEqual((m.name, m.provides, m.enabled_by_default), ("ai_model", "mail_ai", False))
-        self.assertEqual((m.version, m.category, m.events), ("1.0.0", "AI", ()))
+        self.assertEqual((m.version, m.category, m.events), ("1.0.0", "AI", ("case_finalised",)))
         self.assertEqual({f.key: f.type for f in m.config_schema}["token"], "secret")
 
     def test_config_schema(self):

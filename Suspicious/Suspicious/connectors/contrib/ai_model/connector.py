@@ -8,6 +8,7 @@ import logging
 from ai_model.models import AiAssessment
 from case_handler.models import Case
 from connectors.base import (
+    EVENT_CASE_FINALISED,
     PROVIDER_KIND_MAIL_AI,
     ConfigField,
     Connector,
@@ -17,6 +18,7 @@ from connectors.base import (
 )
 from connectors.contrib.ai_model.client import AiInferenceClient
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
+from connectors.tasks import run_campaign_detection
 
 logger = logging.getLogger("connectors.contrib.ai_model")
 
@@ -70,7 +72,7 @@ class AiModelConnector(Connector):
                         help="Bearer token the inference server expects (AI_INFERENCE_TOKEN)."),
             ConfigField("timeout_seconds", "int", default=DEFAULT_TIMEOUT),
         ),
-        events=(),
+        events=(EVENT_CASE_FINALISED,),
         enabled_by_default=False,
         provides=PROVIDER_KIND_MAIL_AI,
     )
@@ -91,6 +93,11 @@ class AiModelConnector(Connector):
         except ValueError as exc:
             return HealthStatus(ok=False, detail=str(exc))
         return HealthStatus(ok=ok, detail=detail)
+
+    def on_case_finalised(self, event) -> None:
+        # Only queued: this hook runs under the connector's breaker, which the classification
+        # calls share, and a Chroma outage during detection must not open it.
+        run_campaign_detection.delay(event.case_id)
 
     def analyze(self, kind: str, case_id: int) -> ProviderResult:
         case = Case.objects.select_related("fileOrMail__mail").get(pk=case_id)

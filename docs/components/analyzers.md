@@ -120,19 +120,23 @@ one `AiAssessment` per case (with the model version, `v0` today), fills the case
 confidence and category, closes the row and queues the case's reconcile. With the connector disabled
 nothing changes: the Cortex `AI_Mail_Analyzer` runs as before.
 
-**Keep it disabled in production for now.** Campaign detection and the case view's AI analyzer card
-read the Cortex AI analyzer's report (an `AnalyzerReport`), and the connector does not create one. So
-for every case analysed while `ai_model` is enabled:
+Campaign detection runs from the connector too. Its `case_finalised` hook only queues a Celery task,
+`run_campaign_detection`, which reads the mail's text and headers the same way (object store first,
+then the archive) and adds the mail to the ChromaDB collection `suspicious_mails` that later detection
+compares new mails against. When the case's AI result is `DANGEROUS` and enough similar mails are
+found, it creates or joins a campaign (a `DANGEROUS` mail from an allow-listed sender domain is
+skipped and not stored). A created or joined campaign sends `campaign_updated`, so TheHive raises its
+campaign alert. The task does not run under the connector's circuit breaker, so a ChromaDB outage
+does not stop classification. A failed run (ChromaDB down, the detection lock busy) is retried up to
+three times, after 30, 60 and 120 s, and then logged at ERROR with the case id and the error class;
+an object store that answers `access_denied` or `invalid` is not retried. These failures are in the
+worker log (`suspicious_celery`), not in the connector's deliveries.
 
-- no campaign is created or joined, no `campaign_updated` event is sent, and TheHive raises no
-  campaign alert;
-- the mail is not added to the ChromaDB collection that later detection compares new mails against,
-  so it stays missing as a neighbour even after the connector is disabled again;
-- the case view shows no AI analyzer card. The AI result in the overview still shows, because it
-  comes from the case's own fields.
-
-This lasts until campaign detection moves into the connector and the case view gets its AI section,
-both in a later change.
+**Keep it disabled in production until the case view has its AI section**, unless losing the AI
+analyzer card is acceptable. The card reads the Cortex AI analyzer's report (an `AnalyzerReport`),
+and the connector does not create one, so a case analysed while `ai_model` is enabled shows no AI
+analyzer card. The AI result in the overview still shows, because it comes from the case's own
+fields. The case view gets its AI section in a later change.
 
 ### When it fails
 

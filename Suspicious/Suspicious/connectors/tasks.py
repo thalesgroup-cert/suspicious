@@ -75,3 +75,47 @@ def run_provider_analysis(self, case_id: int, kind: str, job_id: int):
         except Exception as exc:  # noqa: BLE001 — a bad result must not strand the case
             error = f"could not store the result: {type(exc).__name__}: {exc}"
     finish_provider_analysis(job_id, None, error=error, **ledger)
+
+
+@shared_task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3)
+def run_campaign_detection(self, case_id: int) -> None:
+    """Place one finalised case in a campaign (ai_model) and emit campaign_updated when it
+    joined or created one. Queued by the connector's case_finalised hook rather than run in it:
+    the hook runs under the ai_model breaker, which the classification calls share, and a Chroma
+    outage must not open it. detect_campaign raises only before the campaign rows exist, so
+    every failure but a non-retryable ProviderUnavailable is retried. Only the exception class
+    is logged: a message can carry mail text."""
+    from ai_model.campaign_profile import current_profile
+    from case_handler.models import Case
+    from connectors.base import EVENT_CAMPAIGN_UPDATED
+    from connectors.contrib.ai_model.campaigns import detect_campaign, open_collection
+    from connectors.contrib.ai_model.mailtext import (
+        header_dict, mail_archive_for, read_archive_material,
+    )
+    from connectors.dispatch import emit
+    from connectors.providers import ProviderUnavailable
+
+    try:
+        case = Case.objects.select_related("fileOrMail__mail", "ai_assessment").get(pk=case_id)
+        assessment = getattr(case, "ai_assessment", None)
+        archive = mail_archive_for(case) if assessment else None
+        material = read_archive_material(archive) if archive else None
+        if material is None:
+            logger.info("Case %s: no AI assessment or mail text, no campaign detection.", case_id)
+            return
+        profile = current_profile()
+        campaign = detect_campaign(
+            case, assessment, material.text, header_dict(material.headers), profile,
+            open_collection(profile),
+        )
+        if campaign is not None:
+            emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=campaign.id)
+        return
+    except Exception as exc:  # noqa: BLE001 — a lock or cache outage arrives as any type
+        failure = type(exc).__name__
+        retryable = not isinstance(exc, ProviderUnavailable) or exc.retryable
+    # Retried outside the except block, so the retry does not chain the original exception.
+    if retryable and self.request.retries < self.max_retries:
+        logger.warning("Campaign detection for case %s failed (%s), retrying.", case_id, failure)
+        raise self.retry(countdown=30 * 2 ** self.request.retries)
+    logger.error("Campaign detection for case %s failed: %s", case_id, failure)

@@ -16,9 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server gets a `/v2` API (`AI_INFERENCE_TOKEN`): every `/v2` route except `/v2/health/live` and
   `/v2/health/ready` needs the token, and answers 503 when the server has none set. Set the same
   token in `integrations.ai_model.token`. See `docs/components/analyzers.md`. Keep it disabled in
-  production for now: until campaign detection moves into the connector and the case view gets its
-  AI section (a later change), enabling `ai_model` stops campaign detection, the TheHive campaign
-  alert and the AI analyzer card for new cases.
+  production until the case view gets its AI section (a later change), unless losing the AI analyzer
+  card is acceptable: a case analysed while `ai_model` is enabled shows no AI analyzer card.
+- With `ai_model` enabled, campaign detection runs from the connector. Its `case_finalised` hook
+  queues a Celery task that adds the mail to the ChromaDB collection and, when the AI result is
+  `DANGEROUS` and enough similar mails are found, creates or joins a campaign and sends
+  `campaign_updated`, so TheHive raises its campaign alert. The task does not run under the
+  connector's circuit breaker, so a ChromaDB outage does not stop classification. A failed run is
+  retried up to three times (after 30, 60 and 120 s), then logged.
 - Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
   be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already
   enabled.
