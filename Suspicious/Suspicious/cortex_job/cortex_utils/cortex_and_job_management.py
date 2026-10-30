@@ -6,6 +6,7 @@ from cortex4py.exceptions import NotFoundError
 from django.db import transaction
 from django.utils import timezone
 
+from ai_model.mailinfo import apply_mail_info
 from common.http_client import get_breaker, RETRY
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.migrations._tier_seed import tier_for
@@ -886,29 +887,7 @@ class CortexJobManager:
             classification (str): The main classification of the mail.
             sub_classification (str): The subclassification of the mail.
         """
-        if not mail_info:
-            update_cases_logger.warning("No MailInfo provided to update")
-            return
-
-        try:
-            mail_info.is_analyzed = True
-
-            classification_lower = (classification or "").strip().lower()
-            sub_class_lower = (sub_classification or "").strip().lower()
-
-            if classification_lower in {"classic_phishing", "whaling", "clone"}:
-                mail_info.is_phishing = True
-
-            if sub_class_lower == "dangerous":
-                mail_info.is_dangerous = True
-
-            mail_info.save()
-            update_cases_logger.info(
-                f"MailInfo updated for Mail ID: {getattr(mail_info.mail, 'id', 'Unknown')}"
-            )
-
-        except Exception as e:
-            update_cases_logger.error(f"Error updating MailInfo: {e}")
+        apply_mail_info(mail_info, classification, sub_classification)
 
     def get_sub_class(self, analyzer):
         """

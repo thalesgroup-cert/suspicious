@@ -144,6 +144,7 @@ INSTALLED_APPS = [
     "score_process.apps.ScoreConfig",
     "submission_queue.apps.SubmissionQueueConfig",
     "connectors.apps.ConnectorsConfig",
+    "ai_model.apps.AiModelConfig",
 ]
 
 MIDDLEWARE = [
