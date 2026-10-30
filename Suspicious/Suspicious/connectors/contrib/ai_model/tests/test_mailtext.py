@@ -235,9 +235,47 @@ class ObjectStoreFirstTest(SimpleTestCase):
                 with self.assertRaises(ProviderUnavailable) as caught:
                     self.read(FailingStore(error))
                 self.assertTrue(caught.exception.retryable)
-                self.assertEqual(str(caught.exception), f"object store unavailable: {type(error).__name__}")
+                label = error.code if isinstance(error, StoreError) else type(error).__name__
+                self.assertEqual(str(caught.exception), f"object store unavailable: {label}")
                 for secret in ("rustfs", "9000", "AKIA123", "http"):
                     self.assertNotIn(secret, str(caught.exception))
+
+    def test_the_label_is_the_store_error_code_or_the_class_name(self):
+        for error, label in (
+            (StoreError("access_denied", "key AKIA123 refused by http://rustfs:9000"), "access_denied"),
+            (StoreError("invalid", "bad request"), "invalid"),
+            (RuntimeError("config: http://rustfs:9000"), "RuntimeError"),
+        ):
+            with self.subTest(label=label):
+                with self.assertRaises(ProviderUnavailable) as caught:
+                    self.read(FailingStore(error))
+                self.assertEqual(str(caught.exception), f"object store unavailable: {label}")
+
+    def test_the_warning_for_a_store_error_names_the_mail(self):
+        with self.assertLogs("connectors.contrib.ai_model", level="WARNING") as logs:
+            with self.assertRaises(ProviderUnavailable):
+                self.read(FailingStore(StoreError("unavailable", "boom")))
+        self.assertTrue(any(MAIL in line for line in logs.output), logs.output)
+
+    def test_the_feeder_prefix_layout_is_found_from_the_archive_bucket_name(self):
+        objects = {
+            f"sub-1/{MAIL}/ref.txt": b"Text from the prefix layout",
+            f"sub-1/{MAIL}/ref.headers": b"Subject: hi\n",
+            f"sub-1/{MAIL}/ref.eml": b"E" * 50,
+            f"sub-1/{MAIL}/attachments/note.txt": b"an attachment",
+        }
+        store = FakeObjectStore()
+        store.ensure_bucket("suspicious-feeder")
+        for name, data in objects.items():
+            store.put("suspicious-feeder", name, io.BytesIO(data), length=len(data))
+        opened = []
+        real_open = store.open
+        store.open = lambda bucket, key: (opened.append(key), real_open(bucket, key))[1]
+        archive = mail_archive()
+        archive.bucket_name = "sub-1"
+        with mock.patch("settings.config.get_section", return_value={"feeder_bucket": "suspicious-feeder"}):
+            self.assertEqual(self.read(store, archive), "Text from the prefix layout")
+        self.assertEqual(sorted(opened), [f"sub-1/{MAIL}/ref.headers", f"sub-1/{MAIL}/ref.txt"])
 
     def test_a_store_error_and_a_tar_without_text_is_still_unavailable(self):
         with tempfile.TemporaryDirectory() as directory:

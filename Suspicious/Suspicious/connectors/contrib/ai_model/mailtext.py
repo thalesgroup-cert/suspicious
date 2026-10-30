@@ -11,7 +11,7 @@ import tarfile
 import zlib
 from pathlib import PurePosixPath
 
-from common.storage import get_store
+from common.storage import StoreError, get_store
 from connectors.providers import ProviderUnavailable
 from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import fetch_mail_text_from_minio
 
@@ -41,13 +41,19 @@ def _open_archive(stored):
     return stored.file_path.open("rb")
 
 
+def _mail_id(mail_archive) -> str:
+    return str(getattr(getattr(mail_archive, "mail", None), "mail_id", "") or "")
+
+
 def _read_object_store(mail_archive) -> str | None:
     """The mail's text from the object store; None when it has no ``.txt`` and ``.headers`` there
-    or the text is blank. Store errors propagate."""
-    mail_id = getattr(getattr(mail_archive, "mail", None), "mail_id", "") or ""
+    or the text is blank. The archive's ``bucket_name`` (the submission id) tells which layout to
+    look in. Store errors propagate."""
+    mail_id = _mail_id(mail_archive)
     if not mail_id:
         return None
-    headers, text = fetch_mail_text_from_minio(get_store(), str(mail_id))
+    bucket_name = str(getattr(mail_archive, "bucket_name", "") or "")
+    headers, text = fetch_mail_text_from_minio(get_store(), mail_id, bucket_name)
     return text if headers.strip() and text.strip() else None
 
 
@@ -58,13 +64,18 @@ def read_archive_body(mail_archive) -> str | None:
     store_error = None
     try:
         text = _read_object_store(mail_archive)
-    except Exception as exc:  # noqa: BLE001 -- the store client's failures are many; the class name is reported
+    except Exception as exc:  # noqa: BLE001 -- the store client's failures are many; the label is reported
         store_error, text = exc, None
-        logger.warning("object store read failed for mail archive: %s: %s", type(exc).__name__, exc)
+        logger.warning(
+            "object store read failed for mail %s: %s: %s", _mail_id(mail_archive), type(exc).__name__, exc
+        )
     if text is None:
         text = _read_tar(mail_archive)
     if text is None and store_error is not None:
-        raise ProviderUnavailable(f"object store unavailable: {type(store_error).__name__}") from store_error
+        # A StoreError code is a fixed word; anything else gets its class name. Never the message,
+        # which can carry the endpoint or a key.
+        label = store_error.code if isinstance(store_error, StoreError) else type(store_error).__name__
+        raise ProviderUnavailable(f"object store unavailable: {label}") from store_error
     return text
 
 

@@ -108,12 +108,17 @@ Only one connector may provide `mail_ai` at a time. Enabling a second answers `4
 
 With the connector enabled, a mail's AI verdict comes from it and the Cortex AI job is not created. The
 AI analyzer gets a ledger row (`CaseAnalyzerJob`) with a `provider-` id instead of a Cortex job id. The
-Celery worker (`suspicious_celery`) reads the mail's `.txt` and `.headers` from the object store (the
-durable copy, under `<mail_id>/`; the submission's tar.gz on the work disk is deleted soon after the
-handoff and is only a fallback), posts the body to `/v2/models/ai_mail/classify` over `suspicious_net`,
-stores the answer as one `AiAssessment` per case (with the model version, `v0` today), fills the case's
-AI result, score, confidence and category, closes the row and queues the case's reconcile. With the
-connector disabled nothing changes: the Cortex `AI_Mail_Analyzer` runs as before.
+Celery worker (`suspicious_celery`) reads the mail text from the object store first: the mail's `.txt`
+and `.headers` objects, under `<mail_id>/` in the submission's own bucket, or under
+`<submission_id>/<mail_id>/` in the feeder bucket (`storage.s3.feeder_bucket`) when the submission came
+through the prefix layout. It starts there because the e-mail fetch task deletes the working directory
+that holds the submission's archive shortly after the handoff, so a retry or a redo would no longer find
+it. The archive on the shared volume (`mail_case_data` and `mail_work_data`, mounted in both
+`suspicious` and `suspicious_celery`) is the fallback, used when the store has no text for the mail. The
+worker then posts the body to `/v2/models/ai_mail/classify` over `suspicious_net`, stores the answer as
+one `AiAssessment` per case (with the model version, `v0` today), fills the case's AI result, score,
+confidence and category, closes the row and queues the case's reconcile. With the connector disabled
+nothing changes: the Cortex `AI_Mail_Analyzer` runs as before.
 
 ### When it fails
 
@@ -135,8 +140,10 @@ connector disabled nothing changes: the Cortex `AI_Mail_Analyzer` runs as before
   `Success` with an `Inconclusive` result. A mail with no readable text, in the store or in the archive,
   ends the same way.
 - **Object store down.** If the store errors (not "not found") and the archive cannot stand in, the task
-  retries like a server outage and the row closes as `Failure` with `object store unavailable:
-  <ExceptionClass>`; it is not turned into an `Inconclusive` success.
+  retries like a server outage and the row closes as `Failure`. The delivery `error` reads
+  `object store unavailable: <label>`, where the label is the store's error code (for example
+  `unavailable` or `access_denied`) or, for any other error such as a configuration problem, the
+  exception class name. It is not turned into an `Inconclusive` success.
 
 ## Source
 

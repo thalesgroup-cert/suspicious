@@ -7,6 +7,7 @@ import logging
 from typing import Optional, Tuple
 
 from common.storage import ObjectStore, StoreError
+from common.storage.layout import resolve_submission_location
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -94,25 +95,10 @@ def fetch_mail_files_from_minio(
 
     return headers, eml, txt, html
 
-def fetch_mail_text_from_minio(
-    client: ObjectStore,
-    mail_id: str,
-    max_bytes: int = MAIL_TEXT_MAX_BYTES,
-) -> Tuple[str, str]:
-    """
-    Fetch the mail's ``.headers`` and ``.txt`` objects from MinIO.
 
-    Returns (headers, txt); a part that is not there, or a mail no bucket holds, is "".
-    Unlike fetch_mail_files_from_minio this opens nothing else (the .eml and .html can be
-    tens of MB), looks only at objects directly under ``<mail_id>/`` (``attachments/`` may
-    hold .txt files) and reads at most ``max_bytes`` of each. A store error other than
-    not_found propagates.
-    """
-    bucket = _find_mail_bucket(client, mail_id)
-    if not bucket:
-        return "", ""
-
-    prefix = "%s/" % mail_id
+def _read_text_parts(client: ObjectStore, bucket: str, prefix: str, max_bytes: int) -> dict[str, str]:
+    """{".headers": text, ".txt": text} for the objects directly under ``prefix`` (those that exist),
+    each read capped at ``max_bytes``. {} when the bucket or an object is gone (not_found)."""
     try:
         wanted: dict[str, str] = {}
         for obj in client.list(bucket, prefix=prefix, recursive=True):
@@ -122,13 +108,44 @@ def fetch_mail_text_from_minio(
             for suffix in (".headers", ".txt"):
                 if rel.endswith(suffix):
                     wanted.setdefault(suffix, obj.name)
-        parts = {
+        return {
             suffix: _read_object_safe(client, bucket, name, max_bytes).decode("utf-8", errors="replace")
             for suffix, name in wanted.items()
         }
     except StoreError as exc:
         if exc.code != "not_found":
             raise
-        logger.error("fetch_mail_text: mail %s vanished from the store: %s", mail_id, exc)
-        return "", ""
+        logger.warning("fetch_mail_text: %s/%s not found in the store: %s", bucket, prefix, exc)
+        return {}
+
+
+def fetch_mail_text_from_minio(
+    client: ObjectStore,
+    mail_id: str,
+    bucket_name: str = "",
+    max_bytes: int = MAIL_TEXT_MAX_BYTES,
+) -> Tuple[str, str]:
+    """
+    Fetch the mail's ``.headers`` and ``.txt`` objects from MinIO.
+
+    ``bucket_name`` is ``MailArchive.bucket_name``, the submission id. With it the mail is looked
+    up where common.storage.layout puts the submission: ``<mail_id>/`` in a bucket of that name
+    (legacy), else ``<bucket_name>/<mail_id>/`` in the feeder bucket (prefix contract). Without it,
+    or when nothing is there, the bucket is found by the mail id's timestamp suffix.
+
+    Returns (headers, txt); a part that is not there, or a mail the store does not hold, is "".
+    Unlike fetch_mail_files_from_minio this opens nothing else (the .eml and .html can be
+    tens of MB), looks only at objects directly under the mail's prefix (``attachments/`` may
+    hold .txt files) and reads at most ``max_bytes`` of each. A store error other than
+    not_found propagates.
+    """
+    parts: dict[str, str] = {}
+    location = resolve_submission_location(client, bucket_name) if bucket_name else None
+    if location:
+        bucket, base = location
+        parts = _read_text_parts(client, bucket, "%s%s/" % (base, mail_id), max_bytes)
+    if not parts:
+        bucket = _find_mail_bucket(client, mail_id)
+        if bucket:
+            parts = _read_text_parts(client, bucket, "%s/" % mail_id, max_bytes)
     return parts.get(".headers", ""), parts.get(".txt", "")

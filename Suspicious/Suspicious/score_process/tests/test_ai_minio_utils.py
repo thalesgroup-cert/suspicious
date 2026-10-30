@@ -1,4 +1,5 @@
 import io
+from unittest import mock
 
 from django.test import SimpleTestCase
 
@@ -99,10 +100,14 @@ class _Recording(FakeObjectStore):
 
 
 def recording_store(objects=MAIL_OBJECTS):
+    return recording_store_in(BUCKET, objects)
+
+
+def recording_store_in(bucket, objects=MAIL_OBJECTS):
     store = _Recording()
-    store.ensure_bucket(BUCKET)
+    store.ensure_bucket(bucket)
     for name, data in objects.items():
-        store.put(BUCKET, name, io.BytesIO(data), length=len(data))
+        store.put(bucket, name, io.BytesIO(data), length=len(data))
     return store
 
 
@@ -155,3 +160,82 @@ class FetchMailTextTest(SimpleTestCase):
         store.ensure_bucket(BUCKET)
         store.put(BUCKET, f"{MAIL}/ref.txt", io.BytesIO(b"x"))
         self.assertEqual(fetch_mail_text_from_minio(store, MAIL), ("", ""))
+
+
+FEEDER = "suspicious-feeder"
+SUB = "sub-1"
+FEEDER_CONFIG = {"feeder_bucket": FEEDER}
+
+
+def feeder_store(objects):
+    store = _Recording()
+    store.ensure_bucket(FEEDER)
+    for name, data in objects.items():
+        store.put(FEEDER, name, io.BytesIO(data), length=len(data))
+    return store
+
+
+PREFIX_OBJECTS = {
+    f"{SUB}/{MAIL}/ref.headers": b"Subject: prefix\n",
+    f"{SUB}/{MAIL}/ref.txt": b"Text from the prefix layout",
+    f"{SUB}/{MAIL}/ref.eml": b"E" * 50,
+    f"{SUB}/{MAIL}/attachments/note.txt": b"an attachment, not the mail",
+    f"{SUB}/reporter-submission.eml": b"wrapper",
+    f"sub-2/{MAIL}/ref.txt": b"another submission",
+}
+
+
+@mock.patch("settings.config.get_section", return_value=FEEDER_CONFIG)
+class FetchMailTextLayoutsTest(SimpleTestCase):
+    def test_the_feeder_prefix_layout_is_found_from_the_submission_id(self, _config):
+        store = feeder_store(PREFIX_OBJECTS)
+        self.assertEqual(
+            fetch_mail_text_from_minio(store, MAIL, bucket_name=SUB),
+            ("Subject: prefix\n", "Text from the prefix layout"),
+        )
+        self.assertEqual(
+            sorted(store.opened), [f"{SUB}/{MAIL}/ref.headers", f"{SUB}/{MAIL}/ref.txt"]
+        )
+
+    def test_a_bucket_named_like_the_submission_is_used_even_without_the_timestamp_suffix(self, _config):
+        store = recording_store_in("case-bucket")
+        self.assertEqual(
+            fetch_mail_text_from_minio(store, MAIL, bucket_name="case-bucket"),
+            ("Subject: hi\n", "Dear user, verify your account"),
+        )
+        self.assertEqual(sorted(store.opened), [f"{MAIL}/ref.headers", f"{MAIL}/ref.txt"])
+
+    def test_nothing_under_the_submission_falls_back_to_the_suffix_search(self, _config):
+        store = recording_store()  # legacy bucket named <reporter>-submission-<timestamp>
+        store.ensure_bucket(FEEDER)
+        store.ensure_bucket("unrelated")
+        for name in ("sub-9", "unrelated"):  # not a bucket with the mail / no such prefix in feeder
+            with self.subTest(bucket_name=name):
+                self.assertEqual(
+                    fetch_mail_text_from_minio(store, MAIL, bucket_name=name),
+                    ("Subject: hi\n", "Dear user, verify your account"),
+                )
+
+    def test_an_empty_bucket_name_goes_straight_to_the_suffix_search(self, _config):
+        self.assertEqual(
+            fetch_mail_text_from_minio(recording_store(), MAIL, bucket_name=""),
+            ("Subject: hi\n", "Dear user, verify your account"),
+        )
+
+    def test_without_a_feeder_bucket_only_a_real_bucket_or_the_suffix_search_applies(self, config):
+        config.return_value = {}
+        self.assertEqual(
+            fetch_mail_text_from_minio(recording_store(), MAIL, bucket_name=SUB),
+            ("Subject: hi\n", "Dear user, verify your account"),
+        )
+
+    def test_a_missing_feeder_bucket_is_not_found_not_an_error(self, _config):
+        self.assertEqual(fetch_mail_text_from_minio(FakeObjectStore(), MAIL, bucket_name=SUB), ("", ""))
+
+    def test_a_store_error_while_resolving_the_submission_propagates(self, _config):
+        class Down(_Recording):
+            def bucket_exists(self, bucket):
+                raise StoreError("unavailable", "boom")
+
+        with self.assertRaises(StoreError):
+            fetch_mail_text_from_minio(Down(), MAIL, bucket_name=SUB)

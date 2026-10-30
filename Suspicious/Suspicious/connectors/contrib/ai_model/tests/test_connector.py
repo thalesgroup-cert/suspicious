@@ -11,6 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
+import settings.config as settings_config
 from ai_model.models import AiAssessment
 from case_handler.models import Case, CaseHasFileOrMail
 from common.http_client import BREAKERS
@@ -282,6 +283,8 @@ class ArchiveGoneBetweenAttemptsTest(TestCase):
     """The drill failure: the work dir is wiped after the handoff, so a retry must still find the mail."""
 
     MAIL = "261007071836-7a54e9fcb2f6"
+    # The store copy differs from the tar's text, so the assertions can tell which one was read.
+    STORE_TEXT = b"STORE COPY: " + GOOD["m1.txt"]
 
     def setUp(self):
         private = ConnectorRegistry()
@@ -301,24 +304,36 @@ class ArchiveGoneBetweenAttemptsTest(TestCase):
         self.addCleanup(patcher.stop)
         ConnectorState.objects.create(name="ai_model", enabled=True)
 
-        self.case, archive = make_mail_case(n=51)
-        Mail.objects.filter(pk=archive.mail_id).update(mail_id=self.MAIL)
+        self.case, self.archive = make_mail_case(n=51)
+        Mail.objects.filter(pk=self.archive.mail_id).update(mail_id=self.MAIL)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.tar_path = os.path.join(self.workdir.name, "mail.tar.gz")
         with open(self.tar_path, "wb") as handle:
             handle.write(build_tar(GOOD))
-        File.objects.filter(pk=archive.archive_id).update(tmp_path=self.tar_path)
+        File.objects.filter(pk=self.archive.archive_id).update(tmp_path=self.tar_path)
 
-        store = FakeObjectStore()  # the durable copy the mail feeder uploaded
-        store.ensure_bucket("haruto-submission-261007071836")
-        for name, data in ((".txt", GOOD["m1.txt"]), (".headers", GOOD["m1.headers"])):
-            store.put("haruto-submission-261007071836", f"{self.MAIL}/m1{name}", io.BytesIO(data))
-        patcher = mock.patch.object(mailtext, "get_store", return_value=store)
+        self.store = FakeObjectStore()  # the durable copy the mail feeder uploaded
+        patcher = mock.patch.object(mailtext, "get_store", return_value=self.store)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        real_get_section = settings_config.get_section  # only storage.s3 is faked: the Cortex config is read too
+        patcher = mock.patch(
+            "settings.config.get_section",
+            side_effect=lambda name, *a, **k: (
+                {"feeder_bucket": "suspicious-feeder"} if name == "storage.s3" else real_get_section(name, *a, **k)
+            ),
+        )
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def test_a_retry_after_the_work_dir_is_wiped_still_classifies_the_mail(self):
+    def upload(self, bucket, prefix):
+        self.store.ensure_bucket(bucket)
+        for name, data in ((".txt", self.STORE_TEXT), (".headers", GOOD["m1.headers"])):
+            self.store.put(bucket, f"{prefix}{self.MAIL}/m1{name}", io.BytesIO(data))
+
+    def drill(self):
+        """Attempt 1: server down -> retry. The work dir is wiped. Attempt 2: server up."""
         down = requests.ConnectionError("ai_inference down")
         up = mock.Mock(status_code=200)
         up.json.return_value = payload("DANGEROUS", 7.4, 0.815, "CLASSIC_PHISHING")
@@ -338,7 +353,8 @@ class ArchiveGoneBetweenAttemptsTest(TestCase):
         job.refresh_from_db()
         self.case.refresh_from_db()
         self.assertEqual(job.status, CaseAnalyzerJob.STATUS_SUCCESS)
-        self.assertEqual(session.post.call_args_list[1].kwargs["json"]["mail_body"], GOOD["m1.txt"].decode())
+        for call in session.post.call_args_list:  # both attempts sent the store's copy, not the tar's
+            self.assertEqual(call.kwargs["json"]["mail_body"], self.STORE_TEXT.decode())
         self.assertEqual((self.case.results_ai, self.case.score_ai, self.case.confidence_ai),
                          ("Dangerous", 7, 82))
         self.assertEqual(self.case.ai_assessment.result, "DANGEROUS")
@@ -346,3 +362,13 @@ class ArchiveGoneBetweenAttemptsTest(TestCase):
         delivery = ConnectorDelivery.objects.get()
         self.assertEqual((delivery.status, delivery.attempt, delivery.error), ("success", 2, ""))
         self.reconcile.delay.assert_called_once_with(self.case.id)
+
+    def test_a_retry_after_the_work_dir_is_wiped_still_classifies_the_mail(self):
+        self.upload("haruto-submission-261007071836", "")  # legacy: a bucket per submission
+        MailArchive.objects.filter(pk=self.archive.pk).update(bucket_name="haruto-submission-261007071836")
+        self.drill()
+
+    def test_the_same_with_the_feeder_prefix_layout(self):
+        self.upload("suspicious-feeder", "sub-1/")  # <submission_id>/<mail_id>/<ref>.txt
+        MailArchive.objects.filter(pk=self.archive.pk).update(bucket_name="sub-1")
+        self.drill()
