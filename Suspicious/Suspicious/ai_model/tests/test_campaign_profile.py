@@ -4,6 +4,7 @@ from dataclasses import FrozenInstanceError
 from django.test import TestCase
 
 from ai_model.campaign_profile import allow_list_digest, current_profile
+from ai_model.models import AiAssessment
 from domain_process.models import Domain
 from settings.models import CampaignDomainAllowList
 
@@ -23,7 +24,8 @@ class CampaignProfileTest(TestCase):
         self.assertEqual(profile.min_members, 3)
         self.assertEqual(profile.neighbours, 20)
         self.assertEqual(profile.window_days, 15)
-        self.assertEqual(profile.trigger_class, "Dangerous")
+        self.assertEqual(profile.trigger_class, "DANGEROUS")
+        self.assertEqual(profile.trigger_class, AiAssessment.Result.DANGEROUS)
         self.assertEqual(profile.allow_list_digest, allow_list_digest())
         with self.assertRaises(FrozenInstanceError):
             profile.min_members = 2

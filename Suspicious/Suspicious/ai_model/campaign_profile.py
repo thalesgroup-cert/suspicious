@@ -26,6 +26,8 @@ def allow_list_digest() -> str:
 
 
 def current_profile() -> CampaignProfile:
+    from ai_model.models import AiAssessment
+
     return CampaignProfile(
         embedding_version="cmp-e1",
         collection_name="suspicious_mails",
@@ -34,6 +36,6 @@ def current_profile() -> CampaignProfile:
         min_members=3,
         neighbours=20,
         window_days=15,
-        trigger_class="Dangerous",
+        trigger_class=AiAssessment.Result.DANGEROUS.value,
         allow_list_digest=allow_list_digest(),
     )
