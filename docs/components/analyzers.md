@@ -64,7 +64,7 @@ Plain compose users add the profile: `docker compose --profile ai up -d`.
 
 ### Troubleshooting "inference does not work"
 
-| Symptom (Cortex job error, or connector failure) | Cause / fix |
+| Symptom (Cortex job error) | Cause / fix |
 |---|---|
 | `cannot reach inference server at http://172.17.0.1:8090` | Server not running, or published on `127.0.0.1`, or the bridge gateway differs. `docker ps`, `docker network inspect bridge`, then set `AI_INFERENCE_BIND` and the analyzer's `inference_url`. |
 | `HTTP 503 … Vectorizer unavailable` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy). `/health` shows the exact error. |
@@ -72,13 +72,14 @@ Plain compose users add the profile: `docker compose --profile ai up -d`.
 | `HTTP 503 … variant 'public'` | Expected until real public weights are added to `models_public/`. |
 | Verdicts never change after retraining | Weights were baked into an old image instead of mounted, or the mount is not `models/`. Check `/health`, then `POST /reload`. |
 | Works from the host, fails from Cortex | A corporate `HTTP(S)_PROXY` inside the job container: the client bypasses proxies by default (`INFERENCE_USE_PROXY=1` re-enables). |
-| `401` or `503` on `/v2` (the `ai_model` connector row fails) | From a container on `suspicious_net`, run `curl -H "Authorization: Bearer $AI_INFERENCE_TOKEN" http://ai_inference:8090/v2/models/ai_mail`. `401` = the token the connector sends is not the server's `AI_INFERENCE_TOKEN`. `503` = the token is not set on the server, or the models or vectorizer are not loaded; the response `detail` says which (`token not configured` or the unavailable model). |
+| `401` or `503` on `/v2` (the `ai_model` connector row fails) | From a container on `suspicious_net`, run `curl -H "Authorization: Bearer $AI_INFERENCE_TOKEN" http://ai_inference:8090/v2/models/ai_mail`. `401` = wrong token: the connector's `token` differs from the server's `AI_INFERENCE_TOKEN`. `503` on this route = `AI_INFERENCE_TOKEN` is not set on the server (`token not configured`); set it in `deployment/.env` and recreate `ai_inference`. A `503` on classify that names the models or vectorizer is a loading problem, not a token one: check `curl http://ai_inference:8090/v2/health/ready` (no token needed) and the `detail` in the delivery error. A server `503` shows in the delivery `error` as `inference server HTTP 503: <detail>`; the connector's own empty `token` fails before any call, as `ValueError: token not configured`. |
+| Delivery `error` `inference server unreachable: ...` (the `ai_model` connector row fails) | The worker cannot reach the server. Check that `ai_inference` is up on `suspicious_net` (it runs under the `ai` profile) and that the connector `url` is `http://ai_inference:8090`. The `172.17.0.1` gateway address above is only for Cortex job containers. |
 
 ## v2 API and the ai_model connector
 
 The inference server has a second, token-protected API under `/v2`, next to the legacy `/classify`,
 `/health` and `/reload` routes (those are unchanged and still serve the Cortex analyzer). The
-`ai_model` connector uses it so the AI verdict can come from the platform itself instead of a Cortex job.
+`ai_model` connector uses it so the AI verdict can come from the platform, with no Cortex job.
 
 | Route | Token | What it does |
 |---|---|---|
@@ -92,7 +93,7 @@ The inference server has a second, token-protected API under `/v2`, next to the 
 The server reads `AI_INFERENCE_TOKEN` from its environment (`deployment/.env`, passed to the
 `ai_inference` service by compose). The `/v2` routes that need a token fail closed: with the variable
 unset or empty they answer `503 token not configured`, they never run unauthenticated. A missing or
-wrong `Authorization: Bearer ...` header answers `401`. Generate one with `openssl rand -hex 32`.
+wrong `Authorization: Bearer ...` header answers `401`. Generate one with `openssl rand -hex 24`.
 
 ### Enabling the connector
 
@@ -107,23 +108,29 @@ Only one connector may provide `mail_ai` at a time. Enabling a second answers `4
 
 With the connector enabled, a mail's AI verdict comes from it and the Cortex AI job is not created. The
 AI analyzer gets a ledger row (`CaseAnalyzerJob`) with a `provider-` id instead of a Cortex job id. The
-Celery worker (`suspicious_celery`) reads the mail archive from the shared case volume, posts the body
-to `/v2/models/ai_mail/classify` over `suspicious_net`, stores the answer as one `AiAssessment` per case
+Celery worker (`suspicious_celery`) reads the mail archive from the case volume (`mail_case_data` and
+`mail_work_data`, mounted in both `suspicious` and `suspicious_celery`), posts the body to
+`/v2/models/ai_mail/classify` over `suspicious_net`, stores the answer as one `AiAssessment` per case
 (with the model version, `v0` today), fills the case's AI result, score, confidence and category, closes
 the row and queues the case's reconcile. With the connector disabled nothing changes: the Cortex
 `AI_Mail_Analyzer` runs as before.
 
 ### When it fails
 
+- **Where to look.** When the task fails a row, the reason is recorded in the row's `ConnectorDelivery`
+  entry (event `analyze`, status `failed`, field `error`), listed by
+  `GET /api/connectors/ai_model/deliveries/`.
 - **Server unreachable, timeout or 5xx.** The task retries twice with a short backoff. Each call waits
   at most `timeout_seconds` (20 s), so the row closes as `Failure` within about 75 seconds. The case gets
   `results_ai = Inconclusive` and still finalises.
-- **Repeated failures** open the connector's circuit breaker (see `GET /api/connectors/`). While it is
-  open, new rows fail at once without calling the server.
-- **A rejected token (`401` or `403`)**, a wrong url (`404`), and a `503` that says the token, models or
-  vectorizer are missing, fail the row at once, without retries. They are setup errors that every case
-  would hit, so they show as a `Failure` row and count against the breaker. They are never turned into a
-  quiet `Inconclusive` success.
+- **Repeated failures** open the connector's circuit breaker. `GET /api/connectors/` does not report it:
+  the breaker lives in the Celery worker process. Its effect shows on the rows. While it is open, new
+  rows fail at once without calling the server, and their delivery `error` starts with
+  `CircuitBreakerError:` followed by the breaker's own message.
+- **A rejected token (`401` or `403`)**, a wrong url (`404`), a proxy, timeout or rate-limit answer
+  (`407`, `408`, `429`), and a `503` that says the token, models or vectorizer are missing, fail the row at once, without
+  retries. They are setup errors that every case would hit, so they show as a `Failure` row and count
+  against the breaker. They are never turned into a quiet `Inconclusive` success.
 - **A refusal of one mail (`400`, `413`, `422`)** is a verdict of "cannot tell": the row closes as
   `Success` with an `Inconclusive` result. A mail with no readable archive ends the same way.
 

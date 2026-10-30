@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server gets a token-protected `/v2` API (`AI_INFERENCE_TOKEN`; without a token it answers 503
   rather than serving unauthenticated). Set the same token in `integrations.ai_model.token`. See
   `docs/components/analyzers.md`.
-- The provider is chosen per mail through the connector settings, and only one may be enabled:
-  `PATCH /api/connectors/<name>/` answers 409 when another `mail_ai` provider is already enabled.
+- Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
+  be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already enabled.
 - With the connector enabled, an `.eml` archive now gets a provider row too (the analyzer ledger
   shows a connector-run AI row) and still ends Inconclusive, as it did before.
 
