@@ -162,6 +162,30 @@ def test_a_body_far_over_max_chars_is_truncated_not_rejected(client, token_env):
     assert FakeVectorizer.max_len_seen <= server.MAX_MAIL_CHARS
 
 
+OBFUSCATED_BODIES = {
+    "zero_width_only": "​‌‍⁠﻿" * 200,
+    "zero_width_inside_words": "Ve​rify y‍our acc⁠ount n﻿ow",
+    "mixed_scripts": "Your раyраl αccount: الحساب "
+                     "账户 \U0001f512 rіsk ‮redli‬",
+    "combining_marks": "á̂̃̄" * 500,
+}
+
+
+@pytest.mark.parametrize("name", sorted(OBFUSCATED_BODIES))
+def test_obfuscated_unicode_bodies_are_classified_not_500(client, token_env, name):
+    assert post_v2(client, token_env, body=OBFUSCATED_BODIES[name], raw=True).status_code == 200
+
+
+def test_a_lone_surrogate_escape_is_never_a_500(client, token_env):
+    # A JSON "\ud800" escape decodes to a lone surrogate: unencodable as UTF-8 downstream.
+    resp = client.post(
+        "/v2/models/ai_mail/classify",
+        content=b'{"mail_body": "Verify \\ud800 your account \\udfff now", "versions": ["active"]}',
+        headers={**token_env, "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200, resp.text
+
+
 def test_503_when_models_are_missing(client_without_models, token_env):
     legacy = client_without_models.post("/classify", json={"mail_body": BODY})
     resp = post_v2(client_without_models, token_env, raw=True)

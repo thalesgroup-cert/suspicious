@@ -50,8 +50,10 @@ def make_v2_router(*, store, classify, slots, max_chars) -> APIRouter:
 
         models = store.models("personal")
         started = time.perf_counter()
+        # A JSON "\ud800" escape gives a lone surrogate, which the tokenizer cannot encode: make it "?".
+        body = req.mail_body[:max_chars].encode("utf-8", "replace").decode("utf-8")
         with slots:
-            legacy = classify(models, req.mail_body[:max_chars])
+            legacy = classify(models, body)
         return {
             "results": {"active": {
                 "version": ACTIVE_VERSION["id"],
