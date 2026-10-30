@@ -218,10 +218,7 @@ def parse_and_decode_defaultdict(s):
 
     return decoded_dict
 
-def get_phishing_campaign(similar_mails):
-    similar_threshold = 0.25
-    campaign_threshold = 3
-
+def get_phishing_campaign(similar_mails, similar_threshold=0.25, campaign_threshold=3):
     phshing_campaign_mails = {
         'ids': [[]],
         'embeddings': [[]],

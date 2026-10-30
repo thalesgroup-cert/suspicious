@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger('tasp.cron.update_ongoing_case_jobs')
 
 
-def get_suspicious_collection(chroma_client):
+def get_suspicious_collection(chroma_client, name="suspicious_mails"):
     return chroma_client.get_or_create_collection(
-        name="suspicious_mails",
+        name=name,
         metadata={"hnsw:space": "cosine"},
     )
 
@@ -32,7 +32,9 @@ def get_similar_dangerous_mails(embedding, suspicious_collection, n_results: int
     )
 
 
-def add_to_suspicious_collection(full, alert_id, sourceRef, suspicious_case_id, suspicious_collection):
+def add_to_suspicious_collection(
+    full, alert_id, sourceRef, suspicious_case_id, suspicious_collection, extra_metadata=None
+):
     timestamp = datetime.now()
 
     # One document per case: the report is re-parsed on every reconcile pass, and
@@ -54,6 +56,7 @@ def add_to_suspicious_collection(full, alert_id, sourceRef, suspicious_case_id, 
             'alert_ids': json.dumps([str(alert_id)]),
             'sourceRefs': json.dumps([str(sourceRef)]),
             'suspicious_case_id': str(suspicious_case_id),
+            **(extra_metadata or {}),
         }],
         ids=doc_id if suspicious_case_id is not None
         else timestamp.strftime("%y%m%d") + "-" + str(token_hex(8)),
