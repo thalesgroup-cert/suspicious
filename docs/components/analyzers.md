@@ -112,13 +112,27 @@ Celery worker (`suspicious_celery`) reads the mail text from the object store fi
 and `.headers` objects, under `<mail_id>/` in the submission's own bucket, or under
 `<submission_id>/<mail_id>/` in the feeder bucket (`storage.s3.feeder_bucket`) when the submission came
 through the prefix layout. It starts there because the e-mail fetch task deletes the working directory
-that holds the submission's archive shortly after the handoff, so a retry or a redo would no longer find
+that holds the submission's archive shortly after the handoff, so a retry would no longer find
 it. The archive on the shared volume (`mail_case_data` and `mail_work_data`, mounted in both
 `suspicious` and `suspicious_celery`) is the fallback, used when the store has no text for the mail. The
 worker then posts the body to `/v2/models/ai_mail/classify` over `suspicious_net`, stores the answer as
 one `AiAssessment` per case (with the model version, `v0` today), fills the case's AI result, score,
 confidence and category, closes the row and queues the case's reconcile. With the connector disabled
 nothing changes: the Cortex `AI_Mail_Analyzer` runs as before.
+
+**Keep it disabled in production for now.** Campaign detection and the case view's AI analyzer card
+read the Cortex AI analyzer's report (an `AnalyzerReport`), and the connector does not create one. So
+for every case analysed while `ai_model` is enabled:
+
+- no campaign is created or joined, no `campaign_updated` event is sent, and TheHive raises no
+  campaign alert;
+- the mail is not added to the ChromaDB collection that later detection compares new mails against,
+  so it stays missing as a neighbour even after the connector is disabled again;
+- the case view shows no AI analyzer card. The AI result in the overview still shows, because it
+  comes from the case's own fields.
+
+This lasts until campaign detection moves into the connector and the case view gets its AI section,
+both in a later change.
 
 ### When it fails
 

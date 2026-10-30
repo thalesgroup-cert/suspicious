@@ -15,11 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the result is stored as an `AiAssessment` per case (model version `v0` today). The model
   server gets a token-protected `/v2` API (`AI_INFERENCE_TOKEN`; without a token it answers 503
   rather than serving unauthenticated). Set the same token in `integrations.ai_model.token`. See
-  `docs/components/analyzers.md`.
+  `docs/components/analyzers.md`. Keep it disabled in production for now: until campaign detection
+  moves into the connector and the case view gets its AI section (a later change), enabling
+  `ai_model` stops campaign detection, the TheHive campaign alert and the AI analyzer card for new
+  cases.
 - Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
   be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already enabled.
-- With the connector enabled, an `.eml` archive now gets a provider row too (the analyzer ledger
-  shows a connector-run AI row) and still ends Inconclusive, as it did before.
 
 ### Fixed
 
