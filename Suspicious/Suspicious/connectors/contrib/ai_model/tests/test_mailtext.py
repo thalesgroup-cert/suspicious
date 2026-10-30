@@ -8,8 +8,10 @@ from unittest import mock
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
 
+from common.storage import FakeObjectStore, StoreError
 from connectors.contrib.ai_model import mailtext
 from connectors.contrib.ai_model.mailtext import read_archive_body
+from connectors.providers import ProviderUnavailable
 from suspicious.storage_backends import MinioMediaStorage
 
 
@@ -143,3 +145,108 @@ class ArchiveLocationTest(SimpleTestCase):
         self.assertEqual(
             read_archive_body(self.stored("", storage.open("mail.tar.gz"))), GOOD["m1.txt"].decode()
         )
+
+
+MAIL = "261007071836-7a54e9fcb2f6"
+BUCKET = "haruto.sato-submission-261007071836"
+STORE_OBJECTS = {f"{MAIL}/ref.txt": b"Text from the store", f"{MAIL}/ref.headers": b"Subject: hi\n"}
+
+
+def fake_store(objects=STORE_OBJECTS):
+    store = FakeObjectStore()
+    store.ensure_bucket(BUCKET)
+    for name, data in objects.items():
+        store.put(BUCKET, name, io.BytesIO(data), length=len(data))
+    return store
+
+
+class FailingStore(FakeObjectStore):
+    def __init__(self, error):
+        super().__init__()
+        self.error = error
+
+    def list_buckets(self):
+        raise self.error
+
+
+def mail_archive(tmp_path="/no/such/dir/mail.tar.gz", file_path=None):
+    """A MailArchive as the connector hands it over: the mail (for the store) and the archive file."""
+    if file_path is None:
+        file_path = mock.Mock()
+        file_path.open.side_effect = FileNotFoundError("no such object")
+    return SimpleNamespace(
+        mail=SimpleNamespace(mail_id=MAIL),
+        archive=SimpleNamespace(tmp_path=tmp_path, file_path=file_path),
+    )
+
+
+class ObjectStoreFirstTest(SimpleTestCase):
+    """The work dir is wiped soon after a submission: the object store is the durable copy."""
+
+    def read(self, store, archive=None):
+        with mock.patch.object(mailtext, "get_store", return_value=store):
+            return read_archive_body(archive or mail_archive())
+
+    def tar_on_disk(self, directory, members=GOOD):
+        path = os.path.join(directory, "mail.tar.gz")
+        with open(path, "wb") as handle:
+            handle.write(build_tar(members))
+        return path
+
+    def test_the_text_comes_from_the_store_when_the_archive_is_gone_from_disk(self):
+        self.assertEqual(self.read(fake_store()), "Text from the store")
+
+    def test_the_store_wins_over_a_readable_tar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = mail_archive(self.tar_on_disk(directory))
+            self.assertEqual(self.read(fake_store(), archive), "Text from the store")
+
+    def test_nothing_in_the_store_and_no_tar_gives_none(self):
+        self.assertIsNone(self.read(fake_store({})))
+        self.assertIsNone(self.read(FakeObjectStore()))
+
+    def test_a_blank_text_in_the_store_gives_none(self):
+        blank = {f"{MAIL}/ref.txt": b" \n ", f"{MAIL}/ref.headers": b"Subject: hi\n"}
+        self.assertIsNone(self.read(fake_store(blank)))
+
+    def test_a_store_without_headers_does_not_count(self):
+        self.assertIsNone(self.read(fake_store({f"{MAIL}/ref.txt": b"Text from the store"})))
+
+    def test_not_found_in_the_store_falls_back_to_a_readable_tar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = mail_archive(self.tar_on_disk(directory))
+            for store in (FakeObjectStore(), FailingStore(StoreError("not_found", "no such bucket"))):
+                with self.subTest(store=type(store).__name__):
+                    self.assertEqual(self.read(store, archive), GOOD["m1.txt"].decode())
+
+    def test_a_store_error_falls_back_to_a_readable_tar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = mail_archive(self.tar_on_disk(directory))
+            store = FailingStore(StoreError("unavailable", "http://rustfs:9000 refused"))
+            self.assertEqual(self.read(store, archive), GOOD["m1.txt"].decode())
+
+    def test_a_store_error_with_no_tar_is_a_retryable_unavailable_without_detail(self):
+        errors = (
+            StoreError("unavailable", "could not connect to http://rustfs:9000 key=AKIA123"),
+            ConnectionError("rustfs:9000 refused"),
+        )
+        for error in errors:
+            with self.subTest(error=type(error).__name__):
+                with self.assertRaises(ProviderUnavailable) as caught:
+                    self.read(FailingStore(error))
+                self.assertTrue(caught.exception.retryable)
+                self.assertEqual(str(caught.exception), f"object store unavailable: {type(error).__name__}")
+                for secret in ("rustfs", "9000", "AKIA123", "http"):
+                    self.assertNotIn(secret, str(caught.exception))
+
+    def test_a_store_error_and_a_tar_without_text_is_still_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = mail_archive(self.tar_on_disk(directory, {"m1.headers": b"H: v\n"}))
+            with self.assertRaises(ProviderUnavailable):
+                self.read(FailingStore(StoreError("unavailable", "boom")), archive)
+
+    def test_without_a_mail_id_the_store_is_not_consulted(self):
+        store = mock.Mock()
+        with mock.patch.object(mailtext, "get_store", return_value=store) as get_store:
+            self.assertIsNone(read_archive_body(archive(build_tar({"m1.headers": b"H: v\n"}))))
+        get_store.assert_not_called()

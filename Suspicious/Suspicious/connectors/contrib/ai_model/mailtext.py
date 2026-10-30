@@ -1,8 +1,8 @@
-"""Read the mail body out of a case's mail archive (a tar with ``<ref>.txt`` and
-``<ref>.headers`` members) without touching the disk.
-
-The limits and the member rules mirror Analyzers/AIMailAnalyzer/mail_archive.py, which
-extracts the same archive for the Cortex analyzer."""
+"""Read a case's mail body. The object store holds the durable copy (``<mail_id>/<ref>.txt`` and
+``.headers``); the submission's tar.gz on the work disk is only a fallback, because
+tasp/cron/fetch_emails.py deletes it as soon as the handoff ends. The tar is read in memory,
+never extracted, and its limits and member rules mirror Analyzers/AIMailAnalyzer/mail_archive.py,
+which extracts the same archive for the Cortex analyzer."""
 from __future__ import annotations
 
 import logging
@@ -10,6 +10,10 @@ import os
 import tarfile
 import zlib
 from pathlib import PurePosixPath
+
+from common.storage import get_store
+from connectors.providers import ProviderUnavailable
+from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import fetch_mail_text_from_minio
 
 logger = logging.getLogger("connectors.contrib.ai_model")
 
@@ -37,8 +41,35 @@ def _open_archive(stored):
     return stored.file_path.open("rb")
 
 
+def _read_object_store(mail_archive) -> str | None:
+    """The mail's text from the object store; None when it has no ``.txt`` and ``.headers`` there
+    or the text is blank. Store errors propagate."""
+    mail_id = getattr(getattr(mail_archive, "mail", None), "mail_id", "") or ""
+    if not mail_id:
+        return None
+    headers, text = fetch_mail_text_from_minio(get_store(), str(mail_id))
+    return text if headers.strip() and text.strip() else None
+
+
 def read_archive_body(mail_archive) -> str | None:
-    """The mail's ``.txt`` text, or None when the archive is missing, unreadable, unsafe,
+    """The mail's text: from the object store, else from its tar archive. None when neither has a
+    ``.txt`` and a ``.headers`` with a non-blank text. ProviderUnavailable (retryable) when the
+    store failed and the archive cannot stand in: an outage must not become a verdict."""
+    store_error = None
+    try:
+        text = _read_object_store(mail_archive)
+    except Exception as exc:  # noqa: BLE001 -- the store client's failures are many; the class name is reported
+        store_error, text = exc, None
+        logger.warning("object store read failed for mail archive: %s: %s", type(exc).__name__, exc)
+    if text is None:
+        text = _read_tar(mail_archive)
+    if text is None and store_error is not None:
+        raise ProviderUnavailable(f"object store unavailable: {type(store_error).__name__}") from store_error
+    return text
+
+
+def _read_tar(mail_archive) -> str | None:
+    """The ``.txt`` text of the mail's tar archive, or None when it is missing, unreadable, unsafe,
     lacks a ``.txt`` or a ``.headers`` member, or the text is blank."""
     stored = getattr(mail_archive, "archive", None)
     if stored is None:

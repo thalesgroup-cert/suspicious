@@ -108,12 +108,12 @@ Only one connector may provide `mail_ai` at a time. Enabling a second answers `4
 
 With the connector enabled, a mail's AI verdict comes from it and the Cortex AI job is not created. The
 AI analyzer gets a ledger row (`CaseAnalyzerJob`) with a `provider-` id instead of a Cortex job id. The
-Celery worker (`suspicious_celery`) reads the mail archive from the case volume (`mail_case_data` and
-`mail_work_data`, mounted in both `suspicious` and `suspicious_celery`), posts the body to
-`/v2/models/ai_mail/classify` over `suspicious_net`, stores the answer as one `AiAssessment` per case
-(with the model version, `v0` today), fills the case's AI result, score, confidence and category, closes
-the row and queues the case's reconcile. With the connector disabled nothing changes: the Cortex
-`AI_Mail_Analyzer` runs as before.
+Celery worker (`suspicious_celery`) reads the mail's `.txt` and `.headers` from the object store (the
+durable copy, under `<mail_id>/`; the submission's tar.gz on the work disk is deleted soon after the
+handoff and is only a fallback), posts the body to `/v2/models/ai_mail/classify` over `suspicious_net`,
+stores the answer as one `AiAssessment` per case (with the model version, `v0` today), fills the case's
+AI result, score, confidence and category, closes the row and queues the case's reconcile. With the
+connector disabled nothing changes: the Cortex `AI_Mail_Analyzer` runs as before.
 
 ### When it fails
 
@@ -132,7 +132,11 @@ the row and queues the case's reconcile. With the connector disabled nothing cha
   retries. They are setup errors that every case would hit, so they show as a `Failure` row and count
   against the breaker. They are never turned into a quiet `Inconclusive` success.
 - **A refusal of one mail (`400`, `413`, `422`)** is a verdict of "cannot tell": the row closes as
-  `Success` with an `Inconclusive` result. A mail with no readable archive ends the same way.
+  `Success` with an `Inconclusive` result. A mail with no readable text, in the store or in the archive,
+  ends the same way.
+- **Object store down.** If the store errors (not "not found") and the archive cannot stand in, the task
+  retries like a server outage and the row closes as `Failure` with `object store unavailable:
+  <ExceptionClass>`; it is not turned into an `Inconclusive` success.
 
 ## Source
 

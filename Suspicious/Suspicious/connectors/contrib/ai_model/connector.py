@@ -96,7 +96,7 @@ class AiModelConnector(Connector):
     def analyze(self, kind: str, case_id: int) -> ProviderResult:
         case = Case.objects.select_related("fileOrMail__mail").get(pk=case_id)
         mail = getattr(case.fileOrMail, "mail", None)
-        archive = MailArchive.objects.select_related("archive").filter(mail=mail).first() if mail else None
+        archive = MailArchive.objects.select_related("archive", "mail").filter(mail=mail).first() if mail else None
         if archive is None:
             return _inconclusive("no_mail_archive")
         body = read_archive_body(archive)
