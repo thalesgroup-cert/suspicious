@@ -8,6 +8,8 @@ from django.utils import timezone
 
 from ai_model.mailinfo import apply_mail_info
 from common.http_client import get_breaker, RETRY
+from connectors.base import PROVIDER_KIND_MAIL_AI
+from connectors.providers import has_provider_job, queue_provider_analysis
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.migrations._tier_seed import tier_for
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
@@ -176,8 +178,12 @@ class CortexJob:
             case (Case): The case the dispatched jobs belong to.
 
         Returns:
-            str or None: The job ID of the launched Cortex AI job, or None if launch failed.
+            str or None: The job ID of the launched Cortex AI job, or None if launch failed
+            or the case was handed to the enabled mail_ai provider instead.
         """
+        if queue_provider_analysis(case, PROVIDER_KIND_MAIL_AI) is not None:
+            return None
+
         if data_type != "file":
             return None
 
@@ -788,6 +794,8 @@ class CortexJobManager:
         Args:
             case (Case): The case to manage.
         """
+        if has_provider_job(case):
+            return  # the provider task wrote the AI fields; a Cortex report must not overwrite them
         try:
             eml = getattr(case.fileOrMail, "mail", None)
             if not eml or not getattr(eml, "mail_id", None):
