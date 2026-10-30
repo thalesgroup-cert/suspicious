@@ -5,13 +5,19 @@ import tempfile
 from types import SimpleNamespace
 from unittest import mock
 
+from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
+from case_handler.models import Case, CaseHasFileOrMail
 from common.storage import FakeObjectStore, StoreError
 from connectors.contrib.ai_model import mailtext
 from connectors.contrib.ai_model.mailtext import read_archive_body
 from connectors.providers import ProviderUnavailable
+from file_process.models import File
+from hash_process.models import Hash
+from mail_feeder.models import Mail, MailArchive
 from suspicious.storage_backends import MinioMediaStorage
 
 
@@ -306,3 +312,101 @@ class ObjectStoreFirstTest(SimpleTestCase):
         with mock.patch.object(mailtext, "get_store", return_value=store) as get_store:
             self.assertIsNone(read_archive_body(archive(build_tar({"m1.headers": b"H: v\n"}))))
         get_store.assert_not_called()
+
+
+class ReadArchiveMaterialTest(SimpleTestCase):
+    """The headers and the text, the same bytes the Cortex analyzer read, from the same sources."""
+
+    def read(self, store, archive=None):
+        with mock.patch.object(mailtext, "get_store", return_value=store):
+            return mailtext.read_archive_material(archive or mail_archive())
+
+    def test_material_from_the_store_by_the_mail_id_bucket(self):
+        self.assertEqual(
+            self.read(fake_store()), mailtext.MailMaterial(headers="Subject: hi\n", text="Text from the store")
+        )
+
+    def test_material_from_the_store_in_the_feeder_prefix_layout(self):
+        store = FakeObjectStore()
+        store.ensure_bucket("suspicious-feeder")
+        for name, data in ((f"sub-1/{MAIL}/ref.txt", b"Prefixed text"), (f"sub-1/{MAIL}/ref.headers", b"From: a\n")):
+            store.put("suspicious-feeder", name, io.BytesIO(data), length=len(data))
+        archive = mail_archive()
+        archive.bucket_name = "sub-1"
+        with mock.patch("settings.config.get_section", return_value={"feeder_bucket": "suspicious-feeder"}):
+            material = self.read(store, archive)
+        self.assertEqual(material, mailtext.MailMaterial(headers="From: a\n", text="Prefixed text"))
+
+    def test_a_web_upload_with_nothing_in_the_store_is_read_from_its_tar(self):
+        # A web-uploaded mail has no submission bucket and no copy in the store: the tar is all there is.
+        store = fake_store({"261007071836-0000000000aa/ref.txt": b"another mail"})
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "mail.tar.gz")
+            with open(path, "wb") as handle:
+                handle.write(build_tar(GOOD))
+            archive = mail_archive(path)
+            archive.bucket_name = ""
+            material = self.read(store, archive)
+        self.assertEqual(material, mailtext.MailMaterial(headers="Subject: hi\n", text=GOOD["m1.txt"].decode()))
+
+    def test_tar_headers_are_capped_and_decoded_like_the_text(self):
+        original = mailtext.MAIL_TEXT_MAX_BYTES
+        mailtext.MAIL_TEXT_MAX_BYTES = 1024
+        self.addCleanup(setattr, mailtext, "MAIL_TEXT_MAX_BYTES", original)
+        members = {"m1.txt": b"body", "m1.headers": b"X-Pad: caf\xe9" + b"A" * 4096}  # 11 bytes + padding
+        material = mailtext.read_archive_material(archive(build_tar(members)))
+        self.assertEqual(material.headers, "X-Pad: caf�" + "A" * (1024 - 11))
+
+    def test_a_tar_without_a_headers_member_gives_none(self):
+        self.assertIsNone(mailtext.read_archive_material(archive(build_tar({"m1.txt": b"body"}))))
+
+    def test_a_tar_with_blank_headers_gives_none(self):
+        members = {"m1.txt": b"body", "m1.headers": b" \n\n"}
+        self.assertIsNone(mailtext.read_archive_material(archive(build_tar(members))))
+
+    def test_a_store_outage_with_no_tar_is_unavailable(self):
+        with self.assertRaises(ProviderUnavailable) as caught:
+            self.read(FailingStore(StoreError("unavailable", "http://rustfs:9000 refused")))
+        self.assertTrue(caught.exception.retryable)
+        self.assertEqual(str(caught.exception), "object store unavailable: unavailable")
+
+    def test_read_archive_body_returns_only_the_text(self):
+        data = archive(build_tar(GOOD))
+        self.assertEqual(read_archive_body(data), mailtext.read_archive_material(data).text)
+        self.assertEqual(self.read(fake_store()).text, "Text from the store")
+
+
+class HeaderDictTest(SimpleTestCase):
+    """Keyed as the Cortex analyzer built it (mail_archive.get_header_dict_list), MIME words decoded."""
+
+    def test_a_mime_encoded_subject_is_decoded(self):
+        headers = mailtext.header_dict("Subject: =?utf-8?B?RmFjdHVyZSBpbXBhecOpZQ==?=\nFrom: a@b.example")
+        self.assertEqual(headers, {"Subject": ["Facture impayée"], "From": ["a@b.example"]})
+
+    def test_repeated_keys_keep_every_value_in_order(self):
+        headers = mailtext.header_dict("Received: from a\nReceived: from b\nSubject: hi\n")
+        self.assertEqual(headers, {"Received": ["from a", "from b"], "Subject": ["hi"]})
+
+    def test_no_headers_gives_an_empty_dict(self):
+        self.assertEqual(mailtext.header_dict(""), {})
+
+
+class MailArchiveForTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="ai", password="x")
+        self.mail = Mail.objects.create(subject="s", reportedBy="r", date=timezone.now(), to="t", mail_id="m1")
+        self.case = Case.objects.create(description="", reporter=self.user)
+        self.case.fileOrMail = CaseHasFileOrMail.objects.create(case=self.case, mail=self.mail)
+        self.case.save(update_fields=["fileOrMail"])
+
+    def test_the_case_mail_archive_comes_with_its_file_and_mail(self):
+        file = File.objects.create(linked_hash=Hash.objects.create(value="h1"), tmp_path="mail.tar.gz")
+        stored = MailArchive.objects.create(mail=self.mail, archive=file)
+        found = mailtext.mail_archive_for(Case.objects.get(pk=self.case.pk))
+        self.assertEqual(found, stored)
+        with self.assertNumQueries(0):
+            self.assertEqual((found.archive.tmp_path, found.mail.mail_id), ("mail.tar.gz", "m1"))
+
+    def test_no_archive_or_no_mail_gives_none(self):
+        self.assertIsNone(mailtext.mail_archive_for(self.case))
+        self.assertIsNone(mailtext.mail_archive_for(Case.objects.create(description="", reporter=self.user)))

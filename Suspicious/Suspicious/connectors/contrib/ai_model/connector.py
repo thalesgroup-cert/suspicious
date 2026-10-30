@@ -16,8 +16,7 @@ from connectors.base import (
     ProviderResult,
 )
 from connectors.contrib.ai_model.client import AiInferenceClient
-from connectors.contrib.ai_model.mailtext import read_archive_body
-from mail_feeder.models import MailArchive
+from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
 
 logger = logging.getLogger("connectors.contrib.ai_model")
 
@@ -95,8 +94,7 @@ class AiModelConnector(Connector):
 
     def analyze(self, kind: str, case_id: int) -> ProviderResult:
         case = Case.objects.select_related("fileOrMail__mail").get(pk=case_id)
-        mail = getattr(case.fileOrMail, "mail", None)
-        archive = MailArchive.objects.select_related("archive", "mail").filter(mail=mail).first() if mail else None
+        archive = mail_archive_for(case)
         if archive is None:
             return _inconclusive("no_mail_archive")
         body = read_archive_body(archive)
