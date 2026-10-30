@@ -124,7 +124,7 @@ def detect_campaign(case: Case, assessment: AiAssessment, text: str, headers: di
 ### Task 4: Subscription, task and changelog
 
 **Files:**
-- Modify: `connectors/contrib/ai_model/connector.py` (`events=(EVENT_CASE_FINALISED,)`, `on_case_finalised`), `connectors/tasks.py`, `CHANGELOG.md`
+- Modify: `connectors/contrib/ai_model/connector.py` (`events=(EVENT_CASE_FINALISED,)`, `on_case_finalised`), `connectors/tasks.py`, `CHANGELOG.md`, `docs/components/analyzers.md`
 - Test: `connectors/contrib/ai_model/tests/test_campaign_task.py`
 
 **Interfaces:**
@@ -134,11 +134,11 @@ def detect_campaign(case: Case, assessment: AiAssessment, text: str, headers: di
 @shared_task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3)
 def run_campaign_detection(self, case_id: int) -> None
 ```
-  `on_case_finalised(event)` calls `run_campaign_detection.delay(event.case_id)` and nothing else. The task loads the case, its `ai_assessment` and `mail_archive_for(case)`; no assessment, no archive or no material means return quietly; it opens the collection, runs `detect_campaign(case, assessment, material.text, header_dict(material.headers), current_profile(), collection)` and, with a campaign, `emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=campaign.id)`. `CampaignStoreUnavailable` and a retryable `ProviderUnavailable` retry with `countdown=30 * 2 ** self.request.retries`; when retries run out it logs the case id and exception class at ERROR and returns. It never uses the connector's breaker.
+  `on_case_finalised(event)` calls `run_campaign_detection.delay(event.case_id)` and nothing else. The task loads the case, its `ai_assessment` and `mail_archive_for(case)`; no assessment, no archive or no material means return quietly; it opens the collection, runs `detect_campaign(case, assessment, material.text, header_dict(material.headers), current_profile(), collection)` and, with a campaign, `emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=campaign.id)`. Any exception except a non-retryable `ProviderUnavailable` retries with `countdown=30 * 2 ** self.request.retries` (`detect_campaign` itself never raises once the campaign rows exist, so a retry is always before the rows; a lock timeout and a cache outage arrive here too); when retries run out it logs the case id and exception class at ERROR and returns. It never uses the connector's breaker.
 
 - [ ] **Step 1: Write the failing tests.** `test_the_hook_only_enqueues` (one `.delay`, no collection opened), `test_a_dangerous_assessment_creates_the_campaign_and_emits_once`, `test_a_second_delivery_adds_no_document_row_or_event`, `test_a_chroma_outage_retries_and_leaves_the_breaker_closed` (assert `get_breaker("ai_model").fail_counter` is unchanged and the task retried), `test_exhausted_retries_log_and_return`, `test_no_assessment_means_no_work`, `test_a_disabled_connector_receives_no_case_finalised` (through `emit`), `test_the_thehive_connector_receives_campaign_updated` (fake TheHive connector subscribed to the event).
 - [ ] **Step 2: Run** `ww test backend connectors.contrib.ai_model.tests.test_campaign_task`. Expected: FAIL.
-- [ ] **Step 3: Implement** the hook, the task and a `CHANGELOG.md` entry under `[Unreleased]`: with `ai_model` enabled, campaign detection and the TheHive campaign alert run from the connector.
+- [ ] **Step 3: Implement** the hook, the task and a `CHANGELOG.md` entry under `[Unreleased]`: with `ai_model` enabled, campaign detection and the TheHive campaign alert run from the connector. Also correct the Plan A caveat in the `CHANGELOG.md` "Added" entry and in `docs/components/analyzers.md` ("Keep it disabled in production for now", about lines 123 to 134): campaign detection, `campaign_updated` and the TheHive alert now work with the connector enabled; what is still missing is the AI analyzer card in the case view (a later change), so the advice becomes "keep it disabled until the case view has its AI section, unless losing that card is acceptable". State nothing about the Cortex removal; Task 10 rewrites these paragraphs.
 - [ ] **Step 4: Run** `ww test backend connectors`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(ai-model): run campaign detection from the connector on case_finalised`.
 
