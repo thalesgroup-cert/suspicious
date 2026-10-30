@@ -5,9 +5,10 @@ A campaign is a group of similar dangerous mails (ChromaDB similarity over the a
 campaign embedding). Membership lives in the database."""
 from __future__ import annotations
 
+import json
 import logging
 from collections import Counter
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 
 from django.db import transaction
 
@@ -33,7 +34,7 @@ logger = logging.getLogger("connectors.contrib.ai_model")
 
 
 class CampaignStoreUnavailable(Exception):
-    """The campaign store failed before any membership was written; detection can be retried."""
+    """A failure before any rows exist; the same call can be retried (store down or lock busy)."""
 
 
 @contextmanager
@@ -60,6 +61,34 @@ def _case_ids(docs: dict) -> list[int]:
     return list(dict.fromkeys(ids))
 
 
+def _is_vector(raw: str) -> bool:
+    try:
+        vector = json.loads(raw)
+    except ValueError:
+        return False
+    return isinstance(vector, list) and bool(vector) and all(
+        isinstance(x, (int, float)) and not isinstance(x, bool) for x in vector
+    )
+
+
+def _others(similar: dict, doc_id: str) -> dict:
+    """The neighbours without ``doc_id``: a rerun finds the case's own document, stored the first time."""
+    keep = [i for i, found in enumerate(similar["ids"][0]) if found != doc_id]
+    return {
+        key: [[similar[key][0][i] for i in keep]]
+        for key in ("ids", "embeddings", "metadatas", "documents", "distances")
+    }
+
+
+def _after_rows(case: Case, campaign: Campaign, failure: str, step) -> None:
+    # The rows are committed: a retry would stop at the member guard and lose the event, so a
+    # failure here is logged, never raised.
+    try:
+        step()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Case %s is in campaign %s but %s: %s", case.id, campaign.ref, failure, type(exc).__name__)
+
+
 def _title(docs: dict, case: Case) -> str:
     try:
         return get_most_common_subject(docs)[:255]
@@ -72,10 +101,16 @@ def detect_campaign(
     case: Case, assessment: AiAssessment, text: str, headers: dict, profile: CampaignProfile, collection
 ) -> Campaign | None:
     """Return the campaign ``case`` just created or joined, else None. CampaignStoreUnavailable
-    when Chroma fails before the membership rows are written."""
+    when Chroma fails or the lock is busy before the membership rows are written.
+
+    Not to be called inside an outer transaction.atomic(): the lock would be released before
+    the member rows commit, and a concurrent sibling would not see them."""
     if CampaignMember.objects.filter(case=case).exists():
         return None  # delivered more than once; already placed
     if not assessment.campaign_embedding.strip():
+        return None
+    if not _is_vector(assessment.campaign_embedding):
+        logger.warning("Case %s: the campaign embedding is not a list of numbers; not stored.", case.id)
         return None
     # The shape of the Cortex AI report, which the collection helpers read.
     full = {
@@ -103,13 +138,19 @@ def detect_campaign(
         return None
 
     # Mails of one campaign finalise in parallel: decide membership one at a time.
-    with cache_lock("campaign:detect", ttl=120, wait=90):
+    with ExitStack() as lock:
+        try:
+            lock.enter_context(cache_lock("campaign:detect", ttl=120, wait=90))
+        except RuntimeError as exc:
+            raise CampaignStoreUnavailable("campaign lock timed out") from exc
         with _store_unavailable(failed):
             similar = get_similar_dangerous_mails(
                 assessment.campaign_embedding, collection, n_results=profile.neighbours
             )
             docs = (
-                get_phishing_campaign(similar, profile.distance_threshold, profile.min_members)
+                get_phishing_campaign(
+                    _others(similar, f"case-{case.id}"), profile.distance_threshold, profile.min_members
+                )
                 if similar.get("ids") else None
             )
             if not docs:
@@ -129,16 +170,14 @@ def detect_campaign(
             for cid in member_ids:
                 if cid in existing:
                     CampaignMember.objects.get_or_create(case_id=cid, defaults={"campaign": campaign})
+            members = campaign.members.count()
 
-        # The rows are written: a retry would stop at the guard above and lose the event, so a
-        # store failure here only leaves the Campaigns page short of this mail.
-        try:
-            add_to_suspicious_collection(full, "", campaign.ref, case.id, collection, extra_metadata=extra)
-            set_campaign_ref(collection, [f"case-{c}" for c in member_ids], campaign.ref)
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "Case %s joined campaign %s but the campaign store was not updated: %s",
-                case.id, campaign.ref, type(exc).__name__,
-            )
-    logger.info("Case %s is in campaign %s (%d members).", case.id, campaign.ref, campaign.members.count())
+        _after_rows(case, campaign, "its document was not stored", lambda: add_to_suspicious_collection(
+            full, "", campaign.ref, case.id, collection, extra_metadata=extra
+        ))
+        _after_rows(case, campaign, "the members were not tagged", lambda: set_campaign_ref(
+            collection, [f"case-{c}" for c in member_ids], campaign.ref
+        ))
+        _after_rows(case, campaign, "the detection lock was not released", lock.close)
+    logger.info("Case %s is in campaign %s (%d members).", case.id, campaign.ref, members)
     return campaign

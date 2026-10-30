@@ -1,10 +1,13 @@
 import base64
 import dataclasses
 import json
+from contextlib import ExitStack, contextmanager
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.db import connection, transaction
 from django.test import TestCase
 
 from ai_model.campaign_profile import current_profile
@@ -197,7 +200,8 @@ class DetectionTest(TestCase):
         self.assertEqual(Campaign.objects.count(), 0)
 
     def test_a_chroma_error_after_the_rows_still_returns_the_campaign(self):
-        self._seed([_case() for _ in range(3)])
+        old = [_case() for _ in range(3)]
+        self._seed(old)
         case = _case()
         with patch.object(self.coll, "add", side_effect=RuntimeError(f"chroma down: {TEXT}")), \
                 self.assertLogs("connectors.contrib.ai_model", "ERROR") as logs:
@@ -205,6 +209,85 @@ class DetectionTest(TestCase):
         self.assertIsNotNone(campaign)
         self.assertEqual(campaign.members.count(), 4)
         self.assertNotIn(TEXT, "\n".join(logs.output))
+        for c in old:  # tagged although the case's own document was not stored
+            self.assertEqual(json.loads(self.coll.docs[f"case-{c.id}"]["sourceRefs"]), [campaign.ref])
+
+    def test_a_failed_tagging_still_stores_the_case_document(self):
+        self._seed([_case() for _ in range(3)])
+        case = _case()
+        with patch.object(self.coll, "update", side_effect=RuntimeError("chroma down")), \
+                self.assertLogs("connectors.contrib.ai_model", "ERROR"):
+            campaign = self._detect(case)
+        self.assertEqual(campaign.members.count(), 4)
+        self.assertEqual(json.loads(self.coll.docs[f"case-{case.id}"]["sourceRefs"]), [campaign.ref])
+
+    def test_nothing_queries_the_database_after_the_rows_commit(self):
+        # A failing query there would lose a campaign the caller has to announce.
+        self._seed([_case() for _ in range(3)])
+        case = _case()
+        assessment = _assessment(case)
+
+        def refuse(execute, sql, params, many, context):
+            raise AssertionError(f"query after the rows committed: {sql}")
+
+        @contextmanager
+        def atomic_then_refuse():
+            with transaction.atomic():
+                yield
+            blocked.enter_context(connection.execute_wrapper(refuse))
+
+        with ExitStack() as blocked, patch(f"{C}.transaction", SimpleNamespace(atomic=atomic_then_refuse)):
+            campaign = campaigns.detect_campaign(case, assessment, TEXT, HEADERS, self.profile, self.coll)
+        self.assertEqual(campaign.members.count(), 4)
+
+    def test_a_failed_lock_release_still_returns_the_campaign(self):
+        self._seed([_case() for _ in range(3)])
+        lock = MagicMock()
+        lock.__exit__.side_effect = ConnectionError("cache down")
+        with patch(f"{C}.cache_lock", return_value=lock), \
+                self.assertLogs("connectors.contrib.ai_model", "ERROR"):
+            self.assertIsNotNone(self._detect(_case()))
+
+    def test_a_busy_lock_is_raised_as_store_unavailable(self):
+        self._seed([_case() for _ in range(3)])
+        case = _case()
+        timeout = RuntimeError("Timed out waiting for lock 'campaign:detect'")
+        lock = MagicMock()
+        lock.__enter__.side_effect = timeout
+        with patch(f"{C}.cache_lock", return_value=lock), \
+                self.assertRaises(CampaignStoreUnavailable) as raised:
+            self._detect(case)
+        self.assertEqual(str(raised.exception), "campaign lock timed out")
+        self.assertIs(raised.exception.__cause__, timeout)
+        self.assertNotIn(f"case-{case.id}", self.coll.docs)
+        self.assertEqual(Campaign.objects.count(), 0)
+
+    def test_a_rerun_does_not_count_the_case_s_own_document(self):
+        self._seed([_case(), _case()])
+        case = _case()
+        assessment = _assessment(case)
+
+        def rerun():
+            return campaigns.detect_campaign(case, assessment, TEXT, HEADERS, self.profile, self.coll)
+
+        self.assertIsNone(rerun())  # two others: stored, no campaign
+        self.assertIn(f"case-{case.id}", self.coll.docs)
+        self.assertIsNone(rerun())  # its own stored document is not a third
+        self._seed([_case()])
+        self.assertEqual(rerun().members.count(), 4)
+
+    def test_an_embedding_that_is_not_a_list_of_numbers_is_not_stored(self):
+        self._seed([_case() for _ in range(3)])
+        for embedding in ("{not json", '["a", "b"]', '{"x": 1}', "[]"):
+            with self.subTest(embedding=embedding):
+                case = _case()
+                with self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs:
+                    self.assertIsNone(self._detect(case, embedding=embedding))
+                self.assertNotIn(f"case-{case.id}", self.coll.docs)
+                output = "\n".join(logs.output)
+                self.assertIn(f"Case {case.id}", output)
+                self.assertNotIn(embedding, output)
+        self.assertEqual(Campaign.objects.count(), 0)
 
 
 class OpenCollectionTest(TestCase):
