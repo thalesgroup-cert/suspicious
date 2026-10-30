@@ -13,14 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by default and the Cortex path is unchanged for instances that do not enable it. With the
   connector enabled, a mail's AI verdict comes from the connector, the Cortex AI job is not created,
   and the result is stored as an `AiAssessment` per case (model version `v0` today). The model
-  server gets a token-protected `/v2` API (`AI_INFERENCE_TOKEN`; without a token it answers 503
-  rather than serving unauthenticated). Set the same token in `integrations.ai_model.token`. See
-  `docs/components/analyzers.md`. Keep it disabled in production for now: until campaign detection
-  moves into the connector and the case view gets its AI section (a later change), enabling
-  `ai_model` stops campaign detection, the TheHive campaign alert and the AI analyzer card for new
-  cases.
+  server gets a `/v2` API (`AI_INFERENCE_TOKEN`): every `/v2` route except `/v2/health/live` and
+  `/v2/health/ready` needs the token, and answers 503 when the server has none set. Set the same
+  token in `integrations.ai_model.token`. See `docs/components/analyzers.md`. Keep it disabled in
+  production for now: until campaign detection moves into the connector and the case view gets its
+  AI section (a later change), enabling `ai_model` stops campaign detection, the TheHive campaign
+  alert and the AI analyzer card for new cases.
 - Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
-  be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already enabled.
+  be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already
+  enabled.
 
 ### Fixed
 

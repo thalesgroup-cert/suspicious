@@ -162,12 +162,15 @@ def test_a_body_far_over_max_chars_is_truncated_not_rejected(client, token_env):
     assert FakeVectorizer.max_len_seen <= server.MAX_MAIL_CHARS
 
 
+# Invisible and bidi characters are written as escapes so the source stays readable in review:
+# U+200B/200C/200D zero-width space/non-joiner/joiner, U+2060 word joiner, U+FEFF BOM,
+# U+202E right-to-left override, U+202C pop directional formatting.
 OBFUSCATED_BODIES = {
-    "zero_width_only": "​‌‍⁠﻿" * 200,
-    "zero_width_inside_words": "Ve​rify y‍our acc⁠ount n﻿ow",
+    "zero_width_only": "\u200b\u200c\u200d\u2060\ufeff" * 200,
+    "zero_width_inside_words": "Ve\u200brify y\u200dour acc\u2060ount n\ufeffow",
     "mixed_scripts": "Your раyраl αccount: الحساب "
-                     "账户 \U0001f512 rіsk ‮redli‬",
-    "combining_marks": "á̂̃̄" * 500,
+                     "账户 \U0001f512 rіsk \u202eredli\u202c",
+    "combining_marks": "a\u0301\u0302\u0303\u0304" * 500,
 }
 
 

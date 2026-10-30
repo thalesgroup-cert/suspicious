@@ -139,8 +139,13 @@ both in a later change.
 - **Where to look.** When the task fails a row, the reason is recorded in the row's `ConnectorDelivery`
   entry (event `analyze`, status `failed`, field `error`), listed by
   `GET /api/connectors/ai_model/deliveries/`.
-- **Server unreachable, timeout or 5xx.** The task retries twice with a short backoff. Each call waits
-  at most `timeout_seconds` (20 s), so the row closes as `Failure` within about 75 seconds. The case gets
+- **Server unreachable, timeout or 5xx.** The task retries twice, after a wait of 5 s plus up to 3 s of
+  jitter and then 10 s plus up to 3 s. `timeout_seconds` (20 s) is the socket timeout of the HTTP call:
+  it applies to each connect and each read, not to the whole call. A server that accepts the connection
+  and then hangs closes the row as `Failure` after roughly 75 to 81 seconds (three attempts of 20 s plus
+  the two waits). A server that sends bytes slowly can take longer, because the read timeout starts
+  again after each chunk. A stopped or refusing server fails each attempt at once, so the row closes
+  after the two waits alone, about 15 to 21 seconds (6.0 s and 11.3 s in a live drill). The case gets
   `results_ai = Inconclusive` and still finalises.
 - **Repeated failures** open the connector's circuit breaker. `GET /api/connectors/` does not report it:
   the breaker lives in the Celery worker process. Its effect shows on the rows. While it is open, new
