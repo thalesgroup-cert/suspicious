@@ -44,6 +44,8 @@ import mail_analysis
 from mail_analysis import MODEL_SPECS
 from ResNetMLP import ResNetMLP
 
+from .v2 import make_v2_router
+
 logger = logging.getLogger("inference_server")
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 
@@ -186,6 +188,22 @@ class ModelStore:
         "public" is comparative only, so it being incomplete is not an outage."""
         return self.vectorizer is not None and self.variant_ready("personal")
 
+    def health_payload(self) -> dict:
+        return {
+            "ready": self.ready(),
+            "vectorizer": {"loaded": self.vectorizer is not None, "error": self.vectorizer_error},
+            "variants": {
+                variant: {
+                    "ready": self.variant_ready(variant),
+                    "models": {
+                        name: {"loaded": slot.model is not None, "error": slot.error}
+                        for name, slot in slots.items()
+                    },
+                }
+                for variant, slots in self.slots.items()
+            },
+        }
+
 
 store = ModelStore(MODEL_DIRS)
 _inference_slots = threading.BoundedSemaphore(MAX_CONCURRENCY)
@@ -211,20 +229,7 @@ class ClassifyRequest(BaseModel):
 
 
 def _health_payload() -> dict:
-    return {
-        "ready": store.ready(),
-        "vectorizer": {"loaded": store.vectorizer is not None, "error": store.vectorizer_error},
-        "variants": {
-            variant: {
-                "ready": store.variant_ready(variant),
-                "models": {
-                    name: {"loaded": slot.model is not None, "error": slot.error}
-                    for name, slot in slots.items()
-                },
-            }
-            for variant, slots in store.slots.items()
-        },
-    }
+    return store.health_payload()
 
 
 @app.get("/health")
@@ -302,6 +307,13 @@ def _classify(models: dict, mail_body: str) -> dict:
         # keeps working unchanged.
         "email_embedding": str(email_embedding.tolist()[0]),
     }
+
+
+# Token-protected /v2 API beside the legacy routes; needs _classify, so it is
+# mounted here rather than right after app = FastAPI(...).
+app.include_router(
+    make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS)
+)
 
 
 @app.post("/classify")
