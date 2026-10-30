@@ -48,6 +48,7 @@ def queue_provider_analysis(case, kind: str):
     None when no provider is enabled."""
     if enabled_provider(kind) is None:
         return None
+    from case_handler.models import Result
     from connectors.tasks import run_provider_analysis
     from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
     from cortex_job.migrations._tier_seed import tier_for
@@ -64,6 +65,10 @@ def queue_provider_analysis(case, kind: str):
         analyzer=analyzer,
         status=CaseAnalyzerJob.STATUS_INPROGRESS,
     )
+    # Only finish_provider_analysis replaces this: a row closed any other way (fail_stale_jobs,
+    # a lost or failed enqueue) leaves the AI missing, not at the model default "Suspicious".
+    case.results_ai = Result.INCONCLUSIVE
+    case.save(update_fields=["results_ai"])
     transaction.on_commit(lambda: run_provider_analysis.delay(case.id, kind, job.id))
     return job
 

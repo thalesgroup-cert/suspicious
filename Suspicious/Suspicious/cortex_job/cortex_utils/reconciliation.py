@@ -76,6 +76,10 @@ def reconcile_case_core(case) -> None:
             transition(case, LifecycleState.ANALYZING)
         return
 
+    # A mail_ai provider closes its row and writes the AI fields outside the case lock, possibly
+    # after the caller loaded `case`: reload so scoring reads them and save() does not undo them.
+    case.refresh_from_db()
+
     if case.dispatched_at is None and case.creation_date > timezone.now() - RECONCILE_DISPATCH_GRACE:
         return
 

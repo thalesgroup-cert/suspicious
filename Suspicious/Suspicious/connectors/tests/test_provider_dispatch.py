@@ -1,4 +1,5 @@
 """mail_ai provider slot: queue the case, run the provider, close the ledger row."""
+from datetime import timedelta
 from unittest import mock
 
 import pybreaker
@@ -281,3 +282,43 @@ class ProviderDispatchTest(TestCase):
         self.case.refresh_from_db()
         self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
         finalise.assert_called_once()
+
+    @mock.patch("cortex_job.cortex_utils.reconciliation.run_campaign_detection")
+    @mock.patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
+    def test_a_provider_finishing_mid_reconcile_keeps_its_fields(self, *_):
+        job = self.queue()
+        stale = Case.objects.get(pk=self.case.pk)  # reconcile_case loads it before the ledger sync
+        with mock.patch.object(
+            CortexJobManager, "update_single_job",
+            side_effect=lambda caj: finish_provider_analysis(job.id, DANGEROUS, connector="dummy_provider"),
+        ):
+            reconcile_case_core(stale)  # finalise is NOT mocked: it scores and saves the case
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
+        self.assertEqual(
+            (self.case.results_ai, self.case.score_ai, self.case.confidence_ai,
+             self.case.category_ai),
+            ("Dangerous", 7, 81, "Classic_phishing"),
+        )
+
+    def test_a_provider_row_failed_by_fail_stale_jobs_leaves_the_ai_inconclusive(self):
+        from tasp.tasks import fail_stale_jobs
+
+        job = self.queue()
+        CaseAnalyzerJob.objects.filter(pk=job.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+        fail_stale_jobs.apply().get()
+        job.refresh_from_db()
+        self.case.refresh_from_db()
+        self.assertEqual(job.status, CaseAnalyzerJob.STATUS_FAILURE)
+        self.assertEqual(self.case.results_ai, "Inconclusive")
+
+    def test_a_failed_enqueue_leaves_the_ai_inconclusive(self):
+        with mock.patch.object(
+            run_provider_analysis, "apply_async", side_effect=RuntimeError("broker down")
+        ), self.assertRaises(RuntimeError), self.captureOnCommitCallbacks(execute=True):
+            self.queue()
+        self.case.refresh_from_db()
+        self.assertTrue(has_provider_job(self.case))
+        self.assertEqual(self.case.results_ai, "Inconclusive")
