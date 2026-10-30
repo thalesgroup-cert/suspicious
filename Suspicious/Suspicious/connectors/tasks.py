@@ -77,6 +77,25 @@ def run_provider_analysis(self, case_id: int, kind: str, job_id: int):
     finish_provider_analysis(job_id, None, error=error, **ledger)
 
 
+_mismatch_warned = False
+
+
+def _warn_collection_mismatch(profile) -> None:
+    """Log the cleanup/collection mismatch once per process. Never raises: it must not fail or
+    retry a detection. Checked again on later runs until it has been logged."""
+    global _mismatch_warned
+    if _mismatch_warned:
+        return
+    from connectors.contrib.ai_model.campaigns import collection_mismatch
+    try:
+        sentence = collection_mismatch(profile)
+        if sentence:
+            logger.warning(sentence)
+            _mismatch_warned = True
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Collection mismatch check failed: %s", type(exc).__name__)
+
+
 @shared_task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3)
 def run_campaign_detection(self, case_id: int) -> None:
     """Place one finalised case in a campaign (ai_model) and emit campaign_updated when it
@@ -104,6 +123,7 @@ def run_campaign_detection(self, case_id: int) -> None:
             logger.info("Case %s: no AI assessment or mail text, no campaign detection.", case_id)
             return
         profile = current_profile()
+        _warn_collection_mismatch(profile)
         campaign = detect_campaign(
             case, assessment, material.text, header_dict(material.headers), profile,
             open_collection(profile),

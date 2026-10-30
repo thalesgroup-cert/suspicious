@@ -17,12 +17,15 @@ from ai_model.models import AiAssessment
 from case_handler.models import Campaign, CampaignMember, Case
 from common.clients import get_chroma_client
 from common.locks import cache_lock
+from connectors.contrib.chromadb.connector import _DEFAULT_COLLECTION_NAME
 from connectors.contrib.thehive.utils import (
     extract_sender_domain_from_headers,
     get_most_common_subject,
     get_phishing_campaign,
     is_domain_in_campaign_allow_list,
 )
+from connectors.delivery import get_state
+from connectors.registry import registry
 from score_process.score_utils.chromadb_utils import (
     add_to_suspicious_collection,
     get_similar_dangerous_mails,
@@ -49,6 +52,25 @@ def _store_unavailable(what: str):
 def open_collection(profile: CampaignProfile):
     with _store_unavailable("campaign store unavailable"):
         return get_suspicious_collection(get_chroma_client(), profile.collection_name)
+
+
+def collection_mismatch(profile: CampaignProfile) -> str | None:
+    """A sentence when the chromadb cleanup connector runs against another collection than the
+    one detection writes to (so the 15-day window is not enforced), else None. Never raises: it
+    feeds a health message and a log line."""
+    try:
+        if not get_state("chromadb").enabled:
+            return None
+        watched = registry.instantiate("chromadb").config.get("collection_name", _DEFAULT_COLLECTION_NAME)
+    except Exception:  # noqa: BLE001
+        return None
+    if watched == profile.collection_name:
+        return None
+    return (
+        f"The chromadb connector cleans up collection '{watched}', but campaign detection stores "
+        f"mails in '{profile.collection_name}', so old campaign documents are not removed. "
+        f"Set collection_name of the chromadb connector to '{profile.collection_name}'."
+    )
 
 
 def _case_ids(docs: dict) -> list[int]:

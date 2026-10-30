@@ -9,6 +9,7 @@ from django.test import TestCase
 
 from case_handler.models import Campaign, CampaignMember
 from common.http_client import BREAKERS, get_breaker
+from connectors import tasks
 from connectors.base import (
     EVENT_CAMPAIGN_UPDATED,
     EVENT_CASE_FINALISED,
@@ -65,6 +66,8 @@ class CampaignTaskTest(TestCase):
             mock.patch("connectors.delivery.registry", registry),
             mock.patch(CHROMA, return_value=chroma),
             mock.patch(READ, return_value=MATERIAL),
+            mock.patch.object(tasks, "_mismatch_warned", False),
+            mock.patch(f"{C}.collection_mismatch", return_value=None),
         ]
         for patcher in patchers:
             patcher.start()
@@ -214,3 +217,29 @@ class CampaignTaskTest(TestCase):
         [event] = FakeTheHive.calls
         self.assertEqual((event.event, event.case_id, event.campaign_id),
                          (EVENT_CAMPAIGN_UPDATED, self.case.id, campaign.id))
+
+    def test_the_collection_warning_is_logged_once_across_two_runs(self):
+        _assessment(self.case)
+        sentence = "The chromadb cleanup watches 'suspicious', not 'suspicious_mails'."
+        with mock.patch(f"{C}.collection_mismatch", return_value=sentence), \
+                self.assertLogs("connectors.tasks", "WARNING") as logs:
+            self.run_task()
+            self.run_task()
+        self.assertEqual(logs.output, [f"WARNING:connectors.tasks:{sentence}"])
+
+    def test_no_mismatch_logs_nothing_and_is_checked_again_next_run(self):
+        _assessment(self.case)
+        with mock.patch(f"{C}.collection_mismatch", return_value=None) as check, \
+                self.assertNoLogs("connectors.tasks", "WARNING"):
+            self.run_task()
+            self.run_task()
+        self.assertEqual(check.call_count, 2)
+
+    def test_a_failing_collection_check_neither_fails_nor_retries_the_task(self):
+        _assessment(self.case)
+        with mock.patch(f"{C}.collection_mismatch", side_effect=RuntimeError(f"vault: {TEXT}")), \
+                mock.patch.object(run_campaign_detection, "retry") as retry, \
+                self.assertNoLogs("connectors.tasks", "WARNING"):
+            self.assertIsNone(self.run_task())
+        retry.assert_not_called()
+        self.assertIn(f"case-{self.case.id}", self.coll.docs)

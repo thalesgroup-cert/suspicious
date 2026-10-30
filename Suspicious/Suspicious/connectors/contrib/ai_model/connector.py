@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 
+from ai_model.campaign_profile import current_profile
 from ai_model.models import AiAssessment
 from case_handler.models import Case
 from connectors.base import (
@@ -16,6 +17,7 @@ from connectors.base import (
     HealthStatus,
     ProviderResult,
 )
+from connectors.contrib.ai_model.campaigns import collection_mismatch
 from connectors.contrib.ai_model.client import AiInferenceClient
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
 from connectors.tasks import run_campaign_detection
@@ -91,7 +93,14 @@ class AiModelConnector(Connector):
         try:
             ok, detail = self._client().ready()
         except ValueError as exc:
-            return HealthStatus(ok=False, detail=str(exc))
+            ok, detail = False, str(exc)
+        # Campaign detection is a function of this connector too: say when the cleanup misses it.
+        try:
+            mismatch = collection_mismatch(current_profile())
+        except Exception:  # noqa: BLE001 — a health check must not raise
+            mismatch = None
+        if mismatch:
+            detail = f"{detail.rstrip('. ')}. {mismatch}" if detail else mismatch
         return HealthStatus(ok=ok, detail=detail)
 
     def on_case_finalised(self, event) -> None:

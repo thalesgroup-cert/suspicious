@@ -16,6 +16,7 @@ from case_handler.models import Campaign, CampaignMember, Case
 from connectors.contrib.ai_model import campaigns
 from connectors.contrib.ai_model.campaigns import CampaignStoreUnavailable
 from connectors.contrib.ai_model.mailtext import header_dict
+from connectors.models import ConnectorState
 
 C = "connectors.contrib.ai_model.campaigns"
 TEXT = "pay now"
@@ -304,3 +305,29 @@ class OpenCollectionTest(TestCase):
             collection = campaigns.open_collection(current_profile())
         self.assertEqual(client.get_or_create_collection.call_args.kwargs["name"], "suspicious_mails")
         self.assertIs(collection, client.get_or_create_collection.return_value)
+
+
+class CollectionMismatchTest(TestCase):
+    def mismatch(self, enabled=True, config=None, **kw):
+        ConnectorState.objects.update_or_create(name="chromadb", defaults={"enabled": enabled})
+        with patch("settings.config.get_section", return_value=config or {}, **kw):
+            return campaigns.collection_mismatch(current_profile())
+
+    def test_the_cleanup_default_collection_is_not_the_profile_one(self):
+        message = self.mismatch()
+        self.assertIn("'suspicious'", message)
+        self.assertIn("'suspicious_mails'", message)
+        self.assertIn("collection_name", message)
+        self.assertIn("chromadb", message)
+
+    def test_a_cleanup_connector_on_the_profile_collection_has_no_message(self):
+        self.assertIsNone(self.mismatch(config={"collection_name": "suspicious_mails"}))
+
+    def test_another_collection_name_is_named_in_the_message(self):
+        self.assertIn("'old_mails'", self.mismatch(config={"collection_name": "old_mails"}))
+
+    def test_a_disabled_cleanup_connector_has_no_message(self):
+        self.assertIsNone(self.mismatch(enabled=False))
+
+    def test_an_unreadable_cleanup_config_has_no_message_and_does_not_raise(self):
+        self.assertIsNone(self.mismatch(side_effect=RuntimeError("vault down")))

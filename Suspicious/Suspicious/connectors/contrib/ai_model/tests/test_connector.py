@@ -106,11 +106,33 @@ class ResultMappingTest(SimpleTestCase):
 
 
 class HealthCheckTest(SimpleTestCase):
-    def check(self, config, ready):
-        with mock.patch.object(module, "AiInferenceClient") as client_class:
+    def check(self, config, ready, mismatch=None):
+        with mock.patch.object(module, "AiInferenceClient") as client_class, \
+                mock.patch.object(module, "current_profile"), \
+                mock.patch.object(module, "collection_mismatch", return_value=mismatch):
             client_class.return_value.ready.return_value = ready
             status = AiModelConnector(config).health_check()
         return status, client_class
+
+    def test_a_collection_mismatch_is_appended_without_changing_ok(self):
+        sentence = "Cleanup watches 'a'."
+        status, _ = self.check(CONFIG, (True, "ready, token accepted"), sentence)
+        self.assertEqual((status.ok, status.detail), (True, "ready, token accepted. Cleanup watches 'a'."))
+        status, _ = self.check(CONFIG, (False, "not ready (HTTP 503)"), sentence)
+        self.assertEqual((status.ok, status.detail), (False, "not ready (HTTP 503). Cleanup watches 'a'."))
+        status, _ = self.check({"url": "http://x"}, (True, ""), sentence)
+        self.assertEqual((status.ok, status.detail), (False, "token not configured. Cleanup watches 'a'."))
+
+    def test_no_mismatch_leaves_the_detail_as_it_was(self):
+        status, _ = self.check(CONFIG, (True, "ready, token accepted"))
+        self.assertEqual(status.detail, "ready, token accepted")
+
+    def test_a_failing_collection_check_does_not_break_the_health_check(self):
+        with mock.patch.object(module, "AiInferenceClient") as client_class, \
+                mock.patch.object(module, "current_profile", side_effect=RuntimeError("db down")):
+            client_class.return_value.ready.return_value = (True, "ready, token accepted")
+            status = AiModelConnector(CONFIG).health_check()
+        self.assertEqual((status.ok, status.detail), (True, "ready, token accepted"))
 
     def test_health_check_ok_and_not_ok(self):
         status, client_class = self.check(CONFIG, (True, "ready, token accepted"))
