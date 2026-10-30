@@ -106,6 +106,12 @@ class ConnectorRegistry:
             if event_name in cls.manifest.events
         ]
 
+    def providers(self, kind: str) -> list[str]:
+        return [
+            name for name, cls in sorted(self._classes.items())
+            if cls.manifest.provides == kind
+        ]
+
     def scheduled(self) -> list[tuple[str, Schedule]]:
         return [
             (name, schedule)

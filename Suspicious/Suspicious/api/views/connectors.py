@@ -118,6 +118,13 @@ class ConnectorStateView(APIView):
         if not isinstance(enabled, bool):
             return Response({"detail": "'enabled' must be a boolean."},
                             status=status.HTTP_400_BAD_REQUEST)
+        kind = registry.get(name).manifest.provides
+        if enabled and kind and any(
+            get_state(other).enabled
+            for other in registry.providers(kind) if other != name
+        ):
+            return Response({"detail": f"{name} already provides {kind}"},
+                            status=status.HTTP_409_CONFLICT)
         state = get_state(name)
         state.enabled = enabled
         state.save(update_fields=["enabled", "updated_at"])
