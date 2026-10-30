@@ -251,11 +251,22 @@ class ObjectStoreFirstTest(SimpleTestCase):
                     self.read(FailingStore(error))
                 self.assertEqual(str(caught.exception), f"object store unavailable: {label}")
 
-    def test_the_warning_for_a_store_error_names_the_mail(self):
+    def test_a_denied_or_invalid_store_request_fails_at_once(self):
+        for code in ("access_denied", "invalid"):
+            with self.subTest(code=code):
+                with self.assertRaises(ProviderUnavailable) as caught:
+                    self.read(FailingStore(StoreError(code, "boom")))
+                self.assertFalse(caught.exception.retryable)
+
+    def test_the_warning_for_a_store_error_names_the_mail_and_the_label_not_the_message(self):
+        error = StoreError("unavailable", "could not connect to http://rustfs:9000/bucket/key.txt")
         with self.assertLogs("connectors.contrib.ai_model", level="WARNING") as logs:
             with self.assertRaises(ProviderUnavailable):
-                self.read(FailingStore(StoreError("unavailable", "boom")))
-        self.assertTrue(any(MAIL in line for line in logs.output), logs.output)
+                self.read(FailingStore(error))
+        line = next(line for line in logs.output if MAIL in line)
+        self.assertIn("unavailable", line)
+        for detail in ("rustfs", "9000", "key.txt", "http"):
+            self.assertNotIn(detail, line)
 
     def test_the_feeder_prefix_layout_is_found_from_the_archive_bucket_name(self):
         objects = {

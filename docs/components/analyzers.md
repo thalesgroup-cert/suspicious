@@ -139,8 +139,9 @@ nothing changes: the Cortex `AI_Mail_Analyzer` runs as before.
 - **A refusal of one mail (`400`, `413`, `422`)** is a verdict of "cannot tell": the row closes as
   `Success` with an `Inconclusive` result. A mail with no readable text, in the store or in the archive,
   ends the same way.
-- **Object store down.** If the store errors (not "not found") and the archive cannot stand in, the task
-  retries like a server outage and the row closes as `Failure`. The delivery `error` reads
+- **Object store down.** If the store errors (not "not found") and the archive cannot stand in, the row
+  closes as `Failure`. An `access_denied` or `invalid` error fails it at once, without retries;
+  `unavailable` and any other error are first retried twice like a server outage. The delivery `error` reads
   `object store unavailable: <label>`, where the label is the store's error code (for example
   `unavailable` or `access_denied`) or, for any other error such as a configuration problem, the
   exception class name. It is not turned into an `Inconclusive` success.

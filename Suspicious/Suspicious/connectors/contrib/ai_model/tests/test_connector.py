@@ -15,7 +15,7 @@ import settings.config as settings_config
 from ai_model.models import AiAssessment
 from case_handler.models import Case, CaseHasFileOrMail
 from common.http_client import BREAKERS
-from common.storage import FakeObjectStore
+from common.storage import FakeObjectStore, StoreError
 from connectors.base import ProviderResult
 from connectors.contrib.ai_model import connector as module
 from connectors.contrib.ai_model import mailtext
@@ -371,4 +371,18 @@ class ArchiveGoneBetweenAttemptsTest(TestCase):
     def test_the_same_with_the_feeder_prefix_layout(self):
         self.upload("suspicious-feeder", "sub-1/")  # <submission_id>/<mail_id>/<ref>.txt
         MailArchive.objects.filter(pk=self.archive.pk).update(bucket_name="sub-1")
+        self.drill()
+
+    def test_the_same_with_a_submission_id_s3_cannot_name_a_bucket_after(self):
+        submission = "Haruto.Sato_jp-submission-261007071836"  # the feeder keeps case and "_" in the id
+        real_bucket_exists = self.store.bucket_exists
+
+        def bucket_exists(bucket):  # S3 answers 400 to a bucket name it cannot hold, mapped to invalid
+            if bucket != bucket.lower() or "_" in bucket:
+                raise StoreError("invalid", "400 Bad Request", bucket=bucket)
+            return real_bucket_exists(bucket)
+
+        self.store.bucket_exists = bucket_exists
+        self.upload("suspicious-feeder", f"{submission}/")
+        MailArchive.objects.filter(pk=self.archive.pk).update(bucket_name=submission)
         self.drill()

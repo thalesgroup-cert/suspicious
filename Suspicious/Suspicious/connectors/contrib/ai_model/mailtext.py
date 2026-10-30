@@ -59,23 +59,24 @@ def _read_object_store(mail_archive) -> str | None:
 
 def read_archive_body(mail_archive) -> str | None:
     """The mail's text: from the object store, else from its tar archive. None when neither has a
-    ``.txt`` and a ``.headers`` with a non-blank text. ProviderUnavailable (retryable) when the
-    store failed and the archive cannot stand in: an outage must not become a verdict."""
-    store_error = None
+    ``.txt`` and a ``.headers`` with a non-blank text. ProviderUnavailable when the store failed and
+    the archive cannot stand in (an outage must not become a verdict); retryable unless the store
+    answered access_denied or invalid."""
+    store_error = label = None
     try:
         text = _read_object_store(mail_archive)
     except Exception as exc:  # noqa: BLE001 -- the store client's failures are many; the label is reported
+        # A StoreError code is a fixed word; anything else gets its class name. Never the message,
+        # which can carry the endpoint or a key.
         store_error, text = exc, None
-        logger.warning(
-            "object store read failed for mail %s: %s: %s", _mail_id(mail_archive), type(exc).__name__, exc
-        )
+        label = exc.code if isinstance(exc, StoreError) else type(exc).__name__
+        logger.warning("object store read failed for mail %s: %s", _mail_id(mail_archive), label)
     if text is None:
         text = _read_tar(mail_archive)
     if text is None and store_error is not None:
-        # A StoreError code is a fixed word; anything else gets its class name. Never the message,
-        # which can carry the endpoint or a key.
-        label = store_error.code if isinstance(store_error, StoreError) else type(store_error).__name__
-        raise ProviderUnavailable(f"object store unavailable: {label}") from store_error
+        # Denied and invalid will not change on a retry; an outage or an unknown error may.
+        permanent = isinstance(store_error, StoreError) and store_error.code in ("access_denied", "invalid")
+        raise ProviderUnavailable(f"object store unavailable: {label}", retryable=not permanent) from store_error
     return text
 
 

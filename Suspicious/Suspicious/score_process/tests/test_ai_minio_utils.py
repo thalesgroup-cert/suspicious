@@ -197,6 +197,20 @@ class FetchMailTextLayoutsTest(SimpleTestCase):
             sorted(store.opened), [f"{SUB}/{MAIL}/ref.headers", f"{SUB}/{MAIL}/ref.txt"]
         )
 
+    def test_a_submission_id_s3_cannot_name_a_bucket_after_is_found_in_the_feeder_bucket(self, _config):
+        sub = "John.Doe-submission-261007071836"  # the feeder keeps the reporter's case in the id
+        store = feeder_store({f"{sub}/{MAIL}/ref.headers": b"Subject: hi\n", f"{sub}/{MAIL}/ref.txt": b"Body"})
+        real_bucket_exists = store.bucket_exists
+
+        def bucket_exists(bucket):  # S3 answers 400 to a bucket name it cannot hold, mapped to invalid
+            if bucket != bucket.lower():
+                raise StoreError("invalid", "400 Bad Request", bucket=bucket)
+            return real_bucket_exists(bucket)
+
+        store.bucket_exists = bucket_exists
+        self.assertEqual(fetch_mail_text_from_minio(store, MAIL, bucket_name=sub), ("Subject: hi\n", "Body"))
+        self.assertEqual(sorted(store.opened), [f"{sub}/{MAIL}/ref.headers", f"{sub}/{MAIL}/ref.txt"])
+
     def test_a_bucket_named_like_the_submission_is_used_even_without_the_timestamp_suffix(self, _config):
         store = recording_store_in("case-bucket")
         self.assertEqual(
