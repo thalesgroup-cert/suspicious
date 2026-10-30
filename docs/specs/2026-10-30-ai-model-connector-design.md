@@ -47,7 +47,9 @@ those alerts silently. See section 7.
 - The AI result has its own section in the case view, shown only while the module is enabled.
 - Failure of the model server never blocks a case for long and never fakes a result.
 - Phishing-campaign detection and the TheHive phishing-campaign alert keep working with the same
-  behaviour, and belong to the connector.
+  behaviour, and belong to the connector. Their parameters are versioned with the model, the gate
+  measures how a model does on campaigns it has not seen, and shadow shows how a candidate would
+  change campaign alerts before it goes live.
 
 ## Non-goals
 
@@ -60,6 +62,8 @@ those alerts silently. See section 7.
 - No SetFit, no local language-model triage, no per-user models.
 - No new TheHive alert types. The campaign alert, the challenge alert and the push button keep their
   current behaviour.
+- Campaign membership is not an input of the model and does not create training labels. It is
+  derived from the model's own Dangerous call and the embedding, so using it would be circular.
 - No external services: everything runs locally on CPU hosts.
 
 ## Anti-goals
@@ -85,6 +89,7 @@ those alerts silently. See section 7.
 | D10 | **Decided.** The phishing alert to TheHive that depends on the AI analyzer (campaign detection and its alert) moves to the connector and keeps working. |
 | D11 | **Decided.** The Celery worker can reach the review mailbox over IMAPS, as the email feeder does. |
 | D12 | **Decided.** The `ai_inference` image can download the encoder from Hugging Face at build time. |
+| D13 | **Decided.** Campaign detection is part of the model versioning in v1: a campaign profile per version, campaign-level evaluation in the gate, a campaign dry run in shadow, live campaign counters per version, and a campaign cross-check in the AI section. A live new-campaign recall per version is deferred. |
 
 Volumes given by the owner: about 2,550 mails analysed per month (about 85 a day) and 20 to 30
 challenged mails per month.
@@ -209,13 +214,36 @@ models, prefix per version):
 | `heads/*.pth` | The five heads: safe/unwanted split, spam/dangerous split, internal/external, spam/newsletter, phishing sub-type |
 | `calibration.json` | Temperature for the main decision and the tier cutoffs derived from held-out data |
 | `knn_index.npz` | Embeddings, label ids and case ids of the labelled mails used |
-| `manifest.json` | Version id, recipe id, preprocessing version, encoder id and hash, ledger snapshot digest, metrics and gate results, parent version, trainer revision |
+| `campaign_profile.json` | The campaign profile (below) |
+| `manifest.json` | Version id, recipe id, preprocessing version, encoder id and hash, ledger snapshot digest, the campaigns the training labels belonged to (references and a digest), metrics and gate results, parent version, trainer revision |
+
+**Campaign profile.** The settings under which campaign detection works, recorded with every
+version and copied to every `AiAssessment`:
+
+| Field | Value today |
+|---|---|
+| `embedding_version` | `cmp-e1` (a name, bumped on any change below) |
+| `encoder_id`, `encoder_hash` | `paraphrase-multilingual-mpnet-base-v2` and its hash |
+| `preprocessing` | first 128 tokens, as today |
+| `metric`, `distance_threshold` | cosine, 0.25 |
+| `min_members`, `n_neighbours` | 3, 20 |
+| `window_days` | 15 |
+| `trigger` | the AI class is Dangerous |
+| `allow_list_digest` | digest of the campaign sender allow-list when the version was made |
+
+A new classifier version normally copies the active profile unchanged. A version that changes it is
+a profile migration (section 7).
 
 The DB registry (`ModelVersion`) holds status `candidate`, `shadow`, `active`, `previous` or
 `discarded`, a pointer to the bundle, who and what triggered the training, and the manifest.
 `active` and `shadow` are pointers that can be moved; every move writes an audit row (`ModelEvent`)
 with the user, the time and a note. Models for these tables live in a new Django app, `ai_model`,
 so its migrations are isolated (**Call**).
+
+The registry also keeps a daily roll-up per version (`ModelVersionStats`): mails scored, Dangerous
+calls, campaign checks, campaigns created and joined, TheHive campaign alerts raised. Each
+`AiAssessment` names the version that produced it, so every campaign event is attributed to a
+version.
 
 **Version 0.** On first enable, the connector imports the weights that run in production today as
 version 0, with the legacy preprocessing and the legacy decision rule. Cutover therefore changes no
@@ -236,6 +264,7 @@ One row per label observation, append-only. A correction adds a row that superse
 | `trust` | `folder` (filed by an analyst), `verdict` (edit in Suspicious), `proposal` (reporter, never trained on) |
 | `observed_at` | When the label was seen |
 | `embedding`, `preprocessing_version` | Vector computed by the model server |
+| `campaign_embedding`, `embedding_version` | The vector under the campaign profile, used to build campaign groups |
 | `snapshot` | Sender domain (from the stored headers), subject length, link domains, SPF/DKIM/DMARC, Cortex band per analyzer, allow/deny hits, the AI answer at that time. Not used in v1 |
 | `status` | `active`, `superseded`, `flagged` |
 | `flag_reason` | For example `folder_verdict_mismatch`, `duplicate` |
@@ -245,7 +274,7 @@ forwarded `message/rfc822` attachment, extracts its `Message-ID` header, and mat
 `Message-ID` in the stored mail headers (`Mail.mail_header`). `Mail.mail_id` cannot be used: it is
 the feeder's generated id, not the Message-ID (checked on the dev stack). A mail without a
 Message-ID is matched on sender, date and subject; the builder details that. The first run
-backfills the whole history. Verdict rows come from cases an analyst edited (`last_update_by` set),
+backfills the whole history and computes both embeddings (classifier and campaign) for each row. Verdict rows come from cases an analyst edited (`last_update_by` set),
 recorded when the edit happens.
 
 **Precedence.** The folder is the label of record and the only source the model trains on. The
@@ -285,12 +314,18 @@ never redelivers it. Training itself runs in the `ai_inference` image.
 - Calibration: one temperature fitted on predictions for groups the model did not train on.
 - Tier cutoffs: chosen on the same held-out predictions so the High tier meets a precision target.
 
-**Groups.** Mails whose embeddings have cosine similarity of 0.95 or more are one group (connected
-components). Splits, calibration and the shadow comparison never separate a group. The threshold
-was checked on the legacy embedding space; chunk-averaged embeddings are more similar to each
-other, so the builder re-checks it (random-split versus grouped-split accuracy should still
-differ). A live case that is already in the ledger, for example after "Redo analysis", is excluded
-from its own neighbour list.
+**Groups.** Two kinds of group, both connected components:
+
+- Near-duplicate groups: mails whose classifier embeddings have cosine similarity of 0.95 or more.
+  Splits, calibration and the shadow comparison never separate one. The threshold was checked on the
+  legacy embedding space; chunk-averaged embeddings are more similar to each other, so the builder
+  re-checks it (random-split versus grouped-split accuracy should still differ).
+- Campaign groups: mails whose campaign embeddings are within the profile's distance threshold
+  (similarity 0.75), joined with the ties recorded in `CampaignMember` for cases that are known. The
+  gate's campaign check (below) splits on these.
+
+A live case that is already in the ledger, for example after "Redo analysis", is excluded from its
+own neighbour list.
 
 **Cost.** In the test bed, the repeated grouped evaluation took about 10 minutes on 10 cores and a
 final fit about a minute. The gate runs 3 repeats by default (**Call**); the builder measures it on
@@ -307,9 +342,12 @@ retrained on the same folds, because the active weights may have seen those mail
 4. Every head has at least 8 samples in every class. A head that cannot train fails the whole
    candidate; nothing is silently skipped (**Call**, a change from today's behaviour).
 5. The High tier is right at least 90% of the time (**Call**).
+6. On held-out campaign groups (the same folds, but split on campaign groups), Dangerous mails
+   called Safe are not above the baseline's rate plus a small tolerance (**Call**). This measures
+   what happens on a campaign the model has never seen; see Evidence, E8.
 
-The report stores per-class results with Wilson intervals, the confusion matrix, the tier table and
-the comparison with the active model. Optionally, an admin-supplied check set of recent public
+The report stores per-class results with Wilson intervals, the confusion matrix, the tier table, the
+campaign-held-out result and the comparison with the active model. Optionally, an admin-supplied check set of recent public
 phishing (see Evidence, E6) can add a recall floor; it is off by default.
 
 **Failure.** A failed or cancelled job leaves the active model untouched and records why.
@@ -327,11 +365,27 @@ a recomputation on the stored votes. Verdict flips matter more than class flips,
 retrained model's confidence is calibrated and will not look like the legacy numbers (see
 [Risks](#risks)).
 
+**Campaign dry run.** Detection starts from the AI class Dangerous, so a different model changes
+which mails reach it and how many TheHive alerts follow. Shadow therefore runs detection for the
+candidate in dry-run mode:
+
+- A separate shadow collection holds the candidate's own classification of each document. At shadow
+  start it is seeded by classifying the live collection's documents (about 15 days, 1,300 documents
+  at the owner's volume) with the candidate (**Call**), so the first days are not blind.
+- Dry run creates no `Campaign` or `CampaignMember` rows, sends no event and touches no live
+  collection. It records what would have happened for each case: no check, no campaign, would
+  create, would join, with the member case ids (`ShadowCampaignEffect`).
+- The comparison with the real events of the same period gives the **alert delta**: campaigns the
+  candidate would have raised that the active model did not, and the reverse.
+- If the candidate's campaign profile differs from the active one, the dry run must cover a full
+  profile window before promotion (**Call**).
+
 **Promotion conditions** (all **Call**; an admin can extend the shadow period):
 
 - At least 7 days and at least 500 mails scored. At about 85 mails a day this is about a week.
 - Every Safe-to-Dangerous or Dangerous-to-Safe flip of the case verdict has been reviewed by an
   admin, with a note.
+- Every campaign in the alert delta has been reviewed in the same way.
 - The gate still passes when re-run with the labels that arrived during shadow.
 
 Shadow shows agreement, the table of differences, and which version was closer when the case has an
@@ -370,17 +424,42 @@ alerts. D10 requires that this keeps working.
 - The assessment record replaces the lookup of an analyzer report by name. The mail text and headers
   come from the stored mail (`Mail.mail_body`, `Mail.mail_header`).
 - The campaign embedding is separate from the classifier's input. The server returns it with every
-  classify call, computed with the fixed preprocessing used today. When the classifier recipe moves
-  to whole-body chunks, the campaign embedding does not change, so new mails keep matching the
-  15-day window and the 0.25 threshold stays valid (**Call**). Changing the encoder or this
-  preprocessing is a separate migration: the window refills in 15 days or is re-embedded.
+  classify call, computed under the version's campaign profile (`cmp-e1`: the fixed preprocessing
+  used today). When the classifier recipe moves to whole-body chunks, the campaign embedding does
+  not change, so new mails keep matching the 15-day window and the 0.25 threshold stays valid
+  (**Call**).
 - The check runs for a case whose AI class is Dangerous. That equals today's "score above 6.5" for a
   Dangerous result (**Call**). Mails of other classes are still added to the collection, as today.
-- Shadow results never write to the collection and never emit campaign events.
+- Shadow results never write to the live collection, never create campaign rows and never emit
+  campaign events. Their effect is only recorded, in dry-run mode (section 6).
 - The labelled neighbours behind the "similar past cases" hint are a different store: long-lived,
   versioned with the model, labelled mails only. They are not the campaign collection.
 - No new alert types. The challenge alert and the push button are unchanged and keep reading the AI
   classification from the case fields.
+
+**Versioning the profile.** Every `AiAssessment` and every Chroma document carries the
+`embedding_version` of the profile that produced it. Detection compares only documents of its own
+version. The live collection keeps the name `suspicious_mails` for `cmp-e1`; a later profile uses
+`suspicious_mails__<embedding_version>` (**Call**), so a migration never mixes two embedding spaces.
+A profile migration fills the new collection beside the old one for a full window, with detection
+in dry-run, and only then switches (section 6). Changing the sender allow-list is not a profile
+change, but its digest is recorded so a replay can reproduce a past decision.
+
+**Live counters and purity.** The registry's daily roll-up (section 3) counts, per version, mails
+scored, campaign checks, campaigns created and joined, and TheHive campaign alerts raised (from the
+delivery ledger). **Purity** is the share of campaign members with an analyst label that are
+labelled Dangerous, with the number of labelled members beside it. The Settings versions table shows
+both. A warning appears when purity over the last 30 days is below 80% with at least 10 labelled
+members (**Call**): either the model or the threshold is raising campaigns that are not phishing.
+At the owner's volume few members are labelled, so the count stays visible; a purity figure on three
+labels means little.
+
+**Campaign cross-check.** When a case belongs to a campaign, the AI section shows the campaign
+reference, its size and the labels of the members that have one. If labelled siblings disagree with
+each other, or with this case's AI class, in a hard way (Dangerous against Safe), the case is flagged
+"campaign members disagree" and appears in the review queue in Settings. Sibling labels are display
+and review only. They never become training labels (**Call**): near-duplicates add little
+information, and the ledger already holds the folder label of record.
 
 **Check before relying on the 15-day window.** Detection writes to `suspicious_mails` (hard-coded
 in `get_suspicious_collection`), while the cleanup connector defaults to a collection named
@@ -400,7 +479,9 @@ nothing else breaks.
 Content: the class and sub-type; the confidence as High, Medium or Low with its meaning; the
 runner-up class when the tier is Low; the model version and age; the similar past cases with
 their label and provenance (shown only for cases the viewer may already open); a short statement of
-what the model reads (the body only) and does not read; and the **cross-check**: the other evidence in plain facts, built from the existing verdict
+what the model reads (the body only) and does not read; the **campaign line** when the case belongs
+to a campaign (reference, size, labels of labelled siblings, and a "campaign members disagree" flag);
+and the **cross-check**: the other evidence in plain facts, built from the existing verdict
 explanation (decisive rule, sources, allow/deny hits, flagged links), with an "AI disagrees with the
 evidence" flag when they conflict. No numeric confidence is shown. Cases analysed while the module
 was on keep their stored section, read-only and labelled with the version; with the module off they
@@ -408,16 +489,19 @@ are hidden too (**Call**).
 
 **Settings "AI model" card.** Admin-only and hidden when disabled. It shows: server health and
 breaker state with a reset; the active version, age, label counts by class and source; the
-schedule and the Retrain button; the latest candidate and its gate results; the shadow comparison
-and the review list; the version history with rollback; the label ledger summary and the list of
-flagged labels. A queue lists mails where the AI and the other evidence disagree, as candidates for
-review and labelling.
+schedule and the Retrain button; the latest candidate and its gate results, including the
+campaign-held-out result; the shadow comparison, the review list and the campaign dry-run table with
+the alert delta; the version history with rollback and, per version, the campaign counters and
+purity; the label ledger summary and the list of flagged labels. A queue lists mails where the AI and
+the other evidence disagree, and cases whose campaign members disagree, as candidates for review and
+labelling.
 
 **Connector gallery.** The standard card (enabled, configuration, health, last sync). It shows a
 read-only line pointing to the AI model card (**Call**).
 
 **API.** Read endpoints for status, versions, candidate, shadow comparison, ledger summary; write
-endpoints for retrain, promote, discard, rollback, extend shadow, review a flip, resolve a flag.
+endpoints for retrain, promote, discard, rollback, extend shadow, review a flip or a campaign
+difference, resolve a flag.
 Writes are admin-only, reads Admin and CISO (**Call**).
 
 ### 9. Confidence tiers and scoring
@@ -523,6 +607,23 @@ the repr of a dict, which also holds the real `Message-ID`; `Mail.mail_id` is a 
 markers are `last_update_by`, `final_score` and `final_confidence`. Authentication-Results headers
 are present on about a third of reported mails.
 
+**E8. Campaigns the model has not seen.** Held-out groups at looser and looser "same campaign"
+rules, on the campaign embedding (first-128-token space), 3 seeds, 5 folds. The production campaign
+rule is similarity above 0.75.
+
+| Same-campaign rule | Groups (largest) | Five heads: accuracy / Dangerous called Safe | Neighbour vote (5): accuracy / Dangerous called Safe |
+|---|---|---|---|
+| 0.95 | 263 (63) | 0.797 / 8.0% | 0.800 / 6.8% |
+| 0.90 | 229 (63) | 0.758 / 10.5% | 0.800 / 5.3% |
+| 0.85 | 203 (89) | 0.721 / 14.7% | 0.677 / 5.1% |
+| 0.80 | 180 (89) | 0.714 / 17.8% | 0.663 / 7.6% |
+| 0.75 | 145 (89) | 0.675 / 18.7% | 0.618 / 7.1% |
+
+On an unseen campaign the five heads miss about one Dangerous mail in five; the neighbour vote
+keeps misses near 7% but is worse on the other classes. The blend was not tested at campaign
+granularity. With 145 groups and 3 seeds this is a strong hint, not a figure; hence gate check 6
+rather than a fixed threshold, and a builder task to re-run it on the blend.
+
 ### Sources
 
 Google, MLOps continuous delivery and automation pipelines (levels, validation, rollback); Google,
@@ -536,6 +637,11 @@ model card (128-token limit). Datasets: Apache SpamAssassin public corpus; Nazar
 
 ## Risks
 
+- **Alert volume changes with the model.** A promoted model changes which mails reach campaign
+  detection. The shadow dry run and the reviewed alert delta are the guard; the seeded shadow
+  collection costs one batch classification of about 15 days of mail at shadow start.
+- **Purity needs labels.** At 20 to 30 labels a month, few campaign members are labelled, so purity
+  rests on small counts. It is shown with its count and warns only above a minimum.
 - **Silent loss of phishing campaigns.** Campaign detection and the TheHive alert depend on the AI
   analyzer today (section 7). The acceptance replay is the guard; it must run before the Cortex path
   is removed.
@@ -572,8 +678,11 @@ model card (128-token limit). Datasets: Apache SpamAssassin public corpus; Nazar
 - UI: the section is absent when the module is disabled; tiers and cross-check render; admin-only
   controls hidden from others; Playwright path through retrain, shadow, promote.
 - Campaigns: replay a recent campaign and compare membership and the `campaign_updated` payload with
-  the Cortex path; a shadow result writes nothing to the collection; with the module disabled no
-  detection runs; the TheHive alert is created against a fake TheHive.
+  the Cortex path; a shadow result writes nothing to the live collection, creates no campaign rows
+  and sends no event; the dry run records would-create and would-join correctly on a replayed
+  campaign; documents of another `embedding_version` are never compared; with the module disabled no
+  detection runs; the TheHive alert is created against a fake TheHive; the roll-up counts and the
+  purity figure match a hand count on a small fixture; sibling disagreement raises the flag.
 - Chaos: stop the inference container mid-case and during training.
 
 ## Left to the builder
@@ -590,7 +699,9 @@ image.
 Sender, subject and link features in the model (E5 shows link domains help); learning analyzer
 reliability from analyst-edited verdicts, which may be a better use of Cortex data than feeding it
 to the text model; SetFit; automatic promotion; an active-learning queue beyond the simple
-disagreement list; re-testing Cortex-as-input once about 300 edited labels with snapshots exist.
+disagreement list; re-testing Cortex-as-input once about 300 edited labels with snapshots exist; a
+live **new-campaign recall** per version (the first member's AI verdict against the campaign's
+eventual analyst verdict), which needs enough labelled campaigns first.
 
 ## Calls made in this document
 
@@ -622,3 +733,12 @@ disagreement list; re-testing Cortex-as-input once about 300 edited labels with 
 | C24 | The campaign embedding uses a fixed preprocessing, separate from the classifier's | Keeps the 15-day window and the 0.25 threshold valid when the recipe changes |
 | C25 | A class is decided only at a calibrated probability of at least 0.5, else Inconclusive | Same rule as today, applied to calibrated numbers |
 | C26 | A per-case `AiAssessment` record holds the full AI result | Campaign detection and the UI read one record instead of an analyzer report found by name |
+| C27 | The campaign profile is part of every version and changes only by an explicit migration | Keeps the embedding space and thresholds stable and reproducible |
+| C28 | The collection keeps its name for `cmp-e1`; later profiles use `suspicious_mails__<embedding_version>` | No data migration now, no mixed spaces later |
+| C29 | A version with a different campaign profile needs a full profile window of dry run before promotion | Detection needs 15 days of neighbours to be meaningful |
+| C30 | The ledger stores the campaign embedding, and campaign groups are components at the profile threshold joined with `CampaignMember` ties | Lets the gate test unseen campaigns without needing every label matched to a case |
+| C31 | Gate check 6: Dangerous called Safe on held-out campaigns not above the baseline plus a tolerance | E8 shows this is where the heads are weakest |
+| C32 | The shadow collection is seeded from the live collection at shadow start | Otherwise the dry run is blind for the first days |
+| C33 | Campaigns in the alert delta are reviewed with the verdict flips before promotion | A promotion changes TheHive alert volume |
+| C34 | Purity warning below 80% over 30 days with at least 10 labelled members | Arbitrary; the count is always shown |
+| C35 | Sibling labels in a campaign are display and review only, never training labels | Near-duplicates add little information |
