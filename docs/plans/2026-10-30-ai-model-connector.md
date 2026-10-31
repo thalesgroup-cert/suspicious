@@ -63,13 +63,13 @@ Names later plans rely on; Plan A defines the first four.
 
 ## Plan A: Provider slot, server v2, version 0
 
-**Status: done.** Built and merged as `docs/plans/2026-10-30-ai-model-connector-a-provider-slot.md` describes.
+**Status: done.** Built as `docs/plans/2026-10-30-ai-model-connector-a-provider-slot.md` describes and merged into the local `design/ai-model-connector` branch (not `main`, not pushed).
 
 Detailed in `docs/plans/2026-10-30-ai-model-connector-a-provider-slot.md` (8 tasks: server v2 health and token, v2 classify, `ai_model` app and `AiAssessment`, provider extension point, dispatch with ledger row and Celery task, the connector, parity with the Cortex report, wiring and a dev-stack check).
 
 ## Plan B: Campaigns in the connector and the Cortex cutover
 
-**Status: done.** Built and merged as `docs/plans/2026-10-30-ai-model-connector-b-campaigns.md` describes.
+**Status: done.** Built as `docs/plans/2026-10-30-ai-model-connector-b-campaigns.md` describes and merged into the local `design/ai-model-connector` branch (not `main`, not pushed).
 
 Detailed in `docs/plans/2026-10-30-ai-model-connector-b-campaigns.md` (10 tasks: campaign profile, mail material reader, detection port, subscription and task, collection-name check, parity replay command, dev-stack acceptance, then the cutover removal in three tasks that run only if the replay matches).
 
