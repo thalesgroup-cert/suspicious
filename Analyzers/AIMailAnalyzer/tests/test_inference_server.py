@@ -13,7 +13,9 @@ pytest); skipped cleanly where torch / sentence_transformers / fastapi are
 missing.
 """
 import hashlib
+import importlib
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -334,9 +336,24 @@ def test_oversized_body_is_truncated_not_rejected(make_app):
     assert FakeVectorizer.max_len_seen <= server.MAX_MAIL_CHARS
 
 
-def test_concurrent_requests_are_bounded_by_the_semaphore(make_app, monkeypatch):
+@pytest.fixture
+def max_concurrency_3():
+    """Re-import the server with INFERENCE_MAX_CONCURRENCY=3 (the default is 2), so the app, its
+    v2 router and the semaphore that router holds are all built from the setting."""
+    saved = os.environ.get("INFERENCE_MAX_CONCURRENCY")
+    os.environ["INFERENCE_MAX_CONCURRENCY"] = "3"
+    importlib.reload(server)
+    yield
+    if saved is None:
+        os.environ.pop("INFERENCE_MAX_CONCURRENCY")
+    else:
+        os.environ["INFERENCE_MAX_CONCURRENCY"] = saved
+    importlib.reload(server)
+
+
+def test_concurrent_requests_are_bounded_by_the_configured_concurrency(max_concurrency_3, make_app):
     client, _ = make_app()
-    monkeypatch.setattr(server, "_inference_slots", threading.BoundedSemaphore(2))
+    assert server.MAX_CONCURRENCY == 3
     FakeVectorizer.delay = 0.05
     results, errors = [], []
 
@@ -352,7 +369,7 @@ def test_concurrent_requests_are_bounded_by_the_semaphore(make_app, monkeypatch)
 
     assert not errors
     assert results == [200] * 8
-    assert FakeVectorizer.max_active <= 2
+    assert FakeVectorizer.max_active == 3
 
 
 # --- hot reload ---------------------------------------------------------------
