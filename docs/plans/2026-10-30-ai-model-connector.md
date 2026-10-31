@@ -73,7 +73,9 @@ Detailed in `docs/plans/2026-10-30-ai-model-connector-a-provider-slot.md` (8 tas
 
 Detailed in `docs/plans/2026-10-30-ai-model-connector-b-campaigns.md` (10 tasks: campaign profile, mail material reader, detection port, subscription and task, collection-name check, parity replay command, dev-stack acceptance, then the cutover removal in three tasks that run only if the replay matches).
 
-## Plan C: Case view, AI assessment section (outline)
+## Plan C: Case view, AI assessment section
+
+**Status: detailed** in `docs/plans/2026-10-31-ai-model-connector-c-case-view.md` (5 tasks). The outline below is the earlier sketch; the detailed plan's Calls table supersedes it (backend null instead of a UI connector hook, legacy caption kept for cases without an assessment, sibling labels wait for Plan D).
 
 Deliverable: the case drawer and investigation overview show the new section only while the connector is enabled.
 
