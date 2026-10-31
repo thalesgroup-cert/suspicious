@@ -61,10 +61,10 @@ python manage.py createsuperuser
 | `redis_broker` / `redis_cache` | Valkey 9 — Celery broker + Django cache (per-case lock, webhook jobId dedup) |
 | `elasticsearch` | Search and indexing |
 | `rustfs` | MinIO-compatible S3 object storage (artifacts/attachments) |
-| `cortex` | Analyzer execution engine (YARA, AI, sandbox); reports back via HMAC-signed webhook |
+| `cortex` | Analyzer execution engine (YARA, sandbox, metadata); reports back via HMAC-signed webhook |
 | `chromadb` | Vector DB for semantic similarity search |
 | `mail_renderer` | Isolated headless Chromium (`mail-renderer/`) that draws the mail preview PNG from sanitised HTML; internal network shared only with Django and Celery, no route out |
-| `ai_inference` | AIMailAnalyzer model server (FastAPI, profile `ai`, port 8090 published on the Docker default-bridge gateway `172.17.0.1`). Holds the vectorizer + classifier weights; the Cortex `AI_Mail_Analyzer` job is a thin HTTP client to it. `make` targets enable the profile; plain compose needs `--profile ai` |
+| `ai_inference` | AIMailAnalyzer model server (FastAPI, profile `ai`). Reachable as `http://ai_inference:8090` on `suspicious_net` only, no host port. Holds the vectorizer + classifier weights; the `ai_model` connector calls its token-protected `/v2` API (`AI_INFERENCE_TOKEN`). `make` targets enable the profile; plain compose needs `--profile ai` |
 | `email_feeder` | IMAP poller that auto-ingests emails (runs as non-root `feeder` UID) |
 | `vault` | Secrets store — connector credentials and other runtime secrets |
 | `traefik` | Reverse proxy with TLS termination |
@@ -74,9 +74,9 @@ python manage.py createsuperuser
 
 1. User submits email/file/URL/IP/hash via web UI, API, or the email feeder's IMAP polling.
 2. Django creates a `Case`, then dispatches Cortex analyzers via `CortexJob.run_analyzer` — each call writes an `AnalyzerReport` *and* a `CaseAnalyzerJob` ledger row atomically (`case_id ↔ cortex_job_id` mapping).
-3. Cortex runs analyzers asynchronously (YARA rules, AIMailAnalyzer ML classifier, sandboxing, metadata, FileInfo) and POSTs to `/api/cortex/webhook/` (HMAC-signed, jobId-deduped) when each job finishes.
+3. Cortex runs analyzers asynchronously (YARA rules, sandboxing, metadata, FileInfo) and POSTs to `/api/cortex/webhook/` (HMAC-signed, jobId-deduped) when each job finishes. A mail's AI verdict does not come from Cortex: the mail is handed to the `ai_model` connector (the `mail_ai` provider), whose Celery task calls the `ai_inference` server, stores an `AiAssessment` and closes its own `CaseAnalyzerJob` row (`provider-` id). Without the connector the mail gets `results_ai = Inconclusive` and no AI vote.
 4. The webhook view looks up the case via a single indexed read on `CaseAnalyzerJob`, then enqueues `tasp.tasks.reconcile_case(case_id)` on Celery; the task takes a per-case Redis lock and calls `reconcile_case_core` (`cortex_job/cortex_utils/reconciliation.py`), the single entrypoint that syncs the ledger and advances the case's lifecycle state machine.
-5. Once `reconcile_case_core` aggregates the final score (Safe / Inconclusive / Suspicious / Dangerous) and the case reaches its terminal state, it emits a `case_finalised` event via `connectors.dispatch.emit`. Every connector subscribed to that event (MISP, SMTP-notify, ChromaDB, `ai_narration`) fires independently (TheHive no longer subscribes: its alerts come from the challenge flow, the push button, and campaign detection), and dashboard KPIs are updated — see the `connectors` app row below.
+5. Once `reconcile_case_core` aggregates the final score (Safe / Inconclusive / Suspicious / Dangerous) and the case reaches its terminal state, it emits a `case_finalised` event via `connectors.dispatch.emit`. Every connector subscribed to that event (MISP, SMTP-notify, `ai_narration`, `ai_model`, among others) fires independently; `ai_model`'s hook queues campaign detection (`connectors.tasks.run_campaign_detection`). TheHive does not subscribe: its alerts come from the challenge flow, the push button, and campaign detection (`campaign_updated`). Dashboard KPIs are updated too; see the `connectors` app row below.
 6. Celery beat runs `update_ongoing_cases` every 300s as a webhook-delivery fallback, and `fail_stale_jobs` every 600s to auto-fail any `CaseAnalyzerJob` rows pending beyond `STALE_JOB_TIMEOUT_SECONDS` (2h default).
 
 ### Django Apps (`Suspicious/Suspicious/`)
@@ -88,7 +88,7 @@ python manage.py createsuperuser
 | `email_process` | Email parsing and submission |
 | `cortex_job` | Cortex job orchestration (cortex4py). Defines `Analyzer`, `AnalyzerReport`, and the `CaseAnalyzerJob` junction ledger that powers the webhook lookup |
 | `score_process` | Risk scoring; rule-based verdict explanation (`scoring/explanation/`) and the deterministic narration safety-lock + prompt builder (`scoring/narration/`) that `ai_narration` calls |
-| `connectors` | Connector framework: registry, dispatch, delivery ledger, circuit breaker, contrib connectors for TheHive/MISP/Watcher/SMTP-notify/ChromaDB/`ai_narration`. See [Connectors](docs/components/backend/connectors.md) |
+| `connectors` | Connector framework: registry, dispatch, delivery ledger, circuit breaker, contrib connectors for TheHive/MISP/Watcher/SMTP-notify/ChromaDB/`ai_narration`/`ai_model` (the mail AI classifier and campaign detection). See [Connectors](docs/components/backend/connectors.md) |
 | `domain_process` / `url_process` / `ip_process` / `hash_process` / `file_process` | Per-observable analysis |
 | `dashboard` | KPI metrics |
 | `mail_feeder` | Outbound SMTP notification templates |
@@ -108,7 +108,7 @@ Standalone Python service using Pydantic v2. Polls IMAP/IMAPS mailboxes, extract
 
 Sentence Transformers model (`paraphrase-multilingual-mpnet-base-v2`) for embeddings. Custom ResNetMLP binary classifier for phishing detection. Vector store is ChromaDB for similarity search against prior cases.
 
-**Inference path.** `ai_mail_classifier.py` (the one-shot Cortex analyzer, torch-free image) POSTs the mail body to the persistent `inference_server/` (`/classify`, `/health`, `/reload`), which keeps the vectorizer and the `models/` (`personal`) and `models_public/` (`public`) weights resident and hot-reloads them when the retrain pipeline overwrites them. Cortex job containers sit on Docker's default bridge (no DNS), hence the gateway-IP URL (`inference_url` config item / `INFERENCE_SERVER_URL`). If AI verdicts are missing, `curl http://172.17.0.1:8090/health` first — it names the missing vectorizer/model file. Details and a troubleshooting table: `docs/components/analyzers.md`. Tests: `cd Analyzers/AIMailAnalyzer && python -m pytest tests`.
+**Inference path.** With the `ai_model` connector enabled (`connectors/contrib/ai_model/`, off by default), the Celery worker reads the mail text (object store first, then the archive) and POSTs it to the persistent `inference_server/` at `http://ai_inference:8090/v2/models/ai_mail/classify` with the bearer token `AI_INFERENCE_TOKEN`. The server keeps the vectorizer and the `models/` (`personal`) weights resident and hot-reloads them when the retrain pipeline overwrites them; `/v2` classifies with `personal` only. The answer becomes one `AiAssessment` per case plus the case's AI fields. There is no Cortex AI analyzer any more; historical Cortex AI reports on old cases are still parsed and kept out of the weighted blend, and `integrations.cortex.analyzers.ai` must stay in `settings.json` because it names the AI vote's `Analyzer` row. Campaign detection runs from the connector on `case_finalised` and writes to the ChromaDB collection `suspicious_mails` (set `integrations.chromadb.collection_name` to match, or the cleanup misses it); `python manage.py ai_model_campaign_replay <campaign_ref>` replays a Cortex-built campaign through it. If AI verdicts are missing, check the connector's deliveries (`GET /api/connectors/ai_model/deliveries/`) and `docker compose --profile ai exec ai_inference curl -s http://127.0.0.1:8090/health` (it names the missing vectorizer/model file). Details and a troubleshooting table: `docs/components/analyzers.md`. Tests: `cd Analyzers/AIMailAnalyzer && python -m pytest tests`.
 
 ## Key Configuration Files
 
@@ -166,7 +166,7 @@ docker network create --driver bridge --subnet 172.20.0.0/16 \
 bash scripts/gen-service-secrets.sh .env .env.data   # Redis/ES/Chroma passwords (make init does this too)
 docker compose --env-file .env build suspicious suspicious_ui feeder mail_renderer
 docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb chromadb_proxy
-# AI verdicts need the model server too (weights in Analyzers/AIMailAnalyzer/models/, git-ignored):
+# AI verdicts need the model server (weights in Analyzers/AIMailAnalyzer/models/, git-ignored) and the ai_model connector enabled:
 docker compose --env-file .env --profile ai up -d --build ai_inference
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev-extras.yml \
   up -d greenmail openldap

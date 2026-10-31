@@ -1,7 +1,7 @@
 # AI / ML Analyzers
 
-`Analyzers/AIMailAnalyzer/` is the machine-learning email classifier exposed to
-the platform as a Cortex analyzer.
+`Analyzers/AIMailAnalyzer/` is the machine-learning email classifier. It runs as a model server,
+`ai_inference`, that the `ai_model` connector calls. It is no longer a Cortex analyzer.
 
 ## How it works
 
@@ -9,77 +9,94 @@ the platform as a Cortex analyzer.
   (`paraphrase-multilingual-mpnet-base-v2`) turns email text into vectors.
 - **Classifier:** an ensemble of custom `ResNetMLP` networks (several 2-class
   models plus a 4-class danger model) predicts the verdict from the embeddings.
-- **Similarity:** ChromaDB stores vectors so finalised cases can be matched
-  against prior cases for semantic similarity.
+- **Similarity:** the connector's campaign detection stores each mail's campaign embedding in the
+  ChromaDB collection `suspicious_mails` and compares new dangerous mails against it.
 
-## Architecture: thin Cortex client + persistent inference server
-
-Cortex starts every analyzer in a fresh, one-shot container. Loading a
-sentence-transformer and five classifier checkpoints on every mail would
-dominate the run time, so the model work lives in a long-running service and
-the analyzer is only a client:
+## Architecture: the ai_model connector and the inference server
 
 ```
- Cortex job container (default bridge)          ai_inference container
- ┌─────────────────────────────────┐  POST   ┌──────────────────────────────┐
- │ ai_mail_classifier.py           │ /classify│ inference_server/server.py   │
- │  untar mail → body              │ ───────► │  vectorizer + models in RAM  │
- │  build Cortex report from JSON  │ ◄─────── │  models/ + models_public/    │
- └─────────────────────────────────┘          └──────────────────────────────┘
-        http://172.17.0.1:8090  (default-bridge gateway = docker0 on the host)
+ suspicious_celery (Celery worker)               ai_inference container
+ ┌─────────────────────────────────┐  POST /v2   ┌──────────────────────────────┐
+ │ ai_model connector              │ ──────────► │ inference_server/server.py   │
+ │  read mail text (store/archive) │ Bearer token│  vectorizer + models in RAM  │
+ │  write AiAssessment + case      │ ◄────────── │  models/ + models_public/    │
+ └─────────────────────────────────┘             └──────────────────────────────┘
+        http://ai_inference:8090  (service name on suspicious_net)
 ```
 
-- **Why the gateway IP.** Cortex runs job containers on Docker's *default*
-  bridge, which has no DNS and is not `suspicious_net`, so the service name
-  `ai_inference` does not resolve there. The compose service publishes its port on
-  the gateway address (`AI_INFERENCE_BIND`, default `172.17.0.1`; check with
-  `docker network inspect bridge`). Publishing on `127.0.0.1` would not work:
-  loopback is not reachable from another container.
-- **Variants.** `personal` (`models/`, your own trained weights) drives the case
-  verdict. `public` (`models_public/`) is a comparison set and stays unavailable until
-  weights are dropped in. Select with the analyzer's `variant` config item.
+- **Network.** The server is reachable as `http://ai_inference:8090` on `suspicious_net` only.
+  Neither `deployment/compose_apps.yaml` nor `deployment/docker-compose.override.yml` publishes a
+  host port. To call it by hand, run the call inside a container on that network (examples below).
+- **Variants.** `personal` (`models/`, your own trained weights) is the one `/v2` classifies with.
+  `public` (`models_public/`) is still loaded and reported by `/health`, but no route classifies with
+  it.
 - **Weights.** Bind-mounted read-only, not baked into the image. The server
   re-checks them every `INFERENCE_RELOAD_CHECK_SECONDS` (30) and hot-swaps changed
   files; `POST /reload` does it immediately. A file that fails to load never replaces a
   working model, so the retrain pipeline can overwrite `models/*.pth` in place.
-- **Readiness.** `GET /health` is `200` only when the vectorizer and the five
-  `personal` models (four required plus the optional `unwanted_*`) are loaded;
-  otherwise `503` with the per-file load error. The client retries `502/503/504` and connection errors, and reports the
-  server's own reason in the Cortex error message.
+- **Readiness.** `GET /health` (and `GET /v2/health/ready`, same body) is `200` only when the
+  vectorizer and the five `personal` models (four required plus the optional `unwanted_*`) are
+  loaded; otherwise `503` with the per-file load error.
+
+### Without the connector
+
+An instance that does not enable `ai_model` has no AI vote. A mail case with a mail archive gets
+`results_ai = Inconclusive`, and scoring treats the AI vote as missing, as it did when the old Cortex
+AI job failed. Campaign detection, and with it the TheHive campaign alert, also needs the connector.
+
+Historical Cortex AI reports on existing cases still display (the AI analyzer card) and are still kept
+out of the weighted blend, so their score is not counted twice. `integrations.cortex.analyzers.ai` in
+`settings.json` (`AI_Mail_Analyzer_1_4` in the example settings) must stay. It names the `Analyzer`
+row of the AI vote:
+
+- the connector puts its ledger row (`CaseAnalyzerJob`) on that analyzer, and creates the row if it
+  does not exist;
+- scoring takes the AI vote's weight from that analyzer, and leaves that analyzer's reports out of the
+  other votes and out of the per-file weighted blend.
+
+Without the key the connector cannot queue the AI step and scoring drops the AI vote.
 
 ### Deploying
 
 ```bash
 # 1. put the trained weights where the container mounts them
 ls Analyzers/AIMailAnalyzer/models/*_30_epochs_model.pth     # 5 files
-# 2. build + start (the Makefile enables the `ai` compose profile; `make build` and
-#    `make deploy` also rebuild the aimailanalyzer:local image Cortex runs)
+# 2. build + start (the Makefile enables the `ai` compose profile)
 cd deployment && make build && make up
-# 3. check from where Cortex runs analyzers (the default bridge)
-curl -s http://172.17.0.1:8090/health | python3 -m json.tool
-docker run --rm --entrypoint python aimailanalyzer:local AIMailAnalyzer/health.py --require-server
+# 3. check the server from inside its container (curl is in the image)
+docker compose --env-file .env --profile ai exec ai_inference \
+  curl -s http://127.0.0.1:8090/health
+docker compose --env-file .env --profile ai exec ai_inference \
+  sh -c 'curl -s -H "Authorization: Bearer $AI_INFERENCE_TOKEN" http://127.0.0.1:8090/v2/models/ai_mail'
+# 4. check that the worker reaches it over suspicious_net
+docker compose --env-file .env exec suspicious_celery python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://ai_inference:8090/v2/health/ready').read())"
 ```
 
-Plain compose users add the profile: `docker compose --profile ai up -d`.
+Plain compose users add the profile: `docker compose --profile ai up -d`. Then enable the connector
+(see [Enabling the connector](#enabling-the-connector)).
 
 ### Troubleshooting "inference does not work"
 
-| Symptom (Cortex job error) | Cause / fix |
+The connector's errors are in the delivery `error` of its rows (`GET /api/connectors/ai_model/deliveries/`);
+campaign detection errors are in the worker log (`suspicious_celery`).
+
+| Symptom | Cause / fix |
 |---|---|
-| `cannot reach inference server at http://172.17.0.1:8090` | Server not running, or published on `127.0.0.1`, or the bridge gateway differs. `docker ps`, `docker network inspect bridge`, then set `AI_INFERENCE_BIND` and the analyzer's `inference_url`. |
-| `HTTP 503 … Vectorizer unavailable` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy). `/health` shows the exact error. |
-| `HTTP 503 … Required models unavailable for variant 'personal'` | `Analyzers/AIMailAnalyzer/models/` is empty or has a corrupt/truncated `.pth`; `/health` lists which file and why. |
-| `HTTP 503 … variant 'public'` | Expected until real public weights are added to `models_public/`. |
+| Delivery `error` `inference server unreachable: ...` | The worker cannot reach the server. Check that `ai_inference` is up on `suspicious_net` (it runs under the `ai` profile), that the connector `url` is `http://ai_inference:8090`, and run step 4 above. |
+| Delivery `error` `inference server HTTP 503: Vectorizer unavailable: ...` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy), or the server is still loading. `/health` shows the exact error. |
+| Delivery `error` `inference server HTTP 503: Required models unavailable for variant 'personal': ...` | `Analyzers/AIMailAnalyzer/models/` is empty or has a corrupt/truncated `.pth`; `/health` lists which file and why. |
+| Delivery `error` `inference server HTTP 503: token not configured` | `AI_INFERENCE_TOKEN` is not set on the server. Set it in `deployment/.env` and recreate `ai_inference`. |
+| Delivery `error` `inference server rejected the token (HTTP 401)`, or `token rejected (HTTP 401)` in the `ai_model` health detail | Wrong token: the connector's `token` differs from the server's `AI_INFERENCE_TOKEN`. The connector's own empty `token` fails before any call, as `ValueError: token not configured`. |
 | Verdicts never change after retraining | Weights were baked into an old image instead of mounted, or the mount is not `models/`. Check `/health`, then `POST /reload`. |
-| Works from the host, fails from Cortex | A corporate `HTTP(S)_PROXY` inside the job container: the client bypasses proxies by default (`INFERENCE_USE_PROXY=1` re-enables). |
-| `401` or `503` on `/v2` (the `ai_model` connector row fails) | From a container on `suspicious_net`, run `curl -H "Authorization: Bearer $AI_INFERENCE_TOKEN" http://ai_inference:8090/v2/models/ai_mail`. `401` = wrong token: the connector's `token` differs from the server's `AI_INFERENCE_TOKEN`. `503` on this route = `AI_INFERENCE_TOKEN` is not set on the server (`token not configured`); set it in `deployment/.env` and recreate `ai_inference`. A `503` on classify that names the models or vectorizer is a loading problem, not a token one: check `curl http://ai_inference:8090/v2/health/ready` (no token needed) and the `detail` in the delivery error. A server `503` shows in the delivery `error` as `inference server HTTP 503: <detail>`; the connector's own empty `token` fails before any call, as `ValueError: token not configured`. |
-| Delivery `error` `inference server unreachable: ...` (the `ai_model` connector row fails) | The worker cannot reach the server. Check that `ai_inference` is up on `suspicious_net` (it runs under the `ai` profile) and that the connector `url` is `http://ai_inference:8090`. The `172.17.0.1` gateway address above is only for Cortex job containers. |
+| Worker log warning `The chromadb connector cleans up collection 'suspicious', but campaign detection stores mails in 'suspicious_mails' ...`, also in the `ai_model` health detail | The `chromadb` cleanup connector watches another collection, so old campaign documents are never removed. Set `integrations.chromadb.collection_name` to `suspicious_mails` in `settings.json` (see [Campaign detection](#campaign-detection)). |
+| Worker log `Campaign detection for case <id> failed (<error class>), retrying.`, then `Campaign detection for case <id> failed: <error class>` | ChromaDB is down or the `campaign:detect` lock stayed busy. The task retries 3 times (30, 60, 120 s) and then gives up; the case keeps its verdict but joins no campaign. Check `chromadb`. |
 
 ## v2 API and the ai_model connector
 
-The inference server has a second, token-protected API under `/v2`, next to the legacy `/classify`,
-`/health` and `/reload` routes (those are unchanged and still serve the Cortex analyzer). The
-`ai_model` connector uses it so the AI verdict can come from the platform, with no Cortex job.
+The inference server's classify API is the token-protected `/v2`, next to the `/health` and
+`/reload` routes. The `ai_model` connector uses it, so the AI verdict comes from the platform, with
+no Cortex job.
 
 | Route | Token | What it does |
 |---|---|---|
@@ -102,43 +119,92 @@ wrong `Authorization: Bearer ...` header answers `401`. Generate one with `opens
    `settings.json`). `url` defaults to `http://ai_inference:8090` and `timeout_seconds` to 20.
 3. Enable `ai_model` in Settings, or `PATCH /api/connectors/ai_model/` with `{"enabled": true}`. It is off by
    default.
+4. Set `integrations.chromadb.collection_name` to `suspicious_mails` (see
+   [Campaign detection](#campaign-detection)).
 
 Only one connector may provide `mail_ai` at a time. Enabling a second answers `409`
 (`<name> already provides mail_ai`); disable the first one before enabling the other.
 
-With the connector enabled, a mail's AI verdict comes from it and the Cortex AI job is not created. The
-AI analyzer gets a ledger row (`CaseAnalyzerJob`) with a `provider-` id instead of a Cortex job id. The
-Celery worker (`suspicious_celery`) reads the mail text from the object store first: the mail's `.txt`
-and `.headers` objects, under `<mail_id>/` in the submission's own bucket, or under
-`<submission_id>/<mail_id>/` in the feeder bucket (`storage.s3.feeder_bucket`) when the submission came
-through the prefix layout. It starts there because the e-mail fetch task deletes the working directory
-that holds the submission's archive shortly after the handoff, so a retry would no longer find
-it. The archive on the shared volume (`mail_case_data` and `mail_work_data`, mounted in both
-`suspicious` and `suspicious_celery`) is the fallback, used when the store has no text for the mail. The
-worker then posts the body to `/v2/models/ai_mail/classify` over `suspicious_net`, stores the answer as
-one `AiAssessment` per case (with the model version, `v0` today), fills the case's AI result, score,
-confidence and category, closes the row and queues the case's reconcile. With the connector disabled
-nothing changes: the Cortex `AI_Mail_Analyzer` runs as before.
+With the connector enabled, the AI analyzer gets a ledger row (`CaseAnalyzerJob`) with a `provider-`
+id instead of a Cortex job id. The Celery worker (`suspicious_celery`) reads the mail text from the
+object store first: the mail's `.txt` and `.headers` objects, under `<mail_id>/` in the submission's
+own bucket, or under `<submission_id>/<mail_id>/` in the feeder bucket (`storage.s3.feeder_bucket`)
+when the submission came through the prefix layout. It starts there because the e-mail fetch task
+deletes the working directory that holds the submission's archive shortly after the handoff, so a
+retry would no longer find it. The archive on the shared volume (`mail_case_data` and
+`mail_work_data`, mounted in both `suspicious` and `suspicious_celery`) is the fallback, used when the
+store has no text for the mail. The worker then posts the body to `/v2/models/ai_mail/classify` over
+`suspicious_net`, stores the answer as one `AiAssessment` per case (with the model version, `v0`
+today), fills the case's AI result, score, confidence and category, closes the row and queues the
+case's reconcile.
 
-Campaign detection runs from the connector too. Its `case_finalised` hook only queues a Celery task,
-`run_campaign_detection`, which reads the mail's text and headers the same way (object store first,
-then the archive) and adds the mail to the ChromaDB collection `suspicious_mails` that later detection
-compares new mails against. When the case's AI result is `DANGEROUS` and enough similar mails are
-found, it creates or joins a campaign (a `DANGEROUS` mail from an allow-listed sender domain is
-skipped and not stored). A created or joined campaign sends `campaign_updated`, so TheHive raises its
-campaign alert. The task does not run under the connector's circuit breaker, so a ChromaDB outage
-does not stop classification. A failed run (ChromaDB down, the detection lock busy) is retried up to
-three times, after 30, 60 and 120 s, and then logged at ERROR with the case id and the error class;
-an object store that answers `access_denied` or `invalid` is not retried. These failures are in the
-worker log (`suspicious_celery`), not in the connector's deliveries.
+**The case view has no AI assessment section yet.** The AI analyzer card reads the Cortex AI
+analyzer's report (an `AnalyzerReport`), and the connector does not create one, so it stays empty for
+new cases. The AI result in the overview still shows, because it comes from the case's own fields.
+The case view gets its AI section in a later change.
 
-**Keep it disabled in production until the case view has its AI section**, unless losing the AI
-analyzer card is acceptable. The card reads the Cortex AI analyzer's report (an `AnalyzerReport`),
-and the connector does not create one, so a case analysed while `ai_model` is enabled shows no AI
-analyzer card. The AI result in the overview still shows, because it comes from the case's own
-fields. The case view gets its AI section in a later change.
+### Campaign detection
 
-### When it fails
+Campaign detection runs from the connector. Its `case_finalised` hook only queues a Celery task,
+`connectors.tasks.run_campaign_detection`, which reads the mail's text and headers the same way (object
+store first, then the archive) and adds the mail to the ChromaDB collection `suspicious_mails` that
+later detection compares new mails against. When the case's AI result is `DANGEROUS` and at least
+three similar mails are found, it creates or joins a campaign (a `DANGEROUS` mail from an
+allow-listed sender domain is skipped and not stored). A created or joined campaign sends
+`campaign_updated`, so TheHive raises its campaign alert. Mails of one campaign are placed one at a
+time under the `campaign:detect` lock.
+
+The task does not run under the connector's circuit breaker, so a ChromaDB outage does not stop
+classification. Any failure is retried up to 3 times, after 30, 60 and 120 s (`30 * 2**retries`),
+and then logged at ERROR with the case id and the error class. The one exception is an object store
+that answers `access_denied` or `invalid`: that failure is logged at once, without retries. These
+failures are in the worker log (`suspicious_celery`), not in the connector's deliveries.
+
+**Collection cleanup.** The `chromadb` connector deletes items older than 15 days, once a day, from
+the collection named by its `collection_name` config, default `suspicious`. Detection writes to
+`suspicious_mails`, so with the default the campaign documents are never cleaned up. The key has no
+field in Settings: set it in `settings.json`:
+
+```json
+"integrations": { "chromadb": { "collection_name": "suspicious_mails" } }
+```
+
+While the `chromadb` connector is enabled and watches another collection, the `ai_model` health check
+adds a sentence saying so, and the detection task logs the same sentence as a warning, once per worker
+process.
+
+### Replaying a Cortex-built campaign: `ai_model_campaign_replay`
+
+```bash
+docker compose --env-file .env exec suspicious python manage.py ai_model_campaign_replay <campaign_ref>
+```
+
+Campaigns built before the cutover came from the Cortex AI path. The command replays one of them
+through the connector's detection and compares the members, so you can check that the connector would
+have built the same campaign. Run it on a few campaigns before you rely on the connector for your
+campaign history.
+
+- **Input.** It rebuilds each mail from its Cortex AI report (the newest successful one), so the
+  members' Cortex AI reports must still exist. It works on historical campaigns only: a campaign the
+  connector built has no Cortex AI reports to replay. It stops with an error when fewer than 3 members
+  have a usable report.
+- **What it replays,** in case id order: the stored members, plus every case between the lowest and
+  highest stored member id that has a successful `DANGEROUS` Cortex AI report and is in no campaign.
+  A mail the connector would add then shows up as an extra case id.
+- **What it does not cover:** similar mails outside that id range, mails that belong to other
+  campaigns, and campaign-less mails whose Cortex AI report was purged.
+- **What it checks: membership only.** It compares the members of the campaign the last stored member
+  ends in with the stored members. A missing or extra case id fails the command; otherwise it prints
+  `MATCH`. The `campaign_updated` payload also depends on the case that triggered detection, and id
+  order only approximates the original finalisation order. An allow-list changed since the campaign
+  formed can show up as an extra or missing case.
+- **What it changes: nothing.** It runs in a transaction that it rolls back, compares the mails in an
+  in-process Chroma that is deleted at the end (the Chroma server is never contacted), and sends no
+  event. It takes the live `campaign:detect` lock briefly for each replayed `DANGEROUS` case, as live
+  detection does. It deletes the campaign's member rows inside the transaction, so it holds their row locks for
+  the whole replay: run it off-peak on a very large campaign.
+
+### When classification fails
 
 - **Where to look.** When the task fails a row, the reason is recorded in the row's `ConnectorDelivery`
   entry (event `analyze`, status `failed`, field `error`), listed by
@@ -175,13 +241,15 @@ fields. The case view gets its AI section in a later change.
 
 | Module | Role |
 |---|---|
-| `ai_mail_classifier.py` | Thin Cortex client: untar mail, call the server, build the report |
-| `inference_server/server.py` | FastAPI model server (`/classify`, `/health`, `/reload`) |
+| `inference_server/server.py` | FastAPI model server (`/health`, `/reload`; mounts `/v2`) |
 | `inference_server/v2.py`, `auth.py` | Token-protected `/v2` router and its bearer check |
 | `mail_analysis.py` | Classification maths, taxonomy, explainability (needs numpy/torch) |
-| `mail_archive.py` | Safe mail-archive extraction (stdlib only, used by the client) |
+| `mail_archive.py` | Safe mail-archive extraction (stdlib only), re-exported by `mail_analysis.py` |
 | `ResNetMLP.py` | The neural network definition |
-| `health.py` | Client-image probe; `--require-server` also checks the server |
+
+The connector lives in the backend: `Suspicious/Suspicious/connectors/contrib/ai_model/`
+(`connector.py`, `client.py`, `campaigns.py`, `mailtext.py`), and the replay command in
+`Suspicious/Suspicious/ai_model/management/commands/ai_model_campaign_replay.py`.
 
 ### Tests
 
@@ -191,9 +259,8 @@ pip install -r requirements-inference.txt pytest httpx
 python -m pytest tests -v
 ```
 
-`tests/test_client.py` needs only `requirements-client.txt`; the server tests are skipped where torch is
-absent. They use real `ResNetMLP` checkpoints written to a temp dir and a fake
-sentence-transformer.
+The server tests are skipped where torch is absent. They use real `ResNetMLP` checkpoints written to
+a temp dir and a fake sentence-transformer.
 
 These modules are auto-documented in the
 [Python Code Reference](../reference/index.md).

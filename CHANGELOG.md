@@ -9,24 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The AI mail analyzer can now run as a connector, `ai_model`, instead of a Cortex job. It is off
-  by default and the Cortex path is unchanged for instances that do not enable it. With the
-  connector enabled, a mail's AI verdict comes from the connector, the Cortex AI job is not created,
-  and the result is stored as an `AiAssessment` per case (model version `v0` today). The model
-  server gets a `/v2` API (`AI_INFERENCE_TOKEN`): every `/v2` route except `/v2/health/live` and
-  `/v2/health/ready` needs the token, and answers 503 when the server has none set. Set the same
-  token in `integrations.ai_model.token`. See `docs/components/analyzers.md`. Keep it disabled in
-  production until the case view gets its AI section (a later change), unless losing the AI analyzer
-  card is acceptable: a case analysed while `ai_model` is enabled shows no AI analyzer card.
-- With `ai_model` enabled, campaign detection runs from the connector. Its `case_finalised` hook
-  queues a Celery task that adds the mail to the ChromaDB collection and, when the AI result is
-  `DANGEROUS` and enough similar mails are found, creates or joins a campaign and sends
-  `campaign_updated`, so TheHive raises its campaign alert. The task does not run under the
-  connector's circuit breaker, so a ChromaDB outage does not stop classification. A failed run is
-  retried up to three times (after 30, 60 and 120 s), then logged.
+- The AI mail analyzer runs as a connector, `ai_model`, and no longer as a Cortex job. It is off by
+  default. With the connector enabled, a mail is handed to it, and the result is stored as an
+  `AiAssessment` per case (model version `v0` today) plus the case's AI result, score, confidence and
+  category. The model server gets a `/v2` API (`AI_INFERENCE_TOKEN`): every `/v2` route except
+  `/v2/health/live` and `/v2/health/ready` needs the token, and answers 503 when the server has none
+  set. Set the same token in `integrations.ai_model.token`. See `docs/components/analyzers.md`. The
+  case view has no AI assessment section yet (a later change): the AI analyzer card reads Cortex
+  reports, so it stays empty for new cases. The AI result in the overview still shows.
+- Campaign detection runs from the `ai_model` connector. Its `case_finalised` hook queues a Celery
+  task, `connectors.tasks.run_campaign_detection`, that adds the mail to the ChromaDB collection
+  `suspicious_mails` and, when the AI result is `DANGEROUS` and at least three similar mails are
+  found, creates or joins a campaign and sends `campaign_updated`, so TheHive raises its campaign
+  alert. The task does not run under the connector's circuit breaker, so a ChromaDB outage does not
+  stop classification. A failed run is retried up to three times (after 30, 60 and 120 s), then
+  logged at ERROR with the case id and the error class. Set `integrations.chromadb.collection_name`
+  to `suspicious_mails` in `settings.json` (there is no Settings field for it), or the `chromadb`
+  cleanup connector never removes old campaign documents; the `ai_model` health check and a one-time
+  worker warning report the mismatch.
+- `python manage.py ai_model_campaign_replay <campaign_ref>` replays a campaign the Cortex AI path
+  built through the connector's detection, from the members' Cortex AI reports, and compares the
+  members. It checks membership only, covers the stored members plus the campaign-less `DANGEROUS`
+  Cortex-reported mails between the lowest and highest member id, and changes nothing: the
+  transaction is rolled back, the mails are compared in an in-process Chroma and no event is sent.
+  It cannot replay a campaign the connector built. See `docs/components/analyzers.md`.
 - Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
   be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already
   enabled.
+
+### Removed
+
+- The Cortex AI path. The Cortex `AI_Mail_Analyzer` (its catalog entry, `AIMailAnalyzer.json`, the
+  thin client `ai_mail_classifier.py` and its `aimailanalyzer:local` image), the server's legacy
+  `/classify` route, the `inference_url` analyzer item and the `172.17.0.1` host port of
+  `ai_inference` are gone. The server is reachable as `http://ai_inference:8090` on `suspicious_net`
+  only. The backend no longer launches a Cortex AI job (`launch_cortex_ai_jobs`, `manage_ai_jobs`)
+  and `case_handler/campaigns.py` (campaign detection on reconcile) is gone. **An instance that
+  does not enable `ai_model` has no AI vote**: a mail case gets `results_ai = Inconclusive` and
+  scoring treats the AI vote as missing, as when the Cortex AI job failed; it also has no campaign
+  detection. Historical Cortex AI reports on existing cases are still parsed and still kept out of
+  the weighted blend. Keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the
+  `Analyzer` row the connector's ledger row and the AI vote's weight use.
 
 ### Fixed
 
