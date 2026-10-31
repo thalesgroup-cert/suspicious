@@ -313,8 +313,7 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
     """
     from django.apps import apps
     from django.utils import timezone
-    from connectors.base import PROVIDER_KIND_MAIL_AI
-    from connectors.providers import queue_provider_analysis
+    from connectors.providers import queue_mail_ai
     from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
     from url_process.url_utils.url_planner import filter_dispatch_intents
 
@@ -356,7 +355,7 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
             )
     if ai_archives:
         try:
-            queue_provider_analysis(case, PROVIDER_KIND_MAIL_AI)
+            queue_mail_ai(case)
         except Exception:
             logger.exception("Failed to hand the case to the mail AI provider (case=%s)", case_id)
 

@@ -48,7 +48,6 @@ def queue_provider_analysis(case, kind: str):
     None when no provider is enabled."""
     if enabled_provider(kind) is None:
         return None
-    from case_handler.models import Result
     from connectors.tasks import run_provider_analysis
     from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
     from cortex_job.migrations._tier_seed import tier_for
@@ -67,9 +66,28 @@ def queue_provider_analysis(case, kind: str):
     )
     # Only finish_provider_analysis replaces this: a row closed any other way (fail_stale_jobs,
     # a lost or failed enqueue) leaves the AI missing, not at the model default "Suspicious".
+    mark_ai_missing(case)
+    transaction.on_commit(lambda: run_provider_analysis.delay(case.id, kind, job.id))
+    return job
+
+
+def mark_ai_missing(case) -> None:
+    """No AI result will come: what the Cortex path wrote when its AI job failed or never ran,
+    so scoring treats the AI vote as missing (``ai_missing``) instead of the "Suspicious" default."""
+    from case_handler.models import Result
+
     case.results_ai = Result.INCONCLUSIVE
     case.save(update_fields=["results_ai"])
-    transaction.on_commit(lambda: run_provider_analysis.delay(case.id, kind, job.id))
+
+
+def queue_mail_ai(case):
+    """Hand a mail with a readable archive to the mail_ai provider; with none enabled, mark the
+    AI missing. Returns the ledger row or None."""
+    from connectors.base import PROVIDER_KIND_MAIL_AI
+
+    job = queue_provider_analysis(case, PROVIDER_KIND_MAIL_AI)
+    if job is None:
+        mark_ai_missing(case)
     return job
 
 

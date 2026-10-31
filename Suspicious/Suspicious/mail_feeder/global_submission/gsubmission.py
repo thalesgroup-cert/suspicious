@@ -14,8 +14,7 @@ from mail_feeder.email_info.email_info import MailInfoService
 
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
-from connectors.base import PROVIDER_KIND_MAIL_AI
-from connectors.providers import queue_provider_analysis
+from connectors.providers import mark_ai_missing, queue_mail_ai
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
 from .models import MailSubmissionData
@@ -169,6 +168,9 @@ class GlobalSubmissionService:
             fetch_mail_logger.error("Case creation failed for email %s; skipping dispatch", email_id)
             return
 
+        if attachment_result.ai_missing:
+            mark_ai_missing(case)
+
         if defer_launch:
             self._defer_launch(case, artifact_service, attachment_result, header_intents + body_intents)
             return
@@ -188,7 +190,7 @@ class GlobalSubmissionService:
                 )
         if attachment_result.ai_archive is not None:
             try:
-                queue_provider_analysis(case, PROVIDER_KIND_MAIL_AI)
+                queue_mail_ai(case)
             except Exception:
                 fetch_mail_logger.exception(
                     "Failed to hand the case to the mail AI provider (case=%s)",

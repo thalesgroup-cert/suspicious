@@ -29,6 +29,7 @@ from cortex_job.models import Analyzer, CaseAnalyzerJob
 from file_process.models import File
 from hash_process.models import Hash
 from mail_feeder.models import Mail, MailArchive, MailInfo
+from score_process.scoring.collect import collect_signals
 from tasp.tasks import dispatch_case_analysis
 
 DANGEROUS = ProviderResult(
@@ -133,11 +134,17 @@ class ProviderDispatchTest(TestCase):
     def test_an_ai_archive_dispatch_hands_over_and_calls_no_cortex_api(self):
         self.dispatch_ai_archive()
         self.assertTrue(has_provider_job(self.case))
+        self.run_task(CaseAnalyzerJob.objects.get())
+        self.assertEqual(self.case.results_ai, "Dangerous")
 
     def test_an_ai_archive_dispatch_without_a_provider_queues_nothing(self):
         ConnectorState.objects.filter(name="dummy_provider").update(enabled=False)
         self.dispatch_ai_archive()
         self.assertFalse(CaseAnalyzerJob.objects.exists())
+        # As when the Cortex AI job failed: the AI vote is missing, not the "Suspicious" default.
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.results_ai, "Inconclusive")
+        self.assertIs(collect_signals(self.case)[3], True)
 
     # ── task ───────────────────────────────────────────────────────────────
 
