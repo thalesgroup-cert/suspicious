@@ -66,7 +66,8 @@ def queue_provider_analysis(case, kind: str):
     )
     # Only finish_provider_analysis replaces this: a row closed any other way (fail_stale_jobs,
     # a lost or failed enqueue) leaves the AI missing, not at the model default "Suspicious".
-    # A case with an earlier assessment keeps that row's fields until this row succeeds.
+    # A case with an earlier assessment keeps that row's fields until this row succeeds: they
+    # come from a real answer, and marking them missing now would lose them if this row fails.
     if not has_assessment(case):
         mark_ai_missing(case)
     transaction.on_commit(lambda: run_provider_analysis.delay(case.id, kind, job.id))

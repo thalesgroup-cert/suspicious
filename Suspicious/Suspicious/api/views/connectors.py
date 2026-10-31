@@ -20,7 +20,7 @@ from api.serializers.connectors import (
     ConnectorDeliverySerializer,
     ConnectorSerializer,
 )
-from connectors.base import URL_ERROR, HealthStatus, url_errors
+from connectors.base import URL_ERROR, HealthStatus, _dotted_get, url_errors
 from connectors.delivery import get_state
 from connectors.models import ConnectorDelivery
 from connectors.registry import registry
@@ -130,15 +130,6 @@ class ConnectorStateView(APIView):
         state.enabled = enabled
         state.save(update_fields=["enabled", "updated_at"])
         return Response(ConnectorSerializer(_serialize_connector(name)).data)
-
-
-def _dotted_get(data: dict, dotted: str):
-    node = data
-    for part in dotted.split("."):
-        if not isinstance(node, dict) or part not in node:
-            return None
-        node = node[part]
-    return node
 
 
 def _mask_secrets(section: dict, section_name: str) -> dict:

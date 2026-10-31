@@ -23,7 +23,7 @@ from connectors.providers import (
 from connectors.registry import ConnectorRegistry
 from connectors.tasks import run_provider_analysis
 from connectors.tests.dummy import DummyProviderConnector
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager, _get_cortex_config
+from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager, ai_analyzer_name
 from cortex_job.cortex_utils.reconciliation import reconcile_case_core
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from file_process.models import File
@@ -43,7 +43,7 @@ NO_ANSWER = ProviderResult(
 
 
 def ai_name():
-    return _get_cortex_config()["analyzers"]["ai"]
+    return ai_analyzer_name()
 
 
 def has_provider_job(case):

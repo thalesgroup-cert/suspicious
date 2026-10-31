@@ -54,23 +54,34 @@ def _find_mail_bucket(client: ObjectStore, mail_id: str) -> Optional[str]:
     return None
 
 
+def _submission_prefix(client: ObjectStore, mail_id: str, bucket_name: str) -> Optional[Tuple[str, str]]:
+    """(bucket, ``<base><mail_id>/``) where common.storage.layout puts the submission ``bucket_name``,
+    None without one."""
+    location = resolve_submission_location(client, bucket_name) if bucket_name else None
+    return (location[0], "%s%s/" % (location[1], mail_id)) if location else None
+
+
+def _suffix_prefix(client: ObjectStore, mail_id: str) -> Optional[Tuple[str, str]]:
+    """(bucket, ``<mail_id>/``) for the bucket found by the mail id's timestamp suffix, else None."""
+    bucket = _find_mail_bucket(client, mail_id)
+    return (bucket, "%s/" % mail_id) if bucket else None
+
+
 def find_mail_prefix(client: ObjectStore, mail_id: str, bucket_name: str = "") -> Optional[Tuple[str, str]]:
     """(bucket, ``<...><mail_id>/``) holding the mail's objects, None when no store location does.
     ``bucket_name`` is ``MailArchive.bucket_name``: the submission is looked up as
     fetch_mail_text_from_minio does, then by the mail id's timestamp suffix. A store error other
     than not_found propagates."""
-    location = resolve_submission_location(client, bucket_name) if bucket_name else None
+    location = _submission_prefix(client, mail_id, bucket_name)
     if location:
-        bucket, base = location
-        prefix = "%s%s/" % (base, mail_id)
         try:
-            if any(True for _ in client.list(bucket, prefix=prefix)):
-                return bucket, prefix
+            if any(True for _ in client.list(location[0], prefix=location[1])):
+                return location
         except StoreError as exc:
             if exc.code != "not_found":
                 raise
-    bucket = _find_mail_bucket(client, mail_id)
-    return (bucket, "%s/" % mail_id) if bucket else None
+    # Falls back when the submission's prefix holds no object at all.
+    return _suffix_prefix(client, mail_id)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -158,13 +169,12 @@ def fetch_mail_text_from_minio(
     hold .txt files) and reads at most ``max_bytes`` of each. A store error other than
     not_found propagates.
     """
-    parts: dict[str, str] = {}
-    location = resolve_submission_location(client, bucket_name) if bucket_name else None
-    if location:
-        bucket, base = location
-        parts = _read_text_parts(client, bucket, "%s%s/" % (base, mail_id), max_bytes)
+    location = _submission_prefix(client, mail_id, bucket_name)
+    parts = _read_text_parts(client, *location, max_bytes) if location else {}
     if not parts:
-        bucket = _find_mail_bucket(client, mail_id)
-        if bucket:
-            parts = _read_text_parts(client, bucket, "%s/" % mail_id, max_bytes)
+        # Falls back when the submission's prefix holds no .headers or .txt, even if it holds other
+        # objects (unlike find_mail_prefix).
+        location = _suffix_prefix(client, mail_id)
+        if location:
+            parts = _read_text_parts(client, *location, max_bytes)
     return parts.get(".headers", ""), parts.get(".txt", "")

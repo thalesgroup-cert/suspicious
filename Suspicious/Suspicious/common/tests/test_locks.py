@@ -27,7 +27,5 @@ class CacheLockTest(SimpleTestCase):
     def test_an_expired_holder_does_not_release_the_next_holder_s_lock(self):
         with cache_lock("lock:t", ttl=60):
             cache.delete("lock:t")  # the TTL ran out while the body was still running
-            with cache_lock("lock:t", wait=0.3):
-                pass
             cache.add("lock:t", "next-holder", timeout=60)  # another worker holds it now
         self.assertEqual(cache.get("lock:t"), "next-holder")

@@ -32,11 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from the `chromadb` connector's configuration, so a configuration saved for it in the database
   wins over `settings.json`. The `ai_model` health check and a one-time worker warning report the
   mismatch.
-- A repeated finalisation of a case already in a campaign sends `campaign_updated` again, and
-  TheHive's campaign sync is idempotent, so the alert is not duplicated. The run also stores the
-  case's ChromaDB document if it is missing and tags the campaign's members, so a worker killed
-  after the campaign rows were written no longer leaves the campaign unannounced. Two runs for one
-  case at the same time make one campaign.
 - `python manage.py ai_model_campaign_replay <campaign_ref>` replays a campaign the Cortex AI path
   built through the connector's detection, from the members' Cortex AI reports, and compares the
   members. It checks membership only, covers the stored members plus the campaign-less `DANGEROUS`
@@ -79,6 +74,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A repeated finalisation of a case already in a campaign sends `campaign_updated` again, and
+  TheHive's campaign sync is idempotent, so the alert is not duplicated. The run also stores the
+  case's ChromaDB document if it is missing and tags the campaign's members, so a worker killed
+  after the campaign rows were written no longer leaves the campaign unannounced. Two runs for one
+  case at the same time make one campaign. While ChromaDB is down, a case already in a campaign
+  is still announced; its document and the members' tags wait for a later run.
 - A mail uploaded through the web form now appears in the TheHive campaign alert's material (its
   headers, bodies, `.eml` and attachments). Its object-store location is not recorded, so the
   material is read from the submission's tar archive, under the same member and size limits as
