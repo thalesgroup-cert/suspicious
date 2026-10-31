@@ -66,9 +66,18 @@ def queue_provider_analysis(case, kind: str):
     )
     # Only finish_provider_analysis replaces this: a row closed any other way (fail_stale_jobs,
     # a lost or failed enqueue) leaves the AI missing, not at the model default "Suspicious".
-    mark_ai_missing(case)
+    # A case with an earlier assessment keeps that row's fields until this row succeeds.
+    if not has_assessment(case):
+        mark_ai_missing(case)
     transaction.on_commit(lambda: run_provider_analysis.delay(case.id, kind, job.id))
     return job
+
+
+def has_assessment(case) -> bool:
+    """True when an earlier provider row for the case succeeded (its AiAssessment is stored)."""
+    from ai_model.models import AiAssessment
+
+    return AiAssessment.objects.filter(case=case).exclude(model_version="").exists()
 
 
 def mark_ai_missing(case) -> None:
@@ -102,7 +111,11 @@ def has_provider_job(case) -> bool:
 def finish_provider_analysis(job_id: int, result, *, error: str = "", attempt: int = 1,
                              duration_ms: int = 0, connector: str = "") -> bool:
     """Write ``result`` (None = failure) to the case, close the ledger row and
-    enqueue reconcile. False, and nothing written, when the row is already closed."""
+    enqueue reconcile. False, and nothing written, when the row is already closed.
+
+    A result without a model_version (the provider's "no answer": unreadable mail, a refusal) is
+    a failure. A failure keeps the case's assessment and AI fields from an earlier successful row
+    of the case, else leaves the AI missing (Inconclusive)."""
     from ai_model.mailinfo import apply_mail_info
     from ai_model.models import AiAssessment
     from case_handler.models import Case, Result
@@ -111,6 +124,9 @@ def finish_provider_analysis(job_id: int, result, *, error: str = "", attempt: i
     from mail_feeder.models import MailInfo
     from tasp.tasks import reconcile_case
 
+    if result is not None and not result.model_version:
+        error = f"no model_version ({result.reason})" if result.reason else "no model_version"
+        result = None
     status = CaseAnalyzerJob.STATUS_FAILURE if result is None else CaseAnalyzerJob.STATUS_SUCCESS
     with transaction.atomic():
         # The conditional UPDATE claims the row: a redelivered task finds nothing left to close.
@@ -120,9 +136,7 @@ def finish_provider_analysis(job_id: int, result, *, error: str = "", attempt: i
         if not claimed:
             return False
         case = Case.objects.get(analyzer_jobs__pk=job_id)
-        # A result without a model_version is the provider's "no answer" (unreadable mail, a
-        # refusal): like a failure, it leaves the case's AI fields and MailInfo as they are.
-        if result is not None and result.model_version:
+        if result is not None:
             case.results_ai = result.result.capitalize()
             case.score_ai = result.score
             case.confidence_ai = result.confidence
@@ -131,7 +145,7 @@ def finish_provider_analysis(job_id: int, result, *, error: str = "", attempt: i
             mail = getattr(case.fileOrMail, "mail", None)
             mail_info = MailInfo.objects.filter(mail=mail).first() if mail else None
             apply_mail_info(mail_info, case.category_ai, case.results_ai)
-        else:
+        elif not has_assessment(case):
             case.results_ai = Result.INCONCLUSIVE
             case.save(update_fields=["results_ai"])
         if result is None:

@@ -258,9 +258,11 @@ your campaign history.
   quiet `Inconclusive` success. The `503` that says the vectorizer is still loading (the server
   restarting) is retried like any other `5xx`; a restart that outlasts the two waits still ends as a
   `Failure` row.
-- **A refusal of one mail (`400`, `413`, `422`)** is a verdict of "cannot tell": the row closes as
-  `Success` with an `Inconclusive` result. A mail with no readable text, in the store or in the
-  archive, ends the same way.
+- **A refusal of one mail (`400`, `413`, `422`)** gives no model version, so the row closes as
+  `Failure` without retries and without counting against the breaker. No `AiAssessment` is stored,
+  and the delivery `error` starts with `no model_version`. A mail with no readable text, in the
+  store or in the archive, ends the same way. The case gets `results_ai = Inconclusive`, unless an
+  earlier row of the same case succeeded: then the case keeps that row's assessment and AI fields.
 - **Object store down.** If the store errors (not "not found") and the archive cannot stand in, the
   row closes as `Failure`. An `access_denied` or `invalid` error fails it at once, without retries;
   `unavailable` and any other error are first retried twice like a server outage. The delivery

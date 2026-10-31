@@ -35,6 +35,7 @@ from tasp.tasks import dispatch_case_analysis
 DANGEROUS = ProviderResult(
     "DANGEROUS", 7, 81, "Classic_phishing", "v0", {"sub_class": "CLASSIC_PHISHING"}
 )
+SAFE = ProviderResult("SAFE", 1, 95, "Ham", "v0", {"sub_class": "HAM"})
 # What the ai_model connector returns when the model gave no answer (model_version "").
 NO_ANSWER = ProviderResult(
     "INCONCLUSIVE", 0, 0, "No subclass found", "", {}, reason="archive_unreadable"
@@ -184,20 +185,18 @@ class ProviderDispatchTest(TestCase):
         )
         self.reconcile.delay.assert_called_once_with(self.case.id)
 
-    def test_a_no_answer_result_leaves_the_case_ai_fields_at_their_defaults(self):
+    def test_an_empty_model_version_closes_the_row_as_failure_and_stores_no_assessment(self):
         DummyProviderConnector.result = NO_ANSWER
         job = self.run_task(self.queue())
-        self.assertEqual(job.status, CaseAnalyzerJob.STATUS_SUCCESS)
+        self.assert_failed(job, "no model_version (archive_unreadable)")
         defaults = {name: Case._meta.get_field(name).get_default()
                     for name in ("score_ai", "confidence_ai", "category_ai")}
         self.assertEqual(defaults["category_ai"], "Uncategorized")  # what the dashboard counts
         self.assertEqual(
             {name: getattr(self.case, name) for name in defaults}, defaults
         )
-        self.assertEqual(self.case.results_ai, "Inconclusive")
-        self.assertEqual(AiAssessment.objects.get(case=self.case).result, "INCONCLUSIVE")
+        self.assertFalse(AiAssessment.objects.exists())
         self.assertFalse(MailInfo.objects.get(mail=self.archive.mail).is_analyzed)
-        self.assertEqual(ConnectorDelivery.objects.get().error, "archive_unreadable")
 
     def test_a_model_inconclusive_result_is_written_like_any_class(self):
         DummyProviderConnector.result = ProviderResult(
@@ -213,24 +212,59 @@ class ProviderDispatchTest(TestCase):
         info = MailInfo.objects.get(mail=self.archive.mail)
         self.assertEqual((info.is_analyzed, info.is_phishing, info.is_dangerous), (True, True, False))
 
-    def test_a_no_answer_result_replaces_a_stale_assessment_completely(self):
-        AiAssessment.objects.create(
-            case=self.case, model_version="v0", result="DANGEROUS", sub_class="CLONE",
-            score=9, confidence=97, probabilities={"DANGEROUS": 0.97},
-            sub_probabilities={"CLONE": 0.9}, tier="high", contributing_phrases=["verify"],
-            similar_cases=[1], campaign_embedding="[0.1]", embedding_version="old",
-            latency_ms=12,
-        )
-        DummyProviderConnector.result = NO_ANSWER
+    # ── a second provider row for one case ─────────────────────────────────
+
+    def ai_fields(self):
+        self.case.refresh_from_db()
+        return (self.case.results_ai, self.case.score_ai, self.case.confidence_ai, self.case.category_ai)
+
+    def test_a_second_successful_row_replaces_the_earlier_rows_case_fields(self):
         self.run_task(self.queue())
+        DummyProviderConnector.result = SAFE
+        self.run_task(self.queue())
+        self.assertEqual(self.ai_fields(), ("Safe", 1, 95, "Ham"))
+        self.assertEqual(AiAssessment.objects.get(case=self.case).result, "SAFE")
+
+    def test_the_case_fields_follow_the_latest_finished_row_not_the_latest_queued(self):
+        first, second = self.queue(), self.queue()
+        DummyProviderConnector.result = SAFE
+        self.run_task(second)
+        DummyProviderConnector.result = DANGEROUS
+        self.run_task(first)
+        self.assertEqual(self.ai_fields(), ("Dangerous", 7, 81, "Classic_phishing"))
+        self.assertEqual(AiAssessment.objects.get(case=self.case).result, "DANGEROUS")
+
+    def test_a_pending_second_row_keeps_the_earlier_rows_case_fields(self):
+        self.run_task(self.queue())
+        self.queue()
+        self.assertEqual(self.ai_fields(), ("Dangerous", 7, 81, "Classic_phishing"))
+
+    def assert_earlier_success_kept(self, job):
+        self.assertEqual(job.status, CaseAnalyzerJob.STATUS_FAILURE)
+        self.assertEqual(self.ai_fields(), ("Dangerous", 7, 81, "Classic_phishing"))
         assessment = AiAssessment.objects.get(case=self.case)
-        self.assertEqual(assessment.result, "INCONCLUSIVE")
-        for field in AiAssessment._meta.concrete_fields:
-            if field.name in ("id", "case", "result", "score", "confidence",
-                              "created_at", "updated_at"):
-                continue
-            with self.subTest(field=field.name):
-                self.assertEqual(getattr(assessment, field.name), field.get_default())
+        self.assertEqual((assessment.model_version, assessment.result, assessment.sub_class),
+                         ("v0", "DANGEROUS", "CLASSIC_PHISHING"))
+
+    def test_a_failed_second_row_keeps_the_earlier_rows_assessment_and_case_fields(self):
+        self.run_task(self.queue())
+        DummyProviderConnector.error = ValueError("HTTP 400")
+        self.assert_earlier_success_kept(self.run_task(self.queue()))
+
+    def test_an_empty_model_version_second_row_keeps_the_earlier_rows_assessment_and_case_fields(self):
+        self.run_task(self.queue())
+        DummyProviderConnector.result = NO_ANSWER
+        self.assert_earlier_success_kept(self.run_task(self.queue()))
+
+    def test_a_stale_failed_second_row_keeps_the_earlier_rows_case_fields(self):
+        from tasp.tasks import fail_stale_jobs
+
+        self.run_task(self.queue())
+        job = self.queue()
+        CaseAnalyzerJob.objects.filter(pk=job.pk).update(created_at=timezone.now() - timedelta(days=2))
+        fail_stale_jobs.apply().get()
+        job.refresh_from_db()
+        self.assert_earlier_success_kept(job)
 
     def test_the_task_is_acked_late_and_redelivered_on_worker_loss(self):
         self.assertIs(run_provider_analysis.acks_late, True)
