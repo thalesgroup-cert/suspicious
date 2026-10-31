@@ -175,9 +175,54 @@ class DetectionTest(TestCase):
 
     def test_an_assessment_without_an_embedding_is_not_stored(self):
         self._seed([_case() for _ in range(3)])
+        for result in ("INCONCLUSIVE", "DANGEROUS"):
+            with self.subTest(result=result):
+                case = _case()
+                self.assertIsNone(self._detect(case, result=result, embedding=""))
+                self.assertNotIn(f"case-{case.id}", self.coll.docs)
+        self.assertEqual(Campaign.objects.count(), 0)
+
+    def test_fewer_neighbours_or_a_tighter_distance_make_no_campaign(self):
+        self._seed([_case() for _ in range(3)])
+        self.assertIsNotNone(self._detect(_case(), profile=dataclasses.replace(self.profile)))
+        Campaign.objects.all().delete()
+        for change in ({"neighbours": 2}, {"distance_threshold": 0.1}):
+            with self.subTest(**change):
+                self.coll = FakeCollection()
+                self._seed([_case() for _ in range(3)])
+                case = _case()
+                self.assertIsNone(self._detect(case, profile=dataclasses.replace(self.profile, **change)))
+                self.assertIn(f"case-{case.id}", self.coll.docs)
+        self.assertEqual(Campaign.objects.count(), 0)
+
+    def test_a_neighbour_whose_case_was_deleted_is_not_a_member(self):
+        old = [_case() for _ in range(3)]
+        self._seed(old)
+        gone = old.pop()
+        gone.delete()
         case = _case()
-        self.assertIsNone(self._detect(case, result="INCONCLUSIVE", embedding=""))
-        self.assertNotIn(f"case-{case.id}", self.coll.docs)
+        campaign = self._detect(case)
+        self.assertEqual(set(campaign.members.values_list("case_id", flat=True)), {c.id for c in old} | {case.id})
+
+    def test_the_lock_is_released_after_both_writes(self):
+        self._seed([_case() for _ in range(3)])
+        steps, real_lock = [], campaigns.cache_lock
+
+        @contextmanager
+        def recorded(key, **kw):
+            with real_lock(key, **kw):
+                yield
+            steps.append("released")
+
+        add, update = self.coll.add, self.coll.update
+        with patch(f"{C}.cache_lock", recorded), \
+                patch.object(self.coll, "add", side_effect=lambda *a, **k: (steps.append("add"), add(*a, **k))), \
+                patch.object(self.coll, "update",
+                             side_effect=lambda *a, **k: (steps.append("update"), update(*a, **k))):
+            self.assertIsNotNone(self._detect(_case()))
+        self.assertEqual(steps[0], "add")
+        self.assertEqual(steps[-1], "released")
+        self.assertEqual(set(steps[1:-1]), {"update"})
 
     def test_allow_listed_sender_domain_is_skipped(self):
         self._seed([_case() for _ in range(3)])
@@ -307,7 +352,8 @@ class DetectionTest(TestCase):
 
     def test_an_embedding_that_is_not_a_list_of_numbers_is_not_stored(self):
         self._seed([_case() for _ in range(3)])
-        for embedding in ("{not json", '["a", "b"]', '{"x": 1}', "[]"):
+        for embedding in ("{not json", '["a", "b"]', '{"x": 1}', "[]", "[NaN, 0.1]", "[0.1, Infinity]",
+                          "[-Infinity]"):
             with self.subTest(embedding=embedding):
                 case = _case()
                 with self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs:
@@ -339,10 +385,12 @@ class CollectionMismatchTest(TestCase):
     def mismatch(self, enabled=True, config=None, **kw):
         ConnectorState.objects.update_or_create(name="chromadb", defaults={"enabled": enabled})
         with patch("settings.config.get_section", return_value=config or {}, **kw):
-            return campaigns.collection_mismatch(current_profile())
+            return campaigns.collection_mismatch(current_profile().collection_name)
 
     def test_the_cleanup_default_collection_is_not_the_profile_one(self):
         message = self.mismatch()
+        self.assertNotIn("cleans up", message)
+        self.assertIn("old campaign documents are not removed", message)
         self.assertIn("'suspicious'", message)
         self.assertIn("'suspicious_mails'", message)
         self.assertIn("collection_name", message)
@@ -358,4 +406,7 @@ class CollectionMismatchTest(TestCase):
         self.assertIsNone(self.mismatch(enabled=False))
 
     def test_an_unreadable_cleanup_config_has_no_message_and_does_not_raise(self):
-        self.assertIsNone(self.mismatch(side_effect=RuntimeError("vault down")))
+        with self.assertLogs("connectors.contrib.ai_model", "DEBUG") as logs:
+            self.assertIsNone(self.mismatch(side_effect=RuntimeError("vault down")))
+        self.assertIn("RuntimeError", logs.output[0])
+        self.assertNotIn("vault down", logs.output[0])

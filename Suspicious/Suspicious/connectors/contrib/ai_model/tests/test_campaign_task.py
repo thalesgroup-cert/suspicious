@@ -147,21 +147,27 @@ class CampaignTaskTest(TestCase):
         _assessment(self.case)
         self.seed()
         breaker = get_breaker("ai_model")
-        with mock.patch(CHROMA, side_effect=ConnectionError(f"chroma down: {TEXT}")), \
-                mock.patch.object(run_campaign_detection, "retry", wraps=run_campaign_detection.retry) as retry, \
-                self.assertLogs("connectors.tasks", "WARNING") as logs:
-            for retries in (0, 2):  # eager mode propagates Retry: redeliver by hand
-                with self.assertRaises(Retry) as raised:
-                    self.run_task(retries)
-                self.assertNotIn(TEXT, str(raised.exception))
-                self.assertIsNone(raised.exception.__context__)
-        self.assertEqual([c.kwargs["countdown"] for c in retry.call_args_list], [30, 120])
-        self.assertEqual((breaker.fail_counter, breaker.current_state), (0, "closed"))
-        self.assertIn(f"case {self.case.id}", logs.output[0])
-        self.assertIn("CampaignStoreUnavailable", logs.output[0])
-        self.assertNotIn(TEXT, "\n".join(logs.output))
-        self.assertFalse(CampaignMember.objects.exists())
-        self.assertEqual(FakeTheHive.calls, [])
+        outage = ConnectionError(f"chroma down: {TEXT}")
+        failures = (
+            ("opening the collection", mock.patch(CHROMA, side_effect=outage)),
+            ("the neighbour query", mock.patch.object(self.coll, "query", side_effect=outage)),
+        )
+        for where, failure in failures:
+            with self.subTest(where=where), failure, \
+                    mock.patch.object(run_campaign_detection, "retry", wraps=run_campaign_detection.retry) as retry, \
+                    self.assertLogs("connectors.tasks", "WARNING") as logs:
+                for retries in (0, 2):  # eager mode propagates Retry: redeliver by hand
+                    with self.assertRaises(Retry) as raised:
+                        self.run_task(retries)
+                    self.assertNotIn(TEXT, str(raised.exception))
+                    self.assertIsNone(raised.exception.__context__)
+                self.assertEqual([c.kwargs["countdown"] for c in retry.call_args_list], [30, 120])
+                self.assertEqual((breaker.fail_counter, breaker.current_state), (0, "closed"))
+                self.assertIn(f"case {self.case.id}", logs.output[0])
+                self.assertIn("CampaignStoreUnavailable", logs.output[0])
+                self.assertNotIn(TEXT, "\n".join(logs.output))
+                self.assertFalse(CampaignMember.objects.exists())
+                self.assertEqual(FakeTheHive.calls, [])
 
     def test_exhausted_retries_log_and_return(self):
         _assessment(self.case)
@@ -274,6 +280,12 @@ class CampaignTaskTest(TestCase):
             self.run_task()
             self.run_task()
         self.assertEqual(check.call_count, 2)
+
+    def test_an_unimportable_collection_check_neither_fails_nor_retries_the_task(self):
+        with mock.patch.dict("sys.modules", {"connectors.contrib.ai_model.campaigns": None}), \
+                self.assertLogs("connectors.tasks", "DEBUG") as logs:
+            tasks._warn_collection_mismatch(mock.Mock(collection_name="suspicious_mails"))
+        self.assertIn("ModuleNotFoundError", logs.output[0])
 
     def test_a_failing_collection_check_neither_fails_nor_retries_the_task(self):
         _assessment(self.case)

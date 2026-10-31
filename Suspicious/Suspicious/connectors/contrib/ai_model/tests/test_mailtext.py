@@ -371,9 +371,9 @@ class ReadArchiveMaterialTest(SimpleTestCase):
         self.assertEqual(str(caught.exception), "object store unavailable: unavailable")
 
     def test_read_archive_body_returns_only_the_text(self):
-        data = archive(build_tar(GOOD))
-        self.assertEqual(read_archive_body(data), mailtext.read_archive_material(data).text)
-        self.assertEqual(self.read(fake_store()).text, "Text from the store")
+        self.assertEqual(read_archive_body(archive(build_tar(GOOD))), GOOD["m1.txt"].decode())
+        with mock.patch.object(mailtext, "get_store", return_value=fake_store()):
+            self.assertEqual(read_archive_body(mail_archive()), "Text from the store")
 
 
 class HeaderDictTest(SimpleTestCase):
@@ -389,6 +389,16 @@ class HeaderDictTest(SimpleTestCase):
 
     def test_no_headers_gives_an_empty_dict(self):
         self.assertEqual(mailtext.header_dict(""), {})
+
+    def test_crlf_and_cr_line_ends_read_as_the_cortex_analyzer_read_them(self):
+        # The analyzer opened the .headers file in text mode: every line end became "\n".
+        expected = mailtext.header_dict("Subject: a\n b\nFrom: x@y.example\n")
+        self.assertEqual(mailtext.header_dict("Subject: a\r\n b\r\nFrom: x@y.example\r\n"), expected)
+        self.assertEqual(mailtext.header_dict("Subject: a\r b\rFrom: x@y.example\r"), expected)
+
+    def test_quotes_a_backslash_and_a_replacement_character_survive_the_round_trip(self):
+        value = "It's \"urgent\" C:\\pay \ufffd now"
+        self.assertEqual(mailtext.header_dict(f"Subject: {value}\n"), {"Subject": [value]})
 
 
 class MailArchiveForTest(TestCase):

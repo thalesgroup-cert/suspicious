@@ -24,16 +24,27 @@ from score_process.score_utils.chromadb_utils import get_suspicious_collection
 _AI_PREFIX = "AI_Mail"
 
 
+def ephemeral_client():
+    """The in-process Chroma. Every caller builds it here: Chroma refuses a second client of the
+    process with other settings."""
+    return chromadb.EphemeralClient(settings=Settings(anonymized_telemetry=False))
+
+
 @contextmanager
 def _scratch_collection(name: str):
     """A collection made like the live one, in an in-process Chroma, deleted on exit. The
     in-process Chroma is shared by every client of the process, hence the unique name."""
-    client = chromadb.EphemeralClient(settings=Settings(anonymized_telemetry=False))
+    client = ephemeral_client()
     collection = get_suspicious_collection(client, name)
     try:
         yield collection
     finally:
-        client.delete_collection(name)
+        try:
+            client.delete_collection(name)
+        except Exception as exc:  # noqa: BLE001 -- the Chroma client's failures are many
+            raise CommandError(
+                f"could not delete the in-process collection {name}: {type(exc).__name__}"
+            ) from exc
 
 
 def _cortex_full(case_id: int) -> dict | None:
@@ -123,10 +134,11 @@ class Command(BaseCommand):
             else:
                 replay.append((cases[cid], label, material))
         replayable = [case.id for case, _, _ in replay if case.id in stored]
-        if len(replayable) < profile.min_members:
+        needed = max(profile.min_members, 1)  # the comparison reads the last replayed member
+        if len(replayable) < needed:
             raise CommandError(
                 f"cannot replay {ref}: {len(replayable)} of {len(stored)} members have a usable "
-                f"Cortex AI report, {profile.min_members} needed"
+                f"Cortex AI report, {needed} needed"
             )
 
         seen = set()

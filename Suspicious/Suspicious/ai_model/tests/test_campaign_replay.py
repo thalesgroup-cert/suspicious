@@ -5,6 +5,7 @@ are built from rows, as the Cortex path left them.
 
 CampaignReplayTest pins the logic over an in-memory cosine fake; RealChromaReplayTest runs the
 same command over the real ephemeral Chroma."""
+import dataclasses
 import importlib
 import math
 import re
@@ -14,7 +15,6 @@ from unittest.mock import MagicMock, patch
 
 try:
     import chromadb
-    from chromadb.config import Settings
 except ImportError:  # pragma: no cover -- requirements.txt pins chromadb; reported as a skip
     chromadb = None
 
@@ -25,6 +25,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
+from ai_model.campaign_profile import current_profile
 from case_handler.models import Campaign, CampaignMember, Case
 from connectors.contrib.ai_model.campaigns import CampaignStoreUnavailable
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
@@ -128,6 +129,16 @@ def _stored_campaign(angles):
     return campaign, [_mail_case(angle, campaign) for angle in angles]
 
 
+def _campaign_around(make_between):
+    """A campaign of five members at angles 0 to 0.2, with whatever ``make_between()`` makes
+    between its third and fourth member in id order: (campaign, members, what it returned)."""
+    campaign = Campaign.objects.create(title="Verify payroll")
+    members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+    between = make_between()
+    members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+    return campaign, members, between
+
+
 def _row_counts():
     return {
         model._meta.label: model._default_manager.count()
@@ -171,7 +182,7 @@ class CampaignReplayTest(_Replay):
         self.coll = CosineCollection()
         self.chroma = MagicMock()
         self.chroma.get_or_create_collection.return_value = self.coll
-        self.ephemeral = patch("chromadb.EphemeralClient", return_value=self.chroma).start()
+        self.ephemeral = patch(f"{M}.ephemeral_client", return_value=self.chroma).start()
         self.addCleanup(patch.stopall)
 
     def _scratch_name(self):
@@ -204,10 +215,7 @@ class CampaignReplayTest(_Replay):
         self.assertEqual(self._members(campaign), {case.id for case in cases})
 
     def test_a_near_mail_in_no_campaign_between_the_members_shows_up_as_extra_and_fails(self):
-        campaign = Campaign.objects.create(title="Verify payroll")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
-        near = _mail_case(0.12)
-        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        campaign, members, near = _campaign_around(lambda: _mail_case(0.12))
         out, err, error = self._run(campaign.ref)
         self.assertEqual(_lines(out, near), [f"case {near.id} (not a member): created"])
         self.assertIn("missing case ids []", error)
@@ -216,21 +224,15 @@ class CampaignReplayTest(_Replay):
         self.assertEqual(self._members(campaign), {case.id for case in members})
 
     def test_a_far_mail_in_no_campaign_between_the_members_is_replayed_and_still_matches(self):
-        campaign = Campaign.objects.create(title="Verify payroll")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
-        far = _mail_case(math.pi / 2)
-        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        campaign, members, far = _campaign_around(lambda: _mail_case(math.pi / 2))
         out, err, error = self._run(campaign.ref)
         self.assertIsNone(error)
         self.assertEqual(_lines(out, far), [f"case {far.id} (not a member): stored"])
         self.assertIn(_match_line(campaign, 5), out)
 
     def test_a_near_mail_of_another_campaign_is_not_replayed(self):
-        campaign = Campaign.objects.create(title="Verify payroll")
         other = Campaign.objects.create(title="Other")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
-        elsewhere = _mail_case(0.12, other)
-        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        campaign, members, elsewhere = _campaign_around(lambda: _mail_case(0.12, other))
         out, err, error = self._run(campaign.ref)
         self.assertIsNone(error)
         self.assertEqual(_lines(out, elsewhere), [])
@@ -238,11 +240,9 @@ class CampaignReplayTest(_Replay):
         self.assertEqual(self._members(other), {elsewhere.id})
 
     def test_a_mail_in_no_campaign_without_a_report_or_not_dangerous_is_ignored(self):
-        campaign = Campaign.objects.create(title="Verify payroll")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
-        no_report = _mail_case(None)
-        safe = _mail_case(0.12, classification="SAFE")
-        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        campaign, members, (no_report, safe) = _campaign_around(
+            lambda: (_mail_case(None), _mail_case(0.12, classification="SAFE"))
+        )
         out, err, error = self._run(campaign.ref)
         self.assertIsNone(error)
         self.assertEqual(_lines(out, no_report), [])
@@ -260,10 +260,7 @@ class CampaignReplayTest(_Replay):
         self.assertIn(_match_line(campaign, 5), out)
 
     def test_the_replay_changes_no_rows(self):
-        campaign = Campaign.objects.create(title="Verify payroll")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
-        _mail_case(0.12)  # joins in the replay, which must undo it
-        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        campaign, members, _ = _campaign_around(lambda: _mail_case(0.12))  # joins in the replay, undone
         before = _row_counts()
         out, err, error = self._run(campaign.ref)
         self.assertIn("extra case ids", error)
@@ -301,6 +298,14 @@ class CampaignReplayTest(_Replay):
         self.ephemeral.assert_not_called()
         self.assertEqual(_row_counts(), before)
 
+    def test_no_replayable_member_fails_even_when_no_member_is_needed(self):
+        campaign, _ = _stored_campaign([None, None])
+        profile = dataclasses.replace(current_profile(), min_members=0)
+        with patch(f"{M}.current_profile", return_value=profile):
+            out, err, error = self._run(campaign.ref)
+        self.assertIn("cannot replay", error)
+        self.ephemeral.assert_not_called()
+
     def test_an_unknown_campaign_fails(self):
         out, err, error = self._run("CMP-nope")
         self.assertIn("unknown campaign", error)
@@ -317,10 +322,9 @@ class CampaignReplayTest(_Replay):
     def test_a_failed_delete_of_the_scratch_collection_fails_the_command(self):
         campaign, _ = _stored_campaign(NEAR)
         self.chroma.delete_collection.side_effect = RuntimeError("delete failed")
-        out = StringIO()
-        with self.assertRaises(RuntimeError):
-            call_command("ai_model_campaign_replay", campaign.ref, stdout=out)
-        self.assertNotIn("MATCH", out.getvalue())
+        out, err, error = self._run(campaign.ref)
+        self.assertEqual(error, f"could not delete the in-process collection {self._scratch_name()}: RuntimeError")
+        self.assertNotIn("MATCH", out)
 
     def test_the_scratch_collection_is_shaped_like_the_live_one_and_deleted(self):
         campaign, _ = _stored_campaign(NEAR)
@@ -338,14 +342,10 @@ class RealChromaReplayTest(_Replay):
     """The command over the real in-process Chroma: real add, get, update and cosine query."""
 
     def _collections(self):
-        client = chromadb.EphemeralClient(settings=Settings(anonymized_telemetry=False))
-        return [c.name for c in client.list_collections()]
+        return [c.name for c in importlib.import_module(M).ephemeral_client().list_collections()]
 
     def test_a_campaign_with_a_far_mail_between_its_members_matches(self):
-        campaign = Campaign.objects.create(title="Verify payroll")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
-        far = _mail_case(math.pi / 2)
-        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        campaign, members, far = _campaign_around(lambda: _mail_case(math.pi / 2))
         out, err, error = self._run(campaign.ref)
         self.assertIsNone(error)
         self.assertEqual(out.splitlines(), [
@@ -359,10 +359,7 @@ class RealChromaReplayTest(_Replay):
         ])
 
     def test_a_near_mail_in_no_campaign_shows_up_as_extra(self):
-        campaign = Campaign.objects.create(title="Verify payroll")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
-        near = _mail_case(0.12)
-        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        campaign, members, near = _campaign_around(lambda: _mail_case(0.12))
         out, err, error = self._run(campaign.ref)
         self.assertEqual(_lines(out, near), [f"case {near.id} (not a member): created"])
         self.assertIn("missing case ids []", error)
@@ -380,13 +377,14 @@ class RealChromaReplayTest(_Replay):
         module = importlib.import_module(M)
         self.assertFalse({"get_chroma_client", "open_collection"} & set(vars(module)))
         campaign, _ = _stored_campaign(NEAR)
-        with patch("common.clients.get_chroma_client") as http, \
+        with patch("chromadb.HttpClient") as http_client, \
+                patch("common.clients.get_chroma_client") as http, \
                 patch("connectors.contrib.ai_model.campaigns.get_chroma_client") as campaigns_http, \
                 patch("connectors.contrib.ai_model.campaigns.open_collection") as live, \
                 patch(f"{M}.get_suspicious_collection", wraps=get_suspicious_collection) as made:
             out, err, error = self._run(campaign.ref)
         self.assertIsNone(error)
-        for mock in (http, campaigns_http, live):
+        for mock in (http_client, http, campaigns_http, live):
             mock.assert_not_called()
         self.assertRegex(made.call_args.args[1], SCRATCH)
         self.assertFalse([name for name in self._collections() if SCRATCH.match(name)])

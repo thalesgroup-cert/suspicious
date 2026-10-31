@@ -2,6 +2,9 @@ import hashlib
 from dataclasses import dataclass
 
 
+COLLECTION_NAME = "suspicious_mails"
+
+
 @dataclass(frozen=True)
 class CampaignProfile:
     embedding_version: str
@@ -30,7 +33,7 @@ def current_profile() -> CampaignProfile:
 
     return CampaignProfile(
         embedding_version="cmp-e1",
-        collection_name="suspicious_mails",
+        collection_name=COLLECTION_NAME,
         max_tokens=128,
         distance_threshold=0.25,
         min_members=3,

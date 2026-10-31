@@ -38,6 +38,8 @@ class MailMaterial:
 def header_dict(raw_headers: str) -> dict[str, list[str]]:
     """The headers keyed as the Cortex AI analyzer reported them (mail_archive.get_header_dict_list:
     every value of a key, in order), MIME encoded-words decoded as campaign detection read them."""
+    # The analyzer read the file in text mode, so every line end it saw was "\n".
+    raw_headers = raw_headers.replace("\r\n", "\n").replace("\r", "\n")
     collected = defaultdict(list)
     for key, value in email.message_from_string(raw_headers).items():
         collected[key].append(value)

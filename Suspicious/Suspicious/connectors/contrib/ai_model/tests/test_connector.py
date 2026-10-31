@@ -108,11 +108,17 @@ class ResultMappingTest(SimpleTestCase):
 class HealthCheckTest(SimpleTestCase):
     def check(self, config, ready, mismatch=None):
         with mock.patch.object(module, "AiInferenceClient") as client_class, \
-                mock.patch.object(module, "current_profile"), \
-                mock.patch.object(module, "collection_mismatch", return_value=mismatch):
+                mock.patch.object(module, "collection_mismatch", return_value=mismatch) as check:
             client_class.return_value.ready.return_value = ready
             status = AiModelConnector(config).health_check()
+        check.assert_called_once_with("suspicious_mails")
         return status, client_class
+
+    def test_the_collection_check_builds_no_profile(self):
+        # SimpleTestCase refuses queries: current_profile() reads the allow-list from the database.
+        with mock.patch("ai_model.campaign_profile.current_profile", side_effect=AssertionError("profile")):
+            status, _ = self.check(CONFIG, (True, "ready"), "Cleanup watches 'a'.")
+        self.assertEqual(status.detail, "ready. Cleanup watches 'a'.")
 
     def test_a_collection_mismatch_is_appended_without_changing_ok(self):
         sentence = "Cleanup watches 'a'."
@@ -129,10 +135,13 @@ class HealthCheckTest(SimpleTestCase):
 
     def test_a_failing_collection_check_does_not_break_the_health_check(self):
         with mock.patch.object(module, "AiInferenceClient") as client_class, \
-                mock.patch.object(module, "current_profile", side_effect=RuntimeError("db down")):
+                mock.patch.object(module, "collection_mismatch", side_effect=RuntimeError("db down")), \
+                self.assertLogs("connectors.contrib.ai_model", "DEBUG") as logs:
             client_class.return_value.ready.return_value = (True, "ready, token accepted")
             status = AiModelConnector(CONFIG).health_check()
         self.assertEqual((status.ok, status.detail), (True, "ready, token accepted"))
+        self.assertIn("RuntimeError", logs.output[0])
+        self.assertNotIn("db down", logs.output[0])
 
     def test_health_check_ok_and_not_ok(self):
         status, client_class = self.check(CONFIG, (True, "ready, token accepted"))

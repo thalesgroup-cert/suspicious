@@ -86,9 +86,10 @@ def _warn_collection_mismatch(profile) -> None:
     global _mismatch_warned
     if _mismatch_warned:
         return
-    from connectors.contrib.ai_model.campaigns import collection_mismatch
     try:
-        sentence = collection_mismatch(profile)
+        from connectors.contrib.ai_model.campaigns import collection_mismatch
+
+        sentence = collection_mismatch(profile.collection_name)
         if sentence:
             logger.warning(sentence)
             _mismatch_warned = True

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from ai_model.campaign_profile import current_profile
+from ai_model.campaign_profile import COLLECTION_NAME
 from ai_model.models import AiAssessment
 from case_handler.models import Case
 from connectors.base import (
@@ -96,8 +96,9 @@ class AiModelConnector(Connector):
             ok, detail = False, str(exc)
         # Campaign detection is a function of this connector too: say when the cleanup misses it.
         try:
-            mismatch = collection_mismatch(current_profile())
-        except Exception:  # noqa: BLE001 — a health check must not raise
+            mismatch = collection_mismatch(COLLECTION_NAME)
+        except Exception as exc:  # noqa: BLE001 — a health check must not raise
+            logger.debug("Collection mismatch check failed: %s", type(exc).__name__)
             mismatch = None
         if mismatch:
             detail = f"{detail.rstrip('. ')}. {mismatch}" if detail else mismatch

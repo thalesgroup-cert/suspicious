@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections import Counter
 from contextlib import ExitStack, contextmanager
 
@@ -53,22 +54,23 @@ def open_collection(profile: CampaignProfile):
         return get_suspicious_collection(get_chroma_client(), profile.collection_name)
 
 
-def collection_mismatch(profile: CampaignProfile) -> str | None:
-    """A sentence when the chromadb cleanup connector runs against another collection than the
-    one detection writes to (so the 15-day window is not enforced), else None. Never raises: it
-    feeds a health message and a log line."""
+def collection_mismatch(collection_name: str) -> str | None:
+    """A sentence when the chromadb cleanup connector is set to another collection than
+    ``collection_name``, the one detection writes to (so the 15-day window is not enforced), else
+    None. Never raises: it feeds a health message and a log line."""
     try:
         if not get_state("chromadb").enabled:
             return None
         watched = registry.instantiate("chromadb").config.get("collection_name", _DEFAULT_COLLECTION_NAME)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Collection mismatch check failed: %s", type(exc).__name__)
         return None
-    if watched == profile.collection_name:
+    if watched == collection_name:
         return None
     return (
-        f"The chromadb connector cleans up collection '{watched}', but campaign detection stores "
-        f"mails in '{profile.collection_name}', so old campaign documents are not removed. "
-        f"Set collection_name of the chromadb connector to '{profile.collection_name}'."
+        f"The chromadb connector is set to collection '{watched}', but campaign detection stores "
+        f"mails in '{collection_name}', so old campaign documents are not removed. "
+        f"Set collection_name of the chromadb connector to '{collection_name}'."
     )
 
 
@@ -88,7 +90,7 @@ def _is_vector(raw: str) -> bool:
     except ValueError:
         return False
     return isinstance(vector, list) and bool(vector) and all(
-        isinstance(x, (int, float)) and not isinstance(x, bool) for x in vector
+        isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) for x in vector
     )
 
 
