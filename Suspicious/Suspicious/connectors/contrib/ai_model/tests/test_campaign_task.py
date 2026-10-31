@@ -169,6 +169,22 @@ class CampaignTaskTest(TestCase):
                 self.assertFalse(CampaignMember.objects.exists())
                 self.assertEqual(FakeTheHive.calls, [])
 
+    def test_a_placed_case_is_announced_when_the_collection_cannot_be_opened(self):
+        _assessment(self.case)
+        campaign = Campaign.objects.create(title="Verify payroll")
+        CampaignMember.objects.create(campaign=campaign, case=self.case)
+        with mock.patch(CHROMA, side_effect=ConnectionError(f"chroma down: {TEXT}")), \
+                mock.patch.object(run_campaign_detection, "retry") as retry, \
+                self.assertLogs("connectors.tasks", "WARNING") as logs:
+            self.assertIsNone(self.run_task())
+        retry.assert_not_called()
+        self.assertEqual([(e.case_id, e.campaign_id) for e in FakeTheHive.calls],
+                         [(self.case.id, campaign.id)])
+        self.assertEqual(self.coll.docs, {})
+        self.assertIn(f"Case {self.case.id}", logs.output[0])
+        self.assertIn("CampaignStoreUnavailable", logs.output[0])
+        self.assertNotIn(TEXT, "\n".join(logs.output))
+
     def test_exhausted_retries_log_and_return(self):
         _assessment(self.case)
         self.seed()

@@ -100,15 +100,20 @@ def _warn_collection_mismatch(profile) -> None:
 @shared_task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3)
 def run_campaign_detection(self, case_id: int) -> None:
     """Place one finalised case in a campaign (ai_model) and emit campaign_updated when it
-    joined, created or is already in one (a redelivery announces it again). Queued by the connector's case_finalised hook rather than run in it:
-    the hook runs under the ai_model breaker, which the classification calls share, and a Chroma
-    outage must not open it. detect_campaign raises only before the campaign rows exist, so
-    every failure but a non-retryable ProviderUnavailable is retried. Only the exception class
-    is logged: a message can carry mail text."""
+    joined, created or is already in one (a redelivery announces it again).
+
+    Queued by the connector's case_finalised hook rather than run in it: the hook runs under the
+    ai_model breaker, which the classification calls share, and a Chroma outage must not open it.
+    detect_campaign raises only before the campaign rows exist, so every failure but a
+    non-retryable ProviderUnavailable is retried. A case already placed is announced even when
+    the collection cannot be opened; its store and tag steps wait for a later redelivery. Only
+    the exception class is logged: a message can carry mail text."""
     from ai_model.campaign_profile import current_profile
-    from case_handler.models import Case
+    from case_handler.models import CampaignMember, Case
     from connectors.base import EVENT_CAMPAIGN_UPDATED
-    from connectors.contrib.ai_model.campaigns import detect_campaign, open_collection
+    from connectors.contrib.ai_model.campaigns import (
+        CampaignStoreUnavailable, detect_campaign, open_collection,
+    )
     from connectors.contrib.ai_model.mailtext import (
         header_dict, mail_archive_for, read_archive_material,
     )
@@ -135,9 +140,17 @@ def run_campaign_detection(self, case_id: int) -> None:
             logger.warning("Case %s: unreadable headers (%s), detecting without them.",
                            case_id, type(exc).__name__)
             headers = {}
-        campaign = detect_campaign(
-            case, assessment, material.text, headers, profile, open_collection(profile),
-        )
+        try:
+            collection = open_collection(profile)
+        except CampaignStoreUnavailable as exc:
+            member = CampaignMember.objects.filter(case=case).only("campaign_id").first()
+            if member is None:
+                raise
+            logger.warning("Case %s: campaign store down (%s), announcing campaign %s without it.",
+                           case_id, type(exc).__name__, member.campaign_id)
+            emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=member.campaign_id)
+            return
+        campaign = detect_campaign(case, assessment, material.text, headers, profile, collection)
         if campaign is not None:
             emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=campaign.id)
         return
