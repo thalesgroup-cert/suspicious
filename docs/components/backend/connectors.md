@@ -26,7 +26,11 @@ The mail AI classifier. It is off by default (`enabled_by_default=False`).
 - **Health check:** `/v2/health/ready`, then the token against `/v2/models/ai_mail`; it also reports
   when the `chromadb` cleanup connector watches another collection than `suspicious_mails`.
 
-Without it, a mail case has no AI vote (`results_ai` is set to `Inconclusive`) and no campaign detection.
+Without it, a mail case has no AI vote (`results_ai` is set to `Inconclusive`) and no campaign
+detection. Scoring then finalises most mails that the analyzer count does not make `Dangerous` as
+`Inconclusive` (rule `analysis-incomplete`) instead of `Safe` or `Suspicious`, and the submitter's
+notification mail, the TheHive challenge text and the dashboards show that verdict. Upgrade step:
+enable `ai_model` (and set its `url` and `token`) as part of the upgrade.
 `python manage.py ai_model_campaign_replay <campaign_ref>` replays a campaign the Cortex AI path built
 through its detection. Setup, failures and the replay command:
 [AI / ML Analyzers](../analyzers.md).

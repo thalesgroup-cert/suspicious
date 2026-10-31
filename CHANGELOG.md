@@ -23,16 +23,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   found, creates or joins a campaign and sends `campaign_updated`, so TheHive raises its campaign
   alert. The task does not run under the connector's circuit breaker, so a ChromaDB outage does not
   stop classification. A failed run is retried up to three times (after 30, 60 and 120 s), then
-  logged at ERROR with the case id and the error class. Set `integrations.chromadb.collection_name`
-  to `suspicious_mails` in `settings.json` (there is no Settings field for it), or the `chromadb`
-  cleanup connector never removes old campaign documents; the `ai_model` health check and a one-time
-  worker warning report the mismatch.
+  logged at ERROR with the case id and the error class. An object store that answers
+  `access_denied` or `invalid` is not retried and is logged at once. A case deleted before the task
+  runs is skipped, and headers that cannot be parsed are dropped and the mail is detected without
+  them. Set `integrations.chromadb.collection_name` to `suspicious_mails` in `settings.json` (there
+  is no Settings field for it), or the `chromadb` cleanup connector, which deletes documents older
+  than 15 days by default (`threshold_days`), never removes old campaign documents. The name is read
+  from the `chromadb` connector's configuration, so a configuration saved for it in the database
+  wins over `settings.json`. The `ai_model` health check and a one-time worker warning report the
+  mismatch.
 - `python manage.py ai_model_campaign_replay <campaign_ref>` replays a campaign the Cortex AI path
   built through the connector's detection, from the members' Cortex AI reports, and compares the
   members. It checks membership only, covers the stored members plus the campaign-less `DANGEROUS`
   Cortex-reported mails between the lowest and highest member id, and changes nothing: the
   transaction is rolled back, the mails are compared in an in-process Chroma and no event is sent.
-  It cannot replay a campaign the connector built. See `docs/components/analyzers.md`.
+  It cannot replay a campaign the connector built. It holds the campaign's member row locks for the
+  whole replay, so a replay on the newest campaign can make live detection retry briefly: run it
+  off-peak or expect retries. See `docs/components/analyzers.md`.
 - Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
   be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already
   enabled.
@@ -44,12 +51,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/classify` route, the `inference_url` analyzer item and the `172.17.0.1` host port of
   `ai_inference` are gone. The server is reachable as `http://ai_inference:8090` on `suspicious_net`
   only. The backend no longer launches a Cortex AI job (`launch_cortex_ai_jobs`, `manage_ai_jobs`)
-  and `case_handler/campaigns.py` (campaign detection on reconcile) is gone. **An instance that
-  does not enable `ai_model` has no AI vote**: a mail case gets `results_ai = Inconclusive` and
-  scoring treats the AI vote as missing, as when the Cortex AI job failed; it also has no campaign
-  detection. Historical Cortex AI reports on existing cases are still parsed and still kept out of
-  the weighted blend. Keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the
-  `Analyzer` row the connector's ledger row and the AI vote's weight use.
+  and `case_handler/campaigns.py` (campaign detection on reconcile) is gone.
+- **Breaking: an instance that does not enable `ai_model` has no AI vote.** A mail case gets
+  `results_ai = Inconclusive` and scoring treats the AI vote as missing, as when the Cortex AI job
+  failed. Such a mail is then `Dangerous` when at least a third of its scored analyzer results (and
+  at least one) are malicious or a domain or URL is deny-listed, and `Failure` when no result
+  scored. Otherwise it finalises as `Inconclusive` (rule `analysis-incomplete`), unless an
+  allow-list majority makes it `Safe` or an embedded indicator raises its band. So after the upgrade
+  most mails that the analyzer count does not make `Dangerous` finalise as `Inconclusive` instead of
+  `Safe` or `Suspicious`, and the submitter's notification mail, the TheHive challenge text and the
+  dashboards show that. Without the connector there is no campaign detection either. **Upgrade step:
+  enable `ai_model` (and set its `url` and `token`) as part of the upgrade.**
+- Historical Cortex AI reports on existing cases are still parsed and still kept out of the weighted
+  blend. Keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the `Analyzer` row the
+  connector's ledger row and the AI vote's weight use (without the key the name is
+  `AI_Mail_Analyzer`). The Cortex analyzer sync no longer reports that role as missing from Cortex
+  and leaves its row active.
 
 ### Fixed
 

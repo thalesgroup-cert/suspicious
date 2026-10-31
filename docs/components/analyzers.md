@@ -28,8 +28,8 @@
   Neither `deployment/compose_apps.yaml` nor `deployment/docker-compose.override.yml` publishes a
   host port. To call it by hand, run the call inside a container on that network (examples below).
 - **Variants.** `personal` (`models/`, your own trained weights) is the one `/v2` classifies with.
-  `public` (`models_public/`) is still loaded and reported by `/health`, but no route classifies with
-  it.
+  `public` (`models_public/`) is still loaded and reported by `/health`, but no route classifies
+  with it.
 - **Weights.** Bind-mounted read-only, not baked into the image. The server
   re-checks them every `INFERENCE_RELOAD_CHECK_SECONDS` (30) and hot-swaps changed
   files; `POST /reload` does it immediately. A file that fails to load never replaces a
@@ -41,20 +41,39 @@
 ### Without the connector
 
 An instance that does not enable `ai_model` has no AI vote. A mail case with a mail archive gets
-`results_ai = Inconclusive`, and scoring treats the AI vote as missing, as it did when the old Cortex
-AI job failed. Campaign detection, and with it the TheHive campaign alert, also needs the connector.
+`results_ai = Inconclusive`, and scoring treats the AI vote as missing (`ai_missing`), as it did
+when the old Cortex AI job failed. `score_case` (`score_process/scoring/engine.py`) then finalises
+such a mail as:
 
-Historical Cortex AI reports on existing cases still display (the AI analyzer card) and are still kept
-out of the weighted blend, so their score is not counted twice. `integrations.cortex.analyzers.ai` in
-`settings.json` (`AI_Mail_Analyzer_1_4` in the example settings) must stay. It names the `Analyzer`
-row of the AI vote:
+- `Dangerous` when at least a third of its scored analyzer results (and at least one) are malicious,
+  or when one of its domains or URLs is deny-listed;
+- `Failure` when no analyzer result scored at all;
+- otherwise `Inconclusive`, rule `analysis-incomplete`, whatever the analyzers' scores. Two later
+  steps can still change it: an allow-list majority (a strict majority of analyzer weight is Safe or
+  allow-listed, and every dissent is about an allow-listed target) makes it `Safe`, and an embedded
+  indicator with a worse band raises it to `Suspicious` or `Dangerous`.
+
+So an instance that upgrades and does not enable `ai_model` finalises most mails that the analyzer
+count does not make `Dangerous` as `Inconclusive` instead of `Safe` or `Suspicious`. The submitter's
+notification mail, the TheHive challenge text and the dashboards show that verdict. Campaign
+detection, and with it the TheHive campaign alert, also needs the connector.
+
+**Upgrade step:** enable `ai_model` (and set its `url` and `token`) as part of the upgrade, see
+[Enabling the connector](#enabling-the-connector).
+
+Historical Cortex AI reports on existing cases still display (the AI analyzer card) and are still
+kept out of the weighted blend, so their score is not counted twice.
+`integrations.cortex.analyzers.ai` in `settings.json` (`AI_Mail_Analyzer_1_4` in the example
+settings) names the `Analyzer` row of the AI vote; without the key the name is `AI_Mail_Analyzer`:
 
 - the connector puts its ledger row (`CaseAnalyzerJob`) on that analyzer, and creates the row if it
   does not exist;
-- scoring takes the AI vote's weight from that analyzer, and leaves that analyzer's reports out of the
-  other votes and out of the per-file weighted blend.
+- scoring takes the AI vote's weight from that analyzer, and leaves that analyzer's reports out of
+  the other votes and out of the per-file weighted blend.
 
-Without the key the connector cannot queue the AI step and scoring drops the AI vote.
+Keep the key on an upgraded instance: its row holds the AI weight set in Settings, and the
+historical Cortex AI reports carry its name. The Cortex analyzer sync does not report that role as
+missing from Cortex and leaves its row active.
 
 ### Deploying
 
@@ -78,8 +97,9 @@ Plain compose users add the profile: `docker compose --profile ai up -d`. Then e
 
 ### Troubleshooting "inference does not work"
 
-The connector's errors are in the delivery `error` of its rows (`GET /api/connectors/ai_model/deliveries/`);
-campaign detection errors are in the worker log (`suspicious_celery`).
+The connector's errors are in the delivery `error` of its rows
+(`GET /api/connectors/ai_model/deliveries/`); campaign detection errors are in the worker log
+(`suspicious_celery`).
 
 | Symptom | Cause / fix |
 |---|---|
@@ -108,17 +128,18 @@ no Cortex job.
 ### The token
 
 The server reads `AI_INFERENCE_TOKEN` from its environment (`deployment/.env`, passed to the
-`ai_inference` service by compose). The `/v2` routes that need a token fail closed: with the variable
-unset or empty they answer `503 token not configured`, they never run unauthenticated. A missing or
-wrong `Authorization: Bearer ...` header answers `401`. Generate one with `openssl rand -hex 24`.
+`ai_inference` service by compose). The `/v2` routes that need a token fail closed: with the
+variable unset or empty they answer `503 token not configured`, they never run unauthenticated. A
+missing or wrong `Authorization: Bearer ...` header answers `401`. Generate one with
+`openssl rand -hex 24`.
 
 ### Enabling the connector
 
 1. Set `AI_INFERENCE_TOKEN` in `deployment/.env` and recreate `ai_inference`.
 2. Put the same value in the connector's `token` (Settings, or `integrations.ai_model.token` in
    `settings.json`). `url` defaults to `http://ai_inference:8090` and `timeout_seconds` to 20.
-3. Enable `ai_model` in Settings, or `PATCH /api/connectors/ai_model/` with `{"enabled": true}`. It is off by
-   default.
+3. Enable `ai_model` in Settings, or `PATCH /api/connectors/ai_model/` with `{"enabled": true}`. It
+   is off by default.
 4. Set `integrations.chromadb.collection_name` to `suspicious_mails` (see
    [Campaign detection](#campaign-detection)).
 
@@ -132,46 +153,52 @@ own bucket, or under `<submission_id>/<mail_id>/` in the feeder bucket (`storage
 when the submission came through the prefix layout. It starts there because the e-mail fetch task
 deletes the working directory that holds the submission's archive shortly after the handoff, so a
 retry would no longer find it. The archive on the shared volume (`mail_case_data` and
-`mail_work_data`, mounted in both `suspicious` and `suspicious_celery`) is the fallback, used when the
-store has no text for the mail. The worker then posts the body to `/v2/models/ai_mail/classify` over
-`suspicious_net`, stores the answer as one `AiAssessment` per case (with the model version, `v0`
-today), fills the case's AI result, score, confidence and category, closes the row and queues the
-case's reconcile.
+`mail_work_data`, mounted in both `suspicious` and `suspicious_celery`) is the fallback, used when
+the store has no text for the mail. The worker then posts the body to `/v2/models/ai_mail/classify`
+over `suspicious_net`, stores the answer as one `AiAssessment` per case (with the model version,
+`v0` today), fills the case's AI result, score, confidence and category, closes the row and queues
+the case's reconcile.
 
 **The case view has no AI assessment section yet.** The AI analyzer card reads the Cortex AI
-analyzer's report (an `AnalyzerReport`), and the connector does not create one, so it stays empty for
-new cases. The AI result in the overview still shows, because it comes from the case's own fields.
-The case view gets its AI section in a later change.
+analyzer's report (an `AnalyzerReport`), and the connector does not create one, so it stays empty
+for new cases. The AI result in the overview still shows, because it comes from the case's own
+fields. The case view gets its AI section in a later change.
 
 ### Campaign detection
 
 Campaign detection runs from the connector. Its `case_finalised` hook only queues a Celery task,
-`connectors.tasks.run_campaign_detection`, which reads the mail's text and headers the same way (object
-store first, then the archive) and adds the mail to the ChromaDB collection `suspicious_mails` that
-later detection compares new mails against. When the case's AI result is `DANGEROUS` and at least
-three similar mails are found, it creates or joins a campaign (a `DANGEROUS` mail from an
-allow-listed sender domain is skipped and not stored). A created or joined campaign sends
-`campaign_updated`, so TheHive raises its campaign alert. Mails of one campaign are placed one at a
-time under the `campaign:detect` lock.
+`connectors.tasks.run_campaign_detection`, which reads the mail's text and headers the same way
+(object store first, then the archive) and adds the mail to the ChromaDB collection
+`suspicious_mails` that later detection compares new mails against. When the case's AI result is
+`DANGEROUS` and at least three similar mails are found, it creates or joins a campaign (a
+`DANGEROUS` mail from an allow-listed sender domain is skipped and not stored). A created or joined
+campaign sends `campaign_updated`, so TheHive raises its campaign alert. Mails of one campaign are
+placed one at a time under the `campaign:detect` lock.
 
 The task does not run under the connector's circuit breaker, so a ChromaDB outage does not stop
 classification. Any failure is retried up to 3 times, after 30, 60 and 120 s (`30 * 2**retries`),
-and then logged at ERROR with the case id and the error class. The one exception is an object store
-that answers `access_denied` or `invalid`: that failure is logged at once, without retries. These
-failures are in the worker log (`suspicious_celery`), not in the connector's deliveries.
+and then logged at ERROR with the case id and the error class. An object store that answers
+`access_denied` or `invalid` is not retried: that failure is logged at once. A case deleted before
+the task runs is skipped with an INFO line, and headers that cannot be parsed are dropped (a WARNING
+with the case id and the error class) and the mail is detected without them. These failures are in
+the worker log (`suspicious_celery`), not in the connector's deliveries.
 
-**Collection cleanup.** The `chromadb` connector deletes items older than 15 days, once a day, from
-the collection named by its `collection_name` config, default `suspicious`. Detection writes to
-`suspicious_mails`, so with the default the campaign documents are never cleaned up. The key has no
-field in Settings: set it in `settings.json`:
+**Collection cleanup.** The `chromadb` connector deletes items older than 15 days by default (its
+`threshold_days` config), once a day, from the collection named by its `collection_name` config,
+default `suspicious`. Detection writes to `suspicious_mails`, so with the default the campaign
+documents are never cleaned up. The key has no field in Settings: set it in `settings.json`:
 
 ```json
 "integrations": { "chromadb": { "collection_name": "suspicious_mails" } }
 ```
 
-While the `chromadb` connector is enabled and watches another collection, the `ai_model` health check
-adds a sentence saying so, and the detection task logs the same sentence as a warning, once per worker
-process.
+The cleanup and the `ai_model` mismatch check both read `collection_name` from the `chromadb`
+connector's configuration, and a configuration saved for that connector in the database wins over
+`settings.json`.
+
+While the `chromadb` connector is enabled and watches another collection, the `ai_model` health
+check adds a sentence saying so, and the detection task logs the same sentence as a warning, once
+per worker process.
 
 ### Replaying a Cortex-built campaign: `ai_model_campaign_replay`
 
@@ -180,62 +207,65 @@ docker compose --env-file .env exec suspicious python manage.py ai_model_campaig
 ```
 
 Campaigns built before the cutover came from the Cortex AI path. The command replays one of them
-through the connector's detection and compares the members, so you can check that the connector would
-have built the same campaign. Run it on a few campaigns before you rely on the connector for your
-campaign history.
+through the connector's detection and compares the members, so you can check that the connector
+would have built the same campaign. Run it on a few campaigns before you rely on the connector for
+your campaign history.
 
 - **Input.** It rebuilds each mail from its Cortex AI report (the newest successful one), so the
   members' Cortex AI reports must still exist. It works on historical campaigns only: a campaign the
-  connector built has no Cortex AI reports to replay. It stops with an error when fewer than 3 members
-  have a usable report.
+  connector built has no Cortex AI reports to replay. It stops with an error when fewer than 3
+  members have a usable report.
 - **What it replays,** in case id order: the stored members, plus every case between the lowest and
   highest stored member id that has a successful `DANGEROUS` Cortex AI report and is in no campaign.
   A mail the connector would add then shows up as an extra case id.
 - **What it does not cover:** similar mails outside that id range, mails that belong to other
   campaigns, and campaign-less mails whose Cortex AI report was purged.
-- **What it checks: membership only.** It compares the members of the campaign the last stored member
-  ends in with the stored members. A missing or extra case id fails the command; otherwise it prints
-  `MATCH`. The `campaign_updated` payload also depends on the case that triggered detection, and id
-  order only approximates the original finalisation order. An allow-list changed since the campaign
-  formed can show up as an extra or missing case.
-- **What it changes: nothing.** It runs in a transaction that it rolls back, compares the mails in an
-  in-process Chroma that is deleted at the end (the Chroma server is never contacted), and sends no
-  event. It takes the live `campaign:detect` lock briefly for each replayed `DANGEROUS` case, as live
-  detection does. It deletes the campaign's member rows inside the transaction, so it holds their row locks for
-  the whole replay: run it off-peak on a very large campaign.
+- **What it checks: membership only.** It compares the members of the campaign the last stored
+  member ends in with the stored members. A missing or extra case id fails the command; otherwise it
+  prints `MATCH`. The `campaign_updated` payload also depends on the case that triggered detection,
+  and id order only approximates the original finalisation order. An allow-list changed since the
+  campaign formed can show up as an extra or missing case.
+- **What it changes: nothing.** It runs in a transaction that it rolls back, compares the mails in
+  an in-process Chroma that is deleted at the end (the Chroma server is never contacted), and sends
+  no event. It takes the live `campaign:detect` lock briefly for each replayed `DANGEROUS` case, as
+  live detection does. It deletes the campaign's member rows inside the transaction, so it holds
+  their row locks for the whole replay: run it off-peak on a very large campaign. A replay on the
+  newest campaign can make live detection retry briefly while those locks are held: run it off-peak
+  or expect retries.
 
 ### When classification fails
 
-- **Where to look.** When the task fails a row, the reason is recorded in the row's `ConnectorDelivery`
-  entry (event `analyze`, status `failed`, field `error`), listed by
+- **Where to look.** When the task fails a row, the reason is recorded in the row's
+  `ConnectorDelivery` entry (event `analyze`, status `failed`, field `error`), listed by
   `GET /api/connectors/ai_model/deliveries/`.
-- **Server unreachable, timeout or 5xx.** The task retries twice, after a wait of 5 s plus up to 3 s of
-  jitter and then 10 s plus up to 3 s. `timeout_seconds` (20 s) is the socket timeout of the HTTP call:
-  it applies to each connect and each read, not to the whole call. A server that accepts the connection
-  and then hangs closes the row as `Failure` after roughly 75 to 81 seconds (three attempts of 20 s plus
-  the two waits). A server that sends bytes slowly can take longer, because the read timeout starts
-  again after each chunk. A stopped or refusing server fails each attempt at once, so the row closes
-  after the two waits alone, about 15 to 21 seconds (6.0 s and 11.3 s in a live drill). The case gets
-  `results_ai = Inconclusive` and still finalises.
-- **Repeated failures** open the connector's circuit breaker. `GET /api/connectors/` does not report it:
-  the breaker lives in the Celery worker process. Its effect shows on the rows. While it is open, new
-  rows fail at once without calling the server, and their delivery `error` starts with
+- **Server unreachable, timeout or 5xx.** The task retries twice, after a wait of 5 s plus up to 3 s
+  of jitter and then 10 s plus up to 3 s. `timeout_seconds` (20 s) is the socket timeout of the HTTP
+  call: it applies to each connect and each read, not to the whole call. A server that accepts the
+  connection and then hangs closes the row as `Failure` after roughly 75 to 81 seconds (three
+  attempts of 20 s plus the two waits). A server that sends bytes slowly can take longer, because
+  the read timeout starts again after each chunk. A stopped or refusing server fails each attempt at
+  once, so the row closes after the two waits alone, about 15 to 21 seconds (6.0 s and 11.3 s in a
+  live drill). The case gets `results_ai = Inconclusive` and still finalises.
+- **Repeated failures** open the connector's circuit breaker. `GET /api/connectors/` does not report
+  it: the breaker lives in the Celery worker process. Its effect shows on the rows. While it is
+  open, new rows fail at once without calling the server, and their delivery `error` starts with
   `CircuitBreakerError:` followed by the breaker's own message.
 - **A rejected token (`401` or `403`)**, a wrong url (`404`), a proxy, timeout or rate-limit answer
-  (`407`, `408`, `429`), and a `503` that says the token or models are missing or the vectorizer failed to
-  load, fail the row at once, without retries. They are setup errors that every case would hit, so they
-  show as a `Failure` row and count against the breaker. They are never turned into a quiet `Inconclusive`
-  success. The `503` that says the vectorizer is still loading (the server restarting) is retried like any
-  other `5xx`; a restart that outlasts the two waits still ends as a `Failure` row.
+  (`407`, `408`, `429`), and a `503` that says the token or models are missing or the vectorizer
+  failed to load, fail the row at once, without retries. They are setup errors that every case would
+  hit, so they show as a `Failure` row and count against the breaker. They are never turned into a
+  quiet `Inconclusive` success. The `503` that says the vectorizer is still loading (the server
+  restarting) is retried like any other `5xx`; a restart that outlasts the two waits still ends as a
+  `Failure` row.
 - **A refusal of one mail (`400`, `413`, `422`)** is a verdict of "cannot tell": the row closes as
-  `Success` with an `Inconclusive` result. A mail with no readable text, in the store or in the archive,
-  ends the same way.
-- **Object store down.** If the store errors (not "not found") and the archive cannot stand in, the row
-  closes as `Failure`. An `access_denied` or `invalid` error fails it at once, without retries;
-  `unavailable` and any other error are first retried twice like a server outage. The delivery `error` reads
-  `object store unavailable: <label>`, where the label is the store's error code (for example
-  `unavailable` or `access_denied`) or, for any other error such as a configuration problem, the
-  exception class name. It is not turned into an `Inconclusive` success.
+  `Success` with an `Inconclusive` result. A mail with no readable text, in the store or in the
+  archive, ends the same way.
+- **Object store down.** If the store errors (not "not found") and the archive cannot stand in, the
+  row closes as `Failure`. An `access_denied` or `invalid` error fails it at once, without retries;
+  `unavailable` and any other error are first retried twice like a server outage. The delivery
+  `error` reads `object store unavailable: <label>`, where the label is the store's error code (for
+  example `unavailable` or `access_denied`) or, for any other error such as a configuration problem,
+  the exception class name. It is not turned into an `Inconclusive` success.
 
 ## Source
 
