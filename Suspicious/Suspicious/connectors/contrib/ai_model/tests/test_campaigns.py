@@ -135,15 +135,43 @@ class DetectionTest(TestCase):
         profile = dataclasses.replace(self.profile, min_members=2)
         self.assertIsNotNone(self._detect(_case(), profile=profile))
 
-    def test_a_case_already_in_a_campaign_is_left_alone(self):
+    def test_a_case_already_in_a_campaign_is_stored_tagged_and_returned(self):
+        # A worker killed after the rows committed: the redelivery finishes the Chroma steps.
+        old = [_case() for _ in range(3)]
+        self._seed(old)
         case = _case()
-        CampaignMember.objects.create(campaign=Campaign.objects.create(title="x"), case=case)
-        collection = MagicMock()
-        result = campaigns.detect_campaign(
-            case, _assessment(case), TEXT, HEADERS, self.profile, collection
-        )
-        self.assertIsNone(result)
-        self.assertEqual(collection.method_calls, [])
+        campaign = Campaign.objects.create(title="x")
+        for c in old + [case]:
+            CampaignMember.objects.create(campaign=campaign, case=c)
+        with patch.object(self.coll, "query", wraps=self.coll.query) as query:
+            self.assertEqual(self._detect(case), campaign)
+        query.assert_not_called()
+        self.assertEqual(Campaign.objects.count(), 1)
+        self.assertEqual(campaign.members.count(), 4)
+        for c in old + [case]:
+            self.assertEqual(json.loads(self.coll.docs[f"case-{c.id}"]["sourceRefs"]), [campaign.ref])
+
+    def test_a_case_placed_while_waiting_for_the_lock_is_not_detected_again(self):
+        self._seed([_case() for _ in range(3)])
+        case = _case()
+        assessment = _assessment(case)
+        real_lock, first = campaigns.cache_lock, []
+
+        @contextmanager
+        def sibling_finishes_first(key, **kw):
+            if not first:  # the other task for this case gets the lock first and places it
+                first.append(None)
+                first[0] = campaigns.detect_campaign(case, assessment, TEXT, HEADERS, self.profile, self.coll)
+            with real_lock(key, **kw):
+                yield
+
+        with patch(f"{C}.cache_lock", sibling_finishes_first), \
+                patch.object(self.coll, "query", wraps=self.coll.query) as query:
+            second = campaigns.detect_campaign(case, assessment, TEXT, HEADERS, self.profile, self.coll)
+        self.assertEqual(query.call_count, 1)
+        self.assertEqual(second, first[0])
+        self.assertEqual(Campaign.objects.count(), 1)
+        self.assertEqual(second.members.count(), 4)
 
     def test_an_assessment_without_an_embedding_is_not_stored(self):
         self._seed([_case() for _ in range(3)])

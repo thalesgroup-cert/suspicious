@@ -99,7 +99,7 @@ def _warn_collection_mismatch(profile) -> None:
 @shared_task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3)
 def run_campaign_detection(self, case_id: int) -> None:
     """Place one finalised case in a campaign (ai_model) and emit campaign_updated when it
-    joined or created one. Queued by the connector's case_finalised hook rather than run in it:
+    joined, created or is already in one (a redelivery announces it again). Queued by the connector's case_finalised hook rather than run in it:
     the hook runs under the ai_model breaker, which the classification calls share, and a Chroma
     outage must not open it. detect_campaign raises only before the campaign rows exist, so
     every failure but a non-retryable ProviderUnavailable is retried. Only the exception class

@@ -102,12 +102,31 @@ def _others(similar: dict, doc_id: str) -> dict:
 
 
 def _after_rows(case: Case, campaign: Campaign, failure: str, step) -> None:
-    # The rows are committed: a retry would stop at the member guard and lose the event, so a
-    # failure here is logged, never raised.
+    # The rows are committed and the caller announces the campaign: a failure here is logged,
+    # never raised. A redelivery of the task repeats these steps.
     try:
         step()
     except Exception as exc:  # noqa: BLE001
         logger.error("Case %s is in campaign %s but %s: %s", case.id, campaign.ref, failure, type(exc).__name__)
+
+
+def _placed(case: Case) -> tuple[Campaign, list[int]] | None:
+    """The campaign ``case`` is already a member of and its member case ids, else None."""
+    member = CampaignMember.objects.select_related("campaign").filter(case=case).first()
+    if member is None:
+        return None
+    return member.campaign, list(member.campaign.members.values_list("case_id", flat=True))
+
+
+def _store_and_tag(case: Case, campaign: Campaign, member_ids: list[int], full: dict | None,
+                   extra: dict, collection) -> None:
+    if full is not None:
+        _after_rows(case, campaign, "its document was not stored", lambda: add_to_suspicious_collection(
+            full, "", campaign.ref, case.id, collection, extra_metadata=extra
+        ))
+    _after_rows(case, campaign, "the members were not tagged", lambda: set_campaign_ref(
+        collection, [f"case-{c}" for c in member_ids], campaign.ref
+    ))
 
 
 def _title(docs: dict, case: Case) -> str:
@@ -121,18 +140,17 @@ def _title(docs: dict, case: Case) -> str:
 def detect_campaign(
     case: Case, assessment: AiAssessment, text: str, headers: dict, profile: CampaignProfile, collection
 ) -> Campaign | None:
-    """Return the campaign ``case`` just created or joined, else None. CampaignStoreUnavailable
-    when Chroma fails or the lock is busy before the membership rows are written.
+    """Return the campaign ``case`` just created, joined or is already in, else None.
+    CampaignStoreUnavailable when Chroma fails or the lock is busy before the membership rows are
+    written.
+
+    A case already in a campaign (a redelivery, maybe after a worker was killed once the rows
+    committed) gets its document stored if absent and the members tagged, and its campaign is
+    returned again so the caller announces it once more.
 
     Not to be called inside an outer transaction.atomic(): the lock would be released before
     the member rows commit, and a concurrent sibling would not see them."""
-    if CampaignMember.objects.filter(case=case).exists():
-        return None  # delivered more than once; already placed
-    if not assessment.campaign_embedding.strip():
-        return None
-    if not _is_vector(assessment.campaign_embedding):
-        logger.warning("Case %s: the campaign embedding is not a list of numbers; not stored.", case.id)
-        return None
+    valid = bool(assessment.campaign_embedding.strip()) and _is_vector(assessment.campaign_embedding)
     # The shape of the Cortex AI report, which the collection helpers read.
     full = {
         "classification": assessment.result,
@@ -144,8 +162,20 @@ def detect_campaign(
             "analyzed_mail_headers": headers,
             "email_embedding": assessment.campaign_embedding,
         },
-    }
+    } if valid else None
     extra = {"embedding_version": profile.embedding_version}
+
+    placed = _placed(case)
+    if placed is not None:
+        campaign, member_ids = placed
+        _store_and_tag(case, campaign, member_ids, full, extra, collection)
+        logger.info("Case %s is already in campaign %s.", case.id, campaign.ref)
+        return campaign
+    if not assessment.campaign_embedding.strip():
+        return None
+    if not valid:
+        logger.warning("Case %s: the campaign embedding is not a list of numbers; not stored.", case.id)
+        return None
     failed = f"campaign store failed for case {case.id}"
 
     if assessment.result != profile.trigger_class:
@@ -164,44 +194,45 @@ def detect_campaign(
             lock.enter_context(cache_lock("campaign:detect", ttl=120, wait=90))
         except RuntimeError as exc:
             raise CampaignStoreUnavailable("campaign lock timed out") from exc
-        with _store_unavailable(failed):
-            # No embedding_version filter: for cmp-e1 the live collection holds only that
-            # version and older documents carry no tag. A later profile uses its own collection,
-            # suspicious_mails__<embedding_version> (spec C28), which keeps the versions apart.
-            similar = get_similar_dangerous_mails(
-                assessment.campaign_embedding, collection, n_results=profile.neighbours
-            )
-            docs = (
-                get_phishing_campaign(
-                    _others(similar, f"case-{case.id}"), profile.distance_threshold, profile.min_members
+        # Another task for this case may have placed it while this one waited.
+        placed = _placed(case)
+        if placed is not None:
+            campaign, member_ids = placed
+        else:
+            with _store_unavailable(failed):
+                # No embedding_version filter: for cmp-e1 the live collection holds only that
+                # version and older documents carry no tag. A later profile uses its own
+                # collection, suspicious_mails__<embedding_version> (spec C28), which keeps the
+                # versions apart.
+                similar = get_similar_dangerous_mails(
+                    assessment.campaign_embedding, collection, n_results=profile.neighbours
                 )
-                if similar.get("ids") else None
-            )
-            if not docs:
-                add_to_suspicious_collection(full, "", "", case.id, collection, extra_metadata=extra)
-                return None
+                docs = (
+                    get_phishing_campaign(
+                        _others(similar, f"case-{case.id}"), profile.distance_threshold, profile.min_members
+                    )
+                    if similar.get("ids") else None
+                )
+                if not docs:
+                    add_to_suspicious_collection(full, "", "", case.id, collection, extra_metadata=extra)
+                    return None
 
-        member_ids = list(dict.fromkeys([*_case_ids(docs), case.id]))
-        with transaction.atomic():
-            known = Counter(
-                CampaignMember.objects.filter(case_id__in=member_ids).values_list("campaign_id", flat=True)
-            )
-            campaign = (
-                Campaign.objects.get(pk=min(known, key=lambda cid: (-known[cid], cid)))
-                if known else Campaign.objects.create(title=_title(docs, case))
-            )
-            existing = set(Case.objects.filter(id__in=member_ids).values_list("id", flat=True))
-            for cid in member_ids:
-                if cid in existing:
-                    CampaignMember.objects.get_or_create(case_id=cid, defaults={"campaign": campaign})
-            members = campaign.members.count()
+            member_ids = list(dict.fromkeys([*_case_ids(docs), case.id]))
+            with transaction.atomic():
+                known = Counter(
+                    CampaignMember.objects.filter(case_id__in=member_ids).values_list("campaign_id", flat=True)
+                )
+                campaign = (
+                    Campaign.objects.get(pk=min(known, key=lambda cid: (-known[cid], cid)))
+                    if known else Campaign.objects.create(title=_title(docs, case))
+                )
+                existing = set(Case.objects.filter(id__in=member_ids).values_list("id", flat=True))
+                for cid in member_ids:
+                    if cid in existing:
+                        CampaignMember.objects.get_or_create(case_id=cid, defaults={"campaign": campaign})
+                members = campaign.members.count()
+            logger.info("Case %s is in campaign %s (%d members).", case.id, campaign.ref, members)
 
-        _after_rows(case, campaign, "its document was not stored", lambda: add_to_suspicious_collection(
-            full, "", campaign.ref, case.id, collection, extra_metadata=extra
-        ))
-        _after_rows(case, campaign, "the members were not tagged", lambda: set_campaign_ref(
-            collection, [f"case-{c}" for c in member_ids], campaign.ref
-        ))
+        _store_and_tag(case, campaign, member_ids, full, extra, collection)
         _after_rows(case, campaign, "the detection lock was not released", lock.close)
-    logger.info("Case %s is in campaign %s (%d members).", case.id, campaign.ref, members)
     return campaign

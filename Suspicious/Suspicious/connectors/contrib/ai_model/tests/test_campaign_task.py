@@ -115,7 +115,7 @@ class CampaignTaskTest(TestCase):
         self.assertEqual(emitted.call_args.args[1].id, self.case.id)
         self.assertEqual(emitted.call_args.kwargs, {"campaign_id": campaign.id})
 
-    def test_a_second_delivery_adds_no_document_row_or_event(self):
+    def test_a_second_delivery_emits_again_and_adds_no_document_or_row(self):
         _assessment(self.case)
         self.seed()
         self.run_task()
@@ -123,8 +123,25 @@ class CampaignTaskTest(TestCase):
         self.run_task()
         self.assertEqual(self.coll.docs, docs)
         self.assertEqual(CampaignMember.objects.count(), members)
-        self.assertEqual(Campaign.objects.count(), 1)
-        self.assertEqual(len(FakeTheHive.calls), 1)
+        campaign = Campaign.objects.get()
+        self.assertEqual([(e.case_id, e.campaign_id) for e in FakeTheHive.calls],
+                         [(self.case.id, campaign.id)] * 2)
+
+    def test_a_redelivery_after_a_kill_past_the_rows_stores_tags_and_emits(self):
+        # The rows committed, then the worker died before the Chroma steps and the event.
+        _assessment(self.case)
+        self.seed()
+        campaign = Campaign.objects.create(title="Verify payroll")
+        member_ids = [int(meta["suspicious_case_id"]) for meta in self.coll.docs.values()]
+        for cid in member_ids + [self.case.id]:
+            CampaignMember.objects.create(campaign=campaign, case_id=cid)
+        self.run_task()
+        self.assertIn(f"case-{self.case.id}", self.coll.docs)
+        for meta in self.coll.docs.values():
+            self.assertEqual(meta["sourceRefs"], f'["{campaign.ref}"]')
+        self.assertEqual(CampaignMember.objects.count(), 4)
+        self.assertEqual([(e.case_id, e.campaign_id) for e in FakeTheHive.calls],
+                         [(self.case.id, campaign.id)])
 
     def test_a_chroma_outage_retries_and_leaves_the_breaker_closed(self):
         _assessment(self.case)
