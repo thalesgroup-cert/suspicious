@@ -187,24 +187,28 @@ Run by the controller against the dev stack, like Plan A Task 8; record the outp
 
 ### Task 8: Cutover, backend
 
-Only after Task 7 matched.
+Only after Task 7 matched (it did). Ruling P7: what still serves data that already exists stays. `AiMailParser` (`score_process/scoring/cortex_analyzers/contrib/ai_mail.py`) keeps parsing historical Cortex AI reports on existing cases; `ReportsMixin.exclude_ai_analyzer` and the `integrations.cortex.analyzers.ai` setting it reads keep keeping those reports out of the generic weighted blend (re-scoring an old case must not double-count the AI vote), and `launch_cortex_jobs` keeps excluding that analyzer name from the generic launch for any Cortex catalog that still has it. Only the launch, the case-field write, the sub-class helper and the old campaign hook go.
 
 **Files:**
-- Delete: `case_handler/campaigns.py`, `case_handler/tests/test_campaign_detection.py`, `score_process/scoring/cortex_analyzers/contrib/ai_mail.py` and its parser tests
-- Modify: `cortex_job/cortex_utils/reconciliation.py` (remove the `run_campaign_detection` import and call), `cortex_job/cortex_utils/cortex_and_job_management.py` (remove `launch_cortex_ai_jobs`, `manage_ai_jobs`, `get_sub_class`), `score_process/scoring/cortex_analyzers/reports.py` (remove the `manage_ai_jobs` call and the AI branches), `mail_feeder/global_submission/gsubmission.py` and `tasp/tasks.py` (B9), `ai_model/tests/test_parity.py` (its legacy side is gone: assert the mapped case fields against the values frozen in the fixture instead), the parser registry that names `AiMailParser`, and every test that imports a removed name.
-- Interfaces: the two callers call `queue_provider_analysis(case, PROVIDER_KIND_MAIL_AI)` where they called `launch_cortex_ai_jobs`; `ai_archive` stays as the trigger.
+- Delete: `case_handler/campaigns.py`, `case_handler/tests/test_campaign_detection.py`, `cortex_job/tests/test_manage_ai_jobs.py`
+- Modify: `cortex_job/cortex_utils/reconciliation.py` (remove the `run_campaign_detection` import and call), `cortex_job/cortex_utils/cortex_and_job_management.py` (remove `launch_cortex_ai_jobs`, `manage_ai_jobs`, `get_sub_class` and the imports only they used), `score_process/scoring/cortex_analyzers/reports.py` (remove the `manage_ai_jobs` call and its try block in `get_report`; keep `exclude_ai_analyzer`), `mail_feeder/global_submission/gsubmission.py` and `tasp/tasks.py` (B9), the tests that referenced removed names (`connectors/tests/test_provider_dispatch.py`, `tasp/tests/test_dispatch_case_analysis.py`, `mail_feeder/global_submission/tests.py`, `ai_model/tests/test_parity.py`), the docstring in `score_process/scoring/cortex_analyzers/contrib/ai_mail.py` that points at `case_handler.campaigns`, the lines in `connectors/README.md` and `cortex_job/README.md` that describe removed code
+- Interfaces: the two callers call `queue_provider_analysis(case, PROVIDER_KIND_MAIL_AI)` once per case where they called `launch_cortex_ai_jobs`; `ai_archive` stays as the trigger "this mail has a readable archive". With no provider enabled `queue_provider_analysis` returns None and nothing else happens: the case simply has no AI vote, as when the AI job failed.
+- `ai_model/tests/test_parity.py` loses its legacy side (the real parser plus `manage_ai_jobs`): keep its fixture and assert the mapped case fields (`results_ai`, `score_ai`, `confidence_ai`, `category_ai`) against the values the legacy path produced for each class, frozen into the test as literals read from the fixture today.
+- Cases with a Cortex AI job still in flight at upgrade are not written to the case fields any more; that window is accepted.
 
 - [ ] **Step 1: List** every import and use of each removed name with `grep -rn` and write the list in the report.
 - [ ] **Step 2: Make the deletions and edits**, one concern per commit if the diff is large.
-- [ ] **Step 3: Prove** nothing references a removed name (`grep` returns nothing outside git history and the CHANGELOG), then run `ww test backend` (full suite). Expected: PASS.
+- [ ] **Step 3: Prove** nothing references a removed name (`grep` returns nothing outside git history, the CHANGELOG and the plan documents), then run `ww test backend` (full suite). Expected: PASS.
 - [ ] **Step 4: Commit** `refactor(cortex): remove the Cortex AI path and the old campaign hook`.
 
 ### Task 9: Cutover, analyzer assets, legacy classify and settings
 
+Ruling P7 applies: the code that tolerates a configured `analyzers.ai` name stays, so a deployment that still has the old analyzer in its Cortex catalog behaves; the key leaves the example, sample and CI settings.
+
 **Files:**
-- Delete: `Analyzers/AIMailAnalyzer/AIMailAnalyzer.json`, `ai_mail_classifier.py`, the thin-client `Dockerfile`, `requirements-client.txt` and tests that cover only them
-- Modify: `Analyzers/AIMailAnalyzer/inference_server/server.py` (remove the legacy `/classify` route; keep `/health`, `/reload` and the classify function `/v2` uses), the `inference_url` setting wherever it is defined and documented, `deployment/compose_apps.yaml` (remove the `172.17.0.1` host port binding of `ai_inference`; the connector reaches `ai_inference:8090` on `suspicious_net`), `deployment/.env.example`, `docs/getting-started/examples/Suspicious-settings.example.json`
-- Test: the inference server tests
+- Delete: `Analyzers/AIMailAnalyzer/AIMailAnalyzer.json`, `ai_mail_classifier.py`, the thin-client `Dockerfile` (check which Dockerfile builds the `ai_inference` image and delete only the thin client's), `requirements-client.txt` and tests that cover only them; the `AI_Mail_Analyzer` entry of `Analyzers/analyzers.json`
+- Modify: `Analyzers/AIMailAnalyzer/inference_server/server.py` (remove the legacy `/classify` route; keep `/health`, `/reload` and the classify function `/v2` uses), `Analyzers/AIMailAnalyzer/health.py` if it depends on the deleted client, the `inference_url` item wherever it is defined and documented, `deployment/compose_apps.yaml` (remove the `172.17.0.1` host port binding of `ai_inference`; the connector reaches `ai_inference:8090` on `suspicious_net`), `deployment/.env.example`, `deployment/Makefile` and `deployment/compose.ci.yaml` where they mention the client, the `"ai"` entry under `integrations.cortex.analyzers` in `docs/getting-started/examples/Suspicious-settings.example.json`, `Suspicious/settings-sample.json` and `Suspicious/settings.ci.json`, and the `tasp/cron/sync_cortex.py` docstring if it lists `ai`
+- Test: the inference server tests; a backend test that `launch_cortex_jobs`, `exclude_ai_analyzer` and `sync_cortex` do not raise when `analyzers.ai` is absent
 
 - [ ] **Step 1: Find** every reference to each deleted file and setting (`grep -rn`), including Makefile targets, image builds and the Cortex analyzer catalog sync.
 - [ ] **Step 2: Remove** them; update the inference tests that call `/classify` to call `/v2/models/ai_mail/classify`.
@@ -216,7 +220,7 @@ Only after Task 7 matched.
 **Files:**
 - Modify: `docs/components/analyzers.md`, `docs/components/backend/connectors.md` (list `ai_model`), `CLAUDE.md` (the `ai_inference` row, the AI / ML inference-path paragraph, the `connectors` row), `CHANGELOG.md`
 
-- [ ] **Step 1: Rewrite** the sections that describe the Cortex AI job, the gateway-IP URL and the `ai_model` caveat. State plainly: an instance that does not enable `ai_model` has no AI vote; campaign detection needs it; Plan C adds the case section.
+- [ ] **Step 1: Rewrite** the sections that describe the Cortex AI job, the gateway-IP URL and the `ai_model` caveat. State plainly: an instance that does not enable `ai_model` has no AI vote; campaign detection needs it; historical Cortex AI reports on existing cases still display and are still kept out of the weighted blend; Plan C adds the case section. Document `ai_model_campaign_replay` (what it checks, what MATCH covers and does not cover: stored members plus campaign-less Dangerous mails between the lowest and highest member id; not near mails outside that id range or in other campaigns; the in-process Chroma; run it before relying on the connector for a campaign history), and that the `chromadb` connector's `collection_name` has no Settings field and must name `suspicious_mails` in `settings.json` (`integrations.chromadb.collection_name`).
 - [ ] **Step 2: Add** a `CHANGELOG.md` entry under Removed or Changed for the Cortex AI path.
 - [ ] **Step 3: Check** every claim against the code (`grep` for each name and number written).
 - [ ] **Step 4: Commit** `docs(ai-model): the connector replaces the Cortex AI analyzer`.
