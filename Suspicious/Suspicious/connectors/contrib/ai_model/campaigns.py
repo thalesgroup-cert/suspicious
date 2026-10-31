@@ -165,6 +165,9 @@ def detect_campaign(
         except RuntimeError as exc:
             raise CampaignStoreUnavailable("campaign lock timed out") from exc
         with _store_unavailable(failed):
+            # No embedding_version filter: for cmp-e1 the live collection holds only that
+            # version and older documents carry no tag. A later profile uses its own collection,
+            # suspicious_mails__<embedding_version> (spec C28), which keeps the versions apart.
             similar = get_similar_dangerous_mails(
                 assessment.campaign_embedding, collection, n_results=profile.neighbours
             )

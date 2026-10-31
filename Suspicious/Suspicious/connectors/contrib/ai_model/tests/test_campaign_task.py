@@ -17,6 +17,7 @@ from connectors.base import (
     ConnectorManifest,
     HealthStatus,
 )
+from connectors.contrib.ai_model import campaigns
 from connectors.contrib.ai_model.connector import AiModelConnector
 from connectors.contrib.ai_model.mailtext import MailMaterial
 from connectors.contrib.ai_model.tests.test_campaigns import HEADERS, TEXT, FakeCollection, _assessment, _case
@@ -178,6 +179,28 @@ class CampaignTaskTest(TestCase):
         retry.assert_not_called()
         self.assertIn(f"case {self.case.id}", logs.output[0])
         self.assertIn("ProviderUnavailable", logs.output[0])
+
+    def test_a_deleted_case_returns_quietly(self):
+        with mock.patch.object(run_campaign_detection, "retry") as retry, \
+                self.assertLogs("connectors.tasks", "INFO") as logs:
+            self.assertIsNone(run_campaign_detection.apply(args=(987654,)).get())
+        retry.assert_not_called()
+        self.assertEqual([r.levelname for r in logs.records], ["INFO"])
+        self.assertIn("987654", logs.output[0])
+
+    def test_malformed_headers_still_detect_with_no_headers(self):
+        _assessment(self.case)
+        self.seed()
+        with mock.patch("connectors.contrib.ai_model.mailtext.header_dict",
+                        side_effect=ValueError(f"bad header: {TEXT}")), \
+                mock.patch(f"{C}.detect_campaign", wraps=campaigns.detect_campaign) as detect, \
+                self.assertLogs("connectors.tasks", "WARNING") as logs:
+            self.run_task()
+        self.assertEqual(detect.call_args.args[3], {})
+        self.assertEqual(Campaign.objects.get().members.count(), 4)
+        self.assertIn(f"Case {self.case.id}", logs.output[0])
+        self.assertIn("ValueError", logs.output[0])
+        self.assertNotIn(TEXT, "\n".join(logs.output))
 
     def test_no_assessment_means_no_work(self):
         with mock.patch(CHROMA) as chroma, \

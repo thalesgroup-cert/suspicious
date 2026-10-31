@@ -115,7 +115,11 @@ def run_campaign_detection(self, case_id: int) -> None:
     from connectors.providers import ProviderUnavailable
 
     try:
-        case = Case.objects.select_related("fileOrMail__mail", "ai_assessment").get(pk=case_id)
+        try:
+            case = Case.objects.select_related("fileOrMail__mail", "ai_assessment").get(pk=case_id)
+        except Case.DoesNotExist:
+            logger.info("Case %s no longer exists, no campaign detection.", case_id)
+            return
         assessment = getattr(case, "ai_assessment", None)
         archive = mail_archive_for(case) if assessment else None
         material = read_archive_material(archive) if archive else None
@@ -124,9 +128,14 @@ def run_campaign_detection(self, case_id: int) -> None:
             return
         profile = current_profile()
         _warn_collection_mismatch(profile)
+        try:
+            headers = header_dict(material.headers)
+        except Exception as exc:  # noqa: BLE001 — a malformed header must not stop detection
+            logger.warning("Case %s: unreadable headers (%s), detecting without them.",
+                           case_id, type(exc).__name__)
+            headers = {}
         campaign = detect_campaign(
-            case, assessment, material.text, header_dict(material.headers), profile,
-            open_collection(profile),
+            case, assessment, material.text, headers, profile, open_collection(profile),
         )
         if campaign is not None:
             emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=campaign.id)
