@@ -150,6 +150,13 @@ class HealthCheckTest(SimpleTestCase):
         status, _ = self.check(CONFIG, (False, "not ready (HTTP 503)"))
         self.assertEqual((status.ok, status.detail), (False, "not ready (HTTP 503)"))
 
+    def test_a_bad_saved_url_is_not_ok_without_any_request(self):
+        for url in ("file:///etc/passwd", "http://user:pw@host"):
+            with self.subTest(url=url):
+                status, client_class = self.check({"url": url, "token": "s3cret-token"}, (True, ""))
+                self.assertEqual((status.ok, status.detail), (False, "url is not a valid http(s) URL"))
+                client_class.assert_not_called()
+
     def test_a_missing_token_is_not_ok_without_any_request(self):
         status, client_class = self.check({"url": "http://x"}, (True, ""))
         self.assertFalse(status.ok)

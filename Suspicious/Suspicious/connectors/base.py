@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
+from urllib.parse import urlsplit
 from dataclasses import asdict, dataclass
 from typing import Any, ClassVar
 
@@ -39,6 +40,45 @@ class ConfigField:
     required: bool = False
     default: Any = None
     help: str = ""
+
+
+URL_ERROR = "must be an http or https URL with a host and no credentials"
+
+
+def _dotted_get(data: dict, dotted: str):
+    node = data
+    for part in dotted.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+    return node
+
+
+def valid_url(value) -> bool:
+    """http or https, a host, a valid port if any, and no user or password in it."""
+    if not isinstance(value, str):
+        return False
+    try:
+        parts = urlsplit(value.strip())
+        parts.port  # noqa: B018 -- raises ValueError on a port out of range
+    except ValueError:
+        return False
+    return (parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
+            and "@" not in parts.netloc)
+
+
+def url_errors(schema, config: dict) -> dict[str, str]:
+    """{field key: URL_ERROR} for every ``url`` field of ``schema`` whose value in ``config`` is
+    set and not a valid_url. None and "" are left to the required check. The message never
+    carries the value: a URL can hold a secret."""
+    errors = {}
+    for field in schema:
+        if field.type != "url":
+            continue
+        value = _dotted_get(config if isinstance(config, dict) else {}, field.key)
+        if value not in (None, "") and not valid_url(value):
+            errors[field.key] = URL_ERROR
+    return errors
 
 
 @dataclass(frozen=True)

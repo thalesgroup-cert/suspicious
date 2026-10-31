@@ -76,6 +76,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A connector `url` field (type `url` in the connector's schema) is now checked when its
+  configuration is saved, through `PUT /api/connectors/<name>/config/` or the Django admin's
+  runtime config page: it must use `http` or `https`, name a host and carry no user name or
+  password. Any other value, for example `file:///etc/passwd` or `http://user:pw@host`, is refused
+  with HTTP 400 and an error on that field; the value is not echoed. An empty optional url is still
+  accepted. Values saved before the check, or set in `settings.json`, are not rewritten: the
+  connector's "Test connection" button (`POST /api/connectors/<name>/test/`) reports them as an
+  invalid saved url without running the health check, and the `ai_model` connector fails its calls
+  with `url is not a valid http(s) URL`.
 - Deleting a user no longer deletes the allow-list, deny-list and campaign-list entries they added.
   The `user` link on those six list tables is now nullable and set to empty on deletion, so the
   entries stay and only lose their author (migration `settings/0014`). Before, the entries vanished

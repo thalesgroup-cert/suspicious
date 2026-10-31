@@ -9,6 +9,7 @@ from connectors.base import (
     Schedule,
     EVENT_CASE_CREATED,
     EVENT_CASE_FINALISED,
+    url_errors,
 )
 
 
@@ -102,3 +103,29 @@ class ConnectorABCTest(SimpleTestCase):
             manifest = make_manifest()
         with self.assertRaises(TypeError):
             Bad({})
+
+
+class UrlErrorsTest(SimpleTestCase):
+    SCHEMA = (ConfigField("url", "url", required=True), ConfigField("extra.ui_url", "url"),
+              ConfigField("name", "str"))
+
+    def test_refused_urls_name_the_field_never_the_value(self):
+        for value in ("file:///etc/passwd", "ftp://files.example/x", "javascript:alert(1)",
+                      "http://user:pw@host", "https://token@host", "http://", "http:///path",
+                      "ai_inference:8090", "http://host:99999", "  ", 8090, ["http://x"]):
+            with self.subTest(value=value):
+                errors = url_errors(self.SCHEMA, {"url": value})
+                self.assertEqual(list(errors), ["url"])
+                self.assertNotIn(str(value), errors["url"])
+        self.assertEqual(list(url_errors(self.SCHEMA, {"url": "http://x", "extra": {"ui_url": "file:///x"}})),
+                         ["extra.ui_url"])
+
+    def test_valid_and_absent_urls_pass(self):
+        for value in ("http://ai_inference:8090", "https://x/y", "HTTPS://Misp.example:8443/"):
+            with self.subTest(value=value):
+                self.assertEqual(url_errors(self.SCHEMA, {"url": value}), {})
+        self.assertEqual(url_errors(self.SCHEMA, {}), {})
+        self.assertEqual(url_errors(self.SCHEMA, {"url": None, "name": "file:///x"}), {})
+
+    def test_an_empty_string_is_left_to_the_required_check(self):
+        self.assertEqual(url_errors(self.SCHEMA, {"url": "http://x", "extra": {"ui_url": ""}}), {})

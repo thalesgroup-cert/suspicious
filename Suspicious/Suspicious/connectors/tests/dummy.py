@@ -18,6 +18,7 @@ class DummyConnector(Connector):
         description="Test fixture connector.",
         config_schema=(
             ConfigField("url", "url", required=True),
+            ConfigField("ui_url", "url"),
             ConfigField("api_key", "secret"),
             ConfigField("nested.deep.token", "secret"),
         ),

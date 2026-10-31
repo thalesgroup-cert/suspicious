@@ -16,6 +16,7 @@ from connectors.base import (
     ConnectorManifest,
     HealthStatus,
     ProviderResult,
+    valid_url,
 )
 from connectors.contrib.ai_model.campaigns import collection_mismatch
 from connectors.contrib.ai_model.client import AiInferenceClient
@@ -83,8 +84,11 @@ class AiModelConnector(Connector):
         token = self.config.get("token")
         if not token:
             raise ValueError("token not configured")
+        url = self.config.get("url") or DEFAULT_URL
+        if not valid_url(url):
+            raise ValueError("url is not a valid http(s) URL")
         return AiInferenceClient(
-            self.config.get("url") or DEFAULT_URL,
+            url,
             token,
             float(self.config.get("timeout_seconds") or DEFAULT_TIMEOUT),
         )

@@ -1,3 +1,5 @@
+import json
+
 from django.test import TestCase
 
 from settings.models import RuntimeConfig
@@ -30,3 +32,22 @@ class RuntimeConfigModelTest(TestCase):
         RuntimeConfig.objects.create(scope="shared", key="dup", value=1)
         with self.assertRaises(Exception):
             RuntimeConfig.objects.create(scope="shared", key="dup", value=2)
+
+
+class RuntimeConfigAdminFormTest(TestCase):
+    def form(self, key, value):
+        from settings.admin import RuntimeConfigAdmin
+        from django.contrib.admin.sites import site
+
+        form_class = RuntimeConfigAdmin(RuntimeConfig, site).get_form(None)
+        return form_class(data={"scope": "backend", "key": key, "value": json.dumps(value)})
+
+    def test_a_bad_connector_url_is_refused_naming_the_field_not_the_value(self):
+        form = self.form("integrations.ai_model", {"url": "http://user:pw@ai_inference:8090"})
+        self.assertFalse(form.is_valid())
+        self.assertIn("'url'", "".join(form.errors["value"]))
+        self.assertNotIn("pw", str(form.errors))
+
+    def test_a_valid_url_and_a_non_connector_key_are_saved(self):
+        self.assertTrue(self.form("integrations.ai_model", {"url": "http://ai_inference:8090"}).is_valid())
+        self.assertTrue(self.form("storage.s3", {"url": "file:///x"}).is_valid())
