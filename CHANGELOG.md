@@ -54,14 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `case_handler/campaigns.py` (campaign detection on reconcile) is gone.
 - **Breaking: an instance that does not enable `ai_model` has no AI vote.** A mail case gets
   `results_ai = Inconclusive` and scoring treats the AI vote as missing, as when the Cortex AI job
-  failed. Such a mail is then `Dangerous` when at least a third of its scored analyzer results (and
-  at least one) are malicious or a domain or URL is deny-listed, and `Failure` when no result
-  scored. Otherwise it finalises as `Inconclusive` (rule `analysis-incomplete`), unless an
-  allow-list majority makes it `Safe` or an embedded indicator raises its band. So after the upgrade
-  most mails that the analyzer count does not make `Dangerous` finalise as `Inconclusive` instead of
-  `Safe` or `Suspicious`, and the submitter's notification mail, the TheHive challenge text and the
-  dashboards show that. Without the connector there is no campaign detection either. **Upgrade step:
-  enable `ai_model` (and set its `url` and `token`) as part of the upgrade.**
+  failed. Such a mail is then `Dangerous` when the number of malicious analyzer results is at least
+  one third of the scored ones, rounded down, and at least one, or when a domain or URL is
+  deny-listed, and `Failure` when no result scored. Otherwise it finalises as `Inconclusive` (rule
+  `analysis-incomplete`), unless an allow-list majority makes it `Safe` or an embedded indicator
+  raises its band. So after the upgrade most mails that the analyzer count does not make `Dangerous`
+  finalise as `Inconclusive` instead of `Safe` or `Suspicious`, and the submitter's notification
+  mail, the TheHive challenge text and the dashboards show that. Without the connector there is no
+  campaign detection either. **Upgrade step: enable `ai_model` (and set its `url` and `token`) as
+  part of the upgrade.**
 - Historical Cortex AI reports on existing cases are still parsed and still kept out of the weighted
   blend. Keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the `Analyzer` row the
   connector's ledger row and the AI vote's weight use (without the key the name is

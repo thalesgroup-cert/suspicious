@@ -370,9 +370,7 @@ class CortexAnalyzerReports:
         a tie and lets the case fall back to the (possibly neutral) base
         score instead of the AI's actual verdict.
         """
-        from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
+        from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
 
-        ai_name = _get_cortex_config().get("analyzers", {}).get("ai")
-        if not ai_name:
-            return list(reports)
+        ai_name = ai_analyzer_name()
         return [r for r in reports if r.analyzer.name != ai_name]

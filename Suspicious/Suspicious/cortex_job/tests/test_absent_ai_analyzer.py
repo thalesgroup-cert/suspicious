@@ -33,6 +33,12 @@ class AbsentAiAnalyzerTests(SimpleTestCase):
         with patch(CFG, return_value=NO_AI):
             self.assertEqual(CortexAnalyzerReports.exclude_ai_analyzer(reports), reports)
 
+    def test_exclude_ai_analyzer_drops_the_default_named_report(self):
+        keep = SimpleNamespace(analyzer=SimpleNamespace(name="FileInfo_8_0"))
+        ai = SimpleNamespace(analyzer=SimpleNamespace(name="AI_Mail_Analyzer"))
+        with patch(CFG, return_value=NO_AI):
+            self.assertEqual(CortexAnalyzerReports.exclude_ai_analyzer([keep, ai]), [keep])
+
     def test_sync_cortex_logs_nothing_for_the_absent_role(self):
         from tasp.cron.sync_cortex import sync_cortex_analyzers
 

@@ -45,8 +45,9 @@ An instance that does not enable `ai_model` has no AI vote. A mail case with a m
 when the old Cortex AI job failed. `score_case` (`score_process/scoring/engine.py`) then finalises
 such a mail as:
 
-- `Dangerous` when at least a third of its scored analyzer results (and at least one) are malicious,
-  or when one of its domains or URLs is deny-listed;
+- `Dangerous` when the number of malicious analyzer results is at least one third of the scored
+  ones, rounded down, and at least one (`n_malicious >= max(1, n_scored // 3)`), or when one of its
+  domains or URLs is deny-listed;
 - `Failure` when no analyzer result scored at all;
 - otherwise `Inconclusive`, rule `analysis-incomplete`, whatever the analyzers' scores. Two later
   steps can still change it: an allow-list majority (a strict majority of analyzer weight is Safe or
