@@ -1,23 +1,39 @@
 """Replay a campaign the Cortex AI path built through the ai_model connector's detection and
 compare the members.
 
-Read-only: it runs in a transaction that is always rolled back, against a scratch Chroma
-collection dropped at the end, and emits no event. Safe to run against production data."""
-import dataclasses
+Read-only: it runs in a transaction that is always rolled back, against a collection in an
+in-process Chroma that lives only as long as the command, and emits no event. The Chroma server
+is never contacted: every embedding comes from the Cortex reports in the database. Safe to run
+against production data."""
 import secrets
+from contextlib import contextmanager
 
+import chromadb
+from chromadb.config import Settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from ai_model.campaign_profile import current_profile
 from ai_model.models import AiAssessment
 from case_handler.models import Campaign, CampaignMember, Case
-from common.clients import get_chroma_client
-from connectors.contrib.ai_model.campaigns import CampaignStoreUnavailable, detect_campaign, open_collection
+from connectors.contrib.ai_model.campaigns import CampaignStoreUnavailable, detect_campaign
 from connectors.contrib.thehive.utils import parse_and_decode_defaultdict
 from cortex_job.models import AnalyzerReport
+from score_process.score_utils.chromadb_utils import get_suspicious_collection
 
 _AI_PREFIX = "AI_Mail"
+
+
+@contextmanager
+def _scratch_collection(name: str):
+    """A collection made like the live one, in an in-process Chroma, deleted on exit. The
+    in-process Chroma is shared by every client of the process, hence the unique name."""
+    client = chromadb.EphemeralClient(settings=Settings(anonymized_telemetry=False))
+    collection = get_suspicious_collection(client, name)
+    try:
+        yield collection
+    finally:
+        client.delete_collection(name)
 
 
 def _cortex_full(case_id: int) -> dict | None:
@@ -67,10 +83,11 @@ class Command(BaseCommand):
         "case id fails the command. MATCH is membership only: the campaign_updated payload also "
         "depends on the case that triggered detection, and id order only approximates the original "
         "finalisation order. An allow-list changed since the campaign formed can legitimately show "
-        "up as an extra or missing case (the ids are printed so you can look). Changes nothing: "
-        "rolled-back transaction, scratch Chroma collection, no event. Deleting the campaign's "
-        "member rows holds their row locks for the whole replay, so run it off-peak on a very "
-        "large campaign."
+        "up as an extra or missing case (the ids are printed so you can look). Changes nothing: the "
+        "transaction is rolled back, no event is sent, and the mails are compared in an in-process "
+        "Chroma that is deleted at the end (nothing persists; the Chroma server is never "
+        "contacted). Deleting the campaign's member rows holds their row locks for the whole "
+        "replay, so run it off-peak on a very large campaign."
     )
 
     def add_arguments(self, parser):
@@ -112,43 +129,32 @@ class Command(BaseCommand):
                 f"Cortex AI report, {profile.min_members} needed"
             )
 
-        scratch = dataclasses.replace(
-            profile, collection_name=f"{profile.collection_name}__replay_{secrets.token_hex(4)}"
-        )
-        opened, left_behind, seen = False, False, set()
-        try:
-            # detect_campaign wants no outer atomic because its rows would commit after its lock
-            # is released; these rows never commit.
-            with transaction.atomic():
-                # Otherwise the member guard in detect_campaign stops every replayed case.
-                CampaignMember.objects.filter(campaign=campaign).delete()
+        seen = set()
+        scratch = f"{profile.collection_name}__replay_{secrets.token_hex(8)}"
+        # detect_campaign wants no outer atomic because its rows would commit after its lock is
+        # released; these rows never commit.
+        with _scratch_collection(scratch) as collection, transaction.atomic():
+            # Otherwise the member guard in detect_campaign stops every replayed case.
+            CampaignMember.objects.filter(campaign=campaign).delete()
+            for case, label, material in replay:
                 try:
-                    collection = open_collection(scratch)
+                    found = detect_campaign(case, *material, profile, collection)
                 except CampaignStoreUnavailable as exc:
-                    raise CommandError(f"cannot open the scratch collection: {exc}") from exc
-                opened = True
-                for case, label, material in replay:
-                    try:
-                        found = detect_campaign(case, *material, scratch, collection)
-                    except CampaignStoreUnavailable as exc:
-                        raise CommandError(f"case {case.id}: {exc}") from exc
-                    if found is None:
-                        doc = collection.get(ids=[f"case-{case.id}"]).get("ids")
-                        outcome = "stored" if doc else "not stored"
-                    else:
-                        outcome = "joined" if found.id in seen else "created"
-                        seen.add(found.id)
-                    self.stdout.write(f"{label}: {outcome}")
-                landed = CampaignMember.objects.filter(case_id=max(replayable)).values_list(
-                    "campaign_id", flat=True
-                ).first()
-                replayed = set(
-                    CampaignMember.objects.filter(campaign_id=landed).values_list("case_id", flat=True)
-                ) if landed else set()
-                transaction.set_rollback(True)
-        finally:
-            if opened:
-                left_behind = not self._drop(scratch.collection_name)
+                    raise CommandError(f"case {case.id}: {exc}") from exc
+                if found is None:
+                    doc = collection.get(ids=[f"case-{case.id}"]).get("ids")
+                    outcome = "stored" if doc else "not stored"
+                else:
+                    outcome = "joined" if found.id in seen else "created"
+                    seen.add(found.id)
+                self.stdout.write(f"{label}: {outcome}")
+            landed = CampaignMember.objects.filter(case_id=max(replayable)).values_list(
+                "campaign_id", flat=True
+            ).first()
+            replayed = set(
+                CampaignMember.objects.filter(campaign_id=landed).values_list("case_id", flat=True)
+            ) if landed else set()
+            transaction.set_rollback(True)
 
         missing, extra = sorted(stored - replayed), sorted(replayed - stored)
         if missing or extra:
@@ -158,19 +164,3 @@ class Command(BaseCommand):
             "payload also depends on the case that triggered detection, and id order only "
             "approximates the original finalisation order)"
         )
-        if left_behind:
-            raise CommandError(
-                f"scratch collection {scratch.collection_name} was not dropped; it holds real mail "
-                "bodies and must be deleted by hand"
-            )
-
-    def _drop(self, name: str) -> bool:
-        try:
-            get_chroma_client().delete_collection(name)
-        except Exception as exc:  # noqa: BLE001 -- must not hide the replay's own result or error
-            self.stderr.write(
-                f"scratch collection {name} was not dropped ({type(exc).__name__}); it holds real "
-                "mail bodies: delete it by hand"
-            )
-            return False
-        return True

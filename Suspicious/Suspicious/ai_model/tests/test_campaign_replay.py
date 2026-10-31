@@ -1,10 +1,22 @@
 """ai_model_campaign_replay: a stored campaign's members, and the campaign-less dangerous mails
 between them, replayed from their Cortex AI reports through the connector's detection, against
-a scratch collection and inside a rolled-back transaction. The stored campaigns are built from
-rows, as the Cortex path left them."""
+a collection in an in-process Chroma and inside a rolled-back transaction. The stored campaigns
+are built from rows, as the Cortex path left them.
+
+CampaignReplayTest pins the logic over an in-memory cosine fake; RealChromaReplayTest runs the
+same command over the real ephemeral Chroma."""
+import importlib
 import math
+import re
 from io import StringIO
+from unittest import skipIf
 from unittest.mock import MagicMock, patch
+
+try:
+    import chromadb
+    from chromadb.config import Settings
+except ImportError:  # pragma: no cover -- requirements.txt pins chromadb; reported as a skip
+    chromadb = None
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
@@ -16,8 +28,10 @@ from django.test import TestCase
 from case_handler.models import Campaign, CampaignMember, Case
 from connectors.contrib.ai_model.campaigns import CampaignStoreUnavailable
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
+from score_process.score_utils.chromadb_utils import get_suspicious_collection
 
 M = "ai_model.management.commands.ai_model_campaign_replay"
+SCRATCH = re.compile(r"^suspicious_mails__replay_[0-9a-f]+$")
 HEADERS = (
     "defaultdict(<class 'list'>, {'From': ['HR <hr@evil.example>'], "
     "'Subject': ['=?utf-8?q?Verify_payroll?=']})"
@@ -134,14 +148,9 @@ def _match_line(campaign, members):
     )
 
 
-class CampaignReplayTest(TestCase):
+class _Replay(TestCase):
     def setUp(self):
         cache.delete("campaign:detect")
-        self.coll = CosineCollection()
-        self.chroma = MagicMock()
-        self.opened = patch(f"{M}.open_collection", return_value=self.coll).start()
-        patch(f"{M}.get_chroma_client", return_value=self.chroma).start()
-        self.addCleanup(patch.stopall)
 
     def _run(self, ref):
         """stdout, stderr and the CommandError message (None when the command succeeded)."""
@@ -154,6 +163,19 @@ class CampaignReplayTest(TestCase):
 
     def _members(self, campaign):
         return set(campaign.members.values_list("case_id", flat=True))
+
+
+class CampaignReplayTest(_Replay):
+    def setUp(self):
+        super().setUp()
+        self.coll = CosineCollection()
+        self.chroma = MagicMock()
+        self.chroma.get_or_create_collection.return_value = self.coll
+        self.ephemeral = patch("chromadb.EphemeralClient", return_value=self.chroma).start()
+        self.addCleanup(patch.stopall)
+
+    def _scratch_name(self):
+        return self.chroma.get_or_create_collection.call_args.kwargs["name"]
 
     def test_a_campaign_stored_as_rows_replays_to_a_match(self):
         campaign, cases = _stored_campaign(NEAR)
@@ -276,47 +298,95 @@ class CampaignReplayTest(TestCase):
         out, err, error = self._run(campaign.ref)
         self.assertIn("cannot replay", error)
         self.assertIn(f"case {cases[1].id}: skipped", out)
-        self.opened.assert_not_called()
+        self.ephemeral.assert_not_called()
         self.assertEqual(_row_counts(), before)
 
     def test_an_unknown_campaign_fails(self):
         out, err, error = self._run("CMP-nope")
         self.assertIn("unknown campaign", error)
-        self.opened.assert_not_called()
+        self.ephemeral.assert_not_called()
 
-    def test_a_store_failure_in_detection_fails_naming_the_case_and_drops_the_scratch_collection(self):
+    def test_a_store_failure_in_detection_fails_naming_the_case_and_deletes_the_scratch_collection(self):
         campaign, cases = _stored_campaign(NEAR)
         with patch(f"{M}.detect_campaign", side_effect=CampaignStoreUnavailable("campaign lock timed out")):
             out, err, error = self._run(campaign.ref)
         self.assertEqual(error, f"case {cases[0].id}: campaign lock timed out")
-        scratch = self.opened.call_args.args[0].collection_name
-        self.chroma.delete_collection.assert_called_once_with(scratch)
+        self.chroma.delete_collection.assert_called_once_with(self._scratch_name())
         self.assertEqual(self._members(campaign), {case.id for case in cases})
 
-    def test_a_scratch_collection_that_cannot_be_opened_fails_and_reports_no_drop(self):
-        campaign, cases = _stored_campaign(NEAR)
-        self.opened.side_effect = CampaignStoreUnavailable("campaign store unavailable: ConnectionError")
-        out, err, error = self._run(campaign.ref)
-        self.assertIn("campaign store unavailable: ConnectionError", error)
-        self.chroma.delete_collection.assert_not_called()
-        self.assertEqual(err, "")
-        self.assertEqual(self._members(campaign), {case.id for case in cases})
-
-    def test_a_scratch_collection_left_behind_fails_the_command_even_after_a_match(self):
+    def test_a_failed_delete_of_the_scratch_collection_fails_the_command(self):
         campaign, _ = _stored_campaign(NEAR)
-        self.chroma.delete_collection.side_effect = RuntimeError("chroma down")
-        out, err, error = self._run(campaign.ref)
-        scratch = self.opened.call_args.args[0].collection_name
-        self.assertIn(_match_line(campaign, 5), out)
-        self.assertIn(scratch, err)
-        self.assertIn("real mail bodies", err)
-        self.assertIn(scratch, error)
-        self.assertIn("deleted by hand", error)
+        self.chroma.delete_collection.side_effect = RuntimeError("delete failed")
+        out = StringIO()
+        with self.assertRaises(RuntimeError):
+            call_command("ai_model_campaign_replay", campaign.ref, stdout=out)
+        self.assertNotIn("MATCH", out.getvalue())
 
-    def test_the_live_collection_is_never_opened_or_dropped(self):
+    def test_the_scratch_collection_is_shaped_like_the_live_one_and_deleted(self):
         campaign, _ = _stored_campaign(NEAR)
         self._run(campaign.ref)
-        self.opened.assert_called_once()
-        scratch = self.opened.call_args.args[0].collection_name
-        self.assertRegex(scratch, r"^suspicious_mails__replay_[0-9a-f]+$")
-        self.chroma.delete_collection.assert_called_once_with(scratch)
+        self.ephemeral.assert_called_once()
+        self.chroma.get_or_create_collection.assert_called_once_with(
+            name=self._scratch_name(), metadata={"hnsw:space": "cosine"}
+        )
+        self.assertRegex(self._scratch_name(), SCRATCH)
+        self.chroma.delete_collection.assert_called_once_with(self._scratch_name())
+
+
+@skipIf(chromadb is None, "chromadb cannot be imported, so there is no in-process Chroma to replay on")
+class RealChromaReplayTest(_Replay):
+    """The command over the real in-process Chroma: real add, get, update and cosine query."""
+
+    def _collections(self):
+        client = chromadb.EphemeralClient(settings=Settings(anonymized_telemetry=False))
+        return [c.name for c in client.list_collections()]
+
+    def test_a_campaign_with_a_far_mail_between_its_members_matches(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        far = _mail_case(math.pi / 2)
+        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        out, err, error = self._run(campaign.ref)
+        self.assertIsNone(error)
+        self.assertEqual(out.splitlines(), [
+            f"case {members[0].id}: stored",
+            f"case {members[1].id}: stored",
+            f"case {members[2].id}: stored",
+            f"case {far.id} (not a member): stored",
+            f"case {members[3].id}: created",
+            f"case {members[4].id}: joined",
+            _match_line(campaign, 5),
+        ])
+
+    def test_a_near_mail_in_no_campaign_shows_up_as_extra(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        near = _mail_case(0.12)
+        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        out, err, error = self._run(campaign.ref)
+        self.assertEqual(_lines(out, near), [f"case {near.id} (not a member): created"])
+        self.assertIn("missing case ids []", error)
+        self.assertIn(f"extra case ids [{near.id}]", error)
+
+    def test_two_replays_in_one_process_do_not_see_each_others_documents(self):
+        campaign, _ = _stored_campaign(NEAR)
+        first, _, first_error = self._run(campaign.ref)
+        second, _, second_error = self._run(campaign.ref)
+        self.assertIsNone(first_error)
+        self.assertIsNone(second_error)
+        self.assertEqual(second, first)
+
+    def test_the_http_chroma_is_never_used_and_nothing_persists(self):
+        module = importlib.import_module(M)
+        self.assertFalse({"get_chroma_client", "open_collection"} & set(vars(module)))
+        campaign, _ = _stored_campaign(NEAR)
+        with patch("common.clients.get_chroma_client") as http, \
+                patch("connectors.contrib.ai_model.campaigns.get_chroma_client") as campaigns_http, \
+                patch("connectors.contrib.ai_model.campaigns.open_collection") as live, \
+                patch(f"{M}.get_suspicious_collection", wraps=get_suspicious_collection) as made:
+            out, err, error = self._run(campaign.ref)
+        self.assertIsNone(error)
+        for mock in (http, campaigns_http, live):
+            mock.assert_not_called()
+        self.assertRegex(made.call_args.args[1], SCRATCH)
+        self.assertFalse([name for name in self._collections() if SCRATCH.match(name)])
