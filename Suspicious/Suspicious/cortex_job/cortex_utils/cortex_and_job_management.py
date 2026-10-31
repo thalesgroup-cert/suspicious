@@ -121,11 +121,11 @@ class CortexJob:
                     if getattr(
                         value, "file_path", None
                     ) and value.file_path.name.endswith(".eml"):
+                        # .get(role) not .get(role, {}): an absent role must not put an
+                        # unhashable {} in this set (TypeError, swallowed below: no job at all).
                         excluded = {
-                            (cortex_config.get("analyzers", {}).get("ai", {})),
-                            (cortex_config.get("analyzers", {}).get("yara", {})),
-                            (cortex_config.get("analyzers", {}).get("sandbox", {})),
-                            (cortex_config.get("analyzers", {}).get("header", {})),
+                            cortex_config.get("analyzers", {}).get(role)
+                            for role in ("ai", "yara", "sandbox", "header")
                         }
                         analyzers = [
                             a for a in analyzers if a and a.name not in excluded
