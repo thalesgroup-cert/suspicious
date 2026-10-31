@@ -79,7 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case's ChromaDB document if it is missing and tags the campaign's members, so a worker killed
   after the campaign rows were written no longer leaves the campaign unannounced. Two runs for one
   case at the same time make one campaign. While ChromaDB is down, a case already in a campaign
-  is still announced; its document and the members' tags wait for a later run.
+  is still announced on each try, and the task retries so that its document and the members'
+  tags are written once ChromaDB is back.
 - A refusal from the AI inference server no longer stores or logs the server's detail text: the
   `ai_model` delivery error and the worker log carry only the HTTP status, because a 422 detail
   echoes the request, so the mail body. A `503` the operator must fix keeps a fixed phrase
@@ -87,8 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A mail uploaded through the web form now appears in the TheHive campaign alert's material (its
   headers, bodies, `.eml` and attachments). Its object-store location is not recorded, so the
   material is read from the submission's tar archive, under the same member and size limits as
-  the `ai_model` mail reader. A web-uploaded mail whose archive can no longer be read is still
-  missing from the alert.
+  the `ai_model` mail reader, and at most 10 MB plus one byte is read from each file (a larger
+  attachment is listed as too large, as from the object store). A web-uploaded mail whose archive
+  can no longer be read is still missing from the alert.
+- The trusted-sender check (`scoring.trusted_authserv_ids`) now finds a feeder mail stored under
+  its submission prefix. It never overrules the AI for a mail uploaded through the web form: the
+  uploader wrote that file, `Authentication-Results` headers included.
 - A connector `url` field (type `url` in the connector's schema) is now checked when its
   configuration is saved, through `PUT /api/connectors/<name>/config/` or the Django admin's
   runtime config page: it must use `http` or `https`, name a host and carry no user name or

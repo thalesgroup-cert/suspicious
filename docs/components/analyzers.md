@@ -104,13 +104,14 @@ The connector's errors are in the delivery `error` of its rows
 | Symptom | Cause / fix |
 |---|---|
 | Delivery `error` `inference server unreachable: ...` | The worker cannot reach the server. Check that `ai_inference` is up on `suspicious_net` (it runs under the `ai` profile), that the connector `url` is `http://ai_inference:8090`, and run step 4 above. |
-| Delivery `error` `inference server HTTP 503: Vectorizer unavailable: ...` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy), or the server is still loading. `/health` shows the exact error. |
-| Delivery `error` `inference server HTTP 503: Required models unavailable for variant 'personal': ...` | `Analyzers/AIMailAnalyzer/models/` is empty or has a corrupt/truncated `.pth`; `/health` lists which file and why. |
+| Delivery `error` `inference server HTTP 503: vectorizer unavailable` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy). The row fails at once, without retry. `/health` shows the exact error. |
+| Delivery `error` `inference server HTTP 503` (no phrase after the status) | The server is still loading its vectorizer, or answered another 5xx. The call is retried; the row fails with this error only when the retries run out. Check `/health` and the `ai_inference` log. |
+| Delivery `error` `inference server HTTP 503: models unavailable` | `Analyzers/AIMailAnalyzer/models/` is empty or has a corrupt/truncated `.pth`; `/health` lists which file and why. |
 | Delivery `error` `inference server HTTP 503: token not configured` | `AI_INFERENCE_TOKEN` is not set on the server. Set it in `deployment/.env` and recreate `ai_inference`. |
 | Delivery `error` `inference server rejected the token (HTTP 401)`, or `token rejected (HTTP 401)` in the `ai_model` health detail | Wrong token: the connector's `token` differs from the server's `AI_INFERENCE_TOKEN`. The connector's own empty `token` fails before any call, as `ValueError: token not configured`. |
 | Verdicts never change after retraining | Weights were baked into an old image instead of mounted, or the mount is not `models/`. Check `/health`, then `POST /reload`. |
 | Worker log warning `The chromadb connector is set to collection 'suspicious', but campaign detection stores mails in 'suspicious_mails' ...`, also in the `ai_model` health detail | The `chromadb` cleanup connector watches another collection, so old campaign documents are never removed. Set `integrations.chromadb.collection_name` to `suspicious_mails` in `settings.json` (see [Campaign detection](#campaign-detection)). |
-| Worker log `Campaign detection for case <id> failed (<error class>), retrying.`, then `Campaign detection for case <id> failed: <error class>` | ChromaDB is down or the `campaign:detect` lock stayed busy. The task retries 3 times (30, 60, 120 s) and then gives up; the case keeps its verdict but joins no campaign. Check `chromadb`. |
+| Worker log `Campaign detection for case <id> failed (<error class>), retrying.`, then `Campaign detection for case <id> failed: <error class>` | ChromaDB is down or the `campaign:detect` lock stayed busy. The task retries 3 times (30, 60, 120 s) and then gives up; the case keeps its verdict but joins no campaign. A case already in a campaign is announced on each try even while ChromaDB is down (worker log `Case <id>: campaign store down ...`). Check `chromadb`. |
 
 ## v2 API and the ai_model connector
 
