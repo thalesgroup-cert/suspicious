@@ -361,3 +361,44 @@ class InlineAiHandOffTest(django.test.TestCase):
     def test_a_mail_without_an_archive_keeps_the_ai_default(self, mark):
         self.run_inline(None)
         mark.assert_not_called()
+
+
+class HandleAttachmentsAiArchiveTest(django.test.TestCase):
+    """The real Handlers.handle_attachments decides between ai_archive and ai_missing."""
+
+    def setUp(self):
+        from django.utils import timezone
+        from mail_feeder.models import Mail
+
+        self.mail = Mail.objects.create(
+            subject="s", reportedBy="r", date=timezone.now(), to="t", mail_id="m-att"
+        )
+
+    def handle(self, mail_zip="/tmp/mail.tar.gz"):
+        from mail_feeder.global_submission.handlers import Handlers
+
+        return Handlers().handle_attachments(self.mail, mail_zip)
+
+    def test_an_archive_with_a_file_is_handed_to_the_ai(self):
+        from file_process.models import File
+        from hash_process.models import Hash
+        from mail_feeder.models import MailArchive
+
+        file = File.objects.create(linked_hash=Hash.objects.create(value="h-att"), tmp_path="m.tgz")
+        archive = MailArchive.objects.create(mail=self.mail, archive=file)
+        result = self.handle()
+        self.assertEqual(result.ai_archive, archive)
+        self.assertFalse(result.ai_missing)
+
+    def test_an_archive_row_without_a_file_marks_the_ai_missing(self):
+        from mail_feeder.models import MailArchive
+
+        MailArchive.objects.create(mail=self.mail, archive=None)
+        result = self.handle()
+        self.assertIsNone(result.ai_archive)
+        self.assertTrue(result.ai_missing)
+
+    def test_no_archive_sets_neither(self):
+        result = self.handle(mail_zip=None)
+        self.assertIsNone(result.ai_archive)
+        self.assertFalse(result.ai_missing)

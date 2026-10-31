@@ -25,7 +25,7 @@ from connectors.tasks import run_provider_analysis
 from connectors.tests.dummy import DummyProviderConnector
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager, _get_cortex_config
 from cortex_job.cortex_utils.reconciliation import reconcile_case_core
-from cortex_job.models import Analyzer, CaseAnalyzerJob
+from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from file_process.models import File
 from hash_process.models import Hash
 from mail_feeder.models import Mail, MailArchive, MailInfo
@@ -145,11 +145,25 @@ class ProviderDispatchTest(TestCase):
         self.assertFalse(CaseAnalyzerJob.objects.exists())
 
     def dispatch_ai_archive(self):
-        with mock.patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob") as cortex:
+        # The real CortexJob, against a Cortex API that offers the AI analyzer for every type and
+        # accepts every job: an archive routed to Cortex would call it and write Cortex rows.
+        with mock.patch(
+            "cortex_job.cortex_utils.cortex_and_job_management.SessionCortexApi"
+        ) as api_cls:
+            api = api_cls.return_value
+            analyzer = mock.Mock()
+            analyzer.name = ai_name()
+            api.analyzers.get_by_type.return_value = [analyzer]
+            api.analyzers.get_by_name.return_value = analyzer
+            api.analyzers.run_by_name.return_value = mock.Mock(id="cortex-job-1")
             dispatch_case_analysis.run(
                 self.case.id, [("mail_feeder.mailarchive", self.archive.pk, "ai_archive")]
             )
-        self.assertEqual(cortex.return_value.method_calls, [])
+        self.assertEqual(api.method_calls, [])
+        self.assertFalse(AnalyzerReport.objects.exists())
+        self.assertFalse(
+            CaseAnalyzerJob.objects.exclude(cortex_job_id__startswith=PROVIDER_JOB_PREFIX).exists()
+        )
 
     def test_an_ai_archive_dispatch_hands_over_and_calls_no_cortex_api(self):
         self.dispatch_ai_archive()
