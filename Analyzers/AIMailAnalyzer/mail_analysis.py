@@ -31,10 +31,9 @@ class ModelSpec(NamedTuple):
 
 
 # Single source of truth for every .pth file this analyzer loads, consumed by
-# both ai_mail_classifier.py (real inference) and health.py (load-only probe).
-# These previously drifted independently: health.py hardcoded output_dim=2
-# for all five files, but dangerous_30_epochs_model.pth actually has 4 —
-# load_state_dict raised a shape-mismatch there every time.
+# inference_server/ and the training scripts. Two copies once drifted: a probe
+# hardcoded output_dim=2 for all five files, but dangerous_30_epochs_model.pth
+# actually has 4 — load_state_dict raised a shape-mismatch there every time.
 MODEL_SPECS = (
     ModelSpec("safe_suspicious_30_epochs_model.pth", 2, "main"),
     ModelSpec("spam_dangerous_30_epochs_model.pth", 2, "main"),

@@ -10,7 +10,7 @@ for - plus one skipped-unless-present smoke test against the real vectorizer.
 
 Needs the inference stack (pip install -r requirements-inference.txt httpx
 pytest); skipped cleanly where torch / sentence_transformers / fastapi are
-missing, e.g. in the thin-client venv.
+missing.
 """
 import hashlib
 import json
@@ -43,6 +43,7 @@ BODY = (
     "Click the link below to verify your password immediately! "
     "Failure to act will close your account."
 )
+TOKEN = "s3cret-test-token"
 
 
 class FakeVectorizer:
@@ -117,7 +118,9 @@ def make_app(tmp_path, monkeypatch):
         else:
             dirs["public"].mkdir()
         monkeypatch.setattr(server, "MODEL_DIRS", dirs)
-        monkeypatch.setattr(server, "store", server.ModelStore(dirs))
+        # The v2 router captured server.store at import time: reset that same object in place.
+        monkeypatch.setattr(server.store, "__dict__", server.ModelStore(dirs).__dict__)
+        monkeypatch.setenv("AI_INFERENCE_TOKEN", TOKEN)
         monkeypatch.setattr(server, "SentenceTransformer", vectorizer)
         monkeypatch.setattr(server, "RELOAD_CHECK_SECONDS", 0)  # tests opt in explicitly
         client = TestClient(server.app)
@@ -130,8 +133,13 @@ def make_app(tmp_path, monkeypatch):
         client.__exit__(None, None, None)
 
 
-def classify(client, body=BODY, variant="personal"):
-    return client.post("/classify", json={"mail_body": body, "variant": variant})
+def classify(client, body=BODY):
+    return client.post("/v2/models/ai_mail/classify", json={"mail_body": body},
+                       headers={"Authorization": f"Bearer {TOKEN}"})
+
+
+def active(resp):
+    return resp.json()["results"]["active"]
 
 
 # --- wiring guards ------------------------------------------------------------
@@ -149,16 +157,6 @@ def test_required_plus_optional_models_cover_every_model_spec():
 def test_server_labels_match_the_taxonomy_width():
     assert len(server.SUB_LABELS) == len(mail_analysis.SubClassificationName)
     assert sum(w for w in mail_analysis.SUB_MODEL_WIDTHS) == len(mail_analysis.SubClassificationName)
-
-
-def test_server_response_satisfies_the_client_contract(make_app):
-    """Every key ai_mail_classifier reads must be in the server's response -
-    the two live in different images and can drift independently."""
-    import ai_mail_classifier
-
-    client, _ = make_app()
-    body = classify(client).json()
-    assert set(ai_mail_classifier.REQUIRED_RESULT_KEYS) <= set(body)
 
 
 # --- health -------------------------------------------------------------------
@@ -181,12 +179,11 @@ def test_public_variant_without_weights_is_unavailable_but_not_an_outage(make_ap
     assert body.status_code == 200
     assert body.json()["variants"]["public"]["ready"] is False
 
-    resp = classify(client, variant="public")
-    assert resp.status_code == 503
-    assert "Required models unavailable for variant 'public'" in resp.json()["detail"]
-    assert "safe_suspicious_30_epochs_model.pth" in resp.json()["detail"]
+    detail = server.store.unavailable("public")
+    assert "Required models unavailable for variant 'public'" in detail
+    assert "safe_suspicious_30_epochs_model.pth" in detail
     # ... and the personal variant is unaffected
-    assert classify(client, variant="personal").status_code == 200
+    assert classify(client).status_code == 200
 
 
 def test_health_is_503_when_the_personal_models_are_missing(make_app):
@@ -236,40 +233,38 @@ def test_real_vectorizer_produces_768_dim_embeddings():
     assert store.vectorizer.encode(["hello"], show_progress_bar=False).shape == (1, DIM)
 
 
-# --- /classify ----------------------------------------------------------------
+# --- /v2/models/ai_mail/classify -----------------------------------------------
 
 
 def test_classify_returns_a_well_formed_result(make_app):
     client, _ = make_app()
     resp = classify(client)
     assert resp.status_code == 200
-    body = resp.json()
+    body = active(resp)
 
-    assert body["classification"] in {"SAFE", "UNWANTED", "DANGEROUS", "INCONCLUSIVE"}
-    assert 0.0 <= float(body["malscore"]) <= 10.0
-    assert 0.0 <= float(body["confidence"]) <= 1.0
-    assert sum(body["classification_breakdown"].values()) == pytest.approx(1.0, abs=1e-4)
-    assert set(body["classification_breakdown"]) == {"SAFE", "UNWANTED", "DANGEROUS"}
-    assert set(body["sub_classification_breakdown"]) == {n.name for n in mail_analysis.SubClassificationName}
-    assert sum(body["sub_classification_breakdown"].values()) == pytest.approx(1.0, abs=1e-4)
-    assert set(body["main_probabilities"]) == {"SAFE", "UNWANTED", "DANGEROUS"}
+    assert body["class"] in {"SAFE", "UNWANTED", "DANGEROUS", "INCONCLUSIVE"}
+    assert 0.0 <= body["score"] <= 10.0
+    assert 0.0 <= body["confidence"] <= 1.0
+    assert sum(body["probabilities"].values()) == pytest.approx(1.0, abs=1e-4)
+    assert set(body["probabilities"]) == {"SAFE", "UNWANTED", "DANGEROUS"}
+    assert set(body["sub_probabilities"]) == {n.name for n in mail_analysis.SubClassificationName}
     assert len(body["sub_probabilities"]) == len(server.SUB_LABELS)
-    assert all(v.endswith("%") for v in body["main_probabilities"].values())
+    assert sum(body["sub_probabilities"].values()) == pytest.approx(1.0, abs=1e-4)
 
-    # chromadb_utils does json.loads(report["email_embedding"]) - must be a JSON list
-    embedding = json.loads(body["email_embedding"])
+    # The campaign detector json.loads the embedding - must be a JSON list
+    embedding = json.loads(resp.json()["campaign_embedding"])
     assert len(embedding) == DIM
     assert all(isinstance(x, float) for x in embedding)
 
 
 def test_classify_is_deterministic(make_app):
     client, _ = make_app()
-    assert classify(client).json() == classify(client).json()
+    assert active(classify(client)) == active(classify(client))
 
 
 def test_contributing_phrases_are_scored_sentences(make_app):
     client, _ = make_app()
-    phrases = classify(client).json()["contributing_phrases"]
+    phrases = active(classify(client))["contributing_phrases"]
     assert isinstance(phrases, list)
     sentences = mail_analysis.split_into_sentences(BODY)
     for phrase in phrases:
@@ -281,7 +276,7 @@ def test_single_sentence_body_has_no_contributing_phrases(make_app):
     client, _ = make_app()
     resp = classify(client, body="Just one sentence")
     assert resp.status_code == 200
-    assert resp.json()["contributing_phrases"] == []
+    assert active(resp)["contributing_phrases"] == []
 
 
 def test_empty_body_is_classified_rather_than_crashing(make_app):
@@ -289,23 +284,11 @@ def test_empty_body_is_classified_rather_than_crashing(make_app):
     assert classify(client, body="").status_code == 200
 
 
-def test_unknown_variant_is_a_400_listing_the_valid_ones(make_app):
-    client, _ = make_app()
-    resp = classify(client, variant="bogus")
-    assert resp.status_code == 400
-    assert "personal" in resp.json()["detail"] and "public" in resp.json()["detail"]
-
-
 def test_missing_mail_body_is_a_422(make_app):
     client, _ = make_app()
-    assert client.post("/classify", json={"variant": "personal"}).status_code == 422
-
-
-def test_variants_use_their_own_weights(make_app):
-    client, _ = make_app(public=True)
-    personal = classify(client, variant="personal").json()
-    public = classify(client, variant="public").json()
-    assert personal["classification_probabilities"] != public["classification_probabilities"]
+    resp = client.post("/v2/models/ai_mail/classify", json={},
+                       headers={"Authorization": f"Bearer {TOKEN}"})
+    assert resp.status_code == 422
 
 
 def test_missing_unwanted_model_is_tolerated_with_a_zeroed_slice(make_app):
@@ -315,7 +298,7 @@ def test_missing_unwanted_model_is_tolerated_with_a_zeroed_slice(make_app):
     assert client.get("/health").status_code == 200
     resp = classify(client)
     assert resp.status_code == 200
-    breakdown = resp.json()["sub_classification_breakdown"]
+    breakdown = active(resp)["sub_probabilities"]
     assert breakdown["SPAM"] == 0.0 and breakdown["NEWSLETTER"] == 0.0
 
 
@@ -343,7 +326,7 @@ def test_truncated_weight_files_are_reported_per_file_not_a_crash(make_app):
     assert public["ready"] is False
     bad = public["models"]["safe_30_epochs_model.pth"]
     assert bad["error"]
-    assert classify(client, variant="public").status_code == 503
+    assert server.store.unavailable("public")
 
 
 def test_oversized_body_is_truncated_not_rejected(make_app):
@@ -361,7 +344,7 @@ def test_concurrent_requests_are_bounded_by_the_semaphore(make_app, monkeypatch)
 
     def call():
         try:
-            results.append(server.classify(server.ClassifyRequest(mail_body=BODY)))
+            results.append(classify(client).status_code)
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
 
@@ -370,7 +353,7 @@ def test_concurrent_requests_are_bounded_by_the_semaphore(make_app, monkeypatch)
     [t.join() for t in threads]
 
     assert not errors
-    assert len(results) == 8
+    assert results == [200] * 8
     assert FakeVectorizer.max_active <= 2
 
 
@@ -378,7 +361,7 @@ def test_concurrent_requests_are_bounded_by_the_semaphore(make_app, monkeypatch)
 
 
 def probabilities(client):
-    return classify(client).json()["classification_probabilities"]
+    return active(classify(client))["probabilities"]
 
 
 def test_reload_endpoint_swaps_in_new_weights(make_app):
@@ -466,77 +449,3 @@ def test_sub_probabilities_zero_fill_a_missing_model_keeping_the_vector_width():
     assert (probs[2:4] == 0).all()
     assert probs[:2].sum() == pytest.approx(0.5, abs=1e-5)
     assert probs[4:].sum() == pytest.approx(0.2, abs=1e-5)
-
-
-# --- end to end: Cortex client -> real HTTP -> server -------------------------
-
-
-@pytest.fixture
-def live_server(make_app):
-    """The real app behind a real uvicorn socket on loopback (what a Cortex job
-    container talks to), with the same temp weights/fake vectorizer as make_app."""
-    import socket
-
-    import uvicorn
-
-    make_app()
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
-    uv = uvicorn.Server(uvicorn.Config(server.app, host="127.0.0.1", port=port, log_level="warning"))
-    thread = threading.Thread(target=uv.run, daemon=True)
-    thread.start()
-    deadline = time.time() + 15
-    while not uv.started and time.time() < deadline:
-        time.sleep(0.05)
-    assert uv.started, "uvicorn did not start"
-    yield f"http://127.0.0.1:{port}"
-    uv.should_exit = True
-    thread.join(timeout=10)
-
-
-def run_cortex_job(tmp_path, url, variant="personal"):
-    import tarfile
-
-    import ai_mail_classifier
-
-    job = tmp_path / "job"
-    (job / "input").mkdir(parents=True)
-    (job / "output").mkdir()
-    with tarfile.open(job / "input" / "mail.tar", "w") as tar:
-        for name, content in {"mail.txt": BODY, "mail.headers": "From: a@evil.example\nSubject: urgent\n"}.items():
-            src = tmp_path / f"src_{name}"
-            src.write_text(content)
-            tar.add(src, arcname=name)
-    (job / "input" / "input.json").write_text(json.dumps({
-        "dataType": "file", "file": "mail.tar", "filename": "mail.tar", "tlp": 2, "pap": 2,
-        "config": {"inference_url": url, "variant": variant},
-    }))
-    try:
-        ai_mail_classifier.AIMailClassifier(job_directory=str(job)).run()
-    except SystemExit:
-        pass  # cortexutils exits after writing an error report
-    return json.loads((job / "output" / "output.json").read_text())
-
-
-def test_cortex_analyzer_against_a_live_server(live_server, tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    out = run_cortex_job(tmp_path, live_server)
-
-    assert out["success"] is True
-    assert out["summary"]["classification"] in {"SAFE", "UNWANTED", "DANGEROUS", "INCONCLUSIVE"}
-    report = out["full"]["report"]
-    assert report["analyzed_mail_content"] == BODY
-    assert len(json.loads(report["email_embedding"])) == DIM
-    assert set(report["main_probabilities"]) == {"SAFE", "UNWANTED", "DANGEROUS"}
-
-
-def test_cortex_analyzer_reports_the_unavailable_public_variant(live_server, tmp_path, monkeypatch):
-    import ai_mail_classifier
-
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(ai_mail_classifier, "INFERENCE_RETRIES", 0)
-    out = run_cortex_job(tmp_path, live_server, variant="public")
-
-    assert out["success"] is False
-    assert "Required models unavailable for variant 'public'" in out["errorMessage"]

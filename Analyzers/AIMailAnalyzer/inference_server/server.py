@@ -2,23 +2,14 @@
 """Persistent inference server for AIMailAnalyzer.
 
 Loads the vectorizer and every model variant ONCE at startup and keeps them
-resident in memory, instead of every Cortex job cold-loading them from disk
-(a full SentenceTransformer + 5 ResNetMLP checkpoints, every single mail).
-ai_mail_classifier.py is a thin client: untar the mail, POST the body here,
-build the Cortex report from the JSON response.
+resident in memory (a full SentenceTransformer + 5 ResNetMLP checkpoints). The
+ai_model connector POSTs each mail body to the token-protected /v2 API (v2.py)
+over suspicious_net, as http://ai_inference:8090.
 
 Two variants are loaded side by side - "personal" (models/, trained on this
 deployment's own labeled mail) and "public" (models_public/, see that
 folder's README) - so a single running server can answer for either without
 a restart.
-
-Reachability: Cortex spawns each analyzer in its own ephemeral container on
-Docker's default bridge network, which has no DNS, so a per-job container
-cannot resolve this service by Compose name. It is instead published on the
-default bridge's gateway (172.17.0.1 on a stock Docker install - see
-INFERENCE_SERVER_URL in ai_mail_classifier.py and the ai_inference service in
-deployment/compose_apps.yaml). Publishing it on 127.0.0.1 only would NOT be
-enough: loopback is not reachable from another container.
 
 Weights stay fresh: the monthly retrain pipeline overwrites models/*.pth in
 place, so each variant's files are re-checked (mtime) every
@@ -35,9 +26,8 @@ from typing import NamedTuple, Optional
 
 import numpy as np
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
 import mail_analysis
@@ -185,7 +175,7 @@ class ModelStore:
 
     def unavailable(self, variant: str) -> Optional[str]:
         """The 503 detail for a classify call that cannot be served, else None.
-        Shared by the legacy /classify and the /v2 classify route."""
+        Used by the /v2 classify route."""
         if self.vectorizer is None:
             return f"Vectorizer unavailable: {self.vectorizer_error or 'still loading, try again shortly'}"
         self.maybe_refresh()
@@ -237,11 +227,6 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="AIMailAnalyzer inference server", lifespan=lifespan)
 
 
-class ClassifyRequest(BaseModel):
-    mail_body: str
-    variant: str = "personal"
-
-
 def _health_payload() -> dict:
     return store.health_payload()
 
@@ -250,7 +235,7 @@ def _health_payload() -> dict:
 def health():
     # 503 until the vectorizer and the "personal" variant are usable, so a
     # container healthcheck / load balancer sees "not ready" instead of a
-    # server that answers 200 and then 503s every /classify.
+    # server that answers 200 and then 503s every classify call.
     payload = _health_payload()
     return JSONResponse(payload, status_code=200 if payload["ready"] else 503)
 
@@ -316,28 +301,15 @@ def _classify(models: dict, mail_body: str) -> dict:
         "contributing_phrases": contributing_phrases,
         "main_probabilities": main_probabilities,
         "sub_probabilities": sub_probabilities,
-        # str(list), matching the pre-refactor ai_mail_classifier.py format
-        # so chromadb_utils.add_to_suspicious_collection's json.loads(...)
-        # keeps working unchanged.
+        # str(list): v2 returns it as campaign_embedding, which the campaign
+        # detector json.loads.
         "email_embedding": str(email_embedding.tolist()[0]),
     }
 
 
-# Token-protected /v2 API beside the legacy routes; needs _classify, so it is
-# mounted here rather than right after app = FastAPI(...).
+# Token-protected /v2 API; needs _classify, so it is mounted here rather than
+# right after app = FastAPI(...).
 app.include_router(
     make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS)
 )
 
-
-@app.post("/classify")
-def classify(req: ClassifyRequest):
-    if req.variant not in MODEL_DIRS:
-        raise HTTPException(400, f"Unknown variant {req.variant!r}, expected one of {list(MODEL_DIRS)}")
-    detail = store.unavailable(req.variant)
-    if detail:
-        raise HTTPException(503, detail)
-
-    models = store.models(req.variant)
-    with _inference_slots:
-        return _classify(models, req.mail_body[:MAX_MAIL_CHARS])

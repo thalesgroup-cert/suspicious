@@ -1,4 +1,4 @@
-"""Token-protected /v2 API, mounted beside the legacy /classify (untouched)."""
+"""Token-protected /v2 API of the inference server."""
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,8 +22,8 @@ class ClassifyRequest(BaseModel):
 
 
 def make_v2_router(*, store, classify, slots, max_chars) -> APIRouter:
-    """classify is the legacy server._classify(models, mail_body) dict-returning
-    function; slots is the concurrency semaphore shared with the legacy route."""
+    """classify is server._classify(models, mail_body), which returns the legacy
+    result dict; slots is the server's concurrency semaphore."""
     router = APIRouter(prefix="/v2")
 
     @router.get("/health/live")

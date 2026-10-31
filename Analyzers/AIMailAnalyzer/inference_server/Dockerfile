@@ -1,10 +1,9 @@
 # Persistent inference server image. Built from Analyzers/AIMailAnalyzer/ as
-# the build context (see deployment/compose_apps.yaml's ai_inference service),
-# unlike the parent Dockerfile (the Cortex one-shot client) this one stays
-# running and is never invoked by Cortex's docker job runner directly.
+# the build context (see deployment/docker-compose.override.yml's ai_inference
+# service). A long-running server on suspicious_net.
 FROM python:3.14-slim
 
-# Build-time proxy only, same as the parent Dockerfile.
+# Build-time proxy only.
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
@@ -36,7 +35,7 @@ COPY vectorizers/ ./vectorizers/
 # The vectorizer's own weights are excluded from the build context
 # (.dockerignore) — always the same public checkpoint, so fetch it here.
 # Without this step SentenceTransformer() fails at startup (only the tokenizer
-# files are in the repo) and every /classify answers 503.
+# files are in the repo) and every classify call answers 503.
 RUN VEC=/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2 && \
     BASE=https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2/resolve/main && \
     mkdir -p "$VEC/1_Pooling" && \

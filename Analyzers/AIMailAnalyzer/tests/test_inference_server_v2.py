@@ -22,7 +22,7 @@ TOKEN = "s3cret-test-token"
 
 @pytest.fixture
 def make_client(tmp_path, monkeypatch):
-    """Factory: the real server.app (legacy + v2 routes) against temp model dirs."""
+    """Factory: the real server.app against temp model dirs."""
     clients = []
 
     def make(personal=True):
@@ -32,8 +32,7 @@ def make_client(tmp_path, monkeypatch):
         if personal:
             write_models(dirs["personal"], seed=1)
         monkeypatch.setattr(server, "MODEL_DIRS", dirs)
-        # The v2 router captured server.store at import time, so (unlike the legacy
-        # tests, which swap the module attribute) reset that same object in place.
+        # The v2 router captured server.store at import time: reset that same object in place.
         monkeypatch.setattr(server.store, "__dict__", server.ModelStore(dirs).__dict__)
         monkeypatch.setattr(server, "SentenceTransformer", FakeVectorizer)
         monkeypatch.setattr(server, "RELOAD_CHECK_SECONDS", 0)
@@ -125,8 +124,8 @@ def post_v2(client, headers, body=BODY, versions=("active",), raw=False):
     return resp if raw else resp.json()
 
 
-def test_v2_classify_matches_the_legacy_endpoint(client, token_env):
-    legacy = client.post("/classify", json={"mail_body": BODY}).json()
+def test_v2_classify_maps_the_classify_core(client, token_env):
+    legacy = server._classify(server.store.models("personal"), BODY)
     new = client.post("/v2/models/ai_mail/classify",
                       json={"mail_body": BODY, "versions": ["active"]}, headers=token_env).json()
     r = new["results"]["active"]
@@ -190,10 +189,9 @@ def test_a_lone_surrogate_escape_is_never_a_500(client, token_env):
 
 
 def test_503_when_models_are_missing(client_without_models, token_env):
-    legacy = client_without_models.post("/classify", json={"mail_body": BODY})
     resp = post_v2(client_without_models, token_env, raw=True)
     assert resp.status_code == 503
-    assert resp.json() == legacy.json()  # the legacy detail text, verbatim
+    assert resp.json() == {"detail": server.store.unavailable("personal")}
 
 
 def test_503_when_the_vectorizer_is_missing(client, token_env, monkeypatch):
