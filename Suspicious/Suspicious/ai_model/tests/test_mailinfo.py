@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 from django.test import SimpleTestCase
 
 from ai_model.mailinfo import apply_mail_info
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
 
 
 def _mail_info():
@@ -48,8 +47,3 @@ class ApplyMailInfoTest(SimpleTestCase):
         mail_info = _mail_info()
         mail_info.save.side_effect = RuntimeError("db down")
         apply_mail_info(mail_info, "whaling", "Dangerous")
-
-    def test_manager_method_delegates(self):
-        mail_info = _mail_info()
-        CortexJobManager.update_mail_models(CortexJobManager.__new__(CortexJobManager), mail_info, "clone", "Dangerous")
-        self.assertTrue(mail_info.is_phishing and mail_info.is_dangerous and mail_info.is_analyzed)

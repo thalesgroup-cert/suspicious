@@ -15,9 +15,9 @@ from common.http_client import BREAKERS
 from connectors.base import ProviderResult
 from connectors.models import ConnectorDelivery, ConnectorState
 from connectors.providers import (
+    PROVIDER_JOB_PREFIX,
     ProviderUnavailable,
     finish_provider_analysis,
-    has_provider_job,
     queue_provider_analysis,
 )
 from connectors.registry import ConnectorRegistry
@@ -44,6 +44,12 @@ NO_ANSWER = ProviderResult(
 
 def ai_name():
     return _get_cortex_config()["analyzers"]["ai"]
+
+
+def has_provider_job(case):
+    return CaseAnalyzerJob.objects.filter(
+        case=case, cortex_job_id__startswith=PROVIDER_JOB_PREFIX
+    ).exists()
 
 
 def make_mail_case(n=1):

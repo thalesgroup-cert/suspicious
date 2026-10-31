@@ -5,7 +5,6 @@ from cortex4py.exceptions import NotFoundError
 from django.db import transaction
 from django.utils import timezone
 
-from ai_model.mailinfo import apply_mail_info
 from common.http_client import get_breaker, RETRY
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.migrations._tier_seed import tier_for
@@ -746,14 +745,3 @@ class CortexJobManager:
             if new_status not in CaseAnalyzerJob.PENDING_STATUSES:
                 caj.completed_at = timezone.now()
             caj.save(update_fields=["status", "completed_at"])
-
-    def update_mail_models(self, mail_info, classification, sub_classification):
-        """
-        Update MailInfo model based on classification results.
-
-        Args:
-            mail_info (MailInfo): The mail info object to update.
-            classification (str): The main classification of the mail.
-            sub_classification (str): The subclassification of the mail.
-        """
-        apply_mail_info(mail_info, classification, sub_classification)

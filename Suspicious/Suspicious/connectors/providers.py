@@ -100,14 +100,6 @@ def queue_mail_ai(case):
     return job
 
 
-def has_provider_job(case) -> bool:
-    from cortex_job.models import CaseAnalyzerJob
-
-    return CaseAnalyzerJob.objects.filter(
-        case=case, cortex_job_id__startswith=PROVIDER_JOB_PREFIX
-    ).exists()
-
-
 def finish_provider_analysis(job_id: int, result, *, error: str = "", attempt: int = 1,
                              duration_ms: int = 0, connector: str = "") -> bool:
     """Write ``result`` (None = failure) to the case, close the ledger row and
