@@ -163,7 +163,8 @@ class ConnectorsApiTest(APITestCase):
     def test_config_put_refuses_a_bad_url_naming_the_field_not_the_value(self):
         from settings.models import RuntimeConfig
         for value in ("file:///etc/passwd", "ftp://x/y", "javascript:alert(1)",
-                      "http://user:pw@host", "http:///no-host"):
+                      "http://user:pw@host", "http:///no-host", " http://x", "http://x/ ",
+                      "http://x\ty", "http://x/a\r\nHost: y", "http://x/\n"):
             with self.subTest(value=value):
                 response = self.client.put(
                     "/api/connectors/dummy/config/", {"url": "http://ok", "ui_url": value}, format="json",

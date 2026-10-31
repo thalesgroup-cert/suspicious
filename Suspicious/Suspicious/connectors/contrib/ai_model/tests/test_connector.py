@@ -308,11 +308,16 @@ class RejectedTokenEndToEndTest(TestCase):
         self.assertEqual(self.breaker.fail_counter, 1)  # a refused setup counts toward the breaker
 
     def test_a_422_closes_the_row_as_a_failure_without_tripping_the_breaker(self):
-        job, _ = self.run_with_status(422, "bad body")
+        # A 422 detail can echo the request, so the mail: only the status is kept.
+        with self.assertLogs("connectors", "WARNING") as logs:
+            job, _ = self.run_with_status(422, "bad body")
         self.assertEqual(job.status, CaseAnalyzerJob.STATUS_FAILURE)
         delivery = ConnectorDelivery.objects.get()
         self.assertEqual(delivery.status, ConnectorDelivery.STATUS_FAILED)
         self.assertIn("no model_version (inference server refused the request (HTTP 422)", delivery.error)
+        self.assertTrue(any("HTTP 422" in line and "provider failed" in line for line in logs.output))
+        self.assertNotIn("bad body", "\n".join(logs.output))
+        self.assertNotIn("bad body", delivery.error)
         self.assertEqual(self.breaker.fail_counter, 0)
         self.assertFalse(AiAssessment.objects.filter(case=self.case).exists())
 

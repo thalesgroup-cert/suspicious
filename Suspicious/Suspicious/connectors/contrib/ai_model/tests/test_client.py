@@ -99,8 +99,7 @@ class ClassifyTest(SimpleTestCase):
                 with self.assertRaises(ValueError) as caught:
                     client.classify("x")
                 self.assertNotIsInstance(caught.exception, ProviderUnavailable)
-                self.assertIn(str(status), str(caught.exception))
-                self.assertNotIn("s3cret", str(caught.exception))
+                self.assertEqual(str(caught.exception), f"inference server refused the request (HTTP {status})")
 
     def test_a_non_json_200_is_a_permanent_unavailable(self):
         client = client_with(post=mock.Mock(return_value=reply(200, None, text="<html>")))

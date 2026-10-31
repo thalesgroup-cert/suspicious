@@ -55,11 +55,13 @@ def _dotted_get(data: dict, dotted: str):
 
 
 def valid_url(value) -> bool:
-    """http or https, a host, a valid port if any, and no user or password in it."""
-    if not isinstance(value, str):
+    """http or https, a host, a valid port if any, and no user or password in it. Surrounding
+    whitespace, a tab, CR or LF refuse it: urlsplit drops them silently, so the value would not be
+    the one checked."""
+    if not isinstance(value, str) or value != value.strip() or any(c in value for c in "\t\r\n"):
         return False
     try:
-        parts = urlsplit(value.strip())
+        parts = urlsplit(value)
         parts.port  # noqa: B018 -- raises ValueError on a port out of range
     except ValueError:
         return False

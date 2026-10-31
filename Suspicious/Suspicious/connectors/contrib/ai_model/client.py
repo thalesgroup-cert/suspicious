@@ -83,7 +83,8 @@ class AiInferenceClient:
                 f"inference server {_SETUP_REFUSED[status]} (HTTP {status})", retryable=False
             )
         if status != 200:
-            raise ValueError(f"inference server refused the request (HTTP {status}): {_detail(response)}")
+            # The status only: a 422 detail echoes the request body, so the mail text.
+            raise ValueError(f"inference server refused the request (HTTP {status})")
         try:
             return response.json()
         except ValueError as exc:
