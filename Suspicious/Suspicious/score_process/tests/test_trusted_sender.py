@@ -224,10 +224,30 @@ class ReadMailHeadersTest(TestCase):
         with patch("settings.config.get_section", return_value={"feeder_bucket": "feeder"}):
             self.assertEqual(self.read(store), "From: a@corp.test")
 
-    def test_a_web_upload_is_read_from_its_submission_archive(self):
-        self.archive("", {"./ref.txt": b"body", "./ref.headers": b"From: a@corp.test"})
-        self.assertEqual(self.read(self.store({"mail-submissions": {"x-submission-1-ab/ref.headers": b"no"}})),
-                         "From: a@corp.test")
+    def test_a_web_upload_has_no_trusted_headers_and_is_never_overruled(self):
+        # The uploader wrote the file, so its Authentication-Results prove nothing.
+        trusted = headers(PASS).encode()
+        self.archive("", {"./ref.txt": b"body", "./ref.headers": trusted})
+        store = self.store({
+            "mail-submissions": {f"x-submission-1-ab/{self.MAIL}.headers": trusted},
+            "x-submission-261007071836": {f"{self.MAIL}/{self.MAIL}.headers": trusted},
+        })
+        self.assertEqual(self.read(store), "")
+        case = Case.objects.create(description="", reporter=get_user_model().objects.create_user(username="ts_w", password="x"))
+        from case_handler.models import CaseHasFileOrMail
+
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=self.mail)
+        case.save(update_fields=["fileOrMail"])
+        with patch.object(trusted_sender, "get_config", return_value=TRUSTED), \
+             patch("common.storage.get_store", return_value=store), \
+             patch("connectors.contrib.misp.internal.company_domains", return_value=COMPANY), \
+             patch.object(trusted_sender, "all_artifacts_listed", return_value=True):
+            self.assertFalse(trusted_sender.ai_may_be_overruled(case))
+
+    def test_a_feeder_mail_missing_from_the_store_is_not_read_from_its_tar(self):
+        self.archive("Haruto_Sato-1", {"./ref.txt": b"body", "./ref.headers": b"From: a@corp.test"})
+        with patch("settings.config.get_section", return_value={"feeder_bucket": "feeder"}):
+            self.assertEqual(self.read(self.store({"feeder": {}})), "")
 
     def test_a_mail_with_no_stored_object_and_no_archive_has_no_headers(self):
         self.archive("Haruto_Sato-1")

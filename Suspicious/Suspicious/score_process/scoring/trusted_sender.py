@@ -107,22 +107,23 @@ def all_artifacts_listed(mail, company_domains) -> bool:
 
 
 def read_mail_headers(store, mail) -> str:
-    """The mail's ``.headers``: from the object store, in the submission's layout
-    (``MailArchive.bucket_name``, see find_mail_prefix), else from the submission's tar archive
-    (a web upload's store prefix is not recorded on the mail). "" when neither holds it. Store
-    errors propagate."""
-    from connectors.contrib.ai_model.mailtext import _read_tar
+    """The mail's ``.headers`` from the object store, in the submission's layout
+    (``MailArchive.bucket_name``, see find_mail_prefix). "" when the store does not hold it, and
+    always for a web upload (``bucket_name`` ""): the uploader wrote the file, headers included, so
+    its Authentication-Results prove nothing. Store errors propagate."""
     from mail_feeder.models import MailArchive
     from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import _read_object_safe, find_mail_prefix
 
-    mail_archive = MailArchive.objects.select_related("archive").filter(mail=mail).first()
+    mail_archive = MailArchive.objects.filter(mail=mail).first()
+    if mail_archive is not None and not mail_archive.bucket_name:
+        return ""
     location = find_mail_prefix(store, str(mail.mail_id), getattr(mail_archive, "bucket_name", "") or "")
     if location:
         bucket, prefix = location
         for obj in store.list(bucket, prefix=prefix, recursive=True):
             if obj.name.endswith(".headers"):
                 return _read_object_safe(store, bucket, obj.name).decode("utf-8", "replace")
-    return _read_tar(mail_archive)[0] if mail_archive is not None else ""
+    return ""
 
 
 def ai_may_be_overruled(case) -> bool:
