@@ -297,7 +297,6 @@ services:
       # Weights are bind-mounted (not baked into the image) so the retrain
       # pipeline can promote new ones in place; the server hot-reloads them.
       - "${CUSTOM_ANALYZERS_PATH}/AIMailAnalyzer/models:/worker/AIMailAnalyzer/models:ro"
-      - "${CUSTOM_ANALYZERS_PATH}/AIMailAnalyzer/models_public:/worker/AIMailAnalyzer/models_public:ro"
     networks:
       - suspicious_network
 

@@ -19,7 +19,7 @@
  ┌─────────────────────────────────┐  POST /v2   ┌──────────────────────────────┐
  │ ai_model connector              │ ──────────► │ inference_server/server.py   │
  │  read mail text (store/archive) │ Bearer token│  vectorizer + models in RAM  │
- │  write AiAssessment + case      │ ◄────────── │  models/ + models_public/    │
+ │  write AiAssessment + case      │ ◄────────── │  weights from models/        │
  └─────────────────────────────────┘             └──────────────────────────────┘
         http://ai_inference:8090  (service name on suspicious_net)
 ```
@@ -27,16 +27,15 @@
 - **Network.** The server is reachable as `http://ai_inference:8090` on `suspicious_net` only.
   Neither `deployment/compose_apps.yaml` nor `deployment/docker-compose.override.yml` publishes a
   host port. To call it by hand, run the call inside a container on that network (examples below).
-- **Variants.** `personal` (`models/`, your own trained weights) is the one `/v2` classifies with.
-  `public` (`models_public/`) is still loaded and reported by `/health`, but no route classifies
-  with it.
+- **Variant.** One variant is loaded, `personal` (`models/`, your own trained weights), and `/v2`
+  classifies with it.
 - **Weights.** Bind-mounted read-only, not baked into the image. The server
   re-checks them every `INFERENCE_RELOAD_CHECK_SECONDS` (30) and hot-swaps changed
   files; `POST /reload` does it immediately. A file that fails to load never replaces a
   working model, so the retrain pipeline can overwrite `models/*.pth` in place.
 - **Readiness.** `GET /health` (and `GET /v2/health/ready`, same body) is `200` only when the
-  vectorizer and the five `personal` models (four required plus the optional `unwanted_*`) are
-  loaded; otherwise `503` with the per-file load error.
+  vectorizer and the four required `personal` models are loaded (the optional `unwanted_*` may be
+  absent); otherwise `503` with the per-file load error.
 
 ### Without the connector
 

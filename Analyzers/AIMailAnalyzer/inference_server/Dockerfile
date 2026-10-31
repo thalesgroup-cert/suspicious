@@ -25,7 +25,7 @@ RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --sys
 # The files the server imports as siblings via cwd (mail_analysis.py,
 # mail_archive.py, ResNetMLP.py), the inference_server/ package, and the repo's
 # small tokenizer / sentence-transformers config files for the vectorizer.
-# Model weights are deliberately NOT copied in: models/ and models_public/ are
+# Model weights are deliberately NOT copied in: models/ is
 # bind-mounted at runtime (compose), so the monthly retrain can promote new
 # weights without rebuilding this image, and the server hot-reloads them.
 COPY mail_analysis.py mail_archive.py ResNetMLP.py ./

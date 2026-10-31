@@ -73,6 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connector's ledger row and the AI vote's weight use (without the key the name is
   `AI_Mail_Analyzer`). The Cortex analyzer sync no longer reports that role as missing from Cortex
   and leaves its row active.
+- The inference server's `public` model variant. No route classified with it: the server no longer
+  loads or hot-reloads `models_public/`, `/health` lists only the `personal` variant, and
+  `ai_inference` no longer mounts `models_public/`.
 
 ### Fixed
 

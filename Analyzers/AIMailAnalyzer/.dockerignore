@@ -21,13 +21,11 @@ vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
 vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling/
 
-# models/ and models_public/ hold the trained weights (models/ is git-ignored,
-# there is no fixed public source for it: it's whatever train_models.ipynb /
-# train_test_models.py or the retrain pipeline produced). Neither image bakes
-# them in: the inference server bind-mounts them at runtime so promoted
-# weights are picked up without a rebuild.
+# models/ holds the trained weights (git-ignored, there is no fixed public
+# source for it: it's whatever train_models.ipynb / train_test_models.py or the
+# retrain pipeline produced). Neither image bakes them in: the inference server
+# bind-mounts them at runtime so promoted weights are picked up without a rebuild.
 models/
-models_public/*.pth
 # promote.py's pre-overwrite weight backups - never read at runtime.
 models_backup/
 

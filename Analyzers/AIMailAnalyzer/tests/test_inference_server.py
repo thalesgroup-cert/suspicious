@@ -109,16 +109,12 @@ def make_app(tmp_path, monkeypatch):
     """Factory: build the server against temp model dirs and enter its lifespan."""
     clients = []
 
-    def make(personal=True, public=False, vectorizer=FakeVectorizer, personal_skip=()):
-        dirs = {"personal": tmp_path / "models", "public": tmp_path / "models_public"}
+    def make(personal=True, vectorizer=FakeVectorizer, personal_skip=()):
+        dirs = {"personal": tmp_path / "models"}
         if personal:
             write_models(dirs["personal"], seed=1, skip=personal_skip)
         else:
             dirs["personal"].mkdir()
-        if public:
-            write_models(dirs["public"], seed=100)
-        else:
-            dirs["public"].mkdir()
         monkeypatch.setattr(server, "MODEL_DIRS", dirs)
         # The v2 router captured server.store at import time: reset that same object in place.
         monkeypatch.setattr(server.store, "__dict__", server.ModelStore(dirs).__dict__)
@@ -172,19 +168,6 @@ def test_health_is_ready_with_vectorizer_and_personal_models(make_app):
     assert body["vectorizer"] == {"loaded": True, "error": None}
     assert body["variants"]["personal"]["ready"] is True
     assert all(m["loaded"] for m in body["variants"]["personal"]["models"].values())
-
-
-def test_public_variant_without_weights_is_unavailable_but_not_an_outage(make_app):
-    client, _ = make_app(public=False)
-    body = client.get("/health")
-    assert body.status_code == 200
-    assert body.json()["variants"]["public"]["ready"] is False
-
-    detail = server.store.unavailable("public")
-    assert "Required models unavailable for variant 'public'" in detail
-    assert "safe_suspicious_30_epochs_model.pth" in detail
-    # ... and the personal variant is unaffected
-    assert classify(client).status_code == 200
 
 
 def test_health_is_503_when_the_personal_models_are_missing(make_app):
@@ -314,19 +297,20 @@ def test_truncated_weight_files_are_reported_per_file_not_a_crash(make_app):
     """The weights in the original hand-off were byte-for-byte truncated copies
     (cut at 512 KiB: they still start with a valid zip header but have no
     central directory). Loading must fail soft, say which file and why."""
-    client, dirs = make_app(public=False)
+    client, dirs = make_app(personal=False)
     with TemporaryDirectory() as good:
         write_models(Path(good), seed=100)
         for path in Path(good).glob("*.pth"):
-            (dirs["public"] / path.name).write_bytes(path.read_bytes()[:4096])
+            (dirs["personal"] / path.name).write_bytes(path.read_bytes()[:4096])
     client.post("/reload")
 
-    body = client.get("/health").json()
-    public = body["variants"]["public"]
-    assert public["ready"] is False
-    bad = public["models"]["safe_30_epochs_model.pth"]
+    resp = client.get("/health")
+    assert resp.status_code == 503
+    personal = resp.json()["variants"]["personal"]
+    assert personal["ready"] is False
+    bad = personal["models"]["safe_30_epochs_model.pth"]
     assert bad["error"]
-    assert server.store.unavailable("public")
+    assert server.store.unavailable("personal")
 
 
 def test_oversized_body_is_truncated_not_rejected(make_app):
@@ -433,7 +417,7 @@ def test_unchanged_files_are_not_reloaded(make_app):
     client, _ = make_app()
     assert client.post("/reload").json()["reloaded"]["personal"]  # force=True: reloads all
     store = server.store
-    assert store.refresh() == {"personal": [], "public": []}  # nothing changed on disk
+    assert store.refresh() == {"personal": []}  # nothing changed on disk
 
 
 def test_file_vanishing_mid_promote_keeps_serving(make_app):

@@ -6,10 +6,8 @@ resident in memory (a full SentenceTransformer + 5 ResNetMLP checkpoints). The
 ai_model connector POSTs each mail body to the token-protected /v2 API (v2.py)
 over suspicious_net, as http://ai_inference:8090.
 
-Two variants are loaded side by side - "personal" (models/, trained on this
-deployment's own labeled mail) and "public" (models_public/, see that
-folder's README) - so a single running server can answer for either without
-a restart.
+One variant is loaded: "personal" (models/, trained on this deployment's own
+labeled mail), the one /v2 classifies with.
 
 Weights stay fresh: the monthly retrain pipeline overwrites models/*.pth in
 place, so each variant's files are re-checked (mtime) every
@@ -45,7 +43,6 @@ VECTORIZER_PATH = os.environ.get(
 )
 MODEL_DIRS = {
     "personal": os.environ.get("MODELS_DIR_PERSONAL", "/worker/AIMailAnalyzer/models"),
-    "public": os.environ.get("MODELS_DIR_PUBLIC", "/worker/AIMailAnalyzer/models_public"),
 }
 
 # Seconds between on-disk weight checks (0 disables the automatic check; POST
@@ -183,8 +180,7 @@ class ModelStore:
         return None
 
     def ready(self) -> bool:
-        """Serving requires the vectorizer and the default ("personal") variant.
-        "public" is comparative only, so it being incomplete is not an outage."""
+        """Serving requires the vectorizer and the "personal" variant."""
         return self.vectorizer is not None and self.variant_ready("personal")
 
     def health_payload(self) -> dict:

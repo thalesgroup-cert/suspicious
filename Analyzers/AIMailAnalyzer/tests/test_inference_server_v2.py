@@ -26,7 +26,7 @@ def make_client(tmp_path, monkeypatch):
     clients = []
 
     def make(personal=True):
-        dirs = {"personal": tmp_path / "models", "public": tmp_path / "models_public"}
+        dirs = {"personal": tmp_path / "models"}
         for directory in dirs.values():
             directory.mkdir()
         if personal:
