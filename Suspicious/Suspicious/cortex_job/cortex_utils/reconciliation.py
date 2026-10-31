@@ -3,7 +3,6 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from case_handler.campaigns import run_for_case as run_campaign_detection
 from connectors.dispatch import emit as emit_connector_event
 from cortex_job.cortex_utils.aggregate import CaseAggregate, aggregate_case
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
@@ -93,4 +92,3 @@ def reconcile_case_core(case) -> None:
     finalise(case)
     transition(case, LifecycleState.FINALIZED)
     emit_connector_event("case_finalised", case)
-    run_campaign_detection(case)

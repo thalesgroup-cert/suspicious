@@ -194,9 +194,10 @@ Framework tests live in `connectors/tests/`; each contrib connector has its own
 
 ### Phishing campaigns and TheHive
 
-Campaign detection is core, not a connector: when a case is finalised,
-`case_handler/campaigns.py` looks for at least three similar dangerous mails
-(ChromaDB similarity on the AI analyzer's embedding), groups them in a
+Campaign detection belongs to the `ai_model` connector: when a case is finalised,
+its `case_finalised` hook queues `run_campaign_detection`, and
+`connectors/contrib/ai_model/campaigns.py` looks for at least three similar dangerous mails
+(ChromaDB similarity on the AI assessment's campaign embedding), groups them in a
 `Campaign`, and emits `campaign_updated` (its payload carries `campaign_id`).
 The `thehive` connector creates the campaign's alert in one multipart request,
 then adds only what is new as mails join:

@@ -107,7 +107,7 @@ The ledger replaces the legacy 8-FK Q-object that the webhook used to reverse-wa
 
 - `CortexJob.run_analyzer(api, analyzer, data, data_type, case)` — atomic dispatch.
 - `CortexJob.run(api, analyzer, value, data_type, case)` — thin forwarder (kept for `mail_body` legacy hook).
-- `CortexJob.launch_cortex_jobs(self, value, data_type, case)` and `launch_cortex_ai_jobs(self, value, data_type, case)` — multi-analyzer dispatch sites. **All callers must thread a non-None `case`**; `run_analyzer` raises `TypeError` otherwise.
+- `CortexJob.launch_cortex_jobs(self, value, data_type, case)` — multi-analyzer dispatch site. **All callers must thread a non-None `case`**; `run_analyzer` raises `TypeError` otherwise. The AI mail classification is not launched here: the mail callers hand the case to the `mail_ai` provider (`connectors.providers.queue_provider_analysis`).
 - `CortexJobManager.update_single_job(caj)` — sync one CAJ + its AR from Cortex.
 - `CortexJobManager.finalise_case(case)` — aggregate per-artifact results, run `generate_description`, then `CortexAnalyzerReports.get_report(case)` if the case flipped to `Done`. Called from `process_cortex_job` once the last pending CAJ for the case transitions out of pending.
 - `CortexJobManager.manage_jobs(case)` — unchanged per-case bulk pass, used by the cron fallback.

@@ -246,6 +246,7 @@ class DeferredLaunchTest(django.test.TestCase):
     never started) and the user got "Internal Server Error".
     """
 
+    @patch("mail_feeder.global_submission.gsubmission.queue_provider_analysis")
     @patch("tasp.tasks.reconcile_case")
     @patch("tasp.tasks.dispatch_case_analysis")
     @patch("mail_feeder.global_submission.gsubmission.CortexJob")
@@ -254,7 +255,7 @@ class DeferredLaunchTest(django.test.TestCase):
     @patch("mail_feeder.global_submission.gsubmission.Handlers")
     def test_defer_launch_queues_the_task_instead_of_launching(
         self, mock_handlers_cls, mock_user_cls, mock_case_cls, mock_cortex_cls,
-        mock_dispatch, mock_reconcile,
+        mock_dispatch, mock_reconcile, mock_queue,
     ):
         from django.contrib.auth import get_user_model
         from ip_process.models import IP
@@ -279,7 +280,7 @@ class DeferredLaunchTest(django.test.TestCase):
             )
 
         mock_cortex_cls.return_value.launch_cortex_jobs.assert_not_called()
-        mock_cortex_cls.return_value.launch_cortex_ai_jobs.assert_not_called()
+        mock_queue.assert_not_called()
         mock_dispatch.delay.assert_called_once_with(
             7,
             [
@@ -290,3 +291,58 @@ class DeferredLaunchTest(django.test.TestCase):
             use_sender_domain=True,
         )
         mock_reconcile.delay.assert_not_called()
+
+
+class InlineAiHandOffTest(django.test.TestCase):
+    """The inline mail path hands a mail with a readable archive to the mail_ai provider."""
+
+    def run_inline(self, ai_archive):
+        from django.contrib.auth import get_user_model
+
+        user = get_user_model().objects.create_user(username="inline_ai_u", password="x")
+        case = MagicMock()
+        case.id = 9
+        order = []
+        gs = "mail_feeder.global_submission.gsubmission"
+        with patch("tasp.tasks.reconcile_case"), \
+                patch(f"{gs}.CortexJob") as cortex_cls, \
+                patch(f"{gs}.CaseCreatorService") as case_cls, \
+                patch(f"{gs}.UserCreationService") as user_cls, \
+                patch(f"{gs}.Handlers") as handlers_cls:
+            handlers = _make_handlers_mock(handlers_cls)
+            handlers.handle_mail_body.return_value = [("/tmp/m/body.txt", "mail_body")]
+            handlers.handle_attachments.return_value.ai_archive = ai_archive
+            user_cls.return_value.get_or_create_user.return_value = user
+            case_cls.return_value.create_case.return_value = case
+            cortex_cls.return_value.launch_cortex_jobs.side_effect = lambda **_: order.append("jobs")
+            instance = MagicMock()
+            instance.reportedBy = "x@example.com"
+            GlobalSubmissionService()._handle_common_tasks(instance, "email-1", "mail.tar.gz", "")
+        return case, cortex_cls.return_value, order
+
+    @patch("mail_feeder.global_submission.gsubmission.queue_provider_analysis")
+    def test_a_readable_archive_hands_the_case_over_once_after_the_cortex_jobs(self, mock_queue):
+        order = []
+        mock_queue.side_effect = lambda *a: order.append("ai")
+        case, _, jobs = self.run_inline(MagicMock())
+        mock_queue.assert_called_once_with(case, "mail_ai")
+        self.assertEqual(jobs + order, ["jobs", "ai"])
+
+    @patch("mail_feeder.global_submission.gsubmission.queue_provider_analysis")
+    def test_no_archive_hands_nothing_over(self, mock_queue):
+        self.run_inline(None)
+        mock_queue.assert_not_called()
+
+    @patch("mail_feeder.global_submission.gsubmission.queue_provider_analysis",
+           side_effect=RuntimeError("boom"))
+    def test_a_failed_hand_off_still_marks_the_case_dispatched(self, mock_queue):
+        case, _, _ = self.run_inline(MagicMock())
+        mock_queue.assert_called_once()
+        case.save.assert_any_call(update_fields=["dispatched_at"])
+
+    def test_without_a_provider_nothing_is_queued_and_no_cortex_ai_job_runs(self):
+        from cortex_job.models import CaseAnalyzerJob
+
+        _, cortex, _ = self.run_inline(MagicMock())
+        self.assertFalse(CaseAnalyzerJob.objects.exists())
+        self.assertEqual([name for name, *_ in cortex.method_calls], ["launch_cortex_jobs"])

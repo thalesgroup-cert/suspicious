@@ -23,16 +23,13 @@ from connectors.providers import (
 from connectors.registry import ConnectorRegistry
 from connectors.tasks import run_provider_analysis
 from connectors.tests.dummy import DummyProviderConnector
-from cortex_job.cortex_utils.cortex_and_job_management import (
-    CortexJob,
-    CortexJobManager,
-    _get_cortex_config,
-)
+from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager, _get_cortex_config
 from cortex_job.cortex_utils.reconciliation import reconcile_case_core
-from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
+from cortex_job.models import Analyzer, CaseAnalyzerJob
 from file_process.models import File
 from hash_process.models import Hash
 from mail_feeder.models import Mail, MailArchive, MailInfo
+from tasp.tasks import dispatch_case_analysis
 
 DANGEROUS = ProviderResult(
     "DANGEROUS", 7, 81, "Classic_phishing", "v0", {"sub_class": "CLASSIC_PHISHING"}
@@ -126,25 +123,21 @@ class ProviderDispatchTest(TestCase):
         self.assertIsNone(self.queue())
         self.assertFalse(CaseAnalyzerJob.objects.exists())
 
-    def test_launch_cortex_ai_jobs_hands_over_and_calls_no_cortex_api(self):
-        cortex = CortexJob(api_url="http://cortex.invalid", api_key="k")
-        cortex.api = mock.Mock()
-        with mock.patch.object(CortexJob, "run") as run:
-            self.assertIsNone(cortex.launch_cortex_ai_jobs(self.archive, "file", case=self.case))
-        run.assert_not_called()
-        cortex.api.analyzers.get_by_name.assert_not_called()
+    def dispatch_ai_archive(self):
+        with mock.patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob") as cortex:
+            dispatch_case_analysis.run(
+                self.case.id, [("mail_feeder.mailarchive", self.archive.pk, "ai_archive")]
+            )
+        self.assertEqual(cortex.return_value.method_calls, [])
+
+    def test_an_ai_archive_dispatch_hands_over_and_calls_no_cortex_api(self):
+        self.dispatch_ai_archive()
         self.assertTrue(has_provider_job(self.case))
 
-    def test_launch_cortex_ai_jobs_still_uses_cortex_without_a_provider(self):
+    def test_an_ai_archive_dispatch_without_a_provider_queues_nothing(self):
         ConnectorState.objects.filter(name="dummy_provider").update(enabled=False)
-        cortex = CortexJob(api_url="http://cortex.invalid", api_key="k")
-        cortex.api = mock.Mock()
-        with mock.patch.object(CortexJob, "run", return_value=mock.Mock(id="cx-1")) as run:
-            self.assertEqual(
-                cortex.launch_cortex_ai_jobs(self.archive, "file", case=self.case), "cx-1"
-            )
-        run.assert_called_once()
-        self.assertFalse(has_provider_job(self.case))
+        self.dispatch_ai_archive()
+        self.assertFalse(CaseAnalyzerJob.objects.exists())
 
     # ── task ───────────────────────────────────────────────────────────────
 
@@ -290,29 +283,8 @@ class ProviderDispatchTest(TestCase):
         analyze.assert_not_called()
         self.assert_failed(job, "mail_ai")
 
-    # ── legacy AI path and reconcile ───────────────────────────────────────
+    # ── reconcile ──────────────────────────────────────────────────────────
 
-    def test_manage_ai_jobs_skips_cases_with_a_provider_job_but_still_handles_legacy_cases(self):
-        # A legacy Cortex AI report on the same (deduplicated) archive file.
-        AnalyzerReport.objects.create(
-            cortex_job_id="cx-ai-old", type="file", status="Success",
-            analyzer=Analyzer.objects.create(name=ai_name(), analyzer_cortex_id="cx-ai"),
-            file=self.archive.archive, level="safe", confidence=90, score=0,
-            report_summary={}, report_full={"sub_classification": "ham"}, report_taxonomy={},
-        )
-        self.run_task(self.queue())
-        CortexJobManager().manage_ai_jobs(self.case)
-        self.case.refresh_from_db()
-        self.assertEqual(self.case.results_ai, "Dangerous")
-
-        legacy = Case.objects.create(description="", reporter=self.case.reporter)
-        legacy.fileOrMail = CaseHasFileOrMail.objects.create(case=legacy, mail=self.archive.mail)
-        legacy.save(update_fields=["fileOrMail"])
-        CortexJobManager().manage_ai_jobs(legacy)
-        legacy.refresh_from_db()
-        self.assertEqual(legacy.results_ai, "Safe")
-
-    @mock.patch("cortex_job.cortex_utils.reconciliation.run_campaign_detection")
     @mock.patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
     @mock.patch("cortex_job.cortex_utils.reconciliation.finalise")
     def test_reconcile_waits_for_the_provider_row_then_finalises(self, finalise, *_, result=DANGEROUS):
@@ -332,7 +304,6 @@ class ProviderDispatchTest(TestCase):
     def test_a_no_answer_inconclusive_row_also_lets_the_case_finalise(self):
         self.test_reconcile_waits_for_the_provider_row_then_finalises(result=NO_ANSWER)
 
-    @mock.patch("cortex_job.cortex_utils.reconciliation.run_campaign_detection")
     @mock.patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
     def test_a_provider_finishing_mid_reconcile_keeps_its_fields(self, *_):
         job = self.queue()

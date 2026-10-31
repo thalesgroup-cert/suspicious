@@ -1,5 +1,4 @@
-"""Phishing-campaign detection for the ai_model connector: case_handler.campaigns ported to
-read the case's AiAssessment instead of the Cortex AI report.
+"""Phishing-campaign detection for the ai_model connector, read from the case's AiAssessment.
 
 A campaign is a group of similar dangerous mails (ChromaDB similarity over the assessment's
 campaign embedding). Membership lives in the database."""

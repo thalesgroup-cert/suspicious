@@ -292,7 +292,7 @@ def sweep_missing_mail_previews(self, limit: int = 200):
 
 
 # Intent labels that are not a model: the value travels as-is (a file path the worker
-# shares with the web container), or the intent is the mail archive for the AI analyzer.
+# shares with the web container), or the intent says the mail has a readable archive for the AI.
 PATH_INTENT = "__path__"
 AI_ARCHIVE_INTENT = "ai_archive"
 
@@ -307,12 +307,14 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
     `intents` is a JSON-safe list of (app_label.model, pk, data_type) triples
     (model instances aren't JSON-serializable, so callers resolve+serialize
     them before enqueueing); we re-fetch the objects here. A `PATH_INTENT` entry
-    carries its value in the pk slot, and an `AI_ARCHIVE_INTENT` entry runs the AI
-    analyzer after every other job. `use_sender_domain` lets the URL planner see the
-    mail's sender, as the inline mail path did.
+    carries its value in the pk slot, and an `AI_ARCHIVE_INTENT` entry hands the case to
+    the mail AI provider after every other job. `use_sender_domain` lets the URL planner
+    see the mail's sender, as the inline mail path did.
     """
     from django.apps import apps
     from django.utils import timezone
+    from connectors.base import PROVIDER_KIND_MAIL_AI
+    from connectors.providers import queue_provider_analysis
     from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
     from url_process.url_utils.url_planner import filter_dispatch_intents
 
@@ -352,11 +354,11 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
             logger.exception(
                 "Failed to launch Cortex jobs (case=%s data_type=%s)", case_id, data_type
             )
-    for archive, _data_type in ai_archives:
+    if ai_archives:
         try:
-            cortex.launch_cortex_ai_jobs(archive, "file", case=case)
+            queue_provider_analysis(case, PROVIDER_KIND_MAIL_AI)
         except Exception:
-            logger.exception("Failed to launch the Cortex AI job (case=%s)", case_id)
+            logger.exception("Failed to hand the case to the mail AI provider (case=%s)", case_id)
 
     case.dispatched_at = timezone.now()
     case.save(update_fields=["dispatched_at"])

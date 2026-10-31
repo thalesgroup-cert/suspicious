@@ -90,31 +90,46 @@ class DispatchMailIntentsTest(TestCase):
             value="/tmp/m/body.txt", data_type="mail_body", case=self.case
         )
 
+    @patch("connectors.providers.queue_provider_analysis")
     @patch("tasp.tasks.reconcile_case.delay")
     @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
-    def test_ai_archive_intent_runs_the_ai_job_last(self, mock_cortex_cls, mock_reconcile):
-        mock_cortex = mock_cortex_cls.return_value
+    def test_ai_archive_intent_hands_the_case_to_the_provider_once_and_last(
+        self, mock_cortex_cls, mock_reconcile, mock_queue
+    ):
         calls = []
-        mock_cortex.launch_cortex_jobs.side_effect = lambda **kw: calls.append("jobs")
-        mock_cortex.launch_cortex_ai_jobs.side_effect = lambda *a, **kw: calls.append("ai")
+        mock_cortex_cls.return_value.launch_cortex_jobs.side_effect = lambda **_: calls.append("jobs")
+        mock_queue.side_effect = lambda *a: calls.append("ai")
         intents = [
+            ("ip_process.ip", self.ip.pk, "ai_archive"),
             ("ip_process.ip", self.ip.pk, "ai_archive"),
             ("ip_process.ip", self.ip.pk, "ip"),
         ]
 
         dispatch_case_analysis.run(self.case.id, intents)
 
-        mock_cortex.launch_cortex_ai_jobs.assert_called_once_with(self.ip, "file", case=self.case)
+        mock_queue.assert_called_once_with(self.case, "mail_ai")
         self.assertEqual(calls, ["jobs", "ai"])
         mock_reconcile.assert_called_once_with(self.case.id)
 
+    @patch("connectors.providers.queue_provider_analysis")
     @patch("tasp.tasks.reconcile_case.delay")
     @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
-    def test_ai_job_failure_still_marks_the_case_dispatched(self, mock_cortex_cls, mock_reconcile):
-        mock_cortex_cls.return_value.launch_cortex_ai_jobs.side_effect = RuntimeError("boom")
+    def test_no_ai_archive_intent_hands_nothing_to_the_provider(
+        self, mock_cortex_cls, mock_reconcile, mock_queue
+    ):
+        dispatch_case_analysis.run(self.case.id, [("ip_process.ip", self.ip.pk, "ip")])
 
+        mock_queue.assert_not_called()
+
+    @patch("connectors.providers.queue_provider_analysis", side_effect=RuntimeError("boom"))
+    @patch("tasp.tasks.reconcile_case.delay")
+    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    def test_ai_hand_off_failure_still_marks_the_case_dispatched(
+        self, mock_cortex_cls, mock_reconcile, mock_queue
+    ):
         dispatch_case_analysis.run(self.case.id, [("ip_process.ip", self.ip.pk, "ai_archive")])
 
+        mock_queue.assert_called_once()
         self.case.refresh_from_db()
         self.assertIsNotNone(self.case.dispatched_at)
         mock_reconcile.assert_called_once_with(self.case.id)
