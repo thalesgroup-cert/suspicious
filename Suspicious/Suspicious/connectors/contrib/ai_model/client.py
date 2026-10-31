@@ -75,9 +75,10 @@ class AiInferenceClient:
             raise ProviderUnavailable(f"inference server unreachable: {type(exc).__name__}") from exc
         status = response.status_code
         if status >= 500:
-            detail = _detail(response)
-            retryable = not (status == 503 and _NEEDS_OPERATOR.search(detail))
-            raise ProviderUnavailable(f"inference server HTTP {status}: {detail}", retryable=retryable)
+            # Matched on the detail, never stored: only the fixed phrase the pattern found.
+            needs_operator = _NEEDS_OPERATOR.search(_detail(response)) if status == 503 else None
+            suffix = f": {needs_operator.group(0).lower()}" if needs_operator else ""
+            raise ProviderUnavailable(f"inference server HTTP {status}{suffix}", retryable=not needs_operator)
         if status in _SETUP_REFUSED:
             raise ProviderUnavailable(
                 f"inference server {_SETUP_REFUSED[status]} (HTTP {status})", retryable=False

@@ -85,6 +85,12 @@ class ReadArchiveBodyTest(SimpleTestCase):
             with self.subTest(name=name):
                 self.assertIsNone(read_archive_body(archive(build_tar({**GOOD, name: b"x"}))))
 
+    def test_a_refused_archive_logs_the_class_not_the_member_name(self):
+        with self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs:
+            self.assertIsNone(read_archive_body(archive(build_tar({**GOOD, "../evil-name.txt": b"x"}))))
+        self.assertIn("ValueError", logs.output[0])
+        self.assertNotIn("evil-name", "\n".join(logs.output))
+
     def test_links_and_devices_are_rejected(self):
         for kind in (tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.CHRTYPE, tarfile.FIFOTYPE):
             with self.subTest(kind=kind):

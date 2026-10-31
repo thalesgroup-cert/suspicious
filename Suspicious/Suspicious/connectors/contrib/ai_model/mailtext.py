@@ -164,6 +164,7 @@ def _read_tar(mail_archive) -> tuple[str, str]:
                 for member in (head, body)
             )
     except TAR_ERRORS as exc:
-        logger.warning("mail archive %s not readable: %s", getattr(stored, "pk", "?"), exc)
+        # The class only: the message names archive members, which are the mail's file names.
+        logger.warning("mail archive %s not readable: %s", getattr(stored, "pk", "?"), type(exc).__name__)
         return "", ""
     return headers, text

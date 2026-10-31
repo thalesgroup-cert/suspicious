@@ -49,21 +49,23 @@ class ClassifyTest(SimpleTestCase):
                 with self.assertRaises(ProviderUnavailable) as caught:
                     client.classify("x")
                 self.assertTrue(caught.exception.retryable)
-                self.assertIn(str(status), str(caught.exception))
+                self.assertEqual(str(caught.exception), f"inference server HTTP {status}")
 
     def test_a_503_that_only_an_operator_can_fix_is_not_retryable(self):
+        # The message names the matched fixed phrase only, never the rest of the server's detail.
         details = (
-            "Required models unavailable for variant 'personal': safe_model (looked in /m)",
-            "Vectorizer unavailable: boom",
-            "token not configured",
+            ("Required models unavailable for variant 'personal': safe_model (looked in /m)",
+             "models unavailable"),
+            ("Vectorizer unavailable: boom", "vectorizer unavailable"),
+            ("token not configured", "token not configured"),
         )
-        for detail in details:
+        for detail, phrase in details:
             with self.subTest(detail=detail):
                 client = client_with(post=mock.Mock(return_value=reply(503, {"detail": detail})))
                 with self.assertRaises(ProviderUnavailable) as caught:
                     client.classify("x")
                 self.assertFalse(caught.exception.retryable)
-                self.assertIn(detail[:20], str(caught.exception))
+                self.assertEqual(str(caught.exception), f"inference server HTTP 503: {phrase}")
 
     def test_any_other_503_stays_retryable(self):
         details = (
@@ -77,6 +79,7 @@ class ClassifyTest(SimpleTestCase):
                 with self.assertRaises(ProviderUnavailable) as caught:
                     client.classify("x")
                 self.assertTrue(caught.exception.retryable)
+                self.assertEqual(str(caught.exception), "inference server HTTP 503")
 
     def test_a_refused_setup_fails_at_once_without_retry_and_without_the_token(self):
         for status in (401, 403, 404, 407, 408, 429):

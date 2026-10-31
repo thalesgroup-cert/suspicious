@@ -80,6 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after the campaign rows were written no longer leaves the campaign unannounced. Two runs for one
   case at the same time make one campaign. While ChromaDB is down, a case already in a campaign
   is still announced; its document and the members' tags wait for a later run.
+- A refusal from the AI inference server no longer stores or logs the server's detail text: the
+  `ai_model` delivery error and the worker log carry only the HTTP status, because a 422 detail
+  echoes the request, so the mail body. A `503` the operator must fix keeps a fixed phrase
+  (`models unavailable`, `vectorizer unavailable` or `token not configured`).
 - A mail uploaded through the web form now appears in the TheHive campaign alert's material (its
   headers, bodies, `.eml` and attachments). Its object-store location is not recorded, so the
   material is read from the submission's tar archive, under the same member and size limits as
