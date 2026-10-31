@@ -67,7 +67,8 @@ def _from_tar(mail_id: str, mail_archive) -> MailMaterial | None:
         with open_safe_tar(stored) as (tar, files):
             for path, member in sorted(files, key=lambda f: f[0].stem == mail_id):
                 if len(path.parts) == 1 or (len(path.parts) > 1 and path.parts[0] == "attachments"):
-                    _put(material, str(path), tar.extractfile(member).read())
+                    # One byte past the cap, so select_attachments still sees it as too large.
+                    _put(material, str(path), tar.extractfile(member).read(MAX_FILE_BYTES + 1))
     except TAR_ERRORS as exc:
         # The class only: the message names archive members, which are the mail's file names.
         logger.warning("campaign material: archive of mail %s refused: %s", mail_id, type(exc).__name__)
@@ -95,10 +96,11 @@ def fetch_mail_material(client, mail_id: str, bucket_name: str = "", mail_archiv
         except StoreError as exc:
             if exc.code != "not_found":
                 raise
-            logger.warning("campaign material: %s vanished: %s", obj.name, exc)
+            # Never the object name or message: the name is the mail's file name.
+            logger.warning("campaign material: an object of mail %s vanished: %s", mail_id, exc.code)
             continue
         except Exception as exc:  # noqa: BLE001 — one unreadable object must not lose the rest
-            logger.warning("campaign material: cannot read %s: %s", obj.name, exc)
+            logger.warning("campaign material: cannot read an object of mail %s: %s", mail_id, type(exc).__name__)
             continue
         _put(material, obj.name[len(prefix):], data)
     return material
