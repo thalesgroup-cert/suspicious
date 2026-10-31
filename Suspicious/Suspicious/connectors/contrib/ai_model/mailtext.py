@@ -11,6 +11,7 @@ import os
 import tarfile
 import zlib
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
@@ -50,15 +51,6 @@ def mail_archive_for(case) -> MailArchive | None:
     """The case's mail archive with its file and mail loaded; None when the case has no mail."""
     mail = getattr(case.fileOrMail, "mail", None)
     return MailArchive.objects.select_related("archive", "mail").filter(mail=mail).first() if mail else None
-
-
-def _top_level_name(name: str) -> str | None:
-    """The member's name when it sits at the archive root ("./m.txt" counts), else None.
-    Raises ValueError for an absolute name or one with a ``..`` part."""
-    path = PurePosixPath(name)
-    if path.is_absolute() or ".." in path.parts:
-        raise ValueError(f"archive entry escapes the archive: {name}")
-    return path.name if len(path.parts) == 1 else None
 
 
 def _open_archive(stored):
@@ -120,6 +112,34 @@ def read_archive_body(mail_archive) -> str | None:
     return material.text if material else None
 
 
+# What a damaged or hostile archive raises out of open_safe_tar.
+TAR_ERRORS = (tarfile.TarError, OSError, EOFError, zlib.error, ValueError)
+
+
+@contextmanager
+def open_safe_tar(stored):
+    """Yield (tar, files): the open archive of ``stored`` (a File) and its regular-file members as
+    (relative path, TarInfo), never extracted. Raises ValueError (or another TAR_ERRORS) for more
+    than MAX_MEMBERS entries, more than MAX_TOTAL_BYTES once uncompressed, an entry that is neither
+    a regular file nor a directory, or an absolute name or one with a ``..`` part."""
+    with _open_archive(stored) as handle, tarfile.open(fileobj=handle, mode="r:*") as tar:
+        members = tar.getmembers()
+        if len(members) > MAX_MEMBERS:
+            raise ValueError(f"archive has too many entries ({len(members)})")
+        if sum(max(m.size, 0) for m in members) > MAX_TOTAL_BYTES:
+            raise ValueError("archive is too large once uncompressed")
+        files = []
+        for member in members:
+            if not (member.isreg() or member.isdir()):
+                raise ValueError(f"archive has an unsupported entry type: {member.name}")
+            path = PurePosixPath(member.name)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(f"archive entry escapes the archive: {member.name}")
+            if member.isreg():
+                files.append((path, member))
+        yield tar, files
+
+
 def _read_tar(mail_archive) -> tuple[str, str]:
     """The (headers, text) of the mail's tar archive's ``.headers`` and ``.txt`` members; ("", "")
     when it is missing, unreadable, unsafe, or lacks either member."""
@@ -127,22 +147,14 @@ def _read_tar(mail_archive) -> tuple[str, str]:
     if stored is None:
         return "", ""
     try:
-        with _open_archive(stored) as handle, tarfile.open(fileobj=handle, mode="r:*") as tar:
-            members = tar.getmembers()
-            if len(members) > MAX_MEMBERS:
-                raise ValueError(f"archive has too many entries ({len(members)})")
-            if sum(max(m.size, 0) for m in members) > MAX_TOTAL_BYTES:
-                raise ValueError("archive is too large once uncompressed")
+        with open_safe_tar(stored) as (tar, files):
             body = head = None
-            for member in members:
-                if not (member.isreg() or member.isdir()):
-                    raise ValueError(f"archive has an unsupported entry type: {member.name}")
-                name = _top_level_name(member.name)
-                if not member.isreg() or name is None:
+            for path, member in files:
+                if len(path.parts) != 1:
                     continue
-                if name.endswith(".txt") and body is None:
+                if path.name.endswith(".txt") and body is None:
                     body = member
-                elif name.endswith(".headers") and head is None:
+                elif path.name.endswith(".headers") and head is None:
                     head = member
             if body is None or head is None:
                 return "", ""
@@ -151,7 +163,7 @@ def _read_tar(mail_archive) -> tuple[str, str]:
                 tar.extractfile(member).read(MAIL_TEXT_MAX_BYTES).decode("utf-8", errors="replace")
                 for member in (head, body)
             )
-    except (tarfile.TarError, OSError, EOFError, zlib.error, ValueError) as exc:
+    except TAR_ERRORS as exc:
         logger.warning("mail archive %s not readable: %s", getattr(stored, "pk", "?"), exc)
         return "", ""
     return headers, text

@@ -79,6 +79,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A mail uploaded through the web form now appears in the TheHive campaign alert's material (its
+  headers, bodies, `.eml` and attachments). Its object-store location is not recorded, so the
+  material is read from the submission's tar archive, under the same member and size limits as
+  the `ai_model` mail reader. A web-uploaded mail whose archive can no longer be read is still
+  missing from the alert.
 - A connector `url` field (type `url` in the connector's schema) is now checked when its
   configuration is saved, through `PUT /api/connectors/<name>/config/` or the Django admin's
   runtime config page: it must use `http` or `https`, name a host and carry no user name or

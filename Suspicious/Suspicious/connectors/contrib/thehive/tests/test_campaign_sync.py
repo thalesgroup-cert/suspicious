@@ -117,7 +117,7 @@ class SyncTest(TestCase):
         return case
 
     def _sync(self):
-        with patch(f"{S}.fetch_mail_material", side_effect=lambda client, mail_id, bucket_name="": self.materials[mail_id]):
+        with patch(f"{S}.fetch_mail_material", side_effect=lambda client, mail_id, *_: self.materials[mail_id]):
             return sync_campaign(self.campaign, self.hive, store=FakeStore(), ui_base="https://sus.example",
                                  own_domains=("meridian.example",))
 
@@ -134,10 +134,16 @@ class SyncTest(TestCase):
 
     def test_the_material_is_looked_up_in_the_mail_archive_s_submission(self):
         case = self._add(1)
-        MailArchive.objects.create(mail=case.fileOrMail.mail, bucket_name="Haruto_Sato-1")
+        archive = MailArchive.objects.create(mail=case.fileOrMail.mail, bucket_name="Haruto_Sato-1")
         with patch(f"{S}.fetch_mail_material", return_value=self.materials[case.fileOrMail.mail.mail_id]) as fetch:
             sync_campaign(self.campaign, self.hive, store=FakeStore(), ui_base="https://sus.example")
-        self.assertEqual(fetch.call_args.args[1:], (case.fileOrMail.mail.mail_id, "Haruto_Sato-1"))
+        self.assertEqual(fetch.call_args.args[1:], (case.fileOrMail.mail.mail_id, "Haruto_Sato-1", archive))
+
+    def test_a_mail_with_no_archive_row_is_looked_up_with_no_tar(self):
+        case = self._add(1)
+        with patch(f"{S}.fetch_mail_material", return_value=self.materials[case.fileOrMail.mail.mail_id]) as fetch:
+            sync_campaign(self.campaign, self.hive, store=FakeStore(), ui_base="https://sus.example")
+        self.assertEqual(fetch.call_args.args[1:], (case.fileOrMail.mail.mail_id, "", None))
 
     def test_nothing_new_means_no_calls(self):
         self._add(1)
