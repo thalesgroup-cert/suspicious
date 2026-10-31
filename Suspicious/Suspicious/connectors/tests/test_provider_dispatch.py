@@ -29,7 +29,7 @@ from cortex_job.models import Analyzer, CaseAnalyzerJob
 from file_process.models import File
 from hash_process.models import Hash
 from mail_feeder.models import Mail, MailArchive, MailInfo
-from score_process.scoring.collect import collect_signals
+from score_process.scoring.collect import collect_signals, collect_votes
 from tasp.tasks import dispatch_case_analysis
 
 DANGEROUS = ProviderResult(
@@ -118,6 +118,19 @@ class ProviderDispatchTest(TestCase):
         self.assertEqual(job.analyzer, existing)
         existing.refresh_from_db()
         self.assertEqual(existing.weight, 0.7)
+
+    def test_the_provider_path_and_the_vote_work_without_analyzers_ai(self):
+        with mock.patch(
+            "cortex_job.cortex_utils.cortex_and_job_management._get_cortex_config",
+            return_value={"analyzers": {"yara": "Yara_2_0"}},
+        ):
+            job = self.run_task(self.queue())
+            ai = collect_signals(self.case)[1]
+            votes = {v.analyzer: v for v in collect_votes(self.case, ai)}
+        self.assertEqual(job.analyzer.name, "AI_Mail_Analyzer")
+        self.assertEqual(job.status, CaseAnalyzerJob.STATUS_SUCCESS)
+        self.assertEqual(self.case.results_ai, "Dangerous")
+        self.assertEqual(votes["AI_Mail_Analyzer"].weight, 0.2)  # the row's default weight
 
     def test_queue_returns_none_without_an_enabled_provider(self):
         ConnectorState.objects.filter(name="dummy_provider").update(enabled=False)

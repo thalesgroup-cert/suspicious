@@ -1,6 +1,6 @@
-"""integrations.cortex.analyzers.ai left the example settings with the Cortex AI analyzer; the
-code that still reads it (for deployments whose Cortex catalog keeps the old analyzer) must
-work when the key is absent."""
+"""The Cortex AI analyzer left the catalog, so a deployment may have no
+integrations.cortex.analyzers.ai key (the example settings keep it: it names the AI vote's
+Analyzer row). The code that reads it must work when the key is absent."""
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 

@@ -49,11 +49,11 @@ def queue_provider_analysis(case, kind: str):
     if enabled_provider(kind) is None:
         return None
     from connectors.tasks import run_provider_analysis
-    from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
+    from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
     from cortex_job.migrations._tier_seed import tier_for
     from cortex_job.models import Analyzer, CaseAnalyzerJob
 
-    ai_name = _get_cortex_config()["analyzers"]["ai"]
+    ai_name = ai_analyzer_name()
     analyzer, _ = Analyzer.objects.get_or_create(
         name=ai_name,
         defaults={"analyzer_cortex_id": "provider:" + ai_name, "tier": tier_for(ai_name)},

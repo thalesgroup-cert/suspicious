@@ -78,13 +78,15 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
                 },
             )
             remote_names.append(analyzer.name)
-        Analyzer.objects.exclude(name__in=remote_names).update(is_active=False)
+        # The AI vote's row (ai_model connector) is no Cortex analyzer: leave it active.
+        from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
+        Analyzer.objects.exclude(name__in=[*remote_names, ai_analyzer_name()]).update(is_active=False)
 
     _warn_on_unresolved_configured_analyzers(remote_names)
 
 
 def _warn_on_unresolved_configured_analyzers(remote_names: list[str]) -> None:
-    """integrations.cortex.analyzers.{header,ai,sandbox,yara,file_info} are
+    """integrations.cortex.analyzers.{header,sandbox,yara,file_info} are
     plain name strings that cortex_and_job_management's dispatch resolves via
     api.analyzers.get_by_name() at *dispatch* time: a miss there is just a
     fetch_mail_logger.warning() next to hundreds of routine ones, easy to
@@ -105,7 +107,8 @@ def _warn_on_unresolved_configured_analyzers(remote_names: list[str]) -> None:
 
     remote_set = set(remote_names)
     for role, name in configured.items():
-        if name and name not in remote_set:
+        # ai names the AI vote's Analyzer row (ai_model connector), not a Cortex analyzer.
+        if role != "ai" and name and name not in remote_set:
             log_analyzers.error(
                 "integrations.cortex.analyzers.%s = %r does not match any analyzer "
                 "currently enabled in Cortex; dispatch for this role will silently "

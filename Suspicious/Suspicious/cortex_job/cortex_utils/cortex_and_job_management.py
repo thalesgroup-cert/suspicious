@@ -29,6 +29,16 @@ def _get_cortex_config() -> dict:
         return {}
 
 
+DEFAULT_AI_ANALYZER_NAME = "AI_Mail_Analyzer"
+
+
+def ai_analyzer_name() -> str:
+    """Name of the Analyzer row that carries the AI vote (and its weight): the configured
+    integrations.cortex.analyzers.ai, else DEFAULT_AI_ANALYZER_NAME. The ai_model connector
+    needs no Cortex analyzer, so the key may be absent."""
+    return _get_cortex_config().get("analyzers", {}).get("ai") or DEFAULT_AI_ANALYZER_NAME
+
+
 # Cortex keeps a job InProgress forever when it restarts mid-run, so this is the only thing that
 # frees a case in that state. Long enough for a sandbox detonation, short enough to notice a lost job.
 DEFAULT_STALE_JOB_TIMEOUT_SECONDS = 7200
