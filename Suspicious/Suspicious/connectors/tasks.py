@@ -106,8 +106,9 @@ def run_campaign_detection(self, case_id: int) -> None:
     ai_model breaker, which the classification calls share, and a Chroma outage must not open it.
     detect_campaign raises only before the campaign rows exist, so every failure but a
     non-retryable ProviderUnavailable is retried. A case already placed is announced even when
-    the collection cannot be opened; its store and tag steps wait for a later redelivery. Only
-    the exception class is logged: a message can carry mail text."""
+    the collection cannot be opened, then retried for its store and tag steps (each try announces
+    it again; the last one just ends). Only the exception class is logged: a message can carry
+    mail text."""
     from ai_model.campaign_profile import current_profile
     from case_handler.models import CampaignMember, Case
     from connectors.base import EVENT_CAMPAIGN_UPDATED
@@ -149,11 +150,15 @@ def run_campaign_detection(self, case_id: int) -> None:
             logger.warning("Case %s: campaign store down (%s), announcing campaign %s without it.",
                            case_id, type(exc).__name__, member.campaign_id)
             emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=member.campaign_id)
+            if self.request.retries >= self.max_retries:
+                return
+            # Retried for the store and tag steps; the retry announces it once more.
+            failure, retryable = type(exc).__name__, True
+        else:
+            campaign = detect_campaign(case, assessment, material.text, headers, profile, collection)
+            if campaign is not None:
+                emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=campaign.id)
             return
-        campaign = detect_campaign(case, assessment, material.text, headers, profile, collection)
-        if campaign is not None:
-            emit(EVENT_CAMPAIGN_UPDATED, case, campaign_id=campaign.id)
-        return
     except Exception as exc:  # noqa: BLE001 — a lock or cache outage arrives as any type
         failure = type(exc).__name__
         retryable = not isinstance(exc, ProviderUnavailable) or exc.retryable
