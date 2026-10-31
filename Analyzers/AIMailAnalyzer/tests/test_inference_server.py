@@ -154,8 +154,7 @@ def test_required_plus_optional_models_cover_every_model_spec():
     assert not set(server.REQUIRED_MODELS) & set(server.OPTIONAL_MODELS)
 
 
-def test_server_labels_match_the_taxonomy_width():
-    assert len(server.SUB_LABELS) == len(mail_analysis.SubClassificationName)
+def test_sub_model_widths_match_the_taxonomy_width():
     assert sum(w for w in mail_analysis.SUB_MODEL_WIDTHS) == len(mail_analysis.SubClassificationName)
 
 
@@ -248,7 +247,6 @@ def test_classify_returns_a_well_formed_result(make_app):
     assert sum(body["probabilities"].values()) == pytest.approx(1.0, abs=1e-4)
     assert set(body["probabilities"]) == {"SAFE", "UNWANTED", "DANGEROUS"}
     assert set(body["sub_probabilities"]) == {n.name for n in mail_analysis.SubClassificationName}
-    assert len(body["sub_probabilities"]) == len(server.SUB_LABELS)
     assert sum(body["sub_probabilities"].values()) == pytest.approx(1.0, abs=1e-4)
 
     # The campaign detector json.loads the embedding - must be a JSON list

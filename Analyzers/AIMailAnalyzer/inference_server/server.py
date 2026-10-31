@@ -59,11 +59,6 @@ MAX_CONCURRENCY = max(1, int(os.environ.get("INFERENCE_MAX_CONCURRENCY", "2")))
 # this just bounds tokenisation cost for a pathological multi-megabyte mail.
 MAX_MAIL_CHARS = int(os.environ.get("INFERENCE_MAX_MAIL_CHARS", "200000"))
 
-SUB_LABELS = [
-    "INTERNAL", "EXTERNAL", "SPAM", "NEWSLETTER",
-    "CLASSIC_PHISHING", "WHALING_PHISHING", "CLONE_PHISHING", "BLACKMAILING_PHISHING",
-]
-
 # The unwanted (spam/newsletter) sub-model is trained last and only once enough
 # labeled samples exist (see the retrain pipeline's per-model resilience), so a
 # variant without it is still usable - mail_analysis zero-fills its slice.
@@ -279,15 +274,6 @@ def _classify(models: dict, mail_body: str) -> dict:
         baseline_probability=float(np.max(classification_probabilities)),
     )
 
-    main_probabilities = {
-        name: f"{float(p):.2%}"
-        for name, p in zip(["SAFE", "UNWANTED", "DANGEROUS"], classification_probabilities)
-    }
-    sub_probabilities = {
-        name: f"{float(p):.2%}"
-        for name, p in zip(SUB_LABELS, sub_classification_probabilities)
-    }
-
     return {
         "malscore": str(classification_info["score"]),
         "classification": classification_info["classification"],
@@ -299,8 +285,6 @@ def _classify(models: dict, mail_body: str) -> dict:
         "sub_classification_probabilities": str(sub_classification_probabilities),
         "sub_classification_breakdown": sub_classification_breakdown,
         "contributing_phrases": contributing_phrases,
-        "main_probabilities": main_probabilities,
-        "sub_probabilities": sub_probabilities,
         # str(list): v2 returns it as campaign_embedding, which the campaign
         # detector json.loads.
         "email_embedding": str(email_embedding.tolist()[0]),
