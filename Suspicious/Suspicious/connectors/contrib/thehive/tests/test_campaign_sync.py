@@ -12,7 +12,7 @@ from connectors.contrib.thehive.campaign_material import Attachment, MailMateria
 from connectors.contrib.thehive.campaign_sync import sync_campaign
 from common.storage import StoreError
 from common.storage.fake import FakeObjectStore, _Stream
-from mail_feeder.models import Mail
+from mail_feeder.models import Mail, MailArchive
 
 S = "connectors.contrib.thehive.campaign_sync"
 HEADERS = 'From: "HR" <hr@evil.example>\r\nSubject: Verify payroll\r\n'
@@ -117,7 +117,7 @@ class SyncTest(TestCase):
         return case
 
     def _sync(self):
-        with patch(f"{S}.fetch_mail_material", side_effect=lambda client, mail_id: self.materials[mail_id]):
+        with patch(f"{S}.fetch_mail_material", side_effect=lambda client, mail_id, bucket_name="": self.materials[mail_id]):
             return sync_campaign(self.campaign, self.hive, store=FakeStore(), ui_base="https://sus.example",
                                  own_domains=("meridian.example",))
 
@@ -131,6 +131,13 @@ class SyncTest(TestCase):
         self.assertTrue(all("thehive" in m.synced for m in self.campaign.members.all()))
         files = [o for o in self.hive.observables[alert_id] if o["dataType"] == "file"]
         self.assertEqual(len([f for f in files if f["name"] == "notice.pdf"]), 1)  # same hash, uploaded once
+
+    def test_the_material_is_looked_up_in_the_mail_archive_s_submission(self):
+        case = self._add(1)
+        MailArchive.objects.create(mail=case.fileOrMail.mail, bucket_name="Haruto_Sato-1")
+        with patch(f"{S}.fetch_mail_material", return_value=self.materials[case.fileOrMail.mail.mail_id]) as fetch:
+            sync_campaign(self.campaign, self.hive, store=FakeStore(), ui_base="https://sus.example")
+        self.assertEqual(fetch.call_args.args[1:], (case.fileOrMail.mail.mail_id, "Haruto_Sato-1"))
 
     def test_nothing_new_means_no_calls(self):
         self._add(1)

@@ -1,7 +1,9 @@
 import io
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
+from common.storage import StoreError
 from common.storage.fake import FakeObjectStore
 
 from connectors.contrib.thehive.campaign_material import (
@@ -49,6 +51,35 @@ class FetchMaterialTest(SimpleTestCase):
     def test_unknown_mail_gives_empty_material(self):
         m = fetch_mail_material(fake_store({"a-submission-1": {}}), "999-abc")
         self.assertEqual((m.headers, m.text, m.html, m.eml, m.attachments), ("", "", "", b"", []))
+
+    def test_the_legacy_bucket_named_after_the_submission(self):
+        client = fake_store({"haruto-submission-261007071836": {f"{MAIL}/{MAIL}.headers": b"Subject: Hi"}})
+        m = fetch_mail_material(client, MAIL, "haruto-submission-261007071836")
+        self.assertEqual(m.headers, "Subject: Hi")
+
+    def test_a_feeder_mail_stored_under_its_submission_prefix(self):
+        client = fake_store({"feeder": {
+            f"Haruto_Sato-1/{MAIL}/{MAIL}.headers": b"Subject: Hi",
+            f"Haruto_Sato-1/{MAIL}/attachments/invoice.pdf": b"%PDF-1.4",
+            f"Other-2/{MAIL}/{MAIL}.headers": b"not this one",
+        }})
+        with patch("settings.config.get_section", return_value={"feeder_bucket": "feeder"}):
+            m = fetch_mail_material(client, MAIL, "Haruto_Sato-1")
+        self.assertEqual(m.headers, "Subject: Hi")
+        self.assertEqual([a.name for a in m.attachments], ["invoice.pdf"])
+
+    def test_a_submission_with_no_stored_object_gives_empty_material(self):
+        client = fake_store({"feeder": {"Other-2/x/x.headers": b"x"}})
+        with patch("settings.config.get_section", return_value={"feeder_bucket": "feeder"}):
+            m = fetch_mail_material(client, MAIL, "Haruto_Sato-1")
+        self.assertEqual((m.headers, m.text, m.eml, m.attachments), ("", "", b"", []))
+
+    def test_a_store_outage_propagates(self):
+        client = fake_store({})
+        client.list_buckets = client.bucket_exists = lambda *a: (_ for _ in ()).throw(StoreError("unavailable"))
+        for bucket_name in ("", "haruto-submission-261007071836"):
+            with self.subTest(bucket_name=bucket_name), self.assertRaises(StoreError):
+                fetch_mail_material(client, MAIL, bucket_name)
 
 
 def _att(name, data):

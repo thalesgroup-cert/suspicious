@@ -106,17 +106,23 @@ def all_artifacts_listed(mail, company_domains) -> bool:
     return True
 
 
-def read_mail_headers(store, mail_id: str) -> str:
-    from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import _find_mail_bucket, _read_object_safe
+def read_mail_headers(store, mail) -> str:
+    """The mail's ``.headers``: from the object store, in the submission's layout
+    (``MailArchive.bucket_name``, see find_mail_prefix), else from the submission's tar archive
+    (a web upload's store prefix is not recorded on the mail). "" when neither holds it. Store
+    errors propagate."""
+    from connectors.contrib.ai_model.mailtext import _read_tar
+    from mail_feeder.models import MailArchive
+    from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import _read_object_safe, find_mail_prefix
 
-    bucket = _find_mail_bucket(store, mail_id)
-    if not bucket:
-        return ""
-    prefix = f"{mail_id}/"
-    for obj in store.list(bucket, prefix=prefix, recursive=True):
-        if obj.name.endswith(".headers"):
-            return _read_object_safe(store, bucket, obj.name).decode("utf-8", "replace")
-    return ""
+    mail_archive = MailArchive.objects.select_related("archive").filter(mail=mail).first()
+    location = find_mail_prefix(store, str(mail.mail_id), getattr(mail_archive, "bucket_name", "") or "")
+    if location:
+        bucket, prefix = location
+        for obj in store.list(bucket, prefix=prefix, recursive=True):
+            if obj.name.endswith(".headers"):
+                return _read_object_safe(store, bucket, obj.name).decode("utf-8", "replace")
+    return _read_tar(mail_archive)[0] if mail_archive is not None else ""
 
 
 def ai_may_be_overruled(case) -> bool:
@@ -132,7 +138,7 @@ def ai_may_be_overruled(case) -> bool:
         from connectors.contrib.misp.internal import company_domains
 
         domains = company_domains()
-        headers = read_mail_headers(get_store(), str(mail.mail_id))
+        headers = read_mail_headers(get_store(), mail)
         return authenticated_company_sender(headers, trusted, domains) and all_artifacts_listed(mail, domains)
     except Exception:  # noqa: BLE001 — a security relaxation must never depend on a lucky read
         logger.exception("trusted-sender check failed for case %s; not overruling the AI", getattr(case, "id", "?"))

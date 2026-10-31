@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 
 from common.storage import StoreError
 from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import (
-    _find_mail_bucket,
     _read_object_safe,
+    find_mail_prefix,
 )
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -40,14 +40,15 @@ class MailMaterial:
     attachments: list[Attachment] = field(default_factory=list)
 
 
-def fetch_mail_material(client, mail_id: str) -> MailMaterial:
-    """Read the mail's stored parts and attachments; empty material if not found."""
+def fetch_mail_material(client, mail_id: str, bucket_name: str = "") -> MailMaterial:
+    """Read the mail's stored parts and attachments; empty material if not found.
+    ``bucket_name`` is the mail's ``MailArchive.bucket_name`` (see find_mail_prefix)."""
     material = MailMaterial()
-    bucket = _find_mail_bucket(client, mail_id)
-    if not bucket:
+    location = find_mail_prefix(client, mail_id, bucket_name)
+    if not location:
         logger.warning("campaign material: no bucket holds mail %s", mail_id)
         return material
-    prefix = f"{mail_id}/"
+    bucket, prefix = location
     for obj in client.list(bucket, prefix=prefix, recursive=True):
         rel = obj.name[len(prefix):]
         try:

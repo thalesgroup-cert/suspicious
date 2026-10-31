@@ -166,3 +166,90 @@ class AiVoteWiringTest(TestCase):
              patch("score_process.scoring.trusted_sender.ai_may_be_overruled") as chk:
             collect_votes(self.case, AiSignal(score=0, confidence=90))
         chk.assert_not_called()
+
+
+class ReadMailHeadersTest(TestCase):
+    MAIL = "261007071836-7a54e9fcb2f6"
+
+    def setUp(self):
+        self.mail = Mail.objects.create(subject="s", reportedBy="r", date="2026-01-01T00:00:00Z", to="t",
+                                        mail_id=self.MAIL)
+
+    def store(self, buckets):
+        import io
+
+        from common.storage.fake import FakeObjectStore
+
+        store = FakeObjectStore()
+        for bucket, objects in buckets.items():
+            store.ensure_bucket(bucket)
+            for name, data in objects.items():
+                store.put(bucket, name, io.BytesIO(data), length=len(data))
+        return store
+
+    def archive(self, bucket_name="", members=None):
+        import io
+        import os
+        import tarfile
+        import tempfile
+
+        from file_process.models import File
+        from hash_process.models import Hash
+        from mail_feeder.models import MailArchive
+
+        stored = None
+        if members is not None:
+            fd, path = tempfile.mkstemp(suffix=".tar.gz")
+            os.close(fd)
+            self.addCleanup(os.remove, path)
+            with tarfile.open(path, "w:gz") as tar:
+                for name, data in members.items():
+                    info = tarfile.TarInfo(name)
+                    info.size = len(data)
+                    tar.addfile(info, io.BytesIO(data))
+            stored = File.objects.create(linked_hash=Hash.objects.create(value="h-ts"), tmp_path=path)
+        return MailArchive.objects.create(mail=self.mail, archive=stored, bucket_name=bucket_name)
+
+    def read(self, store):
+        return trusted_sender.read_mail_headers(store, self.mail)
+
+    def test_the_legacy_bucket_named_after_the_submission(self):
+        self.archive("haruto-submission-261007071836")
+        store = self.store({"haruto-submission-261007071836": {f"{self.MAIL}/{self.MAIL}.headers": b"From: a@corp.test"}})
+        self.assertEqual(self.read(store), "From: a@corp.test")
+
+    def test_a_feeder_mail_stored_under_its_submission_prefix(self):
+        self.archive("Haruto_Sato-1")
+        store = self.store({"feeder": {f"Haruto_Sato-1/{self.MAIL}/{self.MAIL}.headers": b"From: a@corp.test"}})
+        with patch("settings.config.get_section", return_value={"feeder_bucket": "feeder"}):
+            self.assertEqual(self.read(store), "From: a@corp.test")
+
+    def test_a_web_upload_is_read_from_its_submission_archive(self):
+        self.archive("", {"./ref.txt": b"body", "./ref.headers": b"From: a@corp.test"})
+        self.assertEqual(self.read(self.store({"mail-submissions": {"x-submission-1-ab/ref.headers": b"no"}})),
+                         "From: a@corp.test")
+
+    def test_a_mail_with_no_stored_object_and_no_archive_has_no_headers(self):
+        self.archive("Haruto_Sato-1")
+        with patch("settings.config.get_section", return_value={"feeder_bucket": "feeder"}):
+            self.assertEqual(self.read(self.store({"feeder": {}})), "")
+        self.assertEqual(self.read(self.store({})), "")
+
+    def test_a_store_outage_propagates_and_the_ai_is_not_overruled(self):
+        from common.storage import StoreError
+
+        self.archive("Haruto_Sato-1", {"./ref.txt": b"body", "./ref.headers": headers(PASS).encode()})
+        store = self.store({})
+        store.list_buckets = store.bucket_exists = lambda *a: (_ for _ in ()).throw(StoreError("unavailable"))
+        with self.assertRaises(StoreError):
+            self.read(store)
+        case = Case.objects.create(description="", reporter=get_user_model().objects.create_user(username="ts_o", password="x"))
+        from case_handler.models import CaseHasFileOrMail
+
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=self.mail)
+        case.save(update_fields=["fileOrMail"])
+        with patch.object(trusted_sender, "get_config", return_value=TRUSTED), \
+             patch("common.storage.get_store", return_value=store), \
+             patch("connectors.contrib.misp.internal.company_domains", return_value=COMPANY), \
+             patch.object(trusted_sender, "all_artifacts_listed", return_value=True):
+            self.assertFalse(trusted_sender.ai_may_be_overruled(case))

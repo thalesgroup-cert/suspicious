@@ -54,6 +54,25 @@ def _find_mail_bucket(client: ObjectStore, mail_id: str) -> Optional[str]:
     return None
 
 
+def find_mail_prefix(client: ObjectStore, mail_id: str, bucket_name: str = "") -> Optional[Tuple[str, str]]:
+    """(bucket, ``<...><mail_id>/``) holding the mail's objects, None when no store location does.
+    ``bucket_name`` is ``MailArchive.bucket_name``: the submission is looked up as
+    fetch_mail_text_from_minio does, then by the mail id's timestamp suffix. A store error other
+    than not_found propagates."""
+    location = resolve_submission_location(client, bucket_name) if bucket_name else None
+    if location:
+        bucket, base = location
+        prefix = "%s%s/" % (base, mail_id)
+        try:
+            if any(True for _ in client.list(bucket, prefix=prefix)):
+                return bucket, prefix
+        except StoreError as exc:
+            if exc.code != "not_found":
+                raise
+    bucket = _find_mail_bucket(client, mail_id)
+    return (bucket, "%s/" % mail_id) if bucket else None
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def fetch_mail_files_from_minio(
