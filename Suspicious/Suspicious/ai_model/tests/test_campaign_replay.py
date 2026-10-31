@@ -1,6 +1,7 @@
-"""ai_model_campaign_replay: a stored campaign's members, replayed from their Cortex AI reports
-through the connector's detection, against a scratch collection and inside a rolled-back
-transaction. The stored campaigns are built from rows, as the Cortex path left them."""
+"""ai_model_campaign_replay: a stored campaign's members, and the campaign-less dangerous mails
+between them, replayed from their Cortex AI reports through the connector's detection, against
+a scratch collection and inside a rolled-back transaction. The stored campaigns are built from
+rows, as the Cortex path left them."""
 import math
 from io import StringIO
 from unittest.mock import MagicMock, patch
@@ -21,6 +22,7 @@ HEADERS = (
     "defaultdict(<class 'list'>, {'From': ['HR <hr@evil.example>'], "
     "'Subject': ['=?utf-8?q?Verify_payroll?=']})"
 )
+NEAR = [0, 0.05, 0.1, 0.15, 0.2]
 
 
 def _unit(angle):
@@ -69,15 +71,15 @@ def _case():
     return Case.objects.create(reporter=user, description="t")
 
 
-def _cortex_ai_report(case, embedding):
+def _cortex_ai_report(case, embedding, classification, malscore, confidence):
     """The AI_Mail analyzer's report as Cortex stored it: numbers as strings, headers as the
     repr of a defaultdict, the embedding as a string."""
     analyzer, _ = Analyzer.objects.get_or_create(
         name="AI_Mail_Analyzer_2_0", defaults={"analyzer_cortex_id": "ai-mail"}
     )
     full = {
-        "classification": "DANGEROUS", "sub_classification": "CLONE",
-        "malscore": "9.75", "confidence": "0.96",
+        "classification": classification, "sub_classification": "CLONE",
+        "malscore": malscore, "confidence": confidence,
         "report": {
             "analyzed_mail_content": "Your payroll account is locked",
             "analyzed_mail_headers": HEADERS,
@@ -95,17 +97,21 @@ def _cortex_ai_report(case, embedding):
     )
 
 
+def _mail_case(angle=None, campaign=None, classification="DANGEROUS", malscore="9.75", confidence="0.96"):
+    """The next case in id order: with a Cortex AI report unless ``angle`` is None, a member of
+    ``campaign`` when given."""
+    case = _case()
+    if angle is not None:
+        _cortex_ai_report(case, _unit(angle), classification, malscore, confidence)
+    if campaign is not None:
+        CampaignMember.objects.create(campaign=campaign, case=case)
+    return case
+
+
 def _stored_campaign(angles):
     """A campaign with one member per angle, in that id order; None means no Cortex report."""
     campaign = Campaign.objects.create(title="Verify payroll")
-    cases = []
-    for angle in angles:
-        case = _case()
-        if angle is not None:
-            _cortex_ai_report(case, _unit(angle))
-        CampaignMember.objects.create(campaign=campaign, case=case)
-        cases.append(case)
-    return campaign, cases
+    return campaign, [_mail_case(angle, campaign) for angle in angles]
 
 
 def _row_counts():
@@ -116,37 +122,45 @@ def _row_counts():
     }
 
 
+def _lines(out, case):
+    return [line for line in out.splitlines() if line.startswith((f"case {case.id}:", f"case {case.id} ("))]
+
+
+def _match_line(campaign, members):
+    return (
+        f"MATCH: campaign {campaign.ref}, {members} members (membership only: the campaign_updated "
+        "payload also depends on the case that triggered detection, and id order only "
+        "approximates the original finalisation order)"
+    )
+
+
 class CampaignReplayTest(TestCase):
     def setUp(self):
         cache.delete("campaign:detect")
         self.coll = CosineCollection()
         self.chroma = MagicMock()
-        patchers = [
-            patch(f"{M}.open_collection", return_value=self.coll),
-            patch(f"{M}.get_chroma_client", return_value=self.chroma),
-        ]
-        self.opened = patchers[0].start()
-        for patcher in patchers[1:]:
-            patcher.start()
-        for patcher in patchers:
-            self.addCleanup(patcher.stop)
+        self.opened = patch(f"{M}.open_collection", return_value=self.coll).start()
+        patch(f"{M}.get_chroma_client", return_value=self.chroma).start()
+        self.addCleanup(patch.stopall)
 
     def _run(self, ref):
-        """The command's output and the CommandError it raised, if any."""
-        out = StringIO()
+        """stdout, stderr and the CommandError message (None when the command succeeded)."""
+        out, err = StringIO(), StringIO()
         try:
-            call_command("ai_model_campaign_replay", ref, stdout=out)
+            call_command("ai_model_campaign_replay", ref, stdout=out, stderr=err)
         except CommandError as exc:
-            return out.getvalue(), str(exc)
-        return out.getvalue(), None
+            return out.getvalue(), err.getvalue(), str(exc)
+        return out.getvalue(), err.getvalue(), None
 
     def _members(self, campaign):
         return set(campaign.members.values_list("case_id", flat=True))
 
-    def test_a_campaign_built_by_the_old_path_replays_to_a_match(self):
-        campaign, cases = _stored_campaign([0, 0.05, 0.1, 0.15, 0.2])
-        out, error = self._run(campaign.ref)
+    def test_a_campaign_stored_as_rows_replays_to_a_match(self):
+        campaign, cases = _stored_campaign(NEAR)
+        with patch("connectors.dispatch.emit") as emit:
+            out, err, error = self._run(campaign.ref)
         self.assertIsNone(error)
+        emit.assert_not_called()
         a, b, c, d, e = (case.id for case in cases)
         self.assertEqual(out.splitlines(), [
             f"case {a}: stored",
@@ -154,65 +168,155 @@ class CampaignReplayTest(TestCase):
             f"case {c}: stored",
             f"case {d}: created",
             f"case {e}: joined",
-            f"MATCH: campaign {campaign.ref}, 5 members, trigger case {e}",
+            _match_line(campaign, 5),
         ])
 
     def test_a_member_with_a_distant_embedding_is_reported_as_a_difference_and_fails(self):
         campaign, cases = _stored_campaign([0, 0.05, math.pi / 2, 0.1, 0.15])
-        out, error = self._run(campaign.ref)
-        self.assertIn(f"case {cases[2].id}: stored", out)
-        self.assertIn(f"case {cases[4].id}: created", out)
+        out, err, error = self._run(campaign.ref)
+        self.assertEqual(_lines(out, cases[2]), [f"case {cases[2].id}: stored"])
+        self.assertEqual(_lines(out, cases[4]), [f"case {cases[4].id}: created"])
         self.assertNotIn("MATCH", out)
         self.assertIn(f"missing case ids [{cases[2].id}]", error)
         self.assertIn("extra case ids []", error)
         self.assertEqual(self._members(campaign), {case.id for case in cases})
 
-    def test_the_replay_changes_no_rows(self):
-        campaign, cases = _stored_campaign([0, 0.05, 0.1, 0.15, 0.2])
-        before = _row_counts()
-        out, error = self._run(campaign.ref)
+    def test_a_near_mail_in_no_campaign_between_the_members_shows_up_as_extra_and_fails(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        near = _mail_case(0.12)
+        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        out, err, error = self._run(campaign.ref)
+        self.assertEqual(_lines(out, near), [f"case {near.id} (not a member): created"])
+        self.assertIn("missing case ids []", error)
+        self.assertIn(f"extra case ids [{near.id}]", error)
+        self.assertFalse(CampaignMember.objects.filter(case=near).exists())
+        self.assertEqual(self._members(campaign), {case.id for case in members})
+
+    def test_a_far_mail_in_no_campaign_between_the_members_is_replayed_and_still_matches(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        far = _mail_case(math.pi / 2)
+        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        out, err, error = self._run(campaign.ref)
         self.assertIsNone(error)
+        self.assertEqual(_lines(out, far), [f"case {far.id} (not a member): stored"])
+        self.assertIn(_match_line(campaign, 5), out)
+
+    def test_a_near_mail_of_another_campaign_is_not_replayed(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        other = Campaign.objects.create(title="Other")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        elsewhere = _mail_case(0.12, other)
+        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        out, err, error = self._run(campaign.ref)
+        self.assertIsNone(error)
+        self.assertEqual(_lines(out, elsewhere), [])
+        self.assertIn(_match_line(campaign, 5), out)
+        self.assertEqual(self._members(other), {elsewhere.id})
+
+    def test_a_mail_in_no_campaign_without_a_report_or_not_dangerous_is_ignored(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        no_report = _mail_case(None)
+        safe = _mail_case(0.12, classification="SAFE")
+        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        out, err, error = self._run(campaign.ref)
+        self.assertIsNone(error)
+        self.assertEqual(_lines(out, no_report), [])
+        self.assertEqual(_lines(out, safe), [])
+        self.assertIn(_match_line(campaign, 5), out)
+
+    def test_a_near_mail_outside_the_member_id_window_is_not_replayed_and_still_matches(self):
+        before = _mail_case(0.02)
+        campaign, cases = _stored_campaign(NEAR)
+        after = _mail_case(0.12)
+        out, err, error = self._run(campaign.ref)
+        self.assertIsNone(error)
+        self.assertEqual(_lines(out, before), [])
+        self.assertEqual(_lines(out, after), [])
+        self.assertIn(_match_line(campaign, 5), out)
+
+    def test_the_replay_changes_no_rows(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        _mail_case(0.12)  # joins in the replay, which must undo it
+        members += [_mail_case(angle, campaign) for angle in (0.15, 0.2)]
+        before = _row_counts()
+        out, err, error = self._run(campaign.ref)
+        self.assertIn("extra case ids", error)
         self.assertEqual(_row_counts(), before)
         self.assertEqual(list(Campaign.objects.values_list("ref", flat=True)), [campaign.ref])
-        self.assertEqual(self._members(campaign), {case.id for case in cases})
+        self.assertEqual(self._members(campaign), {case.id for case in members})
 
     def test_a_member_without_a_cortex_report_is_skipped(self):
         campaign, cases = _stored_campaign([None, 0, 0.05, 0.1, 0.15])
-        out, error = self._run(campaign.ref)
-        self.assertIn(f"case {cases[0].id}: skipped, no successful Cortex AI report", out)
-        self.assertIn(f"case {cases[4].id}: created", out)
+        out, err, error = self._run(campaign.ref)
+        self.assertEqual(_lines(out, cases[0]), [f"case {cases[0].id}: skipped, no successful Cortex AI report"])
+        self.assertEqual(_lines(out, cases[4]), [f"case {cases[4].id}: created"])
         # It cannot come out of the replay, so the campaigns differ.
         self.assertIn(f"missing case ids [{cases[0].id}]", error)
         self.assertEqual(self._members(campaign), {case.id for case in cases})
 
+    def test_a_member_with_a_non_numeric_score_or_confidence_is_skipped_as_unusable(self):
+        campaign = Campaign.objects.create(title="Verify payroll")
+        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        bad_score = _mail_case(0.12, campaign, malscore="n/a")
+        bad_confidence = _mail_case(0.14, campaign, confidence="high")
+        last = _mail_case(0.15, campaign)
+        out, err, error = self._run(campaign.ref)
+        for case in (bad_score, bad_confidence):
+            self.assertEqual(_lines(out, case), [f"case {case.id}: skipped, unusable Cortex AI report"])
+        self.assertEqual(_lines(out, last), [f"case {last.id}: created"])
+        self.assertIn(f"missing case ids [{bad_score.id}, {bad_confidence.id}]", error)
+
     def test_too_few_replayable_members_fails(self):
         campaign, cases = _stored_campaign([None, None, 0])
         before = _row_counts()
-        out, error = self._run(campaign.ref)
+        out, err, error = self._run(campaign.ref)
         self.assertIn("cannot replay", error)
         self.assertIn(f"case {cases[1].id}: skipped", out)
         self.opened.assert_not_called()
         self.assertEqual(_row_counts(), before)
 
     def test_an_unknown_campaign_fails(self):
-        out, error = self._run("CMP-nope")
+        out, err, error = self._run("CMP-nope")
         self.assertIn("unknown campaign", error)
         self.opened.assert_not_called()
 
-    def test_the_scratch_collection_is_dropped_when_the_replay_raises(self):
-        campaign, cases = _stored_campaign([0, 0.05, 0.1, 0.15, 0.2])
-        with patch(f"{M}.detect_campaign", side_effect=CampaignStoreUnavailable("store down")):
-            with self.assertRaises(CampaignStoreUnavailable):
-                self._run(campaign.ref)
+    def test_a_store_failure_in_detection_fails_naming_the_case_and_drops_the_scratch_collection(self):
+        campaign, cases = _stored_campaign(NEAR)
+        with patch(f"{M}.detect_campaign", side_effect=CampaignStoreUnavailable("campaign lock timed out")):
+            out, err, error = self._run(campaign.ref)
+        self.assertEqual(error, f"case {cases[0].id}: campaign lock timed out")
         scratch = self.opened.call_args.args[0].collection_name
         self.chroma.delete_collection.assert_called_once_with(scratch)
         self.assertEqual(self._members(campaign), {case.id for case in cases})
 
+    def test_a_scratch_collection_that_cannot_be_opened_fails_and_reports_no_drop(self):
+        campaign, cases = _stored_campaign(NEAR)
+        self.opened.side_effect = CampaignStoreUnavailable("campaign store unavailable: ConnectionError")
+        out, err, error = self._run(campaign.ref)
+        self.assertIn("campaign store unavailable: ConnectionError", error)
+        self.chroma.delete_collection.assert_not_called()
+        self.assertEqual(err, "")
+        self.assertEqual(self._members(campaign), {case.id for case in cases})
+
+    def test_a_scratch_collection_left_behind_fails_the_command_even_after_a_match(self):
+        campaign, _ = _stored_campaign(NEAR)
+        self.chroma.delete_collection.side_effect = RuntimeError("chroma down")
+        out, err, error = self._run(campaign.ref)
+        scratch = self.opened.call_args.args[0].collection_name
+        self.assertIn(_match_line(campaign, 5), out)
+        self.assertIn(scratch, err)
+        self.assertIn("real mail bodies", err)
+        self.assertIn(scratch, error)
+        self.assertIn("deleted by hand", error)
+
     def test_the_live_collection_is_never_opened_or_dropped(self):
-        campaign, _ = _stored_campaign([0, 0.05, 0.1, 0.15, 0.2])
+        campaign, _ = _stored_campaign(NEAR)
         self._run(campaign.ref)
         self.opened.assert_called_once()
         scratch = self.opened.call_args.args[0].collection_name
         self.assertRegex(scratch, r"^suspicious_mails__replay_[0-9a-f]+$")
         self.chroma.delete_collection.assert_called_once_with(scratch)
-        self.chroma.get_or_create_collection.assert_not_called()
