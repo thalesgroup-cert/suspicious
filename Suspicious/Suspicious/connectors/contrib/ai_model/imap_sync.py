@@ -44,6 +44,14 @@ class ImapLoginFailed(Exception):
     retryable = False  # run_sync_now records the failure without retrying
 
 
+class ImapTlsFailed(Exception):
+    """The TLS handshake or the certificate check failed. The message is the exception class name
+    only. Fatal for the run and not retried: an untrusted certificate (an internal CA missing from
+    the container's trust store) or a TLS mismatch needs an operator."""
+
+    retryable = False
+
+
 def _shown(folder: str) -> str:
     """The folder name for errors and logs: ascii() form, at most 64 characters."""
     return ascii(folder)[:64]
@@ -63,9 +71,13 @@ class ReviewMail:
 
 
 def connect(host, port, user, password, use_ssl, timeout=30):
-    """A logged-in IMAP4_SSL (certificate verified) or IMAP4 client; ImapLoginFailed on login."""
+    """A logged-in IMAP4_SSL (certificate verified against the system CA store) or IMAP4 client;
+    ImapTlsFailed on a TLS or certificate failure, ImapLoginFailed on login."""
     if use_ssl:
-        client = imaplib.IMAP4_SSL(host, port, ssl_context=ssl.create_default_context(), timeout=timeout)
+        try:
+            client = imaplib.IMAP4_SSL(host, port, ssl_context=ssl.create_default_context(), timeout=timeout)
+        except (ssl.SSLError, ssl.CertificateError) as exc:  # the server's text stays out
+            raise ImapTlsFailed(type(exc).__name__) from None
     else:
         client = imaplib.IMAP4(host, port, timeout=timeout)
     try:
@@ -234,7 +246,7 @@ def _read_folder(imap, folder, since_uid, limit, known_uidvalidity):
         try:
             mail = _review_mail(raw, folder, uidvalidity, uid) if raw else None
         except Exception as exc:  # untrusted mail: any parse failure is one skipped mail
-            logger.info("ai_model imap: skipped a mail in %s (%s)", folder, type(exc).__name__)
+            logger.info("ai_model imap: skipped a mail in %s (%s)", _shown(folder), type(exc).__name__)
             mail = None
         if mail is None:
             skipped += 1

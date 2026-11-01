@@ -285,3 +285,37 @@ class ConnectTest(SimpleTestCase):
 class LoginFailedTest(SimpleTestCase):
     def test_a_login_failure_is_not_retried(self):
         self.assertIs(imap_sync.ImapLoginFailed("error").retryable, False)
+
+
+class TlsFailedTest(SimpleTestCase):
+    """Fix wave 8: a TLS failure is its own non-retryable error carrying the class name only."""
+
+    def test_a_certificate_failure_raises_imap_tls_failed(self):
+        import ssl
+        error = ssl.SSLCertVerificationError("certificate verify failed: self-signed imap.corp.example")
+        with mock.patch.object(imap_sync.imaplib, "IMAP4_SSL", side_effect=error):
+            with self.assertRaises(imap_sync.ImapTlsFailed) as ctx:
+                imap_sync.connect("imap.corp.example", 993, "u", "p", True)
+        self.assertEqual(str(ctx.exception), "SSLCertVerificationError")
+        self.assertIs(ctx.exception.retryable, False)
+        self.assertIsNone(ctx.exception.__cause__)
+        self.assertTrue(ctx.exception.__suppress_context__)
+
+    def test_other_ssl_errors_too(self):
+        import ssl
+        with mock.patch.object(imap_sync.imaplib, "IMAP4_SSL", side_effect=ssl.SSLError("wrong version")):
+            with self.assertRaises(imap_sync.ImapTlsFailed) as ctx:
+                imap_sync.connect("imap.example", 993, "u", "p", True)
+        self.assertEqual(str(ctx.exception), "SSLError")
+
+
+class SkipLogTest(SimpleTestCase):
+    def test_a_skipped_mail_log_shows_the_folder_in_its_short_form(self):
+        folder = "INBOX." + "x" * 80
+        imap = FakeImap({folder: {"uidvalidity": 1, "messages": {1: b"anything"}}})
+        with mock.patch.object(imap_sync, "_review_mail", side_effect=ValueError("bad")), \
+                self.assertLogs("connectors.contrib.ai_model", "INFO") as logs:
+            read_folder(imap, folder, since_uid=0, limit=10)
+        line = next(m for m in logs.output if "skipped a mail" in m)
+        self.assertIn(imap_sync._shown(folder), line)
+        self.assertNotIn(folder, line)

@@ -84,7 +84,8 @@ class Command(BaseCommand):
                 connector.sync(unlimited=True)
             except LabelSyncIncomplete as exc:
                 raise CommandError(f"LabelSyncIncomplete: {exc}") from None
-            except (imap_sync.ImapLoginFailed, imap_sync.ImapConnectionLost, ProviderUnavailable) as exc:
+            except (imap_sync.ImapLoginFailed, imap_sync.ImapTlsFailed, imap_sync.ImapConnectionLost,
+                    ProviderUnavailable) as exc:
                 raise CommandError(type(exc).__name__) from None
             self.stdout.write(f"folders synced: {folder_rows.count() - before} folder row(s) created")
 

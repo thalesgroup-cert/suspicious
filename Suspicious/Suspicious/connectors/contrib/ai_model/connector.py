@@ -201,8 +201,9 @@ class AiModelConnector(Connector):
         Celery's 540 s soft limit, also between embed batches (the cut chunk is not committed);
         unlimited (the backfill command) lifts the per-folder cap and the time budget. A folder
         that cannot be read is skipped. A folder whose embed is refused (4xx, inconsistent answer) is skipped too, and once the other
-        folders ran LabelSyncIncomplete (not retried) fails the delivery. A failed login, a lost
-        connection or an unavailable embed endpoint raises at once and fails the run.
+        folders ran LabelSyncIncomplete (not retried) fails the delivery; so does a folder list
+        with no known folder, before connecting. A failed login or TLS handshake (not retried), a
+        lost connection or an unavailable embed endpoint raises at once and fails the run.
         """
         host = self.config.get("imap_host")
         if not host:

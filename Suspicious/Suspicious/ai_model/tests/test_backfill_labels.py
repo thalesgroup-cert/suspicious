@@ -89,7 +89,8 @@ class BackfillLabelsTest(CaseMixin, TestCase):
 
     def test_folder_sync_failures_become_command_errors_with_the_class_only(self):
         connector = AiModelConnector(CONFIG)
-        for exc in (imap_sync.ImapLoginFailed("pw imap-pa55"), imap_sync.ImapConnectionLost("reviewer")):
+        for exc in (imap_sync.ImapLoginFailed("pw imap-pa55"), imap_sync.ImapConnectionLost("reviewer"),
+                    imap_sync.ImapTlsFailed("SSLCertVerificationError")):
             with mock.patch("connectors.registry.registry.instantiate", return_value=connector), \
                     mock.patch.object(imap_sync, "connect", side_effect=exc):
                 with self.assertRaises(CommandError) as caught:
