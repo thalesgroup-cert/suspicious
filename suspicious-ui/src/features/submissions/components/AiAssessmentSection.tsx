@@ -36,7 +36,7 @@ export function AiAssessmentSection({ assessment: a }: { assessment: AiAssessmen
         <Typography variant="body2">Runner-up: {a.runner_up.result}</Typography>
       )}
       <Typography variant="caption" color="text.secondary">
-        Model {a.model_version}, analysed {relativeTime(a.analysed_at, new Date())}. Reads the mail: {a.reads}.
+        Model {a.model_version}{Number.isNaN(Date.parse(a.analysed_at)) ? "" : `, analysed ${relativeTime(a.analysed_at, new Date())}`}. Reads the mail: {a.reads}.
       </Typography>
       {a.campaign && (
         <Typography variant="body2">{`Campaign ${a.campaign.ref}, ${a.campaign.size} ${a.campaign.size === 1 ? "mail" : "mails"}`}</Typography>

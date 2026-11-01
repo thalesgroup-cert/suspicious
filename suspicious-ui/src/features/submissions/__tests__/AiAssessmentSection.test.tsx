@@ -112,3 +112,10 @@ test("campaign line pluralises; disagreement and facts list", () => {
   rerender(<AiAssessmentSection assessment={{ ...base, campaign: { ref: "r", size: 1 } }} />);
   expect(screen.getByText("Campaign r, 1 mail")).toBeInTheDocument();
 });
+
+test.each([[""], ["not a date"]])("omits the age when analysed_at is %j", (analysed_at) => {
+  const { container } = render(<AiAssessmentSection assessment={{ ...base, analysed_at }} />);
+  expect(screen.getByText(/Model v1\.2\./)).toBeInTheDocument();
+  expect(container.textContent).not.toContain("analysed");
+  expect(container.textContent).not.toContain("not checked yet");
+});
