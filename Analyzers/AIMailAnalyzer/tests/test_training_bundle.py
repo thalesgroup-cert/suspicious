@@ -3,6 +3,11 @@ import json
 import os
 import re
 import shutil
+import signal
+import subprocess
+import sys
+import textwrap
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -94,17 +99,17 @@ def test_write_is_atomic_and_leaves_no_temp(tmp_path):
 
 
 def test_flipped_byte_in_head(bdir):
-    p = bdir / "heads" / "safe.pth"
+    p = bdir / "heads" / "safe.npz"
     raw = bytearray(p.read_bytes())
     raw[len(raw) // 2] ^= 1
     p.write_bytes(bytes(raw))
-    with pytest.raises(BundleError, match="safe.pth"):
+    with pytest.raises(BundleError, match="safe.npz"):
         rb(bdir)
 
 
 def test_missing_head(bdir):
-    (bdir / "heads" / "safe.pth").unlink()
-    with pytest.raises(BundleError, match="safe.pth"):
+    (bdir / "heads" / "safe.npz").unlink()
+    with pytest.raises(BundleError, match="safe.npz"):
         rb(bdir)
 
 
@@ -113,12 +118,12 @@ def test_extra_file(bdir):
     with pytest.raises(BundleError, match="extra.txt"):
         rb(bdir)
     (bdir / "extra.txt").unlink()
-    (bdir / "heads" / "evil.pth").write_bytes(b"x")
-    with pytest.raises(BundleError, match="evil.pth"):
+    (bdir / "heads" / "evil.npz").write_bytes(b"x")
+    with pytest.raises(BundleError, match="evil.npz"):
         rb(bdir)
 
 
-@pytest.mark.parametrize("name", ["../x.pth", "/etc/passwd", "heads/sub/a.pth", "heads\\a.pth"])
+@pytest.mark.parametrize("name", ["../x.npz", "/etc/passwd", "heads/sub/a.npz", "heads\\a.npz"])
 def test_bad_name_in_manifest(bdir, name):
     _rewrite_manifest(bdir, lambda m: m["files"].__setitem__(name, "0" * 64))
     with pytest.raises(BundleError):
@@ -126,8 +131,8 @@ def test_bad_name_in_manifest(bdir, name):
 
 
 def test_manifest_lists_file_not_on_disk(bdir):
-    _rewrite_manifest(bdir, lambda m: m["files"].__setitem__("heads/ghost.pth", "0" * 64))
-    with pytest.raises(BundleError, match="ghost.pth"):
+    _rewrite_manifest(bdir, lambda m: m["files"].__setitem__("heads/ghost.npz", "0" * 64))
+    with pytest.raises(BundleError, match="ghost.npz"):
         rb(bdir)
 
 
@@ -176,53 +181,9 @@ def test_truncated_npz(bdir):
         rb(bdir)
 
 
-def test_head_not_a_state_dict(bdir):
-    torch.save({"fc1.weight": [1, 2]}, bdir / "heads" / "safe.pth")
-    _rehash(bdir, "heads/safe.pth")
-    with pytest.raises(BundleError, match="safe.pth"):
-        rb(bdir)
-
-
-def test_head_wrong_shape(bdir):
-    sd = ResNetMLP(DIM + 3, 2).state_dict()
-    torch.save(sd, bdir / "heads" / "safe.pth")
-    _rehash(bdir, "heads/safe.pth")
-    with pytest.raises(BundleError, match="safe.pth"):
-        rb(bdir)
-
-
 class _Evil:
     def __reduce__(self):
         return (Path(os.environ["MARKER"]).write_text, ("pwned",))
-
-
-def test_pickle_in_pth_not_executed(bdir, tmp_path, monkeypatch):
-    marker = tmp_path / "marker"
-    monkeypatch.setenv("MARKER", str(marker))
-    torch.save(_Evil(), bdir / "heads" / "safe.pth")
-    _rehash(bdir, "heads/safe.pth")
-    with pytest.raises(BundleError, match="safe.pth"):
-        rb(bdir)
-    assert not marker.exists()
-
-
-def test_torch_load_always_weights_only(bdir):
-    real = torch.load
-    calls = []
-
-    def spy(*a, **k):
-        calls.append(k)
-        return real(*a, **k)
-
-    with mock.patch.object(torch, "load", spy):
-        rb(bdir)
-    assert len(calls) == len(HEADS) and all(c.get("weights_only") is True for c in calls)
-
-
-def test_torch_load_only_in_bundle():
-    root = Path(bundle_mod.__file__).parent
-    users = [p.name for p in root.glob("*.py") if re.search(r"torch\.load\(", p.read_text())]
-    assert users == ["bundle.py"]
 
 
 def test_size_cap_total(bdir):
@@ -299,11 +260,6 @@ def test_manifest_missing_field(bdir):
 
 # --- fix wave ------------------------------------------------------------------------------------
 
-import errno
-import io
-import tracemalloc
-import zipfile
-
 
 def _rewrite_zip(path, compress, extra=None):
     with zipfile.ZipFile(path) as z:
@@ -315,42 +271,21 @@ def _rewrite_zip(path, compress, extra=None):
             z.writestr(extra[0], extra[1], compress_type=compress)
 
 
-def test_deflated_pth_member_refused_before_load(bdir):
-    p = bdir / "heads" / "safe_suspicious.pth"
+def test_deflated_head_member_refused_before_load(bdir):
+    p = bdir / "heads" / "safe_suspicious.npz"
     _rewrite_zip(p, zipfile.ZIP_DEFLATED)
-    _rehash(bdir, "heads/safe_suspicious.pth")
+    _rehash(bdir, "heads/safe_suspicious.npz")
     with mock.patch.object(torch, "load") as load:
-        with pytest.raises(BundleError, match="safe_suspicious.pth"):
+        with pytest.raises(BundleError, match="safe_suspicious.npz"):
             rb(bdir)
     load.assert_not_called()
 
 
-def test_deflate_bomb_pth_small_memory(bdir):
-    p = bdir / "heads" / "safe.pth"
-    _rewrite_zip(p, zipfile.ZIP_DEFLATED, ("archive/bomb", bytes(20 * 2**20)))
-    _rehash(bdir, "heads/safe.pth")
-    tracemalloc.start()
-    with pytest.raises(BundleError, match="safe.pth"):
-        rb(bdir)
-    peak = tracemalloc.get_traced_memory()[1]
-    tracemalloc.stop()
-    assert peak < 5 * 2**20
-
-
-def test_oversized_stored_pth_member_refused(bdir):
-    p = bdir / "heads" / "safe.pth"
+def test_oversized_stored_head_member_refused(bdir):
+    p = bdir / "heads" / "safe.npz"
     _rewrite_zip(p, zipfile.ZIP_STORED, ("archive/extra", bytes(300_000)))
-    _rehash(bdir, "heads/safe.pth")
-    with pytest.raises(BundleError, match="safe.pth"):
-        rb(bdir)
-
-
-def test_head_with_nan_refused(bdir):
-    sd = ResNetMLP(DIM, 2).state_dict()
-    sd["fc1.weight"][0, 0] = float("nan")
-    torch.save(sd, bdir / "heads" / "safe.pth")
-    _rehash(bdir, "heads/safe.pth")
-    with pytest.raises(BundleError, match="safe.pth"):
+    _rehash(bdir, "heads/safe.npz")
+    with pytest.raises(BundleError, match="safe.npz"):
         rb(bdir)
 
 
@@ -436,13 +371,6 @@ def test_write_returns_manifest_hash(tmp_path):
     assert h == hashlib.sha256((tmp_path / "b" / "manifest.json").read_bytes()).hexdigest()
 
 
-def test_fifo_refused_without_blocking(bdir):
-    (bdir / "campaign_profile.json").unlink()
-    os.mkfifo(bdir / "campaign_profile.json")
-    with pytest.raises(BundleError, match="campaign_profile.json"):
-        rb(bdir)
-
-
 def test_hard_link_refused(bdir, tmp_path):
     os.link(bdir / "campaign_profile.json", tmp_path / "other")
     with pytest.raises(BundleError, match="campaign_profile.json"):
@@ -454,23 +382,6 @@ def test_heads_symlink_refused(bdir, tmp_path):
     (bdir / "heads").symlink_to(tmp_path / "realheads")
     with pytest.raises(BundleError):
         rb(bdir)
-
-
-def test_running_total_stops_reading(bdir):
-    reads = []
-    real = os.read
-    with mock.patch.object(bundle_mod, "MAX_TOTAL", 3000), \
-            mock.patch.object(os, "read", lambda fd, n: (lambda r: (reads.append(len(r)), r)[1])(real(fd, n))):
-        with pytest.raises(BundleError, match="size"):
-            rb(bdir)
-    assert sum(reads) < 200_000  # did not read every head
-
-
-def test_attacker_names_not_echoed(bdir):
-    (bdir / "evil\x1b[31mname\n").write_text("x")
-    with pytest.raises(BundleError) as e:
-        rb(bdir)
-    assert "\x1b" not in str(e.value) and "evil" not in str(e.value)
 
 
 @pytest.mark.parametrize("temp", [{"hierarchy": 31.0, "knn": 1.0}, {"hierarchy": 0.1, "knn": 1.0}])
@@ -528,3 +439,246 @@ def test_write_fsyncs(tmp_path):
         write_bundle(tmp_path / "b", heads=heads, calibration=cal, knn=knn, campaign_profile=prof,
                      manifest=man)
     assert fs.call_count >= 9 + 3
+
+
+# --- fix wave 2 (Ruling E15: heads are npz, torch.load is gone from the bundle) ------------------
+
+def _save(path, sd):
+    np.savez(path, **{k: v.detach().numpy() if hasattr(v, "detach") else v for k, v in sd.items()})
+
+
+def _sd(dim=DIM, out=2):
+    return {k: v.clone() for k, v in ResNetMLP(dim, out).state_dict().items()}
+
+
+def _bad_head(bdir, sd):
+    _save(bdir / "heads" / "safe.npz", sd)
+    _rehash(bdir, "heads/safe.npz")
+    with pytest.raises(BundleError, match="safe.npz"):
+        rb(bdir)
+
+
+def test_head_float64_refused(bdir):
+    _bad_head(bdir, {k: v.numpy().astype(np.float64) for k, v in _sd().items()})
+
+
+def test_head_float16_refused(bdir):
+    _bad_head(bdir, {k: v.numpy().astype(np.float16) for k, v in _sd().items()})
+
+
+def test_head_missing_key_refused(bdir):
+    sd = _sd()
+    sd.pop("fc1.bias")
+    _bad_head(bdir, sd)
+
+
+def test_head_extra_key_refused(bdir):
+    sd = _sd()
+    sd["extra"] = torch.zeros(2)
+    _bad_head(bdir, sd)
+
+
+def test_head_wrong_shape_refused(bdir):
+    _bad_head(bdir, _sd(DIM + 3))
+
+
+def test_head_nan_refused(bdir):
+    sd = _sd()
+    sd["fc1.weight"][0, 0] = float("nan")
+    _bad_head(bdir, sd)
+
+
+def test_head_object_array_not_executed(bdir, tmp_path, monkeypatch):
+    marker = tmp_path / "marker"
+    monkeypatch.setenv("MARKER", str(marker))
+    sd = _sd()
+    sd["fc1.bias"] = np.array([_Evil()], dtype=object)
+    _bad_head(bdir, sd)
+    assert not marker.exists()
+
+
+class _Evil:
+    def __reduce__(self):
+        return (Path(os.environ["MARKER"]).write_text, ("pwned",))
+
+
+def test_torch_load_not_called_and_not_in_source(bdir):
+    with mock.patch.object(torch, "load", side_effect=AssertionError("torch.load called")):
+        rb(bdir)
+    assert "torch.load" not in Path(bundle_mod.__file__).read_text()
+    root = Path(bundle_mod.__file__).parent
+    assert not [p.name for p in root.glob("*.py") if "torch.load(" in p.read_text()]
+
+
+_PROBE = textwrap.dedent("""
+    import resource, sys
+    sys.path.insert(0, %r)
+    from training.bundle import read_bundle, BundleError
+    try:
+        read_bundle(sys.argv[1], manifest_sha256=sys.argv[2])
+        r = "ok"
+    except BundleError:
+        r = "refused"
+    print(r, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+""") % str(Path(bundle_mod.__file__).parent.parent)
+
+
+def _probe(d):
+    h = hashlib.sha256((d / "manifest.json").read_bytes()).hexdigest()
+    out = subprocess.run([sys.executable, "-I", "-c", _PROBE, str(d), h], capture_output=True,
+                         text=True, timeout=120, check=True).stdout.split()
+    return out[0], int(out[1]) // 1024  # MB
+
+
+def _bomb_zip(path, name="fc1.weight.npy", mb=400):
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z, z.open(name, "w", force_zip64=True) as f:
+        chunk = bytes(1 << 20)
+        for _ in range(mb):
+            f.write(chunk)
+
+
+def test_deflate_bomb_head_small_rss(bdir):
+    base = _probe(bdir)
+    assert base[0] == "ok"
+    _bomb_zip(bdir / "heads" / "safe.npz")
+    assert (bdir / "heads" / "safe.npz").stat().st_size < 3 * 2**20
+    _rehash(bdir, "heads/safe.npz")
+    res, mb = _probe(bdir)
+    assert res == "refused" and mb - base[1] < 100
+
+
+def test_fake_central_directory_before_end_record(bdir):
+    """The reviewer's differential: a bomb zip (and a forged directory) in front of the real
+    archive. Python's reader sees only the real one; either way nothing inflates."""
+    p = bdir / "heads" / "safe.npz"
+    legit = p.read_bytes()
+    _bomb_zip(bdir / "bomb.tmp")
+    bomb = (bdir / "bomb.tmp").read_bytes()
+    (bdir / "bomb.tmp").unlink()
+    i = bomb.rindex(b"PK\x01\x02")
+    forged = bomb[i:]  # central directory + end record of the bomb
+    p.write_bytes(bomb[:i] + forged[:-22] + legit)
+    _rehash(bdir, "heads/safe.npz")
+    base = _probe(bdir)
+    res, mb = _probe(bdir)
+    assert res in ("ok", "refused") and mb - base[1] < 100
+
+
+def test_fifo_refused_without_blocking(bdir):
+    (bdir / "campaign_profile.json").unlink()
+    os.mkfifo(bdir / "campaign_profile.json")
+
+    def boom(*_):
+        raise TimeoutError("read_bundle blocked on a FIFO")
+
+    old = signal.signal(signal.SIGALRM, boom)
+    signal.alarm(5)
+    try:
+        with pytest.raises(BundleError, match="campaign_profile.json"):
+            rb(bdir)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+
+
+def test_running_total_with_growing_files(bdir):
+    """Each file is under its own cap but the sum passes MAX_TOTAL: refused while reading."""
+    sizes = [(bdir / "heads" / f"{h}.npz").stat().st_size for h in HEADS]
+    limit = sum(sizes[:2]) + 10  # passes inside the third head
+    with mock.patch.object(bundle_mod, "MAX_TOTAL", limit + (bdir / "manifest.json").stat().st_size):
+        with pytest.raises(BundleError, match="total"):
+            rb(bdir)
+    with mock.patch.object(bundle_mod, "MAX_TOTAL", 10**9):
+        rb(bdir)
+
+
+def test_label_ids_must_be_int64(bdir):
+    np.savez(bdir / "knn_index.npz", embeddings=np.zeros((3, DIM), np.float32),
+             label_ids=np.array([0, 1, 2], np.int32), case_ids=np.array([1, 2, 3], np.int64))
+    _rehash(bdir, "knn_index.npz")
+    with pytest.raises(BundleError, match="label_ids"):
+        rb(bdir)
+
+
+@pytest.mark.parametrize("name", ["evil\nname", "x" * 61, "a b"])
+def test_attacker_names_not_echoed(bdir, name):
+    (bdir / name).write_text("x")
+    with pytest.raises(BundleError) as e:
+        rb(bdir)
+    assert name not in str(e.value) and "\n" not in str(e.value)
+
+
+def test_manifest_key_not_echoed(bdir):
+    _rewrite_manifest(bdir, lambda m: m["files"].__setitem__("k" * 61, "0" * 64))
+    with pytest.raises(BundleError) as e:
+        rb(bdir)
+    assert "k" * 61 not in str(e.value)
+
+
+def test_plain_names_are_shown(bdir):
+    (bdir / "extra.txt").write_text("x")
+    with pytest.raises(BundleError, match="extra.txt"):
+        rb(bdir)
+
+
+def test_caller_path_shown_in_messages(tmp_path):
+    with pytest.raises(BundleError) as e:
+        read_bundle(tmp_path / "no such dir\twith odd", manifest_sha256="0" * 64)
+    assert "no such dir" in str(e.value)
+
+
+@pytest.mark.parametrize("v", [10**401, -(10**401), 2**53, float("inf")])
+def test_huge_numbers_are_bundle_errors(bdir, v):
+    cal = json.loads((bdir / "calibration.json").read_text())
+    cal["temperature"]["knn"] = v if v != float("inf") else 1.0
+    if v == float("inf"):
+        cal["tier_cutoffs"]["high"] = v
+    (bdir / "calibration.json").write_text(json.dumps(cal))
+    _rehash(bdir, "calibration.json")
+    with pytest.raises(BundleError, match="calibration.json"):
+        rb(bdir)
+
+
+@pytest.mark.parametrize("where", ["temperature", "tier_cutoffs"])
+def test_huge_int_on_write(tmp_path, where):
+    heads, cal, knn, prof, man = _parts()
+    if where == "temperature":
+        cal["temperature"]["knn"] = 10**401
+    else:
+        cal["tier_cutoffs"]["high"] = 10**401
+    with pytest.raises(BundleError):
+        write_bundle(tmp_path / "b", heads=heads, calibration=cal, knn=knn, campaign_profile=prof,
+                     manifest=man)
+
+
+def test_huge_int_read_from_json_text(bdir):
+    (bdir / "calibration.json").write_text(
+        '{"temperature": {"hierarchy": 1, "knn": %s}, "tier_cutoffs": {"high": 0.9, "medium": 0.6},'
+        ' "held_out_groups": []}' % ("9" * 401))
+    _rehash(bdir, "calibration.json")
+    with pytest.raises(BundleError, match="calibration.json"):
+        rb(bdir)
+
+
+@pytest.mark.parametrize("pin", ["A" * 64, "0" * 63, "0" * 65, "é" * 64, "", ("0" * 64) + "\n", None])
+def test_pin_must_be_lowercase_hex(bdir, pin):
+    with pytest.raises(BundleError, match="pin"):
+        read_bundle(bdir, manifest_sha256=pin)
+
+
+def test_uppercase_correct_hash_refused(bdir):
+    good = hashlib.sha256((bdir / "manifest.json").read_bytes()).hexdigest()
+    with pytest.raises(BundleError, match="pin"):
+        read_bundle(bdir, manifest_sha256=good.upper())
+
+
+def test_missing_parent_is_bundle_error(tmp_path):
+    heads, cal, knn, prof, man = _parts()
+    with pytest.raises(BundleError):
+        write_bundle(tmp_path / "nope" / "b", heads=heads, calibration=cal, knn=knn,
+                     campaign_profile=prof, manifest=man)
+
+
+def test_temperature_range_is_recipe_bounds():
+    from training import recipe
+    assert bundle_mod.TEMPERATURE_RANGE == tuple(float(x) for x in recipe.T_BOUNDS)

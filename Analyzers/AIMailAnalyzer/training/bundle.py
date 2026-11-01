@@ -1,9 +1,9 @@
 """The model bundle (spec section 3): five heads, calibration, kNN index, campaign profile and a
 manifest holding a SHA-256 per file. The bytes come from object storage through a presigned URL,
 so they are untrusted: read_bundle reads every file once into memory, verifies all hashes, and only
-then parses the same bytes (no TOCTOU). It is the only place in the package that calls torch.load,
-always with weights_only=True, and it accepts a head only if it is a plain dict of tensors that
-fits a freshly built ResNetMLP. Errors are a single BundleError naming the file or field, never
+then parses the same bytes (no TOCTOU). Heads are npz files (Ruling E15: no pickle and no
+torch deserialiser on bundle bytes, because torch's zip reader and Python's disagree on archive layout):
+float32 arrays that must match a freshly built ResNetMLP key for key and shape. Errors are a single BundleError naming the file or field, never
 file contents."""
 import hashlib
 import hmac
@@ -17,7 +17,6 @@ import shutil
 import stat
 import tempfile
 import zipfile
-import zipfile
 from dataclasses import dataclass
 
 import numpy as np
@@ -25,11 +24,11 @@ import torch
 
 from ResNetMLP import ResNetMLP
 from training.gate import TIER_CUTOFF_KEYS
-from training.recipe import HEADS, NUM_OUT, Heads, Knn
+from training.recipe import HEADS, NUM_OUT, T_BOUNDS, Heads, Knn
 
 MANIFEST = "manifest.json"
 BUNDLE_FILES = (
-    *(f"heads/{h}.pth" for h in HEADS),
+    *(f"heads/{h}.npz" for h in HEADS),
     "calibration.json", "knn_index.npz", "campaign_profile.json",
 )
 MAX_TOTAL = 100 * 2**20
@@ -39,7 +38,7 @@ MAX_JSON_DEPTH = 32
 MAX_JSON_NODES = 20000
 MAX_ZIP_MEMBERS = 64
 ZIP_SLACK = 64 * 1024
-TEMPERATURE_RANGE = (0.2, 30.0)  # Ruling E12 fit bounds
+TEMPERATURE_RANGE = tuple(float(x) for x in T_BOUNDS)  # Ruling E12 fit bounds
 MAX_INPUT_DIM = 4096
 TEMPERATURE_KEYS = ("hierarchy", "knn")
 MANIFEST_FIELDS = (
@@ -73,7 +72,12 @@ def _name(s):
 # --- checks shared by write and read -------------------------------------------------------------
 
 def _number(v):
-    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    """Finite real; ints are bounded first so math.isfinite can never overflow."""
+    if isinstance(v, bool):
+        return False
+    if isinstance(v, int):
+        return abs(v) < 2**53
+    return isinstance(v, float) and math.isfinite(v)
 
 
 def _check_calibration(cal):
@@ -130,8 +134,10 @@ def _fsync_dir(path):
 
 def write_bundle(dir, *, heads, calibration, knn, campaign_profile, manifest) -> str:
     """Write a bundle atomically: build it in a sibling temp dir, then rename. Hashes are computed
-    here. Returns the SHA-256 hex of manifest.json (Ruling E14: the caller pins it). Refuses to
-    replace a non-empty path."""
+    here. Returns the SHA-256 hex of manifest.json (Ruling E14: the caller pins it).
+    Notes: an existing empty directory at the target is replaced, a non-empty path is refused, a
+    missing parent raises BundleError, and the call may raise (OSError) after the bundle is in
+    place if the final directory fsync fails."""
     dir = os.fspath(dir)
     _check_calibration(calibration)
     if set(heads.models) != set(HEADS):
@@ -142,8 +148,9 @@ def write_bundle(dir, *, heads, calibration, knn, campaign_profile, manifest) ->
     blobs = {}
     for h in HEADS:
         buf = io.BytesIO()
-        torch.save({k: v.detach().cpu().contiguous() for k, v in heads.models[h].state_dict().items()}, buf)
-        blobs[f"heads/{h}.pth"] = buf.getvalue()
+        np.savez(buf, **{k: v.detach().cpu().numpy().astype(np.float32)
+                         for k, v in heads.models[h].state_dict().items()})
+        blobs[f"heads/{h}.npz"] = buf.getvalue()
     blobs["calibration.json"] = _json_bytes(calibration, "calibration.json")
     try:
         case_ids = np.zeros(0, np.int64) if knn.case_ids is None else np.asarray(knn.case_ids, np.int64)
@@ -158,7 +165,10 @@ def write_bundle(dir, *, heads, calibration, knn, campaign_profile, manifest) ->
     blobs[MANIFEST] = _json_bytes(manifest, MANIFEST)
 
     parent = os.path.dirname(os.path.abspath(dir))
-    tmp = tempfile.mkdtemp(dir=parent, prefix=".bundle-")
+    try:
+        tmp = tempfile.mkdtemp(dir=parent, prefix=".bundle-")
+    except FileNotFoundError:
+        raise BundleError("bundle parent directory does not exist") from None
     try:
         os.mkdir(os.path.join(tmp, "heads"))
         for rel, data in blobs.items():
@@ -186,10 +196,11 @@ def write_bundle(dir, *, heads, calibration, knn, campaign_profile, manifest) ->
 # --- read ----------------------------------------------------------------------------------------
 
 def _open_dir(name, dir_fd=None):
+    """name is the caller's own path or the constant "heads": shown as is."""
     try:
         return os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
     except OSError:
-        raise BundleError(f"{_name(name)}: not a plain directory") from None
+        raise BundleError(f"{name}: not a plain directory") from None
 
 
 def _cap(rel):
@@ -269,34 +280,55 @@ def _parse_json(data, rel):
     return obj
 
 
-def _zip_ok(data, rel, limit):
-    """Stored members only, few of them, and no more bytes than the caller expects: checked
-    before any decoder sees the archive, so a deflate bomb is never inflated."""
+def _npz_shapes(data, rel, limit):
+    """Stored members only, few of them, total size bounded, and every array header consistent
+    with its member size, checked with Python's zip reader (the same one np.load uses) before any
+    array is read: a deflate bomb or a lying header is never inflated or allocated.
+    Returns {array name: (shape, dtype)}."""
+    out = {}
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             infos = z.infolist()
+            if (len(infos) > MAX_ZIP_MEMBERS or any(i.compress_type != zipfile.ZIP_STORED for i in infos)
+                    or sum(i.file_size for i in infos) > limit):
+                raise BundleError(f"{rel}: archive members not plain or too large")
+            for i in infos:
+                if not i.filename.endswith(".npy") or i.filename in out:
+                    raise BundleError(f"{rel}: unexpected archive member")
+                with z.open(i) as f:
+                    ver = np.lib.format.read_magic(f)
+                    if ver not in ((1, 0), (2, 0)):
+                        raise BundleError(f"{rel}: unsupported array format")
+                    read = (np.lib.format.read_array_header_1_0 if ver == (1, 0)
+                            else np.lib.format.read_array_header_2_0)
+                    shape, _, dtype = read(f)
+                if dtype.hasobject or math.prod(shape) * dtype.itemsize > i.file_size:
+                    raise BundleError(f"{rel}: array header does not fit the member")
+                out[i.filename[:-4]] = (shape, dtype)
+    except BundleError:
+        raise
     except Exception:
         raise BundleError(f"{rel}: not a valid archive") from None
-    if (len(infos) > MAX_ZIP_MEMBERS or any(i.compress_type != zipfile.ZIP_STORED for i in infos)
-            or sum(i.file_size for i in infos) > limit):
-        raise BundleError(f"{rel}: archive members not plain or too large")
+    return out
 
 
 def _load_head(data, head, input_dim):
-    rel = f"heads/{head}.pth"
+    rel = f"heads/{head}.npz"
     model = ResNetMLP(input_dim, NUM_OUT[head])
     ref = model.state_dict()
-    _zip_ok(data, rel, sum(v.numel() * v.element_size() for v in ref.values()) + ZIP_SLACK)
-    try:
-        sd = torch.load(io.BytesIO(data), map_location="cpu", weights_only=True)
-    except Exception:
-        raise BundleError(f"{rel}: not a plain state dict") from None
-    if (not isinstance(sd, dict) or set(sd) != set(ref)
-            or not all(isinstance(v, torch.Tensor) for v in sd.values())):
+    shapes = _npz_shapes(data, rel, sum(v.numel() * 4 for v in ref.values()) + ZIP_SLACK)
+    if set(shapes) != set(ref):
         raise BundleError(f"{rel}: keys do not match the head")
-    for k, v in sd.items():
-        if v.shape != ref[k].shape or v.dtype != ref[k].dtype or not bool(torch.isfinite(v).all()):
-            raise BundleError(f"{rel}: tensor {k} does not match the head")
+    for k, (shape, dtype) in shapes.items():
+        if shape != tuple(ref[k].shape) or dtype != np.float32:
+            raise BundleError(f"{rel}: array {k} does not match the head")
+    try:
+        with np.load(io.BytesIO(data), allow_pickle=False) as npz:
+            sd = {k: torch.from_numpy(npz[k].copy()) for k in ref}
+    except Exception:
+        raise BundleError(f"{rel}: unreadable arrays") from None
+    if not all(bool(torch.isfinite(v).all()) for v in sd.values()):
+        raise BundleError(f"{rel}: non-finite values")
     try:
         model.load_state_dict(sd, strict=True)
     except Exception:
@@ -306,14 +338,11 @@ def _load_head(data, head, input_dim):
 
 def _load_knn(data, input_dim):
     rel = "knn_index.npz"
-    _zip_ok(data, rel, MAX_FILE)
+    if set(_npz_shapes(data, rel, MAX_FILE)) != {"embeddings", "label_ids", "case_ids"}:
+        raise BundleError(f"{rel}: wrong arrays")
     try:
         with np.load(io.BytesIO(data), allow_pickle=False) as npz:
-            if set(npz.files) != {"embeddings", "label_ids", "case_ids"}:
-                raise BundleError(f"{rel}: wrong arrays")
             emb, lab, cid = npz["embeddings"], npz["label_ids"], npz["case_ids"]
-    except BundleError:
-        raise
     except Exception:
         raise BundleError(f"{rel}: not a plain npz") from None
     if emb.dtype != np.float32 or emb.ndim != 2 or emb.shape[1] != input_dim or not np.isfinite(emb).all():
@@ -328,12 +357,14 @@ def _load_knn(data, input_dim):
 def read_bundle(dir, *, manifest_sha256: str) -> Bundle:
     """Ruling E14: manifest_sha256 (pinned by the caller, never read from the bundle) is compared
     to the manifest bytes before anything is parsed."""
+    if not isinstance(manifest_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", manifest_sha256):
+        raise BundleError("manifest pin must be 64 lowercase hex characters")
+    pin = manifest_sha256.encode("ascii")
     root = _open_dir(os.fspath(dir))
     try:
         top = set(os.listdir(root))
         raw, spent = _read_file(root, MANIFEST, MANIFEST, 0)
-        if not (isinstance(manifest_sha256, str)
-                and hmac.compare_digest(hashlib.sha256(raw).hexdigest(), manifest_sha256.lower())):
+        if not hmac.compare_digest(hashlib.sha256(raw).hexdigest().encode(), pin):
             raise BundleError(f"{MANIFEST}: hash does not match the pinned manifest hash")
         manifest = _parse_json(raw, MANIFEST)
         files = manifest.get("files") if isinstance(manifest, dict) else None
@@ -350,7 +381,7 @@ def read_bundle(dir, *, manifest_sha256: str) -> Bundle:
             raise BundleError(f"unexpected file {_name(sorted(top - _TOP)[0])}")
         heads_fd = _open_dir("heads", root)
         try:
-            extra = set(os.listdir(heads_fd)) - {f"{h}.pth" for h in HEADS}
+            extra = set(os.listdir(heads_fd)) - {f"{h}.npz" for h in HEADS}
             if extra:
                 raise BundleError(f"unexpected file in heads: {_name(sorted(extra)[0])}")
             data = {}
@@ -369,7 +400,7 @@ def read_bundle(dir, *, manifest_sha256: str) -> Bundle:
     # everything below parses the already verified bytes
     _check_manifest_fields(manifest)
     dim = manifest["input_dim"]
-    models = {h: _load_head(data[f"heads/{h}.pth"], h, dim) for h in HEADS}
+    models = {h: _load_head(data[f"heads/{h}.npz"], h, dim) for h in HEADS}
     calibration = _parse_json(data["calibration.json"], "calibration.json")
     _check_calibration(calibration)
     calibration["temperature"] = {k: float(v) for k, v in calibration["temperature"].items()}
