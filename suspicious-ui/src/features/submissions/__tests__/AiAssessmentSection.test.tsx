@@ -126,3 +126,45 @@ test("omits the cross-check block when cross_check is null", () => {
   expect(screen.queryByRole("listitem")).toBeNull();
   expect(screen.queryByText("AI disagrees with the evidence")).toBeNull();
 });
+
+test("campaign labels: counts in a fixed order and the disagreement alert", () => {
+  const { container } = render(
+    <AiAssessmentSection
+      assessment={{
+        ...base,
+        campaign: { ref: "r", size: 5, labels: { Safe: 1, Dangerous: 3 }, members_disagree: true },
+      }}
+    />,
+  );
+  expect(screen.getByText("Labelled by analysts: 3 Dangerous, 1 Safe")).toBeInTheDocument();
+  expect(screen.getByText("Campaign members disagree")).toBeInTheDocument();
+  expect(container.textContent).not.toContain("%");
+});
+
+test("campaign labels list Unwanted between Dangerous and Safe, no alert without disagreement", () => {
+  render(
+    <AiAssessmentSection
+      assessment={{
+        ...base,
+        campaign: { ref: "r", size: 4, labels: { Safe: 2, Unwanted: 1 }, members_disagree: false },
+      }}
+    />,
+  );
+  expect(screen.getByText("Labelled by analysts: 1 Unwanted, 2 Safe")).toBeInTheDocument();
+  expect(screen.queryByText("Campaign members disagree")).toBeNull();
+});
+
+test("no labels line for a reporter (labels absent) or when no sibling is labelled", () => {
+  const { rerender } = render(
+    <AiAssessmentSection assessment={{ ...base, campaign: { ref: "r", size: 3 } }} />,
+  );
+  expect(screen.getByText("Campaign r, 3 mails")).toBeInTheDocument();
+  expect(screen.queryByText(/Labelled by analysts/)).toBeNull();
+  expect(screen.queryByText("Campaign members disagree")).toBeNull();
+  rerender(
+    <AiAssessmentSection
+      assessment={{ ...base, campaign: { ref: "r", size: 3, labels: {}, members_disagree: false } }}
+    />,
+  );
+  expect(screen.queryByText(/Labelled by analysts/)).toBeNull();
+});
