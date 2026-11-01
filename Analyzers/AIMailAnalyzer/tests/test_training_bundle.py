@@ -983,10 +983,9 @@ def test_object_dtype_header_refused(bdir):
     _refuse_knn(bdir, "array header not accepted")
 
 
-def test_gap_between_members_refused(bdir):
-    """16 bytes after the first member, every later offset shifted to match: only the walk over
-    the local headers sees it."""
-    p = bdir / "knn_index.npz"
+def _insert_gap(p, pad):
+    """Insert pad after the first member, shifting every later offset and the directory offset to
+    match, so zipfile still reads the archive."""
     data = p.read_bytes()
     e = _eocd(data)
     infos = sorted(zipfile.ZipFile(p).infolist(), key=lambda i: i.header_offset)
@@ -997,12 +996,39 @@ def test_gap_between_members_refused(bdir):
         nl, el, cl = struct.unpack_from("<3H", cd, j + 28)
         off, = struct.unpack_from("<L", cd, j + 42)
         if off >= cut:
-            struct.pack_into("<L", cd, j + 42, off + 16)
+            struct.pack_into("<L", cd, j + 42, off + len(pad))
         j += 46 + nl + el + cl
-    e[6] += 16
-    p.write_bytes(data[:cut] + bytes(16) + data[cut:e[6] - 16] + bytes(cd) + _EOCD.pack(*e))
+    e[6] += len(pad)
+    p.write_bytes(data[:cut] + pad + data[cut:e[6] - len(pad)] + bytes(cd) + _EOCD.pack(*e))
     assert len(zipfile.ZipFile(p).infolist()) == 3
+    return data, cut
+
+
+def test_gap_between_members_refused(bdir):
+    """16 bytes after the first member: only the walk over the local headers sees it."""
+    _insert_gap(bdir / "knn_index.npz", bytes(16))
     _refuse_knn(bdir, "members not contiguous")
+
+
+def test_gap_with_compensating_lengths_refused(bdir):
+    """The padding looks like a local header whose name and extra lengths cover the gap plus the
+    second member's own name and extra, so a walk that only adds lengths ends exactly at the
+    directory: the offset of each member must be checked too."""
+    p = bdir / "knn_index.npz"
+    data = p.read_bytes()
+    cut = sorted(zipfile.ZipFile(p).infolist(), key=lambda i: i.header_offset)[1].header_offset
+    n2, x2 = struct.unpack_from("<2H", data, cut + 26)
+    g = 32
+    _insert_gap(p, bytes(26) + struct.pack("<2H", g + n2, x2) + bytes(g - 30))
+    _refuse_knn(bdir, "members not contiguous")
+
+
+def test_member_longer_than_its_array_refused(bdir):
+    """Trailing bytes inside an npy member: np.load would ignore them, the exact check does not."""
+    members = _knn_members()
+    members[0] = (members[0][0], members[0][1] + bytes(8))
+    _zip_stored(bdir / "knn_index.npz", members)
+    _refuse_knn(bdir, "does not fit")
 
 
 def test_arrays_loaded_without_pickle(bdir):
