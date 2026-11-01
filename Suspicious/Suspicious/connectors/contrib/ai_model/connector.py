@@ -79,8 +79,9 @@ class _BudgetSpent(Exception):
 
 
 class LabelSyncIncomplete(Exception):
-    """Raised after the run when some folders were skipped because their embed was refused. The
-    other folders are committed; a retry would hit the same refusal, so it waits for the next run."""
+    """Raised after the run when some folders were skipped because their embed was refused (the
+    other folders are committed), or before it when no configured folder is a known one. A retry
+    would hit the same cause, so it waits for the next run or an operator."""
 
     retryable = False
 
@@ -210,14 +211,18 @@ class AiModelConnector(Connector):
         cap = None if unlimited else FOLDER_BATCH
         budget = None if unlimited else TIME_BUDGET_SECONDS
         client = self._client()
-        folders = [f.strip() for f in (self.config.get("imap_folders") or "").split(",") if f.strip()]
+        folders = [f.strip() for f in (self.config.get("imap_folders") or "").split(",") if f.strip()] or list(FOLDERS)
+        unknown = [f for f in folders if class_of(f) is None]
+        if len(unknown) == len(folders):  # a sync that can read nothing must not record a success
+            names = ", ".join(ascii(f)[:64] for f in unknown)
+            raise LabelSyncIncomplete(f"no known review folder: {len(unknown)} unknown name(s): {names}")
         imap = imap_sync.connect(
             host, int(self.config.get("imap_port") or 993), self.config.get("imap_user") or "",
             self.config.get("imap_password") or "", self.config.get("imap_use_ssl", True) is not False,
         )
         refused = []
         try:
-            for folder in folders or FOLDERS:
+            for folder in folders:
                 if class_of(folder) is None:
                     logger.warning("ai_model sync: folder %s has no known class, skipped", ascii(folder)[:64])
                     continue

@@ -13,7 +13,7 @@ from django.utils import timezone as dj_timezone
 
 from ai_model.messageid import match_case, message_id_hash, stored_message_id, stored_sender
 from ai_model.models import AiAssessment, LabelRecord
-from ai_model.taxonomy import class_of
+from ai_model.taxonomy import canonical, class_of
 from case_handler.models import ProposedVerdict
 
 ACTIVE, SUPERSEDED, FLAGGED = LabelRecord.Status.ACTIVE, LabelRecord.Status.SUPERSEDED, LabelRecord.Status.FLAGGED
@@ -63,7 +63,7 @@ def _observed(message_hash: str, folder: str) -> bool:
 
 
 def is_observed(mail) -> bool:
-    return _observed(_folder_key(mail)[1], mail.folder)
+    return _observed(_folder_key(mail)[1], canonical(mail.folder))
 
 
 def _match(mail):
@@ -96,7 +96,7 @@ def prepare_folder_observation(mail) -> FolderObservation | None:
     message is already observed there, else its key, matched case and snapshot."""
     label_class = class_of(mail.folder)
     message_id, message_hash = _folder_key(mail)
-    if label_class is None or _observed(message_hash, mail.folder):
+    if label_class is None or _observed(message_hash, canonical(mail.folder)):
         return None
     case = _match(mail)
     return FolderObservation(mail, message_id, message_hash, label_class, case, _snapshot(mail, case))
@@ -114,7 +114,7 @@ def record_folder_observation(observation: FolderObservation, vectors, *, prepro
     """
     mail = observation.mail
     with transaction.atomic():
-        if _observed(observation.message_hash, mail.folder):
+        if _observed(observation.message_hash, canonical(mail.folder)):
             return None
         _folder_rows(observation.message_hash).exclude(status=SUPERSEDED).update(status=SUPERSEDED)
         conflict = CONFLICT.get(observation.label_class)
@@ -126,7 +126,7 @@ def record_folder_observation(observation: FolderObservation, vectors, *, prepro
             case=observation.case,
             source=LabelRecord.Source.IMAP_FOLDER,
             source_ref=f"{mail.folder}:{mail.uidvalidity}:{mail.uid}",
-            label=mail.folder,
+            label=canonical(mail.folder),  # the mailbox path stays in source_ref
             label_class=observation.label_class,
             trust=LabelRecord.Trust.FOLDER,
             embedding=json.dumps(vectors["classifier"]),

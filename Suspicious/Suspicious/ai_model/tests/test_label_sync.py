@@ -258,3 +258,44 @@ class LabelSyncTest(TestCase):
         self.assertEqual(LabelRecord.objects.count(), 5)
         state = LabelSyncState.objects.get()
         self.assertEqual((state.uidvalidity, state.last_uid), (8, 3))
+
+
+class FolderHierarchyTest(TestCase):
+    """Fix wave 2: the class comes from the last hierarchy segment; nothing known fails the run."""
+
+    def run_sync(self, imap, folders):
+        with mock.patch.object(imap_sync, "connect", return_value=imap) as connect, \
+                mock.patch.object(module.AiInferenceClient, "embed", side_effect=embed_answer):
+            AiModelConnector({**CONFIG, "imap_folders": folders}).sync()
+        return connect
+
+    def test_hierarchical_names_are_read_and_stored_canonically(self):
+        dotted, slashed = "INBOX.2_CLASSIC_PHISHING", "Review/0_LEGIT_EXTERNAL_COMMUNICATION"
+        imap = FakeImap({
+            dotted: {"uidvalidity": 7, "messages": {1: forward(1)}},
+            slashed: {"uidvalidity": 3, "messages": {2: forward(2)}},
+        })
+        self.run_sync(imap, f"{dotted},{slashed}")
+        selected = [c[1] for c in imap.commands if c[0] == "SELECT"]
+        self.assertEqual(selected, [f'"{dotted}"', f'"{slashed}"'])
+        rows = LabelRecord.objects.order_by("pk")
+        self.assertEqual(
+            [(r.label, r.label_class) for r in rows],
+            [("2_CLASSIC_PHISHING", "Dangerous"), ("0_LEGIT_EXTERNAL_COMMUNICATION", "Safe")],
+        )
+        self.assertTrue(rows[0].source_ref.startswith(f"{dotted}:7:"))
+        self.assertEqual(set(LabelSyncState.objects.values_list("folder", flat=True)), {dotted, slashed})
+        self.run_sync(imap, f"{dotted},{slashed}")  # re-read: nothing new
+        self.assertEqual(LabelRecord.objects.count(), 2)
+
+    def test_only_unknown_folders_fail_the_run_without_a_retry(self):
+        imap = FakeImap({"Inbox": {"uidvalidity": 1, "messages": {1: forward(1)}}})
+        with self.assertRaises(module.LabelSyncIncomplete) as caught:
+            connect = self.run_sync(imap, "Inbox, 9_ODD,Archive/\u00e9t\u00e9")
+        self.assertIs(caught.exception.retryable, False)
+        message = str(caught.exception)
+        self.assertIn("3", message)
+        self.assertIn("'Inbox'", message)
+        self.assertIn(ascii("Archive/\u00e9t\u00e9"), message)
+        self.assertFalse(LabelRecord.objects.exists())
+        self.assertFalse([c for c in imap.commands if c[0] == "SELECT"])
