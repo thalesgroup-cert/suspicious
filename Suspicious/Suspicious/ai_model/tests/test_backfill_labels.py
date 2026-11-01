@@ -181,3 +181,42 @@ class BackfillHistoryTest(CaseMixin, TestCase):
         self.assertIsNone(LabelRecord.objects.get(pk=nobody.pk).case)
         self.assertIsNone(LabelRecord.objects.get(pk=no_id.pk).case)
         self.assertIn("re-matched 0 folder row", self.run_command())
+
+
+class LateMatchConflictTest(CaseMixin, TestCase):
+    """A late case match runs the same conflict check as the live folder path."""
+
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch("ai_model.ledger.enabled", return_value=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _late(self, n, folder_class, verdict_class):
+        case = self.make_case(f"<late{n}@x.example>")
+        ledger.record_verdict(case, self.user, verdict_class)
+        row = LabelRecord.objects.create(
+            message_id=f"late{n}@x.example", message_id_hash=message_id_hash(f"late{n}@x.example"),
+            source="imap_folder", label="x", label_class=folder_class, trust="folder",
+        )
+        return case, row
+
+    def test_conflicts_are_flagged_and_agreement_stays_active(self):
+        pairs = {"d_vs_s": ("Dangerous", "Safe"), "s_vs_d": ("Safe", "Dangerous"),
+                 "agree": ("Dangerous", "Dangerous"), "soft": ("Unwanted", "Safe")}
+        made = {k: self._late(i, *v) for i, (k, v) in enumerate(pairs.items())}
+        call_command(COMMAND, stdout=StringIO())
+        for key, (case, row) in made.items():
+            with self.subTest(key):
+                row = LabelRecord.objects.get(pk=row.pk)
+                self.assertEqual(row.case, case)
+                flagged = key in ("d_vs_s", "s_vs_d")
+                self.assertEqual(row.status, "flagged" if flagged else "active")
+                self.assertEqual(row.flag_reason, "folder_verdict_mismatch" if flagged else "")
+                self.assertEqual(row.trainable, not flagged)
+
+    def test_only_the_latest_verdict_counts(self):
+        case, row = self._late(9, "Dangerous", "Safe")
+        ledger.record_verdict(case, self.user, "Dangerous")  # supersedes the Safe row
+        call_command(COMMAND, stdout=StringIO())
+        self.assertEqual(LabelRecord.objects.get(pk=row.pk).status, "active")

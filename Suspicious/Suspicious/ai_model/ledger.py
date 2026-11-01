@@ -139,6 +139,25 @@ def record_folder_observation(observation: FolderObservation, vectors, *, prepro
         )
 
 
+def attach_case(record_pk: int, case) -> bool:
+    """Late case match (the backfill): set the case of a folder row that matched none, and run the
+    live conflict check against that case's active verdict in the same transaction, so a hard
+    conflict flags the row. False when the row got a case meanwhile."""
+    with transaction.atomic():
+        row = LabelRecord.objects.select_for_update().filter(
+            pk=record_pk, source=LabelRecord.Source.IMAP_FOLDER, case__isnull=True).first()
+        if row is None:
+            return False
+        row.case = case
+        fields = ["case"]
+        conflict = CONFLICT.get(row.label_class)
+        if row.status == ACTIVE and conflict and list(_conflicting_verdicts(case, row.message_id_hash, conflict)):
+            row.status, row.flag_reason = FLAGGED, MISMATCH
+            fields += ["status", "flag_reason"]
+        row.save(update_fields=fields)
+        return True
+
+
 def _stored_mail(case):
     return getattr(getattr(case, "fileOrMail", None), "mail", None)
 

@@ -92,7 +92,8 @@ class Command(BaseCommand):
     @staticmethod
     def _rematch(dry: bool) -> int:
         """Set the case of folder rows that matched no case when they were read, by their stored
-        Message-ID (a row without one cannot be matched again). Only null to a case."""
+        Message-ID (a row without one cannot be matched again). Only null to a case; a hard conflict
+        with that case's active verdict flags the row, as on the live path."""
         rows = LabelRecord.objects.filter(
             source=LabelRecord.Source.IMAP_FOLDER, case__isnull=True,
         ).exclude(message_id="").only("pk", "message_id")
@@ -104,7 +105,7 @@ class Command(BaseCommand):
             if dry:
                 n += 1
             else:
-                n += LabelRecord.objects.filter(pk=row.pk, case__isnull=True).update(case=case)
+                n += ledger.attach_case(row.pk, case)  # also runs the conflict check
         return n
 
     @staticmethod

@@ -387,7 +387,9 @@ It needs the `ai_model` connector enabled. It does three things, then a fourth w
   supersede a verdict recorded live.
 - A proposal row for every challenged case with a Safe or Dangerous proposal.
 - A late case match for folder rows that matched no case: each such row with a Message-ID is
-  matched again, and its case is set when one is found (only from no case to a case).
+  matched again, and its case is set when one is found (only from no case to a case). In the same
+  transaction the row gets the conflict check of the live path: a Dangerous row matched to a case
+  whose active verdict is Safe, or the reverse, is flagged and stops being trainable.
 - `--folders` also runs the sync over every configured folder with no 500-UID cap and no time
   budget, and needs `imap_host`.
 
@@ -410,8 +412,6 @@ folders. It prints counts only. A rerun adds nothing for what is already recorde
   active or flagged; the new row is checked for conflicts again.
 - A mail copied into two folders takes the label of the folder read last. A `UIDVALIDITY` reset of
   the other folder reads it there again, and the label flips.
-- A late case match by the backfill command sets the case only. The row is not checked for a
-  conflict with that case's verdict.
 
 ### When classification fails
 
