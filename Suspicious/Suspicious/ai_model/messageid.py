@@ -11,10 +11,11 @@ from mail_feeder.models import Mail
 
 
 def normalise(header: str) -> str:
-    """Strip whitespace and angle brackets, lower-case. "" for empty or a value with no "@"."""
+    """Strip whitespace and angle brackets, lower-case. "" for empty, a value with no "@", or one
+    above 998 characters (the LabelRecord.message_id width and RFC 5322's line limit)."""
     value = (header or "").strip().strip("<>").strip().lower()
     local, _, domain = value.partition("@")
-    return value if local and domain and not any(c.isspace() for c in value) else ""
+    return value if local and domain and len(value) <= 998 and not any(c.isspace() for c in value) else ""
 
 
 def message_id_hash(normalised: str) -> str:
@@ -34,6 +35,11 @@ def _values(headers: dict[str, list[str]], name: str) -> list[str]:
 
 def _address(value: str) -> str:
     return parseaddr(value or "")[1].strip().lower()
+
+
+def stored_sender(mail) -> str:
+    """The stored mail's sender address, lower-cased: mail_from, else the stored From header."""
+    return _address(mail.mail_from) or next((_address(v) for v in _values(_headers(mail), "from")), "")
 
 
 def _cases_of(mails):
@@ -60,7 +66,7 @@ def match_case(message_id: str, *, sender: str = "", date=None, subject: str = "
     want = _address(sender)
     hits = [
         m for m in mails.select_related("mail_header")
-        if (_address(m.mail_from) or next((_address(v) for v in _values(_headers(m), "from")), "")) == want
+        if stored_sender(m) == want
     ]
     cases = _cases_of(hits)
     return cases[0] if len(cases) == 1 else None

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from ai_model.messageid import _address, _headers, _values, match_case, message_id_hash
+from ai_model.messageid import match_case, message_id_hash, stored_sender
 from ai_model.models import AiAssessment, LabelRecord
 from ai_model.taxonomy import class_of
 
@@ -39,10 +39,7 @@ def _match(mail):
 def _snapshot(mail, case) -> dict:
     """Ruling D9: only what is cheap and already stored at observation time."""
     stored = getattr(getattr(case, "fileOrMail", None), "mail", None) if case else None
-    sender = ""
-    if stored is not None:
-        sender = _address(stored.mail_from) or next((_address(v) for v in _values(_headers(stored), "from")), "")
-    sender = sender or mail.sender
+    sender = (stored_sender(stored) if stored is not None else "") or mail.sender
     ai = AiAssessment.objects.filter(case=case).values("result", "model_version").first() if case else None
     return {
         "sender_domain": sender.rpartition("@")[2].lower(),

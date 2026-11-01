@@ -15,6 +15,11 @@ class NormaliseTest(SimpleTestCase):
         for bad in ("", "   ", "garbage", "<>", "@", "<@x>", "a@", "<@>", "@x.example"):
             self.assertEqual(messageid.normalise(bad), "")
 
+    def test_an_id_above_998_characters_is_dropped(self):
+        at_limit = "a" * (998 - len("@x.example")) + "@x.example"
+        self.assertEqual(messageid.normalise(f"<{at_limit}>"), at_limit)
+        self.assertEqual(messageid.normalise("a" + at_limit), "")
+
     def test_hash(self):
         import hashlib
         self.assertEqual(messageid.message_id_hash("a@b"), hashlib.sha256(b"a@b").hexdigest())
@@ -91,3 +96,13 @@ class MatchCaseTest(TestCase):
         self.assertEqual(messageid.match_case("", sender="bob@x.example", date=local, subject="Hello"), case)
         late = datetime(2026, 5, 1, 23, 0, tzinfo=tz(timedelta(hours=-2)))  # 01:00 UTC on May 2
         self.assertIsNone(messageid.match_case("", sender="bob@x.example", date=late, subject="Hello"))
+
+
+class StoredSenderTest(TestCase):
+    def test_mail_from_then_the_from_header(self):
+        header = MailHeader.objects.create(header_value=str({"From": ["Bob <Bob@X.Example>"]}), fuzzy_hash="s")
+        mail = Mail(subject="s", reportedBy="r", to="t", mail_id="s", mail_header=header, mail_from="")
+        self.assertEqual(messageid.stored_sender(mail), "bob@x.example")
+        mail.mail_from = "Eve <eve@y.example>"
+        self.assertEqual(messageid.stored_sender(mail), "eve@y.example")
+        self.assertEqual(messageid.stored_sender(Mail(mail_from="")), "")
