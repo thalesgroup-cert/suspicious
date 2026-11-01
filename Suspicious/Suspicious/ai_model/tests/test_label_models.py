@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import RequestFactory, TestCase
 
 from ai_model.models import LabelRecord, LabelSyncState
@@ -33,7 +34,14 @@ class LabelRecordTest(TestCase):
 
     def test_sync_state_unique_folder(self):
         LabelSyncState.objects.create(folder="1_SPAM", uidvalidity=1, last_uid=0)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            LabelSyncState.objects.create(folder="1_SPAM", uidvalidity=2, last_uid=5)
         self.assertEqual(LabelSyncState.objects.get().skipped, 0)
+
+    def test_indexes(self):
+        fields = [tuple(i.fields) for i in LabelRecord._meta.indexes]
+        self.assertIn(("message_id_hash", "source", "status"), fields)
+        self.assertIn(("trust", "status"), fields)
 
     def test_admin_read_only(self):
         user = get_user_model().objects.create_superuser("s", "s@x.y", "p")

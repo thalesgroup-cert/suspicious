@@ -90,6 +90,12 @@ class LabelRecord(models.Model):
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolution_note = models.TextField(blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["message_id_hash", "source", "status"]),
+            models.Index(fields=["trust", "status"]),
+        ]
+
     @property
     def trainable(self) -> bool:
         return self.trust == self.Trust.FOLDER and self.status == self.Status.ACTIVE
