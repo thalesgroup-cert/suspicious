@@ -5,6 +5,7 @@ from typing import Any
 from rest_framework import serializers
 
 from case_handler.models import Case
+from api.utils.ai_assessment import ai_assessment_for
 from cortex_job.models import AnalyzerReport
 
 
@@ -295,6 +296,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     screenshot_url = serializers.SerializerMethodField()
     threat_classification = serializers.SerializerMethodField()
     analysis_health = serializers.SerializerMethodField()
+    ai_assessment = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
         fields = InvestigationRowSerializer.Meta.fields + [
@@ -303,8 +305,11 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "reporter_context", "reporter_note", "thehive_alert_id",
             "is_allowlisted", "is_denylisted", "list_reason",
             "observable_group", "screenshot_url",
-            "threat_classification", "analysis_health",
+            "threat_classification", "analysis_health", "ai_assessment",
         ]
+
+    def get_ai_assessment(self, obj: Case):
+        return ai_assessment_for(obj, self.context.get("request"))
 
     def _reports(self) -> list:
         return list(self.context.get("analyzer_reports_qs") or [])

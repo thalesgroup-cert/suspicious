@@ -56,6 +56,8 @@ CASE_DETAIL_SELECT_RELATED = (
     "nonFileIocs__ip",
     "nonFileIocs__hash",
     "observable_group",
+    "ai_assessment",
+    "campaign_membership__campaign",
 )
 
 
@@ -199,6 +201,7 @@ class InvestigationAccessMixin:
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
+                "campaign_membership__campaign__members",
             ),
             self.request.user,
         )

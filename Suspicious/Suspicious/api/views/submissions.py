@@ -52,6 +52,8 @@ CASE_LIST_SELECT_RELATED = (
 CASE_DETAIL_SELECT_RELATED = CASE_LIST_SELECT_RELATED + (
     "reporter",
     "last_update_by",
+    "ai_assessment",
+    "campaign_membership__campaign",
 )
 
 
@@ -178,6 +180,7 @@ class SubmissionDetailsView(RetrieveAPIView):
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
+                "campaign_membership__campaign__members",
             )
         )
         return submission_queryset(queryset, self.request.user)
