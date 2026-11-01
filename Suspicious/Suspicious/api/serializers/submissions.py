@@ -14,8 +14,7 @@ from api.submissions.constants import (
     SUBMISSION_STATUS_CHOICES,
     SUBMISSION_TYPE_CHOICES,
 )
-from api.permissions.submissions import has_elevated_view
-from api.utils.ai_assessment import ai_assessment_for
+from api.utils.ai_assessment import ai_assessment_for, viewer_is_elevated
 
 
 def _normalize_whitespace(value: str) -> str:
@@ -384,7 +383,7 @@ class AdminSubmissionDetailsSerializer(SubmissionDetailsSerializer):
 
     def get_raw(self, obj):
         request = self.context.get("request")
-        if not request or not has_elevated_view(request.user, obj):
+        if not request or not viewer_is_elevated(obj, request):
             return None
 
         file_or_mail = None

@@ -57,10 +57,13 @@ class AiAssessmentDetailTest(TestCase):
             with self.subTest(kind):
                 self.assertIsNone(self._get(kind)["ai_assessment"])
 
-    def test_assessment_and_campaign_add_no_query(self):
-        # Baseline is the same request with the connector off: it still reads the
-        # connector state but never touches the assessment or campaign relations.
+    def test_assessment_and_campaign_add_at_most_one_query(self):
+        # Baseline is the same request with the connector off. On, the campaign size is
+        # one COUNT; the assessment and campaign rows come with the case (select_related).
         other = Case.objects.create(description="o", reporter=self.user)
+        # An analyst viewing someone else's case (the usual one): one permission lookup.
+        self.case.reporter = User.objects.create_user(username="rep", password="pw-12345")
+        self.case.save()
         campaign = Campaign.objects.create()
         CampaignMember.objects.create(campaign=campaign, case=self.case)
         CampaignMember.objects.create(campaign=campaign, case=other)
@@ -75,7 +78,11 @@ class AiAssessmentDetailTest(TestCase):
                 with CaptureQueriesContext(connection) as on:
                     body = self._get(kind)
                 self.assertEqual(body["ai_assessment"]["campaign"]["size"], 2)
-                self.assertEqual(len(on), len(off))
+                counts = [q for q in on.captured_queries if "COUNT(" in q["sql"].upper()]
+                off_counts = [q for q in off.captured_queries if "COUNT(" in q["sql"].upper()]
+                self.assertEqual(len(counts), len(off_counts) + 1)
+                # the count plus, on the investigation view, the one permission lookup
+                self.assertLessEqual(len(on), len(off) + (1 if kind == "submission" else 2))
 
     def test_no_request_in_context_gives_none(self):
         self._enable()
@@ -118,3 +125,48 @@ class AiAssessmentDetailTest(TestCase):
         body = self._get("submission")
         self.assertIn("raw", body)
         self.assertEqual(body["ai_assessment"]["result"], "Dangerous")
+
+    def test_unregistered_connector_gives_none_not_a_500(self):
+        from unittest import mock
+
+        self._assess()
+        with mock.patch("api.utils.ai_assessment.registry.names", return_value=[]):
+            for kind in self.urls:
+                with self.subTest(kind):
+                    self.assertIsNone(self._get(kind)["ai_assessment"])
+
+    def test_cross_check_is_for_analysts_only(self):
+        self._enable()
+        owner = User.objects.create_user(username="owner", password="pw-12345")
+        mine = Case.objects.create(
+            description="m", reporter=owner, is_denylisted=True, list_reason="secret.example",
+            verdict_explanation={"decisive_rule": "deny-listed", "band": "Dangerous", "sources": []},
+        )
+        self._assess(mine)
+        self.client.force_authenticate(owner)
+        body = self.client.get(f"/api/submissions/{mine.pk}/").json()
+        self.assertIsNone(body["ai_assessment"]["cross_check"])
+        self.assertNotIn("secret.example", str(body["ai_assessment"]))
+        self.client.force_authenticate(self.user)  # CERT
+        for url in (f"/api/submissions/{mine.pk}/", f"/api/investigations/{mine.pk}/"):
+            with self.subTest(url):
+                check = self.client.get(url).json()["ai_assessment"]["cross_check"]
+                self.assertIn("secret.example", str(check))
+
+    def test_list_endpoint_does_not_join_the_assessment_or_campaign(self):
+        self._enable()
+        self._assess()
+        with CaptureQueriesContext(connection) as ctx:
+            self.assertEqual(self.client.get("/api/submissions/").status_code, 200)
+        sql = " ".join(q["sql"].lower() for q in ctx.captured_queries)
+        self.assertNotIn("ai_model_aiassessment", sql)
+        self.assertNotIn("campaignmember", sql.replace("_", ""))
+
+    def test_detail_does_not_load_the_campaign_embedding(self):
+        self._enable()
+        self._assess()
+        with CaptureQueriesContext(connection) as ctx:
+            self._get("submission")
+        sql = " ".join(q["sql"].lower() for q in ctx.captured_queries)
+        self.assertIn("ai_model_aiassessment", sql)
+        self.assertNotIn("campaign_embedding", sql)

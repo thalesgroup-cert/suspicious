@@ -56,8 +56,6 @@ CASE_DETAIL_SELECT_RELATED = (
     "nonFileIocs__ip",
     "nonFileIocs__hash",
     "observable_group",
-    "ai_assessment",
-    "campaign_membership__campaign",
 )
 
 
@@ -192,7 +190,10 @@ class InvestigationAccessMixin:
 
     def get_case_detail_queryset(self):
         return scoped_case_queryset(
-            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
+            Case.objects.select_related(
+                *CASE_DETAIL_SELECT_RELATED, "ai_assessment", "campaign_membership__campaign"
+            )
+            .defer("ai_assessment__campaign_embedding")
             .prefetch_related(
                 "fileOrMail__mail__mail_attachments",
                 "fileOrMail__mail__mail_artifacts",
@@ -201,7 +202,6 @@ class InvestigationAccessMixin:
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
-                "campaign_membership__campaign__members",
             ),
             self.request.user,
         )

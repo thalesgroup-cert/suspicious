@@ -52,9 +52,11 @@ CASE_LIST_SELECT_RELATED = (
 CASE_DETAIL_SELECT_RELATED = CASE_LIST_SELECT_RELATED + (
     "reporter",
     "last_update_by",
-    "ai_assessment",
-    "campaign_membership__campaign",
 )
+
+
+# Only the detail view reads these; the list and the other CASE_DETAIL users must not join them.
+AI_SELECT_RELATED = ("ai_assessment", "campaign_membership__campaign")
 
 
 def case_analyzer_reports(case) -> list:
@@ -170,7 +172,8 @@ class SubmissionDetailsView(RetrieveAPIView):
 
     def get_queryset(self):
         queryset = (
-            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
+            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED, *AI_SELECT_RELATED)
+            .defer("ai_assessment__campaign_embedding")
             .prefetch_related(
                 "fileOrMail__mail__mail_attachments",
                 "fileOrMail__mail__mail_artifacts",
@@ -180,7 +183,6 @@ class SubmissionDetailsView(RetrieveAPIView):
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
-                "campaign_membership__campaign__members",
             )
         )
         return submission_queryset(queryset, self.request.user)
