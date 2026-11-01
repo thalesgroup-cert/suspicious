@@ -61,14 +61,21 @@ class AiInferenceClient:
         return True, "ready, token accepted"
 
     def classify(self, mail_body: str) -> dict:
+        return self._post(_MODEL_PATH + "/classify", {"mail_body": mail_body, "versions": ["active"]})
+
+    def embed(self, texts: list[str], profile: str) -> dict:
+        """POST /v2/embed: {"vectors", "preprocessing_version", "embedding_version"}.
+        Same error handling as classify."""
+        return self._post("/v2/embed", {"texts": texts, "profile": profile})
+
+    def _post(self, path: str, payload: dict) -> dict:
         """The server's JSON answer. ProviderUnavailable for what a retry may fix (connection,
         timeout, 5xx), and, with retryable=False, for what only an operator can (models or
         vectorizer not loaded, token missing or rejected, wrong url, rate limit); ValueError
         when the server refused just this request (400, 413, 422 and other 4xx)."""
         try:
             response = self.session.post(
-                self.url + _MODEL_PATH + "/classify",
-                json={"mail_body": mail_body, "versions": ["active"]},
+                self.url + path, json=payload,
                 headers=self._headers, timeout=self.timeout,
             )
         except requests.RequestException as exc:

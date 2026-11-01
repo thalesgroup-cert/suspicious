@@ -138,3 +138,27 @@ class ReadyTest(SimpleTestCase):
         ok, detail = client.ready()
         self.assertFalse(ok)
         self.assertIn("ConnectionError", detail)
+
+
+class EmbedTest(SimpleTestCase):
+    def test_posts_texts_and_profile_with_the_token_and_returns_the_json(self):
+        answer = {"vectors": [[0.1]], "preprocessing_version": "legacy-first128", "embedding_version": "cmp-e1"}
+        client = client_with(post=mock.Mock(return_value=reply(200, answer)))
+        self.assertEqual(client.embed(["hi"], "campaign"), answer)
+        client.session.post.assert_called_once_with(
+            f"{URL}/v2/embed", json={"texts": ["hi"], "profile": "campaign"},
+            headers={"Authorization": "Bearer s3cret"}, timeout=7,
+        )
+
+    def test_503_is_provider_unavailable(self):
+        client = client_with(post=mock.Mock(return_value=reply(503, {"detail": "Vectorizer unavailable: still loading"})))
+        with self.assertRaises(ProviderUnavailable) as caught:
+            client.embed(["hi"], "classifier")
+        self.assertTrue(caught.exception.retryable)
+
+    def test_error_text_carries_the_status_never_the_body(self):
+        client = client_with(post=mock.Mock(return_value=reply(422, {"detail": "SECRET MAIL TEXT"}, text="SECRET MAIL TEXT")))
+        with self.assertRaises(ValueError) as caught:
+            client.embed(["SECRET MAIL TEXT"], "classifier")
+        self.assertIn("422", str(caught.exception))
+        self.assertNotIn("SECRET", str(caught.exception))
