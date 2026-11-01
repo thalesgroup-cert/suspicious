@@ -9,14 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An "AI model assessment" section in the submission drawer and the investigation overview, shown
+  while the `ai_model` connector is enabled and the case has an assessment: class, confidence tier,
+  runner-up on tier Low, model version, campaign line and cross-check facts. Otherwise the older AI
+  classifier caption stays. The submission and investigation detail APIs gain `ai_assessment`.
 - The AI mail analyzer runs as a connector, `ai_model`, and no longer as a Cortex job. It is off by
   default. With the connector enabled, a mail is handed to it, and the result is stored as an
   `AiAssessment` per case (model version `v0` today) plus the case's AI result, score, confidence and
   category. The model server gets a `/v2` API (`AI_INFERENCE_TOKEN`): every `/v2` route except
   `/v2/health/live` and `/v2/health/ready` needs the token, and answers 503 when the server has none
   set. Set the same token in `integrations.ai_model.token`. See `docs/components/analyzers.md`. The
-  case view has no AI assessment section yet (a later change): the AI analyzer card reads Cortex
-  reports, so it stays empty for new cases. The AI result in the overview still shows.
+  AI analyzer card reads Cortex reports, so it stays empty for new cases. The AI result in the
+  overview still shows.
 - Campaign detection runs from the `ai_model` connector. Its `case_finalised` hook queues a Celery
   task, `connectors.tasks.run_campaign_detection`, that adds the mail to the ChromaDB collection
   `suspicious_mails` and, when the AI result is `DANGEROUS` and at least three similar mails are

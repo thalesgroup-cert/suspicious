@@ -75,7 +75,7 @@ Detailed in `docs/plans/2026-10-30-ai-model-connector-b-campaigns.md` (10 tasks:
 
 ## Plan C: Case view, AI assessment section
 
-**Status: detailed** in `docs/plans/2026-10-31-ai-model-connector-c-case-view.md` (5 tasks). The outline below is the earlier sketch; the detailed plan's Calls table supersedes it (backend null instead of a UI connector hook, legacy caption kept for cases without an assessment, sibling labels wait for Plan D).
+**Status: done**, built on feature/ai-model-case-view, not merged. Detailed plan: `docs/plans/2026-10-31-ai-model-connector-c-case-view.md` (5 tasks). The outline below is the earlier sketch; the detailed plan's Calls table supersedes it (backend null instead of a UI connector hook, legacy caption kept for cases without an assessment, sibling labels wait for Plan D).
 
 Deliverable: the case drawer and investigation overview show the new section only while the connector is enabled.
 

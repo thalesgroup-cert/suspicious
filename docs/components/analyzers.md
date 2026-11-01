@@ -160,10 +160,24 @@ over `suspicious_net`, stores the answer as one `AiAssessment` per case (with th
 `v0` today), fills the case's AI result, score, confidence and category, closes the row and queues
 the case's reconcile.
 
-**The case view has no AI assessment section yet.** The AI analyzer card reads the Cortex AI
-analyzer's report (an `AnalyzerReport`), and the connector does not create one, so it stays empty
-for new cases. The AI result in the overview still shows, because it comes from the case's own
-fields. The case view gets its AI section in a later change.
+### Case view
+
+With the connector enabled, the submission drawer and the investigation overview show an "AI model
+assessment" section for a case that has an `AiAssessment`. It shows the class and sub-class, a
+confidence tier chip with its meaning (High, Medium, Low), the runner-up class on tier Low, the
+model version and how long ago it ran, the campaign reference and size when the case is in a
+campaign, and the cross-check facts. The facts are the decisive rule of the verdict, the counted
+sources with their verdicts, and the allow or deny list hit; a warning reads "AI disagrees with the
+evidence" when the AI class and the case band sit on opposite sides of Safe and Dangerous. No
+numeric confidence is shown. Similar cases are listed only when the viewer may open them, and the
+list is empty until the label ledger exists (Plan D).
+
+The API field `ai_assessment` is `null`, and the older "AI classifier" caption stays, when the
+connector is disabled, when the case has no assessment row (for example a case analysed by the old
+Cortex job), and when the serializer has no request. Version 0 has no tier, so the section says
+"Confidence not calibrated". The campaign line shows reference and size only: sibling labels and
+the "campaign members disagree" flag arrive with the label ledger (Plan D). The AI analyzer card
+still reads Cortex AI reports, so it stays empty for new cases.
 
 ### Campaign detection
 
