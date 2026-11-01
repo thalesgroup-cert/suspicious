@@ -6,7 +6,8 @@ import torch
 
 from training import recipe
 from training.recipe import (
-    HEADS, PREPROCESSING_VERSION_TOKENS, PREPROCESSING_VERSION_WORDS90, T_BOUNDS, Heads, Knn,
+    HEADS, PREPROCESSING_VERSION, PREPROCESSING_VERSION_TOKENS, PREPROCESSING_VERSION_WORDS90,
+    T_BOUNDS, Heads, Knn,
     Predictions, chunk_by_tokens, chunk_mean_embedding, fit_heads, fit_temperature, fit_temperatures,
     head_target, predict, smooth, temperature_at_bound, truncation_rate,
 )
@@ -212,13 +213,22 @@ class _FakeVectorizer:
 def test_chunk_mean_embedding_averages_90_word_chunks_up_to_8():
     v = _FakeVectorizer()
     text = " ".join(["w"] * 200)
-    e = chunk_mean_embedding(v, text)
+    e = chunk_mean_embedding(v, text, by_tokens=False)
     assert [len(c.split()) for c in v.calls[0]] == [90, 90, 20]
     np.testing.assert_allclose(e, [200 / 3, 1.0])
-    chunk_mean_embedding(v, " ".join(["w"] * 2000))
+    chunk_mean_embedding(v, " ".join(["w"] * 2000), by_tokens=False)
     assert len(v.calls[1]) == 8
     assert v.calls[1][0].split() == ["w"] * 90
-    np.testing.assert_allclose(chunk_mean_embedding(v, ""), [0.0, 1.0])
+    np.testing.assert_allclose(chunk_mean_embedding(v, "", by_tokens=False), [0.0, 1.0])
+
+
+def test_chunk_mean_embedding_defaults_to_token_chunks():
+    # Ruling E16: the window is 20 tokens, so 9 words per chunk (18 + CLS/SEP).
+    v = _FakeVectorizer()
+    text = " ".join(["w"] * 25)
+    np.testing.assert_allclose(chunk_mean_embedding(v, text), [25 / 3, 1.0])
+    assert [len(c.split()) for c in v.calls[0]] == [9, 9, 7]
+    assert PREPROCESSING_VERSION == PREPROCESSING_VERSION_TOKENS
 
 
 def test_truncation_rate_counts_chunks_over_the_window():

@@ -2,8 +2,8 @@
 
 The slow test needs the real dataset as an .npz made by tools/dataset_to_npz.py, kept outside the
 repository: AI_EVAL_DATASET=<path> python -m pytest tests -m slow. Optional: AI_EVAL_EMBEDDING
-(the array to evaluate, default embeddings_words90), AI_EVAL_REPEATS (default 3), AI_EVAL_REPORT
-(write the gate report as JSON there; counts and metrics only).
+(the array to evaluate, default embeddings_tokens, Ruling E16), AI_EVAL_REPEATS (default 3),
+AI_EVAL_REPORT (write the gate report as JSON there; counts and metrics only).
 """
 import json
 import os
@@ -114,7 +114,7 @@ def _stub_baseline(recipe):
 @pytest.mark.slow
 @pytest.mark.skipif(not os.environ.get("AI_EVAL_DATASET"), reason="AI_EVAL_DATASET is not set")
 def test_recipe_reproduces_the_spec_evidence_on_the_real_dataset():
-    key = os.environ.get("AI_EVAL_EMBEDDING", "embeddings_words90")
+    key = os.environ.get("AI_EVAL_EMBEDDING", "embeddings_tokens")
     with np.load(os.environ["AI_EVAL_DATASET"], allow_pickle=False) as d:
         X, folders, first128 = d[key], d["folders"], d["embeddings"]
     # Groups on the first-128-token embeddings, as in the test bed and spec E8.

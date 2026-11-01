@@ -21,9 +21,10 @@ DANGEROUS_ORDER = {"2_CLASSIC_PHISHING": 0, "2_CLONE_PHISHING": 1, "2_BLACKMAILI
 SUB_HEADS = ("safe", "unwanted", "dangerous")
 K = 5
 TRUNCATION_LIMIT = 0.05  # Ruling E11: above this share of truncated chunks, chunk by tokens
-# Ruling E11: the preprocessing version names the chunking; Task 5 picks one of the two.
+# Ruling E11: the preprocessing version names the chunking; Ruling E16 made tokens the default.
 PREPROCESSING_VERSION_WORDS90 = "chunkmean-words90-v1"
 PREPROCESSING_VERSION_TOKENS = "chunkmean-tokens-v1"
+PREPROCESSING_VERSION = PREPROCESSING_VERSION_TOKENS  # Ruling E16: the default chunking
 EPS = 0.05  # exp_e_combined.smooth
 T_BOUNDS = (0.2, 30)  # exp_e_combined.fitT / exp_a2_calibrate
 COMPONENTS = ("hierarchy", "knn")
@@ -83,12 +84,13 @@ def chunk_by_tokens(vectorizer, text: str, *, max_chunks: int = 8) -> list[str]:
 
 
 def chunk_mean_embedding(vectorizer, text: str, *, words: int = 90, max_chunks: int = 8,
-                         by_tokens: bool = False) -> np.ndarray:
+                         by_tokens: bool = True) -> np.ndarray:
     """Mean of the embeddings of the text's chunks, at most max_chunks of them.
 
-    Default (by_tokens=False): 90-word chunks, PREPROCESSING_VERSION_WORDS90, the form the spec's
-    evidence was measured on. by_tokens=True: chunks sized to the encoder window,
-    PREPROCESSING_VERSION_TOKENS. The caller records the matching version in the manifest."""
+    Default (by_tokens=True, Ruling E16): chunks sized to the encoder window,
+    PREPROCESSING_VERSION_TOKENS. by_tokens=False: 90-word chunks, PREPROCESSING_VERSION_WORDS90,
+    the form the spec's evidence was measured on. The caller records the matching version in the
+    manifest."""
     chunks = chunk_by_tokens(vectorizer, text, max_chunks=max_chunks) if by_tokens \
         else _word_chunks(text, words, max_chunks)
     return np.asarray(vectorizer.encode(chunks), dtype=np.float32).mean(axis=0)
