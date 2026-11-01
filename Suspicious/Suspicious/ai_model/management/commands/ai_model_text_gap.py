@@ -4,10 +4,12 @@ similarity of their "classifier" embeddings (Plan E, Task 1, Ruling E3).
 
 Read-only: no ledger or database writes, the mailbox is opened read-only. Prints counts and
 statistics only: never mail text, subjects, addresses, usernames or case ids."""
+import imaplib
 import math
 import statistics
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import DatabaseError
 
 from ai_model import ledger
 from ai_model.models import LabelRecord
@@ -55,13 +57,21 @@ class Command(BaseCommand):
         if not config.get("imap_host"):
             raise CommandError("no imap_host configured for the ai_model connector")
 
-        skipped = {"no archive": 0, "no IMAP row": 0, "UIDVALIDITY mismatch": 0, "fetch failed": 0}
+        try:
+            raw = config.get("imap_port")
+            port = 993 if raw in (None, "") else int(raw)
+            if not 0 < port < 65536:
+                raise ValueError
+        except (TypeError, ValueError):
+            raise CommandError("invalid imap_port") from None
+        skipped = {"no archive": 0, "bad locator": 0, "UIDVALIDITY mismatch": 0, "fetch failed": 0,
+                   "zero vector": 0}
         pairs = []  # (label_class, live text, filed text)
-        rows = (LabelRecord.objects.filter(source=LabelRecord.Source.IMAP_FOLDER, case__isnull=False)
-                .exclude(status=LabelRecord.Status.SUPERSEDED).select_related("case").order_by("-pk")
-                [:max(opts["limit"], 0)])
         imap = None
         try:
+            rows = (LabelRecord.objects.filter(source=LabelRecord.Source.IMAP_FOLDER, case__isnull=False)
+                    .exclude(status=LabelRecord.Status.SUPERSEDED).select_related("case").order_by("-pk")
+                    [:max(opts["limit"], 0)])
             for row in rows:
                 try:
                     live = read_archive_body(mail_archive_for(row.case))
@@ -72,11 +82,11 @@ class Command(BaseCommand):
                     continue
                 where = _locator(row.source_ref)
                 if where is None:
-                    skipped["no IMAP row"] += 1
+                    skipped["bad locator"] += 1
                     continue
                 if imap is None:
                     imap = imap_sync.connect(
-                        config.get("imap_host"), int(config.get("imap_port") or 993),
+                        config.get("imap_host"), port,
                         config.get("imap_user") or "", config.get("imap_password") or "",
                         config.get("imap_use_ssl", True) is not False)
                 try:
@@ -90,9 +100,9 @@ class Command(BaseCommand):
                     skipped["fetch failed"] += 1
                     continue
                 pairs.append((row.label_class, live, mail.text))
-            sims = self._similarities(connector, pairs)
+            sims = self._similarities(connector, pairs, skipped)
         except (imap_sync.ImapConnectionLost, imap_sync.ImapLoginFailed, imap_sync.ImapTlsFailed,
-                ProviderUnavailable, ValueError) as exc:
+                ProviderUnavailable, ValueError, OSError, imaplib.IMAP4.error, DatabaseError) as exc:
             raise CommandError(type(exc).__name__) from None
         finally:
             if imap is not None:
@@ -111,14 +121,18 @@ class Command(BaseCommand):
             for label_class in sorted({c for c, _ in sims}):
                 out(f"  {label_class}: median {statistics.median(s for c, s in sims if c == label_class):.4f}")
 
-    def _similarities(self, connector, pairs):
+    def _similarities(self, connector, pairs, skipped):
         client = connector._client()
         sims = []
         for i in range(0, len(pairs), BATCH):
             chunk = pairs[i:i + BATCH]
-            texts = [t for _, live, filed in chunk for t in (live, filed)]
-            vectors = client.embed(texts, "classifier")["vectors"]
-            if len(vectors) != len(texts):
+            live = client.embed([p[1] for p in chunk], "classifier")["vectors"]
+            filed = client.embed([p[2] for p in chunk], "classifier")["vectors"]
+            if len(live) != len(chunk) or len(filed) != len(chunk):
                 raise ValueError("embed answer size")
-            sims += [(c, cosine(vectors[2 * n], vectors[2 * n + 1])) for n, (c, _, _) in enumerate(chunk)]
+            for (label_class, _, _), a, b in zip(chunk, live, filed):
+                if not any(a) or not any(b):
+                    skipped["zero vector"] += 1
+                else:
+                    sims.append((label_class, cosine(a, b)))
         return sims

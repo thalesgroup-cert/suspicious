@@ -319,3 +319,32 @@ class SkipLogTest(SimpleTestCase):
         line = next(m for m in logs.output if "skipped a mail" in m)
         self.assertIn(imap_sync._shown(folder), line)
         self.assertNotIn(folder, line)
+
+
+class FetchOneTest(SimpleTestCase):
+    def test_reads_one_mail_read_only_with_peek_only(self):
+        imap = fake({3: forward(1), 4: forward(2)})
+        mail = imap_sync.fetch_one(imap, FOLDER, 7, 4)
+        self.assertEqual((mail.uid, mail.uidvalidity, mail.message_id), (4, 7, "id.2@evil.example"))
+        self.assertEqual([c[2] for c in imap.commands if c[0] == "SELECT"], [True])
+        fetches = [c[3] for c in imap.commands if c[:2] == ("UID", "FETCH")]
+        self.assertEqual(fetches, ["(RFC822.SIZE)", "(BODY.PEEK[])"])
+
+    def test_oversize_is_refused_without_a_body_fetch(self):
+        imap = fake({3: forward(1)}, sizes={3: imap_sync.MAX_MESSAGE_BYTES + 1})
+        self.assertIsNone(imap_sync.fetch_one(imap, FOLDER, 7, 3))
+        self.assertNotIn("(BODY.PEEK[])", [c[3] for c in imap.commands if c[:2] == ("UID", "FETCH")])
+
+    def test_forbidden_folder_names_are_rejected_before_any_command(self):
+        for name in ("a\r\nA1 DELETE x", "bad\nname", "caf\u00e9"):
+            imap = fake({3: forward(1)})
+            with self.assertRaises(FolderUnavailable):
+                imap_sync.fetch_one(imap, name, 7, 3)
+            self.assertEqual(imap.commands, [])
+
+    def test_missing_uid_is_none_and_uidvalidity_mismatch_raises(self):
+        self.assertIsNone(imap_sync.fetch_one(fake({3: forward(1)}), FOLDER, 7, 99))
+        imap = fake({3: forward(1)}, uidvalidity=8)
+        with self.assertRaises(imap_sync.UidValidityChanged):
+            imap_sync.fetch_one(imap, FOLDER, 7, 3)
+        self.assertNotIn("FETCH", [c[1] for c in imap.commands if c[0] == "UID"])
