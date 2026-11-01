@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from ai_model.models import AiAssessment
-from ai_model.presentation import cross_check, present_assessment
+from ai_model.presentation import _campaign, cross_check, present_assessment
 from case_handler.models import Campaign, CampaignMember, Case
 
 EXPLANATION = {
@@ -38,7 +38,7 @@ class PresentAssessmentTest(TestCase):
         out = self._present()
         self.assertEqual(out["tier"], "")
         self.assertIsNone(out["runner_up"])
-        self.assertEqual(out["result"], "DANGEROUS")
+        self.assertEqual(out["result"], "Dangerous")
         self.assertEqual(out["model_version"], "v0")
         self.assertEqual(out["analysed_at"], a.updated_at)
         self.assertEqual(out["reads"], "body only")
@@ -50,6 +50,11 @@ class PresentAssessmentTest(TestCase):
             probabilities={"Dangerous": 0.48, "Safe": 0.42, "Unwanted": 0.10},
         )
         self.assertEqual(self._present()["runner_up"], {"result": "Safe"})
+
+    def test_uppercase_storage_is_shown_in_title_case(self):
+        self._assess(tier="low", probabilities={"DANGEROUS": 0.48, "UNWANTED": 0.42, "SAFE": 0.1})
+        out = self._present()
+        self.assertEqual((out["result"], out["runner_up"]), ("Dangerous", {"result": "Unwanted"}))
 
     def test_high_tier_has_no_runner_up(self):
         self._assess(tier="high", probabilities={"Dangerous": 0.9, "Safe": 0.1})
@@ -70,6 +75,18 @@ class PresentAssessmentTest(TestCase):
             other = Case.objects.create(description="", reporter=self.other)
             CampaignMember.objects.create(campaign=campaign, case=other)
         self.assertEqual(self._present()["campaign"], {"ref": campaign.ref, "size": 3})
+
+    def test_prefetched_campaign_size_runs_no_query(self):
+        self._assess()
+        campaign = Campaign.objects.create()
+        CampaignMember.objects.create(campaign=campaign, case=self.case)
+        case = (
+            Case.objects.select_related("ai_assessment")
+            .prefetch_related("campaign_membership__campaign__members")
+            .get(pk=self.case.pk)
+        )
+        with self.assertNumQueries(0):
+            self.assertEqual(_campaign(case), {"ref": campaign.ref, "size": 1})
 
     def test_case_outside_a_campaign_has_no_campaign(self):
         self._assess()

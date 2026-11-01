@@ -10,12 +10,17 @@ from case_handler.models import Case
 _AXIS = {"SAFE", "DANGEROUS"}  # the only classes that can disagree
 
 
+def _display(name: str) -> str:
+    """Stored classes are uppercase (AiAssessment.Result); people read title case."""
+    return str(name).title()
+
+
 def _runner_up(assessment):
     if assessment.tier != "low":
         return None
     ranked = sorted(assessment.probabilities.items(), key=lambda kv: kv[1], reverse=True)
     others = [name for name, _ in ranked if name.upper() != assessment.result.upper()]
-    return {"result": others[0]} if others else None
+    return {"result": _display(others[0])} if others else None
 
 
 def _visible_similar_cases(assessment, user):
@@ -34,7 +39,7 @@ def _campaign(case):
     if membership is None:
         return None
     campaign = membership.campaign
-    return {"ref": campaign.ref, "size": campaign.members.count()}
+    return {"ref": campaign.ref, "size": len(campaign.members.all())}  # uses a prefetch when present
 
 
 def cross_check(case, assessment) -> dict:
@@ -64,7 +69,7 @@ def present_assessment(case, user) -> dict | None:
     if assessment is None:
         return None
     return {
-        "result": assessment.result,
+        "result": _display(assessment.result),
         "sub_class": assessment.sub_class,
         "tier": assessment.tier,
         "runner_up": _runner_up(assessment),
