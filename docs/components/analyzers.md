@@ -166,14 +166,19 @@ With the connector enabled, the submission drawer and the investigation overview
 assessment" section for a case that has an `AiAssessment`. It shows the class and sub-class, a
 confidence tier chip with its meaning (High, Medium, Low), the runner-up class on tier Low, the
 model version and how long ago it ran, the campaign reference and size when the case is in a
-campaign, and the cross-check facts. The facts are the decisive rule of the verdict, the counted
-sources with their verdicts, and the allow or deny list hit; a warning reads "AI disagrees with the
-evidence" when the AI class and the case band sit on opposite sides of Safe and Dangerous. No
+campaign, and the cross-check facts. The model reads the mail body text only, not the headers or
+attachments. The facts are the decisive rule of the verdict, the counted sources with their
+verdicts, and the allow or deny list hit; a warning reads "AI disagrees with the evidence" when the
+AI class and the case verdict sit on opposite sides of Safe and Dangerous (the stored explanation
+band, or the case's current result when there is no explanation, so an analyst override counts).
+When the AI itself set the verdict (rule `ai-classifier-decisive`) the facts say "No independent
+evidence beyond the AI" and the warning never shows. The cross-check is analyst material: a
+reporter viewing their own submission gets no cross-check block (`cross_check` is `null`). No
 numeric confidence is shown. Similar cases are listed only when the viewer may open them, and the
 list is empty until the label ledger exists (Plan D).
 
 The API field `ai_assessment` is `null`, and the older "AI classifier" caption stays, when the
-connector is disabled, when the case has no assessment row (for example a case analysed by the old
+connector is disabled or not registered, when the case has no assessment row or its model version is blank (for example a case analysed by the old
 Cortex job), and when the serializer has no request. Version 0 has no tier, so the section says
 "Confidence not calibrated". The campaign line shows reference and size only: sibling labels and
 the "campaign members disagree" flag arrive with the label ledger (Plan D). The AI analyzer card

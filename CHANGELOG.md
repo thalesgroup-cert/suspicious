@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - An "AI model assessment" section in the submission drawer and the investigation overview, shown
   while the `ai_model` connector is enabled and the case has an assessment: class, confidence tier,
-  runner-up on tier Low, model version, campaign line and cross-check facts. Otherwise the older AI
-  classifier caption stays. The submission and investigation detail APIs gain `ai_assessment`.
+  runner-up on tier Low, model version, campaign line and, for analysts only, cross-check facts
+  (`cross_check` is `null` for a reporter). Otherwise the older AI classifier caption stays. The submission and investigation detail APIs gain `ai_assessment`.
 - The AI mail analyzer runs as a connector, `ai_model`, and no longer as a Cortex job. It is off by
   default. With the connector enabled, a mail is handed to it, and the result is stored as an
   `AiAssessment` per case (model version `v0` today) plus the case's AI result, score, confidence and

@@ -50,12 +50,14 @@
   "runner_up": {"result": "Safe"} | null,
   "model_version": "v0",
   "analysed_at": "2026-10-31T10:00:00Z",
-  "reads": "body only",
+  "reads": "body text only, not headers or attachments",
   "similar_cases": [{"case_id": 12, "similarity": 0.91, "label": "Dangerous", "provenance": "analyst"}],
   "campaign": {"ref": "261031-865a1", "size": 9} | null,
-  "cross_check": {"facts": [{"kind": "rule" | "source" | "list", "text": "..."}], "disagrees": false}
+  "cross_check": {"facts": [{"kind": "rule" | "source" | "list", "text": "..."}], "disagrees": false} | null
 }
 ```
+
+`cross_check` is `null` for a viewer without `has_elevated_view` (a reporter): the decisive rule and the list reason are analyst material, as `raw` is. When the decisive rule is `ai-classifier-decisive`, the facts hold one rule fact, "No independent evidence beyond the AI", and `disagrees` is false. Without a verdict explanation, `disagrees` compares with `Case.results`. The whole payload is `null` when the assessment has no `model_version`, and a tier outside high, medium and low is sent as `""`.
 
 ---
 
