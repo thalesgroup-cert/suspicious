@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
             name='LabelRecord',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('message_id', models.CharField(db_index=True, max_length=998)),
+                ('message_id', models.CharField(max_length=998)),
                 ('message_id_hash', models.CharField(db_index=True, max_length=64)),
                 ('source', models.CharField(choices=[('imap_folder', 'Imap Folder'), ('analyst_verdict', 'Analyst Verdict'), ('challenge', 'Challenge')], max_length=20)),
                 ('source_ref', models.CharField(blank=True, max_length=255)),

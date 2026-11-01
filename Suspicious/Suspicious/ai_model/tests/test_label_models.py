@@ -67,3 +67,13 @@ class LabelRecordTest(TestCase):
             self.assertFalse(ma.has_add_permission(req))
             self.assertFalse(ma.has_change_permission(req))
             self.assertFalse(ma.has_delete_permission(req))
+
+
+class LabelMigrationTest(TestCase):
+    def test_message_id_is_not_indexed_and_migrations_are_complete(self):
+        # Lookups go through message_id_hash; a 998-character index is only write cost.
+        from io import StringIO
+        from django.core.management import call_command
+        self.assertFalse(LabelRecord._meta.get_field("message_id").db_index)
+        self.assertTrue(LabelRecord._meta.get_field("message_id_hash").db_index)
+        call_command("makemigrations", "ai_model", "--check", "--dry-run", stdout=StringIO())

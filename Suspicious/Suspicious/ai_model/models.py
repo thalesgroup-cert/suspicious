@@ -58,7 +58,7 @@ class LabelRecord(models.Model):
         SUPERSEDED = "superseded"
         FLAGGED = "flagged"
 
-    message_id = models.CharField(max_length=998, db_index=True)
+    message_id = models.CharField(max_length=998)  # looked up through message_id_hash
     message_id_hash = models.CharField(max_length=64, db_index=True)
     case = models.ForeignKey(
         "case_handler.Case",
