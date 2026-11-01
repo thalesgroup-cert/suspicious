@@ -21,7 +21,7 @@ _NEEDS_OPERATOR = re.compile(
 _SETUP_REFUSED = {
     401: "rejected the token",
     403: "forbade the request, check the token",
-    404: "has no ai_mail endpoint, check the url",
+    404: "has no {path} endpoint, check the url and the image version",
     407: "needs proxy authentication",
     408: "timed out waiting for the request",
     429: "is rate limiting requests",
@@ -88,7 +88,7 @@ class AiInferenceClient:
             raise ProviderUnavailable(f"inference server HTTP {status}{suffix}", retryable=not needs_operator)
         if status in _SETUP_REFUSED:
             raise ProviderUnavailable(
-                f"inference server {_SETUP_REFUSED[status]} (HTTP {status})", retryable=False
+                f"inference server {_SETUP_REFUSED[status].format(path=path)} (HTTP {status})", retryable=False
             )
         if status != 200:
             # The status only: a 422 detail echoes the request body, so the mail text.

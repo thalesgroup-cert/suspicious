@@ -95,6 +95,18 @@ class ClassifyTest(SimpleTestCase):
             client.classify("x")
         self.assertEqual(str(caught.exception), "inference server rejected the token (HTTP 401)")
 
+    def test_a_404_names_the_real_path(self):
+        client = client_with(post=mock.Mock(return_value=reply(404, {"detail": "Not Found"})))
+        with self.assertRaises(ProviderUnavailable) as caught:
+            client.embed(["x"], "classifier")
+        self.assertEqual(
+            str(caught.exception),
+            "inference server has no /v2/embed endpoint, check the url and the image version (HTTP 404)",
+        )
+        with self.assertRaises(ProviderUnavailable) as caught:
+            client.classify("x")
+        self.assertIn("no /v2/models/ai_mail/classify endpoint", str(caught.exception))
+
     def test_a_refusal_of_this_request_is_a_value_error_and_never_echoes_the_token(self):
         for status in (400, 409, 413, 422):  # 409: an unlisted 4xx counts as request-specific
             with self.subTest(status=status):
