@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from ai_model.models import AiAssessment
 from ai_model.presentation import _campaign, cross_check, present_assessment
@@ -87,6 +89,17 @@ class PresentAssessmentTest(TestCase):
         )
         with self.assertNumQueries(0):
             self.assertEqual(_campaign(case), {"ref": campaign.ref, "size": 1})
+
+    def test_campaign_size_without_prefetch_only_counts(self):
+        campaign = Campaign.objects.create()
+        CampaignMember.objects.create(campaign=campaign, case=self.case)
+        other = Case.objects.create(description="", reporter=self.other)
+        CampaignMember.objects.create(campaign=campaign, case=other)
+        case = Case.objects.select_related("campaign_membership__campaign").get(pk=self.case.pk)
+        with CaptureQueriesContext(connection) as ctx:
+            self.assertEqual(_campaign(case), {"ref": campaign.ref, "size": 2})
+        self.assertEqual(len(ctx.captured_queries), 1)
+        self.assertIn("COUNT(", ctx.captured_queries[0]["sql"].upper())
 
     def test_case_outside_a_campaign_has_no_campaign(self):
         self._assess()

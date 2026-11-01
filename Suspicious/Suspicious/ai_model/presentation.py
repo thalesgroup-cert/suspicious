@@ -39,7 +39,7 @@ def _campaign(case):
     if membership is None:
         return None
     campaign = membership.campaign
-    return {"ref": campaign.ref, "size": len(campaign.members.all())}  # uses a prefetch when present
+    return {"ref": campaign.ref, "size": campaign.members.count()}  # served from a prefetch when present
 
 
 def cross_check(case, assessment) -> dict:
