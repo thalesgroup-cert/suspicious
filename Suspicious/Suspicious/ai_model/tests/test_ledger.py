@@ -305,6 +305,26 @@ class ResolveFlagTest(CaseMixin, TestCase):
         with self.assertRaises(ValueError):
             ledger.resolve_flag(row, self.user, "", keep=True)
 
+    def test_keep_supersedes_and_annotates_a_row_active_in_another_folder(self):
+        row = self.flagged()
+        other = LabelRecord.objects.create(message_id=row.message_id, message_id_hash=row.message_id_hash,
+                                           source="imap_folder", label="1_SPAM", label_class="Unwanted",
+                                           trust="folder")
+        ledger.resolve_flag(row, self.user, "folder is right", keep=True)
+        other.refresh_from_db()
+        self.assertEqual((other.status, other.resolved_by, other.resolution_note),
+                         ("superseded", self.user, f"superseded by resolution of row {row.pk}"))
+        self.assertIsNotNone(other.resolved_at)
+
+    def test_a_stale_instance_cannot_resolve_twice(self):
+        row = self.flagged()
+        stale = LabelRecord.objects.get(pk=row.pk)
+        ledger.resolve_flag(row, self.user, "first", keep=False)
+        with self.assertRaises(ValueError):
+            ledger.resolve_flag(stale, self.user, "second", keep=True)
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.resolution_note), ("superseded", "first"))
+
     def test_drop_supersedes(self):
         row = self.flagged()
         ledger.resolve_flag(row, self.user, "verdict is right", keep=False)

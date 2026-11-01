@@ -214,17 +214,24 @@ def record_challenge(case, proposed) -> LabelRecord | None:
 
 
 def resolve_flag(record, user, note, *, keep: bool) -> None:
-    """Close a flag: keep makes the row active again (superseding any other active folder row of
-    the message), else it is superseded. flag_reason stays as the audit trail (ruling D4)."""
-    if record.status != FLAGGED:
-        raise ValueError("only a flagged row can be resolved")
+    """Close a flag: keep makes the row active again, else it is superseded. flag_reason stays as the
+    audit trail (ruling D4). The row is re-read under a row lock, so a stale instance or a second
+    resolver gets ValueError. With keep, any other active folder row of the message is superseded
+    and carries the same resolution, naming this row."""
     with transaction.atomic():
-        if keep and record.source == LabelRecord.Source.IMAP_FOLDER:
-            _folder_rows(record.message_id_hash).filter(status=ACTIVE).exclude(pk=record.pk).update(
-                status=SUPERSEDED)
-        record.status = ACTIVE if keep else SUPERSEDED
-        record.resolved_by, record.resolved_at, record.resolution_note = user, dj_timezone.now(), note
-        record.save(update_fields=["status", "resolved_by", "resolved_at", "resolution_note"])
+        fresh = LabelRecord.objects.select_for_update().get(pk=record.pk)
+        if fresh.status != FLAGGED:
+            raise ValueError("only a flagged row can be resolved")
+        now = dj_timezone.now()
+        if keep and fresh.source == LabelRecord.Source.IMAP_FOLDER:
+            _folder_rows(fresh.message_id_hash).filter(status=ACTIVE).exclude(pk=fresh.pk).update(
+                status=SUPERSEDED, resolved_by=user, resolved_at=now,
+                resolution_note=f"superseded by resolution of row {fresh.pk}")
+        fresh.status = ACTIVE if keep else SUPERSEDED
+        fresh.resolved_by, fresh.resolved_at, fresh.resolution_note = user, now, note
+        fresh.save(update_fields=["status", "resolved_by", "resolved_at", "resolution_note"])
+    record.status, record.resolved_by, record.resolved_at, record.resolution_note = (
+        fresh.status, fresh.resolved_by, fresh.resolved_at, fresh.resolution_note)
 
 
 def ledger_summary() -> dict:
