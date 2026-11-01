@@ -127,7 +127,7 @@ export type AiAssessment = {
     provenance: string | null;
   }[];
   campaign: { ref: string; size: number } | null;
-  cross_check: { facts: { kind: "rule" | "source" | "list"; text: string }[]; disagrees: boolean };
+  cross_check: null | { facts: { kind: "rule" | "source" | "list"; text: string }[]; disagrees: boolean };
 };
 
 export type SubmissionDetails = SubmissionRow & {

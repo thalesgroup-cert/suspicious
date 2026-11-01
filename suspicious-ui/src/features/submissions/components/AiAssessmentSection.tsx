@@ -41,8 +41,8 @@ export function AiAssessmentSection({ assessment: a }: { assessment: AiAssessmen
       {a.campaign && (
         <Typography variant="body2">{`Campaign ${a.campaign.ref}, ${a.campaign.size} ${a.campaign.size === 1 ? "mail" : "mails"}`}</Typography>
       )}
-      {a.cross_check.disagrees && <Alert severity="warning">AI disagrees with the evidence</Alert>}
-      {a.cross_check.facts.length > 0 && (
+      {a.cross_check?.disagrees && <Alert severity="warning">AI disagrees with the evidence</Alert>}
+      {a.cross_check && a.cross_check.facts.length > 0 && (
         <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
           {a.cross_check.facts.map((f, i) => (
             <li key={i}><Typography variant="body2" component="span">{f.text}</Typography></li>

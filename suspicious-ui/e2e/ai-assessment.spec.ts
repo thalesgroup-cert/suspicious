@@ -37,6 +37,13 @@ async function setup(page: Page, aiAssessment: unknown) {
       body: JSON.stringify({ id: 1, username: "alice", email: "alice@corp.test", groups: ["CERT"] }),
     })
   );
+  await page.route("**/api/submissions/**", (route) => {
+    const detail = /\/submissions\/\d+\/$/.test(route.request().url());
+    const body = detail
+      ? { ...ROW, analyzer_reports: [], case_infos: {}, ai_assessment: aiAssessment }
+      : { count: 1, next: null, previous: null, results: [ROW] };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
   await page.route("**/api/investigations/**", (route) => {
     const detail = /\/investigations\/\d+\/$/.test(route.request().url());
     const body = detail
@@ -72,4 +79,13 @@ test("keeps the legacy AI classifier caption when ai_assessment is null", async 
 
   await expect(page.getByText("AI classifier")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "AI model assessment" })).toHaveCount(0);
+});
+
+test("submission drawer shows the section and omits the cross-check for a reporter", async ({ page }) => {
+  await setup(page, { ...ASSESSMENT, cross_check: null });
+  await page.goto("/submissions?q=7&open=7");
+
+  await expect(page.getByRole("heading", { name: "AI model assessment" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Campaign 261031-865a1, 9 mails")).toBeVisible();
+  await expect(page.getByText("Decisive rule: deny-listed")).toHaveCount(0);
 });

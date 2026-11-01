@@ -119,3 +119,10 @@ test.each([[""], ["not a date"]])("omits the age when analysed_at is %j", (analy
   expect(container.textContent).not.toContain("analysed");
   expect(container.textContent).not.toContain("not checked yet");
 });
+
+test("omits the cross-check block when cross_check is null", () => {
+  render(<AiAssessmentSection assessment={{ ...base, cross_check: null }} />);
+  expect(screen.getByRole("heading", { name: "AI model assessment" })).toBeInTheDocument();
+  expect(screen.queryByRole("listitem")).toBeNull();
+  expect(screen.queryByText("AI disagrees with the evidence")).toBeNull();
+});
