@@ -426,3 +426,33 @@ class MailArchiveForTest(TestCase):
     def test_no_archive_or_no_mail_gives_none(self):
         self.assertIsNone(mailtext.mail_archive_for(self.case))
         self.assertIsNone(mailtext.mail_archive_for(Case.objects.create(description="", reporter=self.user)))
+
+
+class TextFromMessageTest(SimpleTestCase):
+    def msg(self, plain=None, html=None, charset="utf-8"):
+        from email.message import EmailMessage
+        m = EmailMessage()
+        m["Subject"] = "s"
+        if plain is not None:
+            m.set_content(plain, charset=charset)
+        if html is not None:
+            if plain is None:
+                m.set_content(html, subtype="html", charset=charset)
+            else:
+                m.add_alternative(html, subtype="html")
+        return m
+
+    def test_plain_part_wins(self):
+        self.assertEqual(mailtext.text_from_message(self.msg("plain body", "<p>html body</p>")), "plain body")
+
+    def test_html_reduced_to_text(self):
+        html = "<style>p{}</style><p>Hello <b>there</b></p><script>evil()</script><p>bye</p>"
+        self.assertEqual(mailtext.text_from_message(self.msg(html=html)), "Hello there bye")
+
+    def test_charset_decoded(self):
+        self.assertEqual(mailtext.text_from_message(self.msg("caf\u00e9", charset="iso-8859-1")), "caf\u00e9")
+
+    def test_nothing_usable(self):
+        from email.message import EmailMessage
+        self.assertEqual(mailtext.text_from_message(EmailMessage()), "")
+        self.assertEqual(mailtext.text_from_message(self.msg(html="<script>x</script>")), "")

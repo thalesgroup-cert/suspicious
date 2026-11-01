@@ -6,6 +6,7 @@ which extracts the same archive for the Cortex analyzer."""
 from __future__ import annotations
 
 import email
+import html.parser
 import logging
 import os
 import tarfile
@@ -168,3 +169,41 @@ def _read_tar(mail_archive) -> tuple[str, str]:
         logger.warning("mail archive %s not readable: %s", getattr(stored, "pk", "?"), type(exc).__name__)
         return "", ""
     return headers, text
+
+
+class _TextOnly(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts, self._skip = [], 0
+
+    def handle_starttag(self, tag, attrs):
+        self._skip += tag in ("script", "style")
+
+    def handle_endtag(self, tag):
+        self._skip = max(0, self._skip - (tag in ("script", "style")))
+
+    def handle_data(self, data):
+        if not self._skip:
+            self.parts.append(data)
+
+
+def text_from_message(message) -> str:
+    """The plain part of an EmailMessage (policy=default), else its HTML part reduced to text; "" when
+    neither is usable."""
+    for kind in ("plain", "html"):
+        part = message.get_body(preferencelist=(kind,))
+        if part is None:
+            continue
+        try:
+            text = part.get_content()
+        except (LookupError, ValueError, UnicodeError, AttributeError):
+            continue
+        if kind == "html":
+            parser = _TextOnly()
+            parser.feed(text)
+            parser.close()
+            text = " ".join(" ".join(parser.parts).split())
+        text = text.strip()
+        if text:
+            return text
+    return ""
