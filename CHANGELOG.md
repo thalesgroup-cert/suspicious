@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A label ledger for the `ai_model` connector (`ai_model.models.LabelRecord`, append-only). A
+  nightly sync (schedule 86400 s) reads the analysts' review folders over IMAP, read-only
+  (`BODY.PEEK[]`), matches each forwarded mail to a case by Message-ID and stores its folder label,
+  its embeddings from the new `POST /v2/embed` route and a small snapshot, never the mail text. New
+  connector fields: `imap_host` (empty: no sync), `imap_port`, `imap_user`, `imap_password`
+  (secret), `imap_use_ssl` and `imap_folders` (the eight training folders by default). Analyst
+  verdicts and reporter challenge proposals add rows while the connector is enabled. A Dangerous
+  folder label against a Safe verdict, or the reverse, flags the folder row and keeps it out of
+  training until resolved. See "Label ledger" in `docs/components/analyzers.md`.
+- `python manage.py ai_model_backfill_labels [--folders] [--dry-run]` records verdict and proposal
+  rows for existing cases and, with `--folders`, syncs the review folders without the per-run cap
+  and time budget.
+- For analysts, the campaign line of the AI model assessment section shows the folder labels of the
+  other cases in the campaign ("Labelled by analysts: 3 Dangerous, 1 Safe") and a "Campaign members
+  disagree" warning. The API's `ai_assessment.campaign` gains `labels` and `members_disagree` for
+  elevated viewers only.
 - An "AI model assessment" section in the submission drawer and the investigation overview, shown
   while the `ai_model` connector is enabled and the case has an assessment: class, confidence tier,
   runner-up on tier Low, model version, campaign line and, for analysts only, cross-check facts

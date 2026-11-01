@@ -26,7 +26,7 @@
 - Version 0 has no tier (`AiAssessment.tier == ""`): the UI says "confidence not calibrated", never a made-up tier (Task 1, 3).
 - A case with no `AiAssessment` row (analysed by the old Cortex job): `null`, legacy caption stays (Task 2).
 - `similar_cases` naming a case the viewer may not open: that entry is dropped (Task 1).
-- Case in a campaign: the line shows reference and size; no sibling labels yet because no label store exists before Plan D (Task 1).
+- Case in a campaign: the line shows reference and size (Task 1); Plan D Task 8 adds the siblings' folder labels for analysts.
 - The detail endpoints add no query per case beyond the `select_related` (Task 2).
 
 ## Calls made in this plan
@@ -34,7 +34,7 @@
 - **Ruling C1: null from the backend, no UI hook on `connectors/enabled`.** The master outline had the UI read the enabled-connectors endpoint. One source of truth is simpler: the serializer returns `null` when the connector is disabled, and the UI renders on `null`. Cost if wrong: a stale payload cached by the client shows until refetch.
 - **Ruling C2: legacy caption stays when `ai_assessment` is `null`.** Spec section 8 hides stored sections when the module is off; it does not say the Cortex-era caption goes too. Keeping it leaves old cases informative. Cost if wrong: a one-line follow-up removes it.
 - **Ruling C3: no tier in version 0.** The server returns `tier: None` for version 0 (`inference_server/v2.py:68`). The UI does not derive one; it shows "Confidence not calibrated" and the runner-up is skipped (it appears only on tier `low`).
-- **Ruling C4: sibling labels, "campaign members disagree" and the review queue wait for Plan D.** No label field exists on `Case` or `CampaignMember` today. Plan C ships the campaign reference and size only.
+- **Ruling C4: sibling labels, "campaign members disagree" and the review queue wait for Plan D.** No label field exists on `Case` or `CampaignMember` today. Plan C ships the campaign reference and size only. Plan D Task 8 added the sibling labels and `members_disagree` from the label ledger; the review queue belongs to Plan G.
 - **Ruling C5: flagged links are not in the cross-check.** The verdict explanation has no flagged-link structure. The facts are: decisive rule, counted sources with their verdicts, and the allow/deny list hit from `Case.is_allowlisted`, `is_denylisted`, `list_reason`.
 - **Ruling C6: the cross-check is built on the server.** The drawer API does not serialize `verdict_explanation` today; building the facts in `presentation.py` serves both views and keeps the explanation private to the case's viewers.
 
@@ -52,12 +52,12 @@
   "analysed_at": "2026-10-31T10:00:00Z",
   "reads": "body text only, not headers or attachments",
   "similar_cases": [{"case_id": 12, "similarity": 0.91, "label": "Dangerous", "provenance": "analyst"}],
-  "campaign": {"ref": "261031-865a1", "size": 9} | null,
+  "campaign": {"ref": "261031-865a1", "size": 9, "labels": {"Dangerous": 3, "Safe": 1}, "members_disagree": true} | null,
   "cross_check": {"facts": [{"kind": "rule" | "source" | "list", "text": "..."}], "disagrees": false} | null
 }
 ```
 
-`cross_check` is `null` for a viewer without `has_elevated_view` (a reporter): the decisive rule and the list reason are analyst material, as `raw` is. When the decisive rule is `ai-classifier-decisive`, the facts hold one rule fact, "No independent evidence beyond the AI", and `disagrees` is false. Without a verdict explanation, `disagrees` compares with `Case.results`. The whole payload is `null` when the assessment has no `model_version`, and a tier outside high, medium and low is sent as `""`.
+`cross_check` is `null` for a viewer without `has_elevated_view` (a reporter): the decisive rule and the list reason are analyst material, as `raw` is. The same gate holds for `campaign.labels` and `campaign.members_disagree` (Plan D): a reporter's `campaign` has `ref` and `size` only. `labels` counts, per class (Dangerous, Unwanted, Safe, in that order, zero counts left out), the other members of the campaign with an active `imap_folder` ledger row; flagged and superseded rows do not count. `members_disagree` is true when those labels hold both Dangerous and Safe, or when this case's AI class is Dangerous and a sibling is labelled Safe, or the reverse. When the decisive rule is `ai-classifier-decisive`, the facts hold one rule fact, "No independent evidence beyond the AI", and `disagrees` is false. Without a verdict explanation, `disagrees` compares with `Case.results`. The whole payload is `null` when the assessment has no `model_version`, and a tier outside high, medium and low is sent as `""`.
 
 ---
 

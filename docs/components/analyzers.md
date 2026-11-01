@@ -124,6 +124,7 @@ no Cortex job.
 | `GET /v2/health/live` | no | `{"live": true}` while the process is up. |
 | `GET /v2/health/ready` | no | The same body as `/health`: `200` when the vectorizer and the `personal` models are loaded, otherwise `503`. |
 | `GET /v2/models/ai_mail` | yes | Model metadata: the versions the server holds. Today one, `active` (id `v0`), the legacy classifier. |
+| `POST /v2/embed` | yes | Body `{"texts": [...], "profile": "classifier"}` or `"campaign"`, at most 32 texts. Returns `{"vectors": [...], "preprocessing_version": "legacy-first128", "embedding_version": "cmp-e1"}`. In version 0 both profiles give the same vectors. `503` while the vectorizer is not loaded. The label sync uses it. |
 | `POST /v2/models/ai_mail/classify` | yes | Body `{"mail_body": "...", "versions": ["active"]}`. Returns the verdict under `results.active` (class, score, confidence, class and sub-class probabilities, contributing phrases) plus the campaign embedding, its version and the latency. `400` for any other `versions`, `503` when models or vectorizer are not loaded. |
 
 ### The token
@@ -174,14 +175,19 @@ band, or the case's current result when there is no explanation, so an analyst o
 When the AI itself set the verdict (rule `ai-classifier-decisive`) the facts say "No independent
 evidence beyond the AI" and the warning never shows. The cross-check is analyst material: a
 reporter viewing their own submission gets no cross-check block (`cross_check` is `null`). No
-numeric confidence is shown. Similar cases are listed only when the viewer may open them, and the
-list is empty until the label ledger exists (Plan D).
+numeric confidence is shown. Similar cases are listed only when the viewer may open them; the list
+is empty today, because the version 0 server returns no similar cases.
 
 The API field `ai_assessment` is `null`, and the older "AI classifier" caption stays, when the
 connector is disabled or not registered, when the case has no assessment row or its model version is blank (for example a case analysed by the old
 Cortex job), and when the serializer has no request. Version 0 has no tier, so the section says
-"Confidence not calibrated". The campaign line shows reference and size only: sibling labels and
-the "campaign members disagree" flag arrive with the label ledger (Plan D). The AI analyzer card
+"Confidence not calibrated". For an analyst the campaign line also gives the folder labels of the
+other cases in the campaign, for example "Labelled by analysts: 3 Dangerous, 1 Safe" (a count of
+cases per class, Dangerous, Unwanted, Safe in that order, from the active folder rows of the
+[label ledger](#label-ledger); flagged and superseded rows do not count). A warning reads
+"Campaign members disagree" when those labels hold both Dangerous and Safe, or when this case's AI
+class is Dangerous and a sibling is labelled Safe, or the reverse; Unwanted never counts. A reporter
+gets the reference and size only (`campaign` has no `labels` or `members_disagree` key). The AI analyzer card
 still reads Cortex AI reports, so it stays empty for new cases.
 
 ### Campaign detection
@@ -253,6 +259,124 @@ your campaign history.
   newest campaign can make live detection retry briefly while those locks are held: run it off-peak
   or expect retries.
 
+### Label ledger
+
+The label ledger (`ai_model.models.LabelRecord`) collects labelled mails for retraining (Plan E).
+It is append-only: a row is never changed except its `status`, `flag_reason` and the resolution
+fields (`resolved_by`, `resolved_at`, `resolution_note`).
+
+**What a row holds.** The normalised Message-ID (whitespace and angle brackets stripped,
+lower-cased; an id without `@` or above 998 characters counts as none) and its SHA-256, the matched
+case (null when no case matched), the source and a source reference, the label and its class, the
+trust level, when it was observed, the status and the flag reason. A folder row also holds the
+classifier and campaign embeddings with their `preprocessing_version` and `embedding_version`, and
+a small snapshot: the sender domain, the subject length, the case's allow and deny list hits and its
+AI result and model version at that moment. The ledger never stores the mail text, the subject or
+the sender address.
+
+| Source | Written by | Trust | Label |
+|---|---|---|---|
+| `imap_folder` | the nightly sync and the backfill command | `folder` | the folder name; class Safe, Unwanted or Dangerous |
+| `analyst_verdict` | an analyst verdict on an investigation, while `ai_model` is enabled | `verdict` | the verdict (Safe, Unwanted, Dangerous, Suspicious or Inconclusive) |
+| `challenge` | a reporter's challenge with a proposed verdict, while `ai_model` is enabled | `proposal` | the proposal (Safe or Dangerous) |
+
+Only a `folder` row with status `active` is trainable. A verdict row with the same class as the
+case's active one adds nothing; a different class supersedes it. A new challenge proposal supersedes
+the case's earlier one. A failed ledger write is logged with the case id and the exception class,
+and never fails the verdict or the challenge.
+
+**Folders and their classes.** The class comes from the digit prefix of the folder name, from the
+training notebook (`Analyzers/AIMailAnalyzer/train_models.ipynb`):
+
+| Folder | Class |
+|---|---|
+| `0_LEGIT_INTERNAL_COMMUNICATION`, `0_LEGIT_EXTERNAL_COMMUNICATION` | Safe |
+| `1_SPAM`, `1_NEWSLETTER` | Unwanted |
+| `2_CLASSIC_PHISHING`, `2_CLONE_PHISHING`, `2_BLACKMAILING_PHISHING`, `2_WHALING_PHISHING` | Dangerous |
+
+A folder outside the list is never read. A configured name that is not one of these eight is
+skipped with a warning in the worker log.
+
+**Configuration.** The sync uses these fields of the `ai_model` connector (Settings, or
+`integrations.ai_model` in `settings.json`):
+
+| Field | Default | Meaning |
+|---|---|---|
+| `imap_host` | empty | IMAP server of the review mailbox. Empty: the sync does nothing. |
+| `imap_port` | `993` | |
+| `imap_user` | empty | |
+| `imap_password` | empty | A secret field (Vault), never logged. |
+| `imap_use_ssl` | `true` | IMAPS with the certificate verified. `false` is plain IMAP with no STARTTLS, so the password travels in clear: for dev or greenmail only. |
+| `imap_folders` | the eight folders above | Comma-separated folder names. |
+
+**The nightly sync.** The connector declares a `label-sync` schedule of 86400 s, which Celery beat
+runs as `connectors.tasks.run_connector_sync` while the connector is enabled; the outcome is a
+delivery with event `sync` in `GET /api/connectors/ai_model/deliveries/`. The mailbox is opened
+read-only: each folder is selected with `readonly=True` and mails are fetched with `BODY.PEEK[]`,
+so nothing is marked read, moved, flagged or deleted. Sizes are asked first with `RFC822.SIZE`, and
+a mail above 25 MB is skipped without being downloaded. The labelled mail is the first
+`message/rfc822` attachment of the review mail; a review mail without one, or one that cannot be
+parsed, is skipped and counted (`LabelSyncState.skipped`).
+
+Each run examines at most 500 UIDs per folder (skipped and already recorded ones included), in
+chunks of 100 mails. A chunk is embedded through `/v2/embed` (both profiles, 32 texts per call),
+then its rows and the folder checkpoint (`LabelSyncState.last_uid`) commit in one transaction, so
+the next run resumes after the last committed chunk. The run stops between chunks, or between embed
+calls (that chunk is then not committed), once 300 s have passed; Celery's soft limit is 540 s. A
+large mailbox therefore takes several nights, unless the backfill command reads it. When the folder's
+`UIDVALIDITY` changes, the folder is read again from the start; mails already recorded add no row.
+A mail seen again in the same folder adds no row.
+
+Each mail is matched to a case by its Message-ID. Without one, the match is on the sender address,
+the UTC day of the Date header and the subject; exactly one case must match. When neither matches,
+the Message-IDs of mails forwarded inside it are tried. An unmatched row is still recorded, with no
+case.
+
+Failures: a folder that cannot be selected or searched is skipped with a warning. An embed the
+server refuses for a chunk (a 4xx, an answer that does not fit the batch, versions changing within
+the chunk) skips that folder without moving its checkpoint; once the other folders ran, the sync
+raises `LabelSyncIncomplete` and the delivery is recorded failed, without a retry. A failed login
+fails the run without a retry. A lost IMAP connection or an unreachable embed endpoint fails the
+run, and the delivery is retried.
+
+**Precedence and flags.** The folder row is the label of record; verdict and proposal rows are
+provenance. A hard conflict is a Dangerous folder label against a Safe analyst verdict, or a Safe
+folder label against a Dangerous one; Unwanted, Suspicious and Inconclusive never conflict, and a
+proposal never flags. Whichever arrives first, the folder row gets status `flagged`
+(`flag_reason = folder_verdict_mismatch`) and is not trainable until the flag is resolved.
+`ai_model.ledger.resolve_flag(record, user, note, keep=...)` resolves it (keep makes the row active
+again, otherwise it is superseded); it has no API or screen yet, that comes with the Settings card
+(Plan G). `ai_model.ledger.ledger_summary()` gives the counts per source and class, the flagged count
+and the trainable count, over the rows not superseded.
+
+**Backfill: `ai_model_backfill_labels`.**
+
+```bash
+docker compose --env-file .env exec suspicious python manage.py ai_model_backfill_labels [--folders] [--dry-run]
+```
+
+It needs the `ai_model` connector enabled. It records a verdict row for every case an analyst last
+updated (`last_update_by` set) whose result is a label class, and a proposal row for every challenged
+case with a Safe or Dangerous proposal. `--folders` also runs the sync over every configured folder
+with no 500-UID cap and no time budget, and needs `imap_host`. `--dry-run` writes nothing and prints
+the verdict and proposal counts it would create; it does not read the folders. It prints counts
+only. A rerun adds nothing for what is already recorded.
+
+**Limits.**
+
+- A mail the server refuses to fetch (a `NO` or `BAD` for that one UID) is skipped, and the
+  checkpoint moves past it: it is not retried.
+- Plain mode (`imap_use_ssl` false) is for dev or greenmail only.
+- A verdict or proposal row for a case whose mail has no Message-ID is keyed per case. It meets
+  folder rows only through the matched case.
+- A folder row of a mail without a Message-ID that matched no case is never checked against a
+  verdict.
+- When the same Message-ID is on two cases, the cases are not checked against each other: a verdict
+  is compared with its own case's folder rows and with the folder rows that matched no case.
+- A flag survives a later verdict change until it is resolved.
+- A mail moved to another folder adds a row for the new folder and supersedes its earlier rows,
+  active or flagged; the new row is checked for conflicts again.
+
 ### When classification fails
 
 - **Where to look.** When the task fails a row, the reason is recorded in the row's
@@ -300,8 +424,9 @@ your campaign history.
 | `ResNetMLP.py` | The neural network definition |
 
 The connector lives in the backend: `Suspicious/Suspicious/connectors/contrib/ai_model/`
-(`connector.py`, `client.py`, `campaigns.py`, `mailtext.py`), and the replay command in
-`Suspicious/Suspicious/ai_model/management/commands/ai_model_campaign_replay.py`.
+(`connector.py`, `client.py`, `campaigns.py`, `mailtext.py`, `imap_sync.py`), the ledger in
+`Suspicious/Suspicious/ai_model/` (`models.py`, `ledger.py`, `messageid.py`, `taxonomy.py`), and the
+replay and backfill commands in `Suspicious/Suspicious/ai_model/management/commands/`.
 
 ### Tests
 
