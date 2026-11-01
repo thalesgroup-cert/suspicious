@@ -1,5 +1,6 @@
 import { api } from "@/api/client";
 import { parseObservableGroup, type ObservableGroup } from "./observableGroup";
+import type { AiAssessment } from "@/features/submissions/api";
 import type { AnalyzerReportRow } from "@/features/submissions/components/AnalyzerReportCard";
 
 export type InvestigationStatus =
@@ -127,7 +128,6 @@ type InvestigationCaseInfos = {
 };
 
 export type InvestigationDetails = {
-  ai_assessment?: import("../submissions/api").AiAssessment | null;
   id: number;
   reporter_email: string;
   status: InvestigationStatus;
@@ -139,6 +139,7 @@ export type InvestigationDetails = {
   result: InvestigationResult | string;
   is_challengeable: boolean;
   is_challenged: boolean;
+  ai_assessment?: AiAssessment | null;
   /** Relative URL to the rendered .eml→png preview, or null when absent / not a mail. */
   mail_preview_url?: string | null;
   /** Relative URL to the captured page screenshot, or null when none was captured. */

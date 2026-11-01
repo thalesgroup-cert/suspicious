@@ -7,57 +7,97 @@ const base: AiAssessment = {
   result: "Dangerous",
   sub_class: "CREDENTIAL_PHISHING",
   tier: "high",
-  runner_up: null,
-  model_version: "v1",
-  analysed_at: "2026-10-31T10:00:00Z",
+  runner_up: { result: "Safe" },
+  model_version: "v1.2",
+  analysed_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
   reads: "body only",
-  similar_cases: [],
+  similar_cases: [{ case_id: 12, similarity: 0.91, label: "Dangerous", provenance: "analyst" }],
   campaign: null,
   cross_check: { facts: [], disagrees: false },
 };
 
-test("high tier shows chip and meaning", () => {
+const MEANINGS = [
+  "The model is confident",
+  "The model leans this way, check the evidence",
+  "The model is unsure, rely on the other evidence",
+];
+
+test("renders heading, humanised class, version and age", () => {
   render(<AiAssessmentSection assessment={base} />);
-  expect(screen.getByText("High")).toBeInTheDocument();
-  expect(screen.getByText("The model is confident")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "AI model assessment" })).toBeInTheDocument();
+  expect(screen.getByText("Credential phishing")).toBeInTheDocument();
+  expect(screen.getByText(/Model v1\.2, analysed 3 h ago/)).toBeInTheDocument();
   expect(screen.getByText(/body only/)).toBeInTheDocument();
-  expect(document.body.textContent).not.toMatch(/%|\d\.\d/);
 });
 
-test("low tier shows runner-up", () => {
-  render(<AiAssessmentSection assessment={{ ...base, tier: "low", runner_up: { result: "Safe" } }} />);
-  expect(screen.getByText("Low")).toBeInTheDocument();
+test.each([
+  ["high", "High", MEANINGS[0]],
+  ["medium", "Medium", MEANINGS[1]],
+  ["low", "Low", MEANINGS[2]],
+] as const)("tier %s shows its chip and only its meaning", (tier, chip, meaning) => {
+  render(<AiAssessmentSection assessment={{ ...base, tier }} />);
+  expect(screen.getByText(chip)).toBeInTheDocument();
+  expect(screen.getByText(meaning)).toBeInTheDocument();
+  for (const m of MEANINGS.filter((x) => x !== meaning)) expect(screen.queryByText(m)).not.toBeInTheDocument();
+});
+
+test("runner-up only on low tier", () => {
+  const { rerender } = render(<AiAssessmentSection assessment={{ ...base, tier: "low" }} />);
   expect(screen.getByText("Runner-up: Safe")).toBeInTheDocument();
-  expect(screen.getByText("The model is unsure, rely on the other evidence")).toBeInTheDocument();
+  for (const tier of ["high", "medium", ""] as const) {
+    rerender(<AiAssessmentSection assessment={{ ...base, tier }} />);
+    expect(screen.queryByText(/Runner-up/)).not.toBeInTheDocument();
+  }
 });
 
-test("no tier says not calibrated", () => {
+test("empty tier says not calibrated, no chip, no meaning", () => {
   render(<AiAssessmentSection assessment={{ ...base, tier: "" }} />);
   expect(screen.getByText("Confidence not calibrated")).toBeInTheDocument();
-  expect(screen.queryByText("High")).not.toBeInTheDocument();
+  for (const t of ["High", "Medium", "Low"]) expect(screen.queryByText(t)).not.toBeInTheDocument();
+  for (const m of MEANINGS) expect(screen.queryByText(m)).not.toBeInTheDocument();
 });
 
-test("similar cases table and none", () => {
-  const { rerender } = render(
+test("similar cases: null members show a dash, never 'null'", () => {
+  const { container, rerender } = render(
     <AiAssessmentSection
       assessment={{
         ...base,
         similar_cases: [
           { case_id: 12, similarity: 0.91, label: "Dangerous", provenance: "analyst" },
-          { case_id: 13, similarity: null, label: null, provenance: null },
+          { case_id: null, similarity: null, label: null, provenance: null },
         ],
       }}
     />,
   );
+  expect(screen.getByRole("table", { name: "Similar cases" })).toBeInTheDocument();
   expect(screen.getAllByRole("row")).toHaveLength(3);
   expect(screen.getByText("analyst")).toBeInTheDocument();
-  expect(document.body.textContent).not.toContain("0.91");
-  rerender(<AiAssessmentSection assessment={base} />);
+  expect(container.textContent).not.toContain("null");
+  expect(screen.getAllByText("—")).toHaveLength(3);
+  rerender(<AiAssessmentSection assessment={{ ...base, similar_cases: [] }} />);
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
 
-test("campaign line and disagreement", () => {
-  render(
+test("no percent and no similarity value in any state", () => {
+  for (const tier of ["high", "medium", "low", ""] as const) {
+    const { container, unmount } = render(
+      <AiAssessmentSection
+        assessment={{
+          ...base,
+          tier,
+          similar_cases: [{ case_id: 12, similarity: 0.91, label: "Dangerous", provenance: "analyst" }],
+        }}
+      />,
+    );
+    expect(container.textContent).not.toContain("%");
+    expect(container.textContent).not.toContain("0.91");
+    expect(container.textContent).not.toContain("91");
+    unmount();
+  }
+});
+
+test("campaign line pluralises; disagreement and facts list", () => {
+  const { rerender } = render(
     <AiAssessmentSection
       assessment={{
         ...base,
@@ -68,5 +108,7 @@ test("campaign line and disagreement", () => {
   );
   expect(screen.getByText("Campaign 261031-865a1, 9 mails")).toBeInTheDocument();
   expect(screen.getByText("AI disagrees with the evidence")).toBeInTheDocument();
-  expect(screen.getByText("Decisive rule: deny-listed")).toBeInTheDocument();
+  expect(screen.getByRole("listitem")).toHaveTextContent("Decisive rule: deny-listed");
+  rerender(<AiAssessmentSection assessment={{ ...base, campaign: { ref: "r", size: 1 } }} />);
+  expect(screen.getByText("Campaign r, 1 mail")).toBeInTheDocument();
 });
