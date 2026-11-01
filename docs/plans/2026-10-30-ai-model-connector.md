@@ -42,7 +42,7 @@ Programme-level conditions the spec implies and no single task owns; each is pin
 | A. Provider slot, server v2, version 0 | The AI result comes from the connector, same values as the Cortex job | 1, 2, 3 (v0), 10, 11 step 2 | none |
 | B. Campaigns in the connector, Cortex cutover | Campaign detection and the TheHive alert run from the connector; the Cortex AI path is removed | 7, 11 steps 2-3 | A |
 | C. Case view: AI assessment section | The new section with tier, similar cases (empty until Plan D), campaign line and cross-check | 8 (case part), 7 (campaign line) | A |
-| D. Label ledger and sync | Ledger, nightly review-folder sync, verdict and challenge rows, flags, campaign sibling labels | 4, 7 (sibling labels) | A |
+| D. Label ledger and sync | Ledger, review-folder sync about every 24 hours, verdict and challenge rows, flags, campaign sibling labels | 4, 7 (sibling labels) | A |
 | E. Retrain, gate and registry | Candidate versions from the ledger, gated, stored as bundles | 3, 5, 9, Evidence | A, D |
 | F. Shadow, promotion, campaign dry run, counters | Shadow scoring, promote and rollback, alert delta, per-version stats | 6, 7 (versioning, counters), 9 | A, B, E |
 | G. Settings AI model card | The admin card, queue and connector line | 8 (Settings part), 10 | D, E, F |
@@ -89,7 +89,7 @@ Deliverable: the case drawer and investigation overview show the new section onl
 
 **Status: done**, built on feature/ai-model-label-ledger, not merged. Detailed plan: `docs/plans/2026-11-01-ai-model-connector-d-label-ledger.md` (8 tasks). The outline below is the earlier sketch; the detailed plan's Calls table supersedes it (folder taxonomy from the training notebook, text form and canonical recipe left to Plan E, a smaller snapshot without link domains, auth results or Cortex bands, verdict rows written while `ai_model` is enabled, challenge proposals recorded too, sibling labels in the case view included).
 
-Deliverable: a nightly sync fills the append-only ledger from the review folders, read-only; analyst verdicts and reporter challenge proposals add rows beside it; a hard conflict between a folder label and the analyst verdict flags the folder row; `ledger_summary()` and `resolve_flag()` exist for Plan G, with no API yet; `ai_model_backfill_labels` backfills history; the case view's campaign line shows the folder labels of the campaign siblings to analysts, with a "Campaign members disagree" warning.
+Deliverable: a sync about every 24 hours fills the append-only ledger from the review folders, read-only; analyst verdicts and reporter challenge proposals add rows beside it; a hard conflict between a folder label and the analyst verdict flags the folder row; `ledger_summary()` and `resolve_flag()` exist for Plan G, with no API yet; `ai_model_backfill_labels` backfills history without superseding verdicts recorded live, and matches unmatched folder rows to cases; the case view's campaign line shows the folder labels of the campaign siblings to analysts, with a "Campaign members disagree" warning.
 
 1. **Models**: `LabelRecord` (spec section 4 table) with append-only supersession, migration, admin read-only.
 2. **Server `POST /v2/embed`**: `{"texts": [...], "profile": "classifier"|"campaign"}` returning vectors; tests with the fake vectorizer.

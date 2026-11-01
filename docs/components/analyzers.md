@@ -266,7 +266,8 @@ It is append-only: a row is never changed except its `status`, `flag_reason` and
 fields (`resolved_by`, `resolved_at`, `resolution_note`).
 
 **What a row holds.** The normalised Message-ID (whitespace and angle brackets stripped,
-lower-cased; an id without `@` or above 998 characters counts as none) and its SHA-256, the matched
+lower-cased; an id without `@`, with whitespace inside it, or above 998 characters counts as
+none) and its SHA-256, the matched
 case (null when no case matched), the source and a source reference, the label and its class, the
 trust level, when it was observed, the status and the flag reason. A folder row also holds the
 classifier and campaign embeddings with their `preprocessing_version` and `embedding_version`, and
@@ -276,8 +277,8 @@ the sender address.
 
 | Source | Written by | Trust | Label |
 |---|---|---|---|
-| `imap_folder` | the nightly sync and the backfill command | `folder` | the folder name; class Safe, Unwanted or Dangerous |
-| `analyst_verdict` | an analyst verdict on an investigation, while `ai_model` is enabled | `verdict` | the verdict (Safe, Unwanted, Dangerous, Suspicious or Inconclusive) |
+| `imap_folder` | the label sync and the backfill command | `folder` | the known folder name; class Safe, Unwanted or Dangerous |
+| `analyst_verdict` | an analyst verdict on an investigation, while `ai_model` is enabled | `verdict` | the verdict (Safe, Dangerous, Suspicious or Inconclusive) |
 | `challenge` | a reporter's challenge with a proposed verdict, while `ai_model` is enabled | `proposal` | the proposal (Safe or Dangerous) |
 
 Only a `folder` row with status `active` is trainable. A verdict row with the same class as the
@@ -294,8 +295,13 @@ training notebook (`Analyzers/AIMailAnalyzer/train_models.ipynb`):
 | `1_SPAM`, `1_NEWSLETTER` | Unwanted |
 | `2_CLASSIC_PHISHING`, `2_CLONE_PHISHING`, `2_BLACKMAILING_PHISHING`, `2_WHALING_PHISHING` | Dangerous |
 
-A folder outside the list is never read. A configured name that is not one of these eight is
-skipped with a warning in the worker log.
+The name is taken from the last segment of the mailbox path, split on `.` and `/`, so
+`INBOX.2_CLASSIC_PHISHING` and `Review/0_LEGIT_EXTERNAL_COMMUNICATION` work: the row's label is the
+known name, and the configured path is what the IMAP `SELECT` gets (and what `source_ref` keeps). A
+folder outside the list is never read. A configured name whose last segment is not one of these
+eight is skipped with a warning in the worker log. When none of the configured names is known, the
+sync fails before connecting with `LabelSyncIncomplete` (not retried), giving the count and the
+names in `ascii()` form, so a typo does not show as a successful sync.
 
 **Configuration.** The sync uses these fields of the `ai_model` connector (Settings, or
 `integrations.ai_model` in `settings.json`):
@@ -306,12 +312,22 @@ skipped with a warning in the worker log.
 | `imap_port` | `993` | |
 | `imap_user` | empty | |
 | `imap_password` | empty | A secret field (Vault), never logged. |
-| `imap_use_ssl` | `true` | IMAPS with the certificate verified. `false` is plain IMAP with no STARTTLS, so the password travels in clear: for dev or greenmail only. |
+| `imap_use_ssl` | `true` | IMAPS with the certificate verified against the system CA store of the Celery worker container. `false` is plain IMAP with no STARTTLS, so the password travels in clear: for dev or greenmail only. |
 | `imap_folders` | the eight folders above | Comma-separated folder names. |
 
-**The nightly sync.** The connector declares a `label-sync` schedule of 86400 s, which Celery beat
-runs as `connectors.tasks.run_connector_sync` while the connector is enabled; the outcome is a
-delivery with event `sync` in `GET /api/connectors/ai_model/deliveries/`. The mailbox is opened
+A mailbox behind an internal CA: `ssl.create_default_context()` reads the container's system CA
+store (or the file named by `SSL_CERT_FILE`). The `rootcafile.pem` that compose mounts at
+`/etc/private/` is not read by it. Without the CA the run fails with `ImapTlsFailed` (the exception
+class name only, not retried).
+
+**The label sync.** The connector declares a `label-sync` schedule of 86400 s, which Celery beat
+runs as `connectors.tasks.run_connector_sync` while the connector is enabled, so about every 24
+hours. The interval is counted from when beat started: recreating the `suspicious_celery_beat`
+container starts the countdown again. There is no run-now button or API route for a connector
+sync. To run one at once, use the backfill command with `--folders`, or queue the task:
+`docker compose --env-file .env exec suspicious python manage.py shell -c "from connectors.tasks
+import run_connector_sync; run_connector_sync.delay('ai_model')"`. The outcome is a delivery with
+event `sync` in `GET /api/connectors/ai_model/deliveries/`. The mailbox is opened
 read-only: each folder is selected with `readonly=True` and mails are fetched with `BODY.PEEK[]`,
 so nothing is marked read, moved, flagged or deleted. Sizes are asked first with `RFC822.SIZE`, and
 a mail above 25 MB is skipped without being downloaded. The labelled mail is the first
@@ -319,25 +335,31 @@ a mail above 25 MB is skipped without being downloaded. The labelled mail is the
 parsed, is skipped and counted (`LabelSyncState.skipped`).
 
 Each run examines at most 500 UIDs per folder (skipped and already recorded ones included), in
-chunks of 100 mails. A chunk is embedded through `/v2/embed` (both profiles, 32 texts per call),
+chunks of 25 mails. A chunk is embedded through `/v2/embed` (both profiles, 32 texts per call),
 then its rows and the folder checkpoint (`LabelSyncState.last_uid`) commit in one transaction, so
 the next run resumes after the last committed chunk. The run stops between chunks, or between embed
-calls (that chunk is then not committed), once 300 s have passed; Celery's soft limit is 540 s. A
-large mailbox therefore takes several nights, unless the backfill command reads it. When the folder's
+calls (that chunk is then not committed), once 300 s have passed; Celery's soft limit is 540 s,
+and a chunk of 25 keeps the fetch, match and embed of one chunk far below it. A large mailbox
+therefore takes several runs, unless the backfill command reads it. When the folder's
 `UIDVALIDITY` changes, the folder is read again from the start; mails already recorded add no row.
 A mail seen again in the same folder adds no row.
 
 Each mail is matched to a case by its Message-ID. Without one, the match is on the sender address,
 the UTC day of the Date header and the subject; exactly one case must match. When neither matches,
-the Message-IDs of mails forwarded inside it are tried. An unmatched row is still recorded, with no
-case.
+the Message-IDs of mails forwarded inside it are tried. When several cases carry the same
+Message-ID (a re-submission, or the same mail reported twice), the newest case wins. An unmatched
+row is still recorded, with no case; the sync does not match it again later, the backfill command
+does (see below).
 
 Failures: a folder that cannot be selected or searched is skipped with a warning. An embed the
 server refuses for a chunk (a 4xx, an answer that does not fit the batch, versions changing within
 the chunk) skips that folder without moving its checkpoint; once the other folders ran, the sync
 raises `LabelSyncIncomplete` and the delivery is recorded failed, without a retry. A failed login
-fails the run without a retry. A lost IMAP connection or an unreachable embed endpoint fails the
-run, and the delivery is retried.
+(`ImapLoginFailed`) or TLS handshake (`ImapTlsFailed`) fails the run without a retry. An embed that
+fails on setup also fails the run without a retry: a rejected token (401, 403), a wrong url (404),
+a proxy, timeout or rate-limit answer (407, 408, 429), and a 503 saying the token, models or
+vectorizer are missing. A lost IMAP connection, an unreachable embed endpoint, another 5xx and the
+503 of a vectorizer still loading fail the run, and the delivery is retried (up to 3 attempts).
 
 **Precedence and flags.** The folder row is the label of record; verdict and proposal rows are
 provenance. A hard conflict is a Dangerous folder label against a Safe analyst verdict, or a Safe
@@ -355,12 +377,22 @@ and the trainable count, over the rows not superseded.
 docker compose --env-file .env exec suspicious python manage.py ai_model_backfill_labels [--folders] [--dry-run]
 ```
 
-It needs the `ai_model` connector enabled. It records a verdict row for every case an analyst last
-updated (`last_update_by` set) whose result is a label class, and a proposal row for every challenged
-case with a Safe or Dangerous proposal. `--folders` also runs the sync over every configured folder
-with no 500-UID cap and no time budget, and needs `imap_host`. `--dry-run` writes nothing and prints
-the verdict and proposal counts it would create; it does not read the folders. It prints counts
-only. A rerun adds nothing for what is already recorded.
+It needs the `ai_model` connector enabled. It does three things, then a fourth with `--folders`:
+
+- A verdict row for every case an analyst last updated (`last_update_by` set) whose result is a
+  label class and that has no verdict row yet (in any status), dated at the case's `last_update`.
+  History from before the ledger cannot tell an analyst's edit from a later re-score: "Redo
+  analysis" keeps `last_update_by`. So the backfill records the case's current class under its last
+  editor, and it never touches a case that already has a verdict row, so a redone case cannot
+  supersede a verdict recorded live.
+- A proposal row for every challenged case with a Safe or Dangerous proposal.
+- A late case match for folder rows that matched no case: each such row with a Message-ID is
+  matched again, and its case is set when one is found (only from no case to a case).
+- `--folders` also runs the sync over every configured folder with no 500-UID cap and no time
+  budget, and needs `imap_host`.
+
+`--dry-run` writes nothing and prints the counts it would create or re-match; it does not read the
+folders. It prints counts only. A rerun adds nothing for what is already recorded.
 
 **Limits.**
 
@@ -376,6 +408,10 @@ only. A rerun adds nothing for what is already recorded.
 - A flag survives a later verdict change until it is resolved.
 - A mail moved to another folder adds a row for the new folder and supersedes its earlier rows,
   active or flagged; the new row is checked for conflicts again.
+- A mail copied into two folders takes the label of the folder read last. A `UIDVALIDITY` reset of
+  the other folder reads it there again, and the label flips.
+- A late case match by the backfill command sets the case only. The row is not checked for a
+  conflict with that case's verdict.
 
 ### When classification fails
 
