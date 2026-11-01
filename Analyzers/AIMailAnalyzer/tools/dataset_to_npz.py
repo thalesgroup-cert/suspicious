@@ -3,15 +3,21 @@
     python tools/dataset_to_npz.py <dataset.pkl> <out.npz> [--encoder <sentence-transformers dir>]
 
 The pickle is our own trusted export (the test bed made it); it is read with pandas, which this
-tool alone needs. The .npz holds `embeddings` (float32 (n, 768), the stored `mpnet_vect`: one
-encoder pass over the body, so the first 128 tokens), `folders` (fixed-width unicode) and, when
-the pickle has a `hash` column, `mail_ids`. With --encoder it also re-embeds each body in the two
+tool alone needs. Warning: never point this at a file you did not produce yourself; unpickling
+executes code. The tool refuses an input that is world-writable or owned by anyone but the
+current user or root.
+
+The .npz holds `embeddings` (float32 (n, 768), the stored `mpnet_vect`: one encoder pass over
+the body, so the first 128 tokens), `folders` (fixed-width unicode) and, when the pickle has a
+`hash` column, `mail_ids`. With --encoder it also re-embeds each body in the two
 chunk forms of Ruling E11, `embeddings_words90` and `embeddings_tokens`, and prints how close a
 plain encoder pass gets to the stored vectors. Only counts and statistics are printed; no mail
 text is written or printed. Keep the output outside the repository (Ruling E2). Nothing in
 training/ or inference_server/ imports this file.
 """
 import argparse
+import os
+import stat
 import sys
 from pathlib import Path
 
@@ -24,13 +30,27 @@ def _cosine(a, b):
     return (a * b).sum(1) / (np.linalg.norm(a, axis=1) * np.linalg.norm(b, axis=1))
 
 
+WARNING = ("Warning: never point this at a file you did not produce yourself; unpickling executes "
+           "code.")
+
+
+def _refuse_untrusted(path):
+    """Exit before unpickling a file someone else could have written."""
+    st = os.stat(path)
+    if st.st_mode & stat.S_IWOTH:
+        raise SystemExit(f"refusing {path!r}: world-writable. {WARNING}")
+    if st.st_uid not in (os.geteuid(), 0):
+        raise SystemExit(f"refusing {path!r}: not owned by the current user or root. {WARNING}")
+
+
 def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(description=f"{__doc__.splitlines()[0]} {WARNING}")
     ap.add_argument("dataset")
     ap.add_argument("out")
     ap.add_argument("--encoder", help="sentence-transformers model directory")
     args = ap.parse_args(argv)
 
+    _refuse_untrusted(args.dataset)
     import pandas as pd
 
     df = pd.read_pickle(args.dataset)

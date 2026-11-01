@@ -5,8 +5,10 @@ repository: AI_EVAL_DATASET=<path> python -m pytest tests -m slow. Optional: AI_
 (the array to evaluate, default embeddings_tokens, Ruling E16), AI_EVAL_REPEATS (default 3),
 AI_EVAL_REPORT (write the gate report as JSON there; counts and metrics only).
 """
+import inspect
 import json
 import os
+import stat
 import subprocess
 import sys
 import time
@@ -18,6 +20,7 @@ import numpy as np
 import pytest
 import torch
 
+import training.recipe as recipe_mod
 from training.gate import candidate_recipe, legacy_recipe, run_gate, wilson
 from training.groups import campaign_groups, near_duplicate_groups
 
@@ -44,17 +47,28 @@ def _synthetic(n_per=8, dim=8, seed=0):
     return X.astype(np.float32), folders, dup, dup // 2
 
 
-def test_gate_metrics_are_identical_across_runs_and_global_thread_counts():
+def test_gate_metrics_are_identical_across_runs_and_global_thread_counts(monkeypatch):
     X, folders, dup, camp = _synthetic()
     recipe = partial(candidate_recipe, epochs=2)
+    pinned = inspect.signature(candidate_recipe).parameters["threads"].default
+    seen = []
+    real_train = recipe_mod._train_head
+
+    def spy(*args, **kwargs):  # the thread count while a head trains
+        seen.append(torch.get_num_threads())
+        return real_train(*args, **kwargs)
+
+    monkeypatch.setattr(recipe_mod, "_train_head", spy)
     previous = torch.get_num_threads()
     try:
         reports = []
         for threads in (1, 4):  # the recipe pins its own threads, so the global count is moot
             torch.set_num_threads(threads)
+            seen.clear()
             reports.append(asdict(run_gate(X, folders, dup, camp, recipe=recipe,
                                            baseline_recipe=recipe, repeats=1)))
-            assert torch.get_num_threads() == threads
+            assert seen and set(seen) == {pinned}  # pinned inside every fit
+            assert torch.get_num_threads() == threads  # and restored afterwards
     finally:
         torch.set_num_threads(previous)
     assert reports[0] == reports[1]
@@ -87,6 +101,39 @@ def test_dataset_tool_writes_a_pickle_free_npz_and_prints_counts_only(tmp_path):
         assert d["folders"].dtype.kind == "U" and list(d["folders"]) == list(df["folder"])
         assert list(d["mail_ids"]) == list(df["hash"])
     assert secret.encode() not in out.read_bytes()
+
+
+WARNING = "never point this at a file you did not produce yourself; unpickling executes code"
+
+
+def _tool(*args):
+    return subprocess.run([sys.executable, str(TOOL), *map(str, args)], capture_output=True,
+                          text=True)
+
+
+def test_dataset_tool_warns_about_unpickling_in_its_docstring_and_help():
+    assert WARNING in " ".join(TOOL.read_text().split())
+    run = _tool("--help")
+    assert run.returncode == 0 and WARNING in " ".join(run.stdout.split())
+
+
+def test_dataset_tool_refuses_a_world_writable_input(tmp_path):
+    src = tmp_path / "d.pkl"
+    src.write_bytes(b"not read")
+    src.chmod(0o666)
+    run = _tool(src, tmp_path / "d.npz")
+    assert run.returncode != 0 and "world-writable" in run.stderr
+    assert not (tmp_path / "d.npz").exists()
+
+
+@pytest.mark.skipif(os.geteuid() != 0, reason="chown to another user needs root")
+def test_dataset_tool_refuses_an_input_owned_by_another_user(tmp_path):
+    src = tmp_path / "d.pkl"
+    src.write_bytes(b"not read")
+    os.chown(src, 12345, 12345)
+    assert not src.stat().st_mode & stat.S_IWOTH
+    run = _tool(src, tmp_path / "d.npz")  # we are root, the file is user 12345's
+    assert run.returncode != 0 and "not owned" in run.stderr
 
 
 def test_dataset_tool_is_not_imported_by_the_package_or_the_server():
