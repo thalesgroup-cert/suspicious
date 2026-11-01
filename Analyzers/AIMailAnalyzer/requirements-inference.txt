@@ -5,3 +5,6 @@
 
 fastapi>=0.115
 uvicorn[standard]>=0.32
+# The retrain recipe (training/) runs in this image: class weights, groups, temperature fit.
+scikit-learn>=1.9.1
+scipy>=1.10.0
