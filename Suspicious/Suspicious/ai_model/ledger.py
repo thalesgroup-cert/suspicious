@@ -238,16 +238,15 @@ def resolve_flag(record, user, note, *, keep: bool) -> None:
 
 
 def ledger_summary() -> dict:
-    """Counts of the current rows (superseded ones are history) by source and class, the flagged
-    count and the trainable count."""
+    """Counts of the current rows (superseded ones are history): {source: {class: n}}, the flagged
+    count and the trainable count. Classes stay per source, as a folder Safe and a proposed Safe are
+    not the same kind of label."""
     rows = LabelRecord.objects.exclude(status=SUPERSEDED).order_by()
-
-    def by(field):
-        return dict(rows.values_list(field).annotate(n=Count("id")))
-
+    by_source: dict[str, dict[str, int]] = {}
+    for source, label_class, n in rows.values_list("source", "label_class").annotate(n=Count("id")):
+        by_source.setdefault(source, {})[label_class] = n
     return {
-        "by_source": by("source"),
-        "by_class": by("label_class"),
+        "by_source": by_source,
         "flagged": rows.filter(status=FLAGGED).count(),
         "trainable": rows.filter(trust=LabelRecord.Trust.FOLDER, status=ACTIVE).count(),
     }

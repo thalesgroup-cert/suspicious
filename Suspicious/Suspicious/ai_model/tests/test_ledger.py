@@ -354,8 +354,8 @@ class LedgerSummaryTest(CaseMixin, TestCase):
         ledger.record_verdict(case, self.user, "Safe")
         ledger.record_challenge(case, "Safe")
         self.assertEqual(ledger.ledger_summary(), {
-            "by_source": {"imap_folder": 2, "analyst_verdict": 1, "challenge": 1},
-            "by_class": {"Dangerous": 1, "Unwanted": 1, "Safe": 2},
+            "by_source": {"imap_folder": {"Dangerous": 1, "Unwanted": 1}, "analyst_verdict": {"Safe": 1},
+                          "challenge": {"Safe": 1}},
             "flagged": 1,
             "trainable": 1,
         })
@@ -363,4 +363,4 @@ class LedgerSummaryTest(CaseMixin, TestCase):
     def test_superseded_rows_are_not_counted(self):
         observe(review())
         observe(review(folder="1_SPAM"))
-        self.assertEqual(ledger.ledger_summary()["by_class"], {"Unwanted": 1})
+        self.assertEqual(ledger.ledger_summary()["by_source"], {"imap_folder": {"Unwanted": 1}})
