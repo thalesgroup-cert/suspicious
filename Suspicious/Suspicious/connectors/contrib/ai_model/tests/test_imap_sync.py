@@ -5,30 +5,43 @@ from unittest import mock
 from django.test import SimpleTestCase
 
 from connectors.contrib.ai_model import imap_sync
-from connectors.contrib.ai_model.imap_sync import FolderUnavailable, ReviewMail, read_folder
+from connectors.contrib.ai_model.imap_sync import (
+    FolderUnavailable,
+    ImapConnectionLost,
+    ReviewMail,
+    read_folder,
+)
 from connectors.contrib.ai_model.tests.fake_imap import FakeImap
 
 FOLDER = "2_CLASSIC_PHISHING"
 
 
-def inner(n=1, body="Please verify your account now."):
+_DATE = "Mon, 05 Oct 2026 10:00:00 +0200"
+
+
+def inner(n=1, body="Please verify your account now.", date=_DATE, attach=()):
     msg = EmailMessage()
     msg["From"] = f"Bad Actor <bad{n}@evil.example>"
     msg["To"] = "victim@meridian.example"
     msg["Subject"] = f"Urgent {n}"
-    msg["Date"] = "Mon, 05 Oct 2026 10:00:00 +0200"
+    if date is not None:
+        msg["Date"] = date
     msg["Message-ID"] = f"<ID.{n}@Evil.Example>"
     msg.set_content(body)
+    for message in attach:
+        msg.add_attachment(message)
     return msg
 
 
-def forward(n=1, **kw):
+def forward(n=1, *, extra=(), **kw):
     outer = EmailMessage()
     outer["From"] = "analyst@meridian.example"
     outer["Subject"] = "Fwd: review"
     outer["Message-ID"] = f"<outer.{n}@meridian.example>"
     outer.set_content("see attached")
     outer.add_attachment(inner(n, **kw))
+    for message in extra:
+        outer.add_attachment(message)
     return outer.as_bytes()
 
 
@@ -66,15 +79,16 @@ class ReadFolderTest(SimpleTestCase):
             if command[0] == "UID":
                 self.assertIn(command[1], {"SEARCH", "FETCH"})
                 if command[1] == "FETCH":
-                    self.assertEqual(command[3], "(BODY.PEEK[])")
+                    self.assertIn(command[3], {"(BODY.PEEK[])", "(RFC822.SIZE)"})
 
     def test_only_uids_above_since_uid_lowest_first_at_most_limit(self):
         imap = fake({u: forward(u) for u in (2, 5, 6, 9, 11)})
         mails, _, _, last_uid = read_folder(imap, FOLDER, since_uid=5, limit=2)
         self.assertEqual([m.uid for m in mails], [6, 9])
         self.assertEqual(last_uid, 9)
-        fetched = [c[2] for c in imap.commands if c[:2] == ("UID", "FETCH")]
+        fetched = [c[2] for c in imap.commands if c[:2] == ("UID", "FETCH") and c[3] == "(BODY.PEEK[])"]
         self.assertEqual(fetched, ["6", "9"])
+        self.assertIn(("UID", "FETCH", "6,9", "(RFC822.SIZE)"), imap.commands)
 
     def test_search_echoing_the_last_uid_fetches_nothing(self):
         imap = fake({4: forward(4)}, search_extra=(4,))
@@ -143,6 +157,69 @@ class ReadFolderTest(SimpleTestCase):
         self.assertEqual(len(read_folder(imap, "2 CLONE", since_uid=0, limit=10)[0]), 1)
         self.assertEqual(imap.commands[0], ("SELECT", '"2 CLONE"', True))
 
+    def test_size_precheck_skips_without_downloading(self):
+        imap = fake({1: forward(1), 2: forward(2)}, sizes={2: 30_000_000})
+        mails, skipped, _, last_uid = read_folder(imap, FOLDER, since_uid=0, limit=10)
+        self.assertEqual(([m.uid for m in mails], skipped, last_uid), ([1], 1, 2))
+        self.assertNotIn(("UID", "FETCH", "2", "(BODY.PEEK[])"), imap.commands)
+
+    def test_size_precheck_error_falls_back_to_the_download_check(self):
+        imap = fake({1: forward(1)}, errors={"SIZE": imap_sync.imaplib.IMAP4.error("BAD")})
+        self.assertEqual(len(read_folder(imap, FOLDER, since_uid=0, limit=10)[0]), 1)
+
+    def test_nested_forward_labels_the_outermost_and_lists_inner_ids(self):
+        deepest = inner(3)
+        middle = inner(2, attach=(deepest,))
+        imap = fake({1: forward(1, attach=(middle,))})
+        mail = read_folder(imap, FOLDER, since_uid=0, limit=10)[0][0]
+        self.assertEqual(mail.message_id, "id.1@evil.example")
+        self.assertEqual(mail.subject, "Urgent 1")
+        self.assertEqual(mail.text, "Please verify your account now.")
+        self.assertEqual(mail.inner_message_ids, ("id.2@evil.example", "id.3@evil.example"))
+
+    def test_sibling_attachments_first_wins(self):
+        imap = fake({1: forward(1, extra=(inner(2),))})
+        mail = read_folder(imap, FOLDER, since_uid=0, limit=10)[0][0]
+        self.assertEqual((mail.message_id, mail.inner_message_ids), ("id.1@evil.example", ()))
+
+    def test_missing_or_invalid_date_is_none(self):
+        for date in (None, "not a date"):
+            imap = fake({1: forward(1, date=date)})
+            self.assertIsNone(read_folder(imap, FOLDER, since_uid=0, limit=10)[0][0].date, date)
+
+    def test_naive_date_is_utc(self):
+        imap = fake({1: forward(1, date="Mon, 05 Oct 2026 10:00:00 -0000")})
+        mail = read_folder(imap, FOLDER, since_uid=0, limit=10)[0][0]
+        self.assertEqual(mail.date, datetime(2026, 10, 5, 10, 0, tzinfo=timezone.utc))
+
+    def test_forbidden_characters_in_folder_name_send_nothing(self):
+        for name in ('X"\r\nA001 DELETE INBOX', "A\x00B", "Bo\u00eete", "A\x7fB"):
+            imap = fake({})
+            with self.assertRaises(FolderUnavailable) as ctx:
+                read_folder(imap, name, since_uid=0, limit=10)
+            self.assertEqual(imap.commands, [])
+            message = str(ctx.exception)
+            self.assertFalse(any(ord(c) < 0x20 or ord(c) >= 0x7f for c in message), message)
+
+    def test_fetch_error_on_one_uid_is_skipped(self):
+        imap = fake({1: forward(1), 2: forward(2)}, errors={1: imap_sync.imaplib.IMAP4.error("NO")})
+        mails, skipped, _, last_uid = read_folder(imap, FOLDER, since_uid=0, limit=10)
+        self.assertEqual(([m.uid for m in mails], skipped, last_uid), ([2], 1, 2))
+
+    def test_search_error_is_folder_unavailable(self):
+        imap = fake({1: forward(1)}, errors={"SEARCH": imap_sync.imaplib.IMAP4.error("BAD")})
+        with self.assertRaises(FolderUnavailable):
+            read_folder(imap, FOLDER, since_uid=0, limit=10)
+
+    def test_connection_loss_anywhere_is_fatal(self):
+        abort = imap_sync.imaplib.IMAP4.abort("socket error: secret")
+        for where, exc in (("SELECT", abort), ("SEARCH", TimeoutError("t")), ("SIZE", OSError("o")),
+                           (1, abort), (1, ConnectionResetError("r"))):
+            imap = fake({1: forward(1)}, errors={where: exc})
+            with self.assertRaises(ImapConnectionLost) as ctx:
+                read_folder(imap, FOLDER, since_uid=0, limit=10)
+            self.assertEqual(str(ctx.exception), type(exc).__name__)
+
     def test_empty_folder(self):
         self.assertEqual(read_folder(fake({}), FOLDER, since_uid=3, limit=10), ([], 0, 7, 3))
 
@@ -168,6 +245,7 @@ class ConnectTest(SimpleTestCase):
         self.assertEqual(args, ("imap.example", 993))
         self.assertEqual(kwargs["timeout"], 30)
         self.assertEqual(kwargs["ssl_context"].verify_mode, imap_sync.ssl.CERT_REQUIRED)
+        self.assertTrue(kwargs["ssl_context"].check_hostname)
         client.login.assert_called_once_with("u", "p")
 
     def test_plain(self):

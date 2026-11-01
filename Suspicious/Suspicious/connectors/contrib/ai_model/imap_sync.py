@@ -24,10 +24,16 @@ logger = logging.getLogger(__name__)
 
 MAX_MESSAGE_BYTES = 25 * 1024 * 1024
 _LITERAL_SIZE = re.compile(rb"\{(\d+)\}\s*$")
+_UID = re.compile(rb"\bUID (\d+)")
+_SIZE = re.compile(rb"\bRFC822\.SIZE (\d+)")
 
 
 class FolderUnavailable(Exception):
-    """The folder could not be selected (missing, or refused by the server)."""
+    """This folder cannot be read (bad name, missing, refused, SEARCH failed); others may still be."""
+
+
+class ImapConnectionLost(Exception):
+    """The connection broke (abort, socket error, timeout): fatal for the whole run."""
 
 
 @dataclass(frozen=True)
@@ -40,6 +46,7 @@ class ReviewMail:
     date: datetime | None
     subject: str
     text: str
+    inner_message_ids: tuple[str, ...] = ()
 
 
 def connect(host, port, user, password, use_ssl, timeout=30):
@@ -64,20 +71,49 @@ def _uidvalidity(imap) -> int:
         return 0
 
 
-def _new_uids(imap, since_uid: int, limit: int) -> list[int]:
-    typ, data = imap.uid("SEARCH", None, "UID", f"{since_uid + 1}:*")
-    if typ != "OK" or not data or not data[0]:
-        return []
+def _new_uids(imap, folder: str, since_uid: int, limit: int) -> list[int]:
+    try:
+        typ, data = imap.uid("SEARCH", None, "UID", f"{since_uid + 1}:*")
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error as exc:
+        raise FolderUnavailable(ascii(folder)) from None
+    if typ != "OK":
+        raise FolderUnavailable(ascii(folder))
+    joined = b" ".join(d for d in data or () if d)
     # "n:*" answers the last UID even when none is newer: filter ourselves. Lowest first so the
     # caller's checkpoint advances monotonically.
-    return sorted(u for u in {int(x) for x in data[0].split()} if u > since_uid)[:limit]
+    return sorted(u for u in {int(x) for x in joined.split()} if u > since_uid)[:limit]
+
+
+def _oversize(imap, uids: list[int]) -> set[int]:
+    """UIDs the server reports above the cap, asked once for the batch. Empty when it refuses."""
+    try:
+        typ, data = imap.uid("FETCH", ",".join(map(str, uids)), "(RFC822.SIZE)")
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error:
+        return set()  # the post-download check still applies
+    found = set()
+    for item in (data or ()) if typ == "OK" else ():
+        line = item[0] if isinstance(item, tuple) else item
+        uid, size = _UID.search(line or b""), _SIZE.search(line or b"")
+        if uid and size and int(size.group(1)) > MAX_MESSAGE_BYTES:
+            found.add(int(uid.group(1)))
+    return found
 
 
 def _fetch(imap, uid: int) -> bytes | None:
-    """The raw message, or None when the answer has no literal or it is above the size cap."""
-    # ponytail: imaplib reads the whole literal before the cap applies (no streaming); a prior
-    # UID FETCH (RFC822.SIZE) would avoid downloading oversize mails.
-    typ, data = imap.uid("FETCH", str(uid), "(BODY.PEEK[])")
+    """The raw message, or None when the server refuses it, the answer has no literal or it is above
+    the size cap."""
+    # ponytail: backstop for servers whose RFC822.SIZE is missing or wrong; imaplib has already read
+    # the whole literal by then (no streaming), so the precheck in _oversize is the real guard.
+    try:
+        typ, data = imap.uid("FETCH", str(uid), "(BODY.PEEK[])")
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error:
+        return None
     if typ != "OK":
         return None
     literal = next((item for item in data or () if isinstance(item, tuple) and len(item) == 2), None)
@@ -91,6 +127,8 @@ def _fetch(imap, uid: int) -> bytes | None:
 
 
 def _date(value) -> datetime | None:
+    """The Date header as an aware datetime; a naive one (no zone, or -0000) is taken as UTC. None
+    when missing or unparseable."""
     try:
         parsed = parsedate_to_datetime(str(value)) if value else None
     except (TypeError, ValueError, IndexError):
@@ -101,11 +139,15 @@ def _date(value) -> datetime | None:
 
 
 def _review_mail(raw: bytes, folder: str, uidvalidity: int, uid: int) -> ReviewMail | None:
+    """The labelled mail is the FIRST message/rfc822 part in document order (depth-first), so the
+    outermost forward wins and later sibling attachments are ignored. Message/rfc822 parts nested
+    inside it only contribute their Message-IDs to `inner_message_ids`, a match fallback."""
     outer = email.message_from_bytes(raw, policy=policy.default)
     part = next((p for p in outer.walk() if p.get_content_type() == "message/rfc822"), None)
     if part is None:
         return None
     message = part.get_content()
+    nested = (p.get_payload(0) for p in message.walk() if p.get_content_type() == "message/rfc822")
     return ReviewMail(
         folder=folder,
         uidvalidity=uidvalidity,
@@ -115,36 +157,64 @@ def _review_mail(raw: bytes, folder: str, uidvalidity: int, uid: int) -> ReviewM
         date=_date(message.get("Date")),
         subject=str(message.get("Subject", "")).strip(),
         text=text_from_message(message),
+        inner_message_ids=tuple(i for i in (normalise(str(m.get("Message-ID", ""))) for m in nested) if i),
     )
 
 
 def _quoted(folder: str) -> str:
-    """An IMAP quoted string: imaplib sends the mailbox as given, so spaces would break SELECT."""
+    """An IMAP quoted string: imaplib sends the mailbox as given, so spaces would break SELECT.
+
+    Refuses control characters, DEL and non-ASCII: a CR/LF would end the command and let the name
+    inject another one. The exception names the folder through ascii(), never raw.
+    """
+    bad = next((i for i, c in enumerate(folder) if ord(c) < 0x20 or ord(c) >= 0x7F), None)
+    if bad is not None:
+        raise FolderUnavailable(f"{ascii(folder)}: forbidden character at index {bad}")
     return '"' + folder.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def read_folder(imap, folder, *, since_uid, limit, known_uidvalidity=None):
-    """(mails, skipped, uidvalidity, last_uid) for the lowest `limit` UIDs above `since_uid`.
-
-    A mail with no message/rfc822 part, an unreadable one and one above 25 MB count in `skipped`.
-    `last_uid` is the highest UID examined, skipped ones included (`since_uid` when none is newer).
-    When `known_uidvalidity` is given and differs from the folder's, the read starts from UID 0.
-    """
+def _select(imap, folder: str) -> None:
+    quoted = _quoted(folder)
     try:
-        typ, _ = imap.select(_quoted(folder), readonly=True)
+        typ, _ = imap.select(quoted, readonly=True)
+    except imaplib.IMAP4.readonly as exc:  # a subclass of abort, but about this folder only
+        logger.warning("ai_model imap: cannot select %s (%s)", folder, type(exc).__name__)
+        raise FolderUnavailable(folder) from None
+    except imaplib.IMAP4.abort:
+        raise
     except imaplib.IMAP4.error as exc:
         logger.warning("ai_model imap: cannot select %s (%s)", folder, type(exc).__name__)
         raise FolderUnavailable(folder) from None
     if typ != "OK":
         logger.warning("ai_model imap: cannot select %s (%s)", folder, typ)
         raise FolderUnavailable(folder)
+
+
+def read_folder(imap, folder, *, since_uid, limit, known_uidvalidity=None):
+    """(mails, skipped, uidvalidity, last_uid) for the lowest `limit` UIDs above `since_uid`.
+
+    A mail with no message/rfc822 part, an unreadable or refused one and one above 25 MB count in
+    `skipped`. `last_uid` is the highest UID examined, skipped ones included (`since_uid` when none
+    is newer). When `known_uidvalidity` is given and differs from the folder's, the read starts from
+    UID 0. FolderUnavailable: this folder only. ImapConnectionLost: the connection is gone.
+    """
+    try:
+        return _read_folder(imap, folder, since_uid, limit, known_uidvalidity)
+    except (imaplib.IMAP4.abort, OSError) as exc:  # TimeoutError and ssl errors are OSErrors
+        logger.warning("ai_model imap: connection lost reading %s (%s)", ascii(folder), type(exc).__name__)
+        raise ImapConnectionLost(type(exc).__name__) from None
+
+
+def _read_folder(imap, folder, since_uid, limit, known_uidvalidity):
+    _select(imap, folder)
     uidvalidity = _uidvalidity(imap)
     if known_uidvalidity is not None and known_uidvalidity != uidvalidity:
         since_uid = 0
     mails, skipped = [], 0
-    uids = _new_uids(imap, since_uid, limit)
+    uids = _new_uids(imap, folder, since_uid, limit)
+    oversize = _oversize(imap, uids) if uids else set()
     for uid in uids:
-        raw = _fetch(imap, uid)
+        raw = None if uid in oversize else _fetch(imap, uid)
         try:
             mail = _review_mail(raw, folder, uidvalidity, uid) if raw else None
         except Exception as exc:  # untrusted mail: any parse failure is one skipped mail

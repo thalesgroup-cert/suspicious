@@ -9,11 +9,15 @@ class FakeImap:
 
     `fetch_override` maps a uid to the raw data list `uid("FETCH")` returns for it, to mimic odd
     server answers. `search_extra` adds UIDs to every SEARCH answer (servers answer "n:*" with the
-    last existing UID even when none is newer). Every call lands in `commands`.
+    last existing UID even when none is newer). `sizes` overrides the RFC822.SIZE a uid reports.
+    `errors` maps "SELECT", "SEARCH", "SIZE" or a uid (its BODY fetch) to an exception to raise
+    once that command is recorded. Every call lands in `commands`.
     """
 
-    def __init__(self, folders=None, *, fetch_override=None, search_extra=()):
+    def __init__(self, folders=None, *, fetch_override=None, search_extra=(), sizes=None, errors=None):
         self.folders = folders or {}
+        self.sizes = sizes or {}
+        self.errors = errors or {}
         self.fetch_override = fetch_override or {}
         self.search_extra = tuple(search_extra)
         self.commands: list[tuple] = []
@@ -22,6 +26,8 @@ class FakeImap:
 
     def select(self, mailbox="INBOX", readonly=False):
         self.commands.append(("SELECT", mailbox, readonly))
+        if "SELECT" in self.errors:
+            raise self.errors["SELECT"]
         self.untagged_responses = {}  # imaplib clears them at select
         name = mailbox
         if len(name) >= 2 and name[0] == name[-1] == '"':
@@ -48,11 +54,23 @@ class FakeImap:
         messages = self.selected["messages"]
         if command == "SEARCH":
             # args: (None, "UID", "n:*")
+            if "SEARCH" in self.errors:
+                raise self.errors["SEARCH"]
             low = int(args[-1].split(":", 1)[0])
             hits = sorted({u for u in messages if u >= low} | set(self.search_extra))
             return "OK", [" ".join(str(u) for u in hits).encode()]
+        if command == "FETCH" and args[1] == "(RFC822.SIZE)":
+            if "SIZE" in self.errors:
+                raise self.errors["SIZE"]
+            uids = [int(u) for u in args[0].split(",")]
+            return "OK", [
+                f"{n} (UID {u} RFC822.SIZE {self.sizes.get(u, len(messages[u]))})".encode()
+                for n, u in enumerate(uids, 1) if u in messages
+            ]
         if command == "FETCH":
             uid, spec = int(args[0]), args[1]
+            if uid in self.errors:
+                raise self.errors[uid]
             if spec != "(BODY.PEEK[])":
                 raise AssertionError(f"unexpected fetch spec {spec}")
             if uid in self.fetch_override:
