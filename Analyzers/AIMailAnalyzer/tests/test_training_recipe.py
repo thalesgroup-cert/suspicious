@@ -6,8 +6,9 @@ import torch
 
 from training import recipe
 from training.recipe import (
-    HEADS, Heads, Knn, chunk_by_tokens, chunk_mean_embedding, fit_heads, fit_temperature,
-    head_target, predict, truncation_rate,
+    HEADS, PREPROCESSING_VERSION_TOKENS, PREPROCESSING_VERSION_WORDS90, T_BOUNDS, Heads, Knn,
+    Predictions, chunk_by_tokens, chunk_mean_embedding, fit_heads, fit_temperature, fit_temperatures,
+    head_target, predict, smooth, temperature_at_bound, truncation_rate,
 )
 
 FOLDERS = (
@@ -89,8 +90,8 @@ def test_class_weights_are_balanced(monkeypatch):
 
 def test_fit_heads_is_reproducible():
     X, folders = _synthetic()
-    a = fit_heads(X, folders, seed=3, epochs=2)
-    b = fit_heads(X, folders, seed=3, epochs=2)
+    a = fit_heads(X, folders, seed=3, epochs=2, threads=1)
+    b = fit_heads(X, folders, seed=3, epochs=2, threads=1)
     for h in HEADS:
         for ta, tb in zip(a.models[h].state_dict().values(), b.models[h].state_dict().values()):
             assert torch.equal(ta, tb), h
@@ -112,40 +113,64 @@ def _softmax(z):
     return e / e.sum()
 
 
-def test_predict_blends_hierarchy_and_distance_weighted_knn():
-    logits = {"safe_suspicious": [0.2, 1.0], "spam_dangerous": [-0.5, 0.5], "safe": [1.0, 0.0],
-              "unwanted": [0.0, 0.0], "dangerous": [3.0, 0.0, 0.0, 0.0]}
-    heads = Heads({h: _Fixed(v) for h, v in logits.items()})
+def _hier_heads(logits):
+    return Heads({h: _Fixed(v) for h, v in logits.items()}, input_dim=2)
+
+
+LOGITS = {"safe_suspicious": [0.2, 1.0], "spam_dangerous": [-0.5, 0.5], "safe": [1.0, 0.0],
+          "unwanted": [0.0, 0.0], "dangerous": [3.0, 0.0, 0.0, 0.0]}
+
+
+def _calibrated(p, t):
+    """exp_e_combined.softmax_T on an already smoothed probability row."""
+    return _softmax(np.log(np.clip(p, 1e-9, 1)) / t)
+
+
+def test_predict_smooths_and_calibrates_each_component_then_averages():
     # Neighbours at cosine 0.9, 0.8, 0.6, 0.5, 0.0 and a sixth at -1 that 5-NN ignores.
     cos = [0.9, 0.8, 0.6, 0.5, 0.0, -1.0]
     E = np.array([[c, np.sqrt(1 - c**2)] for c in cos])
     labels = np.array([2, 0, 2, 1, 0, 1])
-    knn = Knn(E, labels)
     q = np.array([[2.0, 0.0]])  # unit-normalised inside
-    p = predict(heads, knn, q)
+    temps = {"hierarchy": 1.7, "knn": 0.6}
+    p = predict(_hier_heads(LOGITS), Knn(E, labels), q, temperature=temps)
 
-    ss, sd = _softmax(np.array(logits["safe_suspicious"])), _softmax(np.array(logits["spam_dangerous"]))
-    hier = np.array([ss[0], sd[0] * ss[1], sd[1] * ss[1]])
+    ss, sd = _softmax(np.array(LOGITS["safe_suspicious"])), _softmax(np.array(LOGITS["spam_dangerous"]))
+    hier = 0.95 * np.array([ss[0], sd[0] * ss[1], sd[1] * ss[1]]) + 0.05 / 3
     w = 1 / (1 - np.array(cos[:5]))
-    vote = np.array([w[labels[:5] == c].sum() for c in range(3)]) / w.sum()
-    np.testing.assert_allclose(p.hierarchy[0], hier, rtol=1e-5)
-    np.testing.assert_allclose(p.knn[0], vote, rtol=1e-5)
-    np.testing.assert_allclose(p.main[0], (hier + vote) / 2, rtol=1e-5)
+    vote = 0.95 * np.array([w[labels[:5] == c].sum() for c in range(3)]) / w.sum() + 0.05 / 3
+    h_cal, k_cal = _calibrated(hier, 1.7), _calibrated(vote, 0.6)
+    np.testing.assert_allclose(p.logits["hierarchy"][0], np.log(hier), rtol=1e-5)
+    np.testing.assert_allclose(p.logits["knn"][0], np.log(vote), rtol=1e-5)
+    np.testing.assert_allclose(p.hierarchy[0], h_cal, rtol=1e-5)
+    np.testing.assert_allclose(p.knn[0], k_cal, rtol=1e-5)
+    np.testing.assert_allclose(p.main[0], (h_cal + k_cal) / 2, rtol=1e-5)
     np.testing.assert_allclose(p.main.sum(1), 1, rtol=1e-6)
-    np.testing.assert_allclose(p.sub["dangerous"][0], _softmax(np.array(logits["dangerous"])), rtol=1e-5)
+    np.testing.assert_allclose(p.sub["dangerous"][0], _softmax(np.array(LOGITS["dangerous"])), rtol=1e-5)
     for v in p.sub.values():
         np.testing.assert_allclose(v.sum(1), 1, rtol=1e-6)
 
 
-def test_predict_applies_the_temperature_to_the_hierarchy():
-    logits = {"safe_suspicious": [0.0, 2.0], "spam_dangerous": [0.0, 1.0], "safe": [0.0, 0.0],
-              "unwanted": [0.0, 0.0], "dangerous": [0.0, 0.0, 0.0, 0.0]}
-    knn = Knn(np.array([[1.0, 0.0]] * 5), np.array([0, 0, 0, 0, 0]))
-    raw = predict(Heads({h: _Fixed(v) for h, v in logits.items()}), knn, np.ones((1, 2)))
-    hot = predict(Heads({h: _Fixed(v) for h, v in logits.items()}, temperature=2.0), knn, np.ones((1, 2)))
-    expected = _softmax(np.log(raw.hierarchy[0]) / 2.0)
-    np.testing.assert_allclose(hot.hierarchy[0], expected, rtol=1e-5)
-    np.testing.assert_allclose(raw.logits, np.log(raw.hierarchy), rtol=1e-5)
+def test_default_temperature_is_one_per_component():
+    knn = Knn(np.array([[1.0, 0.0]] * 5), np.array([0, 1, 2, 0, 0]))
+    a = predict(_hier_heads(LOGITS), knn, np.ones((1, 2)))
+    b = predict(_hier_heads(LOGITS), knn, np.ones((1, 2)), temperature={"hierarchy": 1.0, "knn": 1.0})
+    np.testing.assert_allclose(a.main, b.main)
+    np.testing.assert_allclose(a.hierarchy, np.exp(a.logits["hierarchy"]), rtol=1e-6)  # T=1 is a no-op
+    np.testing.assert_allclose(smooth(np.eye(3))[0], [0.95 + 0.05 / 3, 0.05 / 3, 0.05 / 3])
+
+
+def test_one_hot_knn_vote_has_finite_logits_and_its_own_temperature():
+    knn = Knn(np.array([[1.0, 0.0]] * 5), np.zeros(5, dtype=int))  # unanimous: one-hot vote
+    p = predict(_hier_heads(LOGITS), knn, np.ones((1, 2)), temperature={"hierarchy": 1.0, "knn": 2.0})
+    assert np.isfinite(p.logits["knn"]).all()
+    np.testing.assert_allclose(p.logits["knn"][0], np.log([0.95 + 0.05 / 3, 0.05 / 3, 0.05 / 3]), rtol=1e-6)
+    np.testing.assert_allclose(p.knn[0], _calibrated(np.exp(p.logits["knn"][0]), 2.0), rtol=1e-6)
+
+
+def test_knn_vote_on_an_empty_index_raises():
+    with pytest.raises(ValueError, match="empty neighbour index"):
+        Knn(np.zeros((0, 2)), np.zeros(0, dtype=int)).vote(np.ones((1, 2)))
 
 
 def _sampled(scale, n=20000, seed=0):
@@ -210,3 +235,41 @@ def test_chunk_by_tokens_fits_the_window():
     assert len(chunk_by_tokens(v, "a " * 1000)) == 8
     e = chunk_mean_embedding(v, " ".join(["w"] * 25), by_tokens=True)
     np.testing.assert_allclose(e, [25 / 3, 1.0])
+
+
+def test_fit_temperatures_fits_one_per_component():
+    zc, y = _sampled(1.0)
+    zh = zc * 3.0  # over-confident hierarchy, calibrated knn
+    softmax = lambda z: np.exp(z) / np.exp(z).sum(1, keepdims=True)
+    preds = Predictions(main=None, hierarchy=None, knn=None, sub={},
+                        logits={"hierarchy": np.log(softmax(zh)), "knn": np.log(softmax(zc))})
+    t = fit_temperatures(preds, y)
+    assert set(t) == {"hierarchy", "knn"}
+    assert t["hierarchy"] > 1.5 and t["knn"] == pytest.approx(1.0, abs=0.08)
+
+
+def test_temperature_at_bound():
+    lo, hi = T_BOUNDS
+    assert (lo, hi) == (0.2, 30)
+    assert temperature_at_bound(lo) and temperature_at_bound(lo + 5e-7)
+    assert temperature_at_bound(hi) and temperature_at_bound(hi - 5e-7)
+    assert not temperature_at_bound(1.0) and not temperature_at_bound(lo + 1e-3)
+
+
+def test_fit_heads_restores_threads_when_it_raises():
+    X, folders = _synthetic()
+    keep = np.array([not f.startswith("2_") for f in folders])  # the dangerous head has no rows
+    before = torch.get_num_threads()
+    with pytest.raises(ValueError, match="dangerous"):
+        fit_heads(X[keep], folders[keep], seed=0, epochs=1, threads=1 if before != 1 else 2)
+    assert torch.get_num_threads() == before
+
+
+def test_heads_record_their_input_dim():
+    X, folders = _synthetic(dim=12)
+    assert fit_heads(X, folders, seed=0, epochs=1, threads=1).input_dim == 12
+
+
+def test_preprocessing_versions_name_the_chunking():
+    assert PREPROCESSING_VERSION_WORDS90 == "chunkmean-words90-v1"
+    assert PREPROCESSING_VERSION_TOKENS == "chunkmean-tokens-v1"

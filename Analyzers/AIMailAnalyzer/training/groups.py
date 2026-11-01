@@ -5,10 +5,12 @@ from scipy.sparse.csgraph import connected_components
 
 
 def _cosine(X: np.ndarray) -> np.ndarray:
-    # ponytail: dense n x n similarity, fine for ledgers of a few thousand rows; switch to a
-    # radius-neighbours graph if the ledger grows past ~20k rows.
-    X = np.asarray(X, dtype=np.float64)
-    Xn = X / np.maximum(np.linalg.norm(X, axis=1, keepdims=True), 1e-12)
+    # ponytail: dense n x n float32 similarity (4 n^2 bytes) plus the boolean adjacency (n^2).
+    # Measured extra peak, 768-dim, few edges: 0.12 GB at 5k rows, 0.33 GB at 8k, 1.9 GB at 20k;
+    # each joined pair adds about 12 bytes in the sparse graph. Ceiling about 8k rows beside the
+    # encoder; past that, switch to a radius-neighbours graph.
+    X = np.asarray(X, dtype=np.float32)
+    Xn = X / np.maximum(np.linalg.norm(X, axis=1, keepdims=True), np.float32(1e-12))
     return Xn @ Xn.T
 
 
@@ -24,7 +26,7 @@ def near_duplicate_groups(embeddings: np.ndarray, threshold: float = 0.95) -> np
 def campaign_groups(campaign_embeddings, distance_threshold: float, ties: list[tuple[int, int]]) -> np.ndarray:
     """Component id per row; rows within cosine distance distance_threshold are joined, and so is
     every (i, j) pair in ties (the CampaignMember links)."""
-    adjacency = (1.0 - _cosine(campaign_embeddings)) <= distance_threshold
+    adjacency = _cosine(campaign_embeddings) >= 1.0 - distance_threshold
     for i, j in ties:
         adjacency[i, j] = adjacency[j, i] = True
     return _components(adjacency)

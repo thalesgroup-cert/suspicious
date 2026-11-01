@@ -39,3 +39,21 @@ def test_campaign_groups_merge_by_distance_and_ties():
     assert _same(g, 0, 1) and not _same(g, 2, 3) and not _same(g, 0, 2)
     g = campaign_groups(X, 0.25, [(2, 3)])
     assert _same(g, 2, 3) and not _same(g, 0, 2)
+
+
+def _old_components(X, adjacency_of):
+    from scipy.sparse import csr_matrix
+    from scipy.sparse.csgraph import connected_components
+    Xn = X / np.linalg.norm(X, axis=1, keepdims=True)
+    return connected_components(csr_matrix(adjacency_of(Xn @ Xn.T)), directed=False)[1]
+
+
+def test_float32_components_match_the_float64_behaviour():
+    rng = np.random.default_rng(0)
+    centres = rng.normal(size=(6, 32))
+    X = np.vstack([c + rng.normal(scale=s, size=(5, 32)) for c in centres for s in (0.05, 0.6)])
+    old = _old_components(X, lambda S: S >= 0.95)
+    assert len(np.unique(old)) not in (1, len(X))  # the set has both joined and lone rows
+    assert np.array_equal(near_duplicate_groups(X), old)
+    old = _old_components(X, lambda S: (1.0 - S) <= 0.25)
+    assert np.array_equal(campaign_groups(X, 0.25, []), old)
