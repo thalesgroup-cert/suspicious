@@ -96,8 +96,12 @@ class LabelRecord(models.Model):
             models.Index(fields=["trust", "status"]),
         ]
 
-    # Ruling D4: the only columns a save() may change; case only from null. QuerySet.update()
-    # bypasses this check, so the ledger module updates these columns only.
+    # Ruling D4: the only columns a save() may change; case only from null.
+    # ponytail: a guard on save() only, not a database rule. Not covered: QuerySet.update() and
+    # bulk_update() (ai_model.ledger uses update() on these columns only); a new instance given an
+    # existing pk (_state.adding is True, so the check is skipped and save() updates the row); raw
+    # SQL. The row is read then written without a lock (TOCTOU), so two concurrent saves are each
+    # checked against the row as it was. A DB trigger is the upgrade if the ledger gets other writers.
     MUTABLE = frozenset({"status", "flag_reason", "case_id", "resolved_by_id", "resolved_at", "resolution_note"})
 
     def save(self, *args, **kwargs):
