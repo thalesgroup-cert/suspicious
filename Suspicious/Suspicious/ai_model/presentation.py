@@ -4,10 +4,12 @@ No numeric confidence leaves this module: people see the class, the tier and,
 on tier ``low``, the runner-up class.
 """
 
-from api.permissions.submissions import submission_queryset
+from api.permissions.submissions import has_elevated_view, submission_queryset
 from case_handler.models import Case
 
 _AXIS = {"SAFE", "DANGEROUS"}  # the only classes that can disagree
+_TIERS = {"high", "medium", "low"}
+_AI_RULE = "ai-classifier-decisive"
 _SIMILAR_KEYS = ("case_id", "similarity", "label", "provenance")
 
 
@@ -59,13 +61,18 @@ def _campaign(case):
 
 def cross_check(case, assessment) -> dict:
     """Facts from the verdict explanation and the list hit, and whether the AI class
-    sits on the other side of the Safe/Dangerous axis from the case band."""
-    explanation = case.verdict_explanation or {}
+    sits on the other side of the Safe/Dangerous axis from the case verdict band."""
+    explanation = case.verdict_explanation if isinstance(case.verdict_explanation, dict) else {}
+    rule = explanation.get("decisive_rule")
+    ai_decided = rule == _AI_RULE  # the AI set the band: agreement or conflict would be circular
     facts = []
-    if explanation.get("decisive_rule"):
-        facts.append({"kind": "rule", "text": f"Decisive rule: {explanation['decisive_rule']}"})
-    for source in explanation.get("sources") or []:
-        if source.get("counted"):
+    if ai_decided:
+        facts.append({"kind": "rule", "text": "No independent evidence beyond the AI"})
+    elif rule:
+        facts.append({"kind": "rule", "text": f"Decisive rule: {rule}"})
+    sources = explanation.get("sources")
+    for source in sources if isinstance(sources, list) else []:
+        if isinstance(source, dict) and source.get("counted"):
             facts.append(
                 {"kind": "source", "text": f"{source.get('name')} reported {source.get('verdict')}."}
             )
@@ -74,24 +81,29 @@ def cross_check(case, assessment) -> dict:
         reason = f": {case.list_reason}" if case.list_reason else ""
         facts.append({"kind": "list", "text": f"The case matched the {which}{reason}."})
     ai = assessment.result.upper()
-    band = str(explanation.get("band") or "").upper()
-    disagrees = ai in _AXIS and band in _AXIS and ai != band
+    # Without an explanation (or a band in it) the case's current verdict stands in, so an
+    # analyst override is still compared.
+    band = str(explanation.get("band") or case.results or "").upper()
+    disagrees = not ai_decided and ai in _AXIS and band in _AXIS and ai != band
     return {"facts": facts, "disagrees": disagrees}
 
 
-def present_assessment(case, user) -> dict | None:
+def present_assessment(case, user, elevated: bool | None = None) -> dict | None:
+    if elevated is None:
+        elevated = has_elevated_view(user, case)
     assessment = getattr(case, "ai_assessment", None)
-    if assessment is None:
+    if assessment is None or not assessment.model_version:
         return None
     return {
         "result": _display(assessment.result),
         "sub_class": assessment.sub_class,
-        "tier": assessment.tier,
+        "tier": assessment.tier if assessment.tier in _TIERS else "",
         "runner_up": _runner_up(assessment),
         "model_version": assessment.model_version,
         "analysed_at": assessment.updated_at,
-        "reads": "body only",
+        "reads": "body text only, not headers or attachments",  # the inference input is the .txt only
         "similar_cases": _visible_similar_cases(assessment, user),
         "campaign": _campaign(case),
-        "cross_check": cross_check(case, assessment),
+        # The rule and list reason are analyst material, as `raw` is.
+        "cross_check": cross_check(case, assessment) if elevated else None,
     }

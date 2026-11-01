@@ -43,7 +43,7 @@ class PresentAssessmentTest(TestCase):
         self.assertEqual(out["result"], "Dangerous")
         self.assertEqual(out["model_version"], "v0")
         self.assertEqual(out["analysed_at"], a.updated_at)
-        self.assertEqual(out["reads"], "body only")
+        self.assertEqual(out["reads"], "body text only, not headers or attachments")
 
     def test_low_tier_names_the_runner_up(self):
         self._assess(
@@ -126,6 +126,29 @@ class PresentAssessmentTest(TestCase):
         self.assertEqual(len(ctx.captured_queries), 1)
         self.assertIn("COUNT(", ctx.captured_queries[0]["sql"].upper())
 
+    def test_blank_model_version_gives_none(self):
+        self._assess(model_version="")
+        self.assertIsNone(self._present())
+
+    def test_unknown_tier_is_shown_as_not_calibrated(self):
+        for tier in ("HIGH", "certain", "None"):
+            with self.subTest(tier):
+                AiAssessment.objects.filter(case=self.case).delete()
+                self._assess(tier=tier)
+                self.assertEqual(self._present()["tier"], "")
+
+    def test_cross_check_is_null_for_a_non_elevated_viewer(self):
+        self._assess()
+        self.assertIsNone(present_assessment(Case.objects.get(pk=self.case.pk), self.user)["cross_check"])
+
+    def test_cross_check_is_present_for_an_analyst(self):
+        from django.contrib.auth.models import Group
+        analyst = get_user_model().objects.create_user(username="cert", password="pass")
+        analyst.groups.add(Group.objects.get_or_create(name="CERT")[0])
+        self._assess()
+        out = present_assessment(Case.objects.get(pk=self.case.pk), analyst)
+        self.assertEqual(out["cross_check"], {"facts": [], "disagrees": False})
+
     def test_case_outside_a_campaign_has_no_campaign(self):
         self._assess()
         self.assertIsNone(self._present()["campaign"])
@@ -171,6 +194,26 @@ class CrossCheckTest(TestCase):
     def test_no_explanation_gives_no_rule_or_source_and_no_disagreement(self):
         out = self._check("SAFE", None)
         self.assertEqual(out, {"facts": [], "disagrees": False})
+
+    def test_ai_decisive_rule_is_not_listed_and_never_disagrees(self):
+        out = self._check("SAFE", {"decisive_rule": "ai-classifier-decisive", "band": "Dangerous"})
+        self.assertEqual(
+            out, {"facts": [{"kind": "rule", "text": "No independent evidence beyond the AI"}],
+                  "disagrees": False},
+        )
+
+    def test_no_explanation_compares_with_the_case_verdict(self):
+        out = self._check("SAFE", None, results="Dangerous")  # e.g. an analyst override
+        self.assertEqual(out, {"facts": [], "disagrees": True})
+        self.assertFalse(self._check("DANGEROUS", None, results="Dangerous")["disagrees"])
+
+    def test_malformed_explanation_is_tolerated(self):
+        for bad in ("text", ["a"], 3):
+            with self.subTest(bad):
+                self.assertEqual(self._check("SAFE", bad), {"facts": [], "disagrees": False})
+        out = self._check("SAFE", {"sources": ["x", None, {"name": "n", "verdict": "v", "counted": True}]})
+        self.assertEqual([f["kind"] for f in out["facts"]], ["source"])
+        self.assertEqual(self._check("SAFE", {"sources": "oops"}), {"facts": [], "disagrees": False})
 
     def test_allow_list_hit_is_a_fact(self):
         out = self._check("SAFE", None, is_allowlisted=True, list_reason="good.example")
