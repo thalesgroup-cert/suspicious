@@ -85,7 +85,9 @@ Deliverable: the case drawer and investigation overview show the new section onl
 4. **Hidden when disabled**: the section reads the enabled-connectors endpoint (`EnabledConnectorsView`); absent when `ai_model` is not enabled; old cases follow the spec (hidden too).
 5. **Tests**: Vitest for each state (High, Low with runner-up, version 0, disabled, campaign conflict); Playwright path through a drawer.
 
-## Plan D: Label ledger and sync (outline)
+## Plan D: Label ledger and sync
+
+**Status: detailed** in `docs/plans/2026-11-01-ai-model-connector-d-label-ledger.md` (8 tasks). The outline below is the earlier sketch; the detailed plan's Calls table supersedes it (folder taxonomy from the training notebook, text form and canonical recipe left to Plan E, sibling labels in the case view included).
 
 Deliverable: a nightly sync fills the ledger from the review folders and verdict edits; flagged conflicts are listed; a management command backfills history.
 
