@@ -122,6 +122,17 @@ Official documentation read for this plan (links checked on 2026-11-01). Where a
 - [ ] **3. Checkpoint:** run it on the real dataset in the image and put the numbers in the report. If it fails the thresholds, stop and report; do not start Task 6.
 - [ ] **4. Commit:** `test(training): add the slow evaluation regression and dataset tool`.
 
+### Task 5b: Learning curve
+
+**Files:** Create `Analyzers/AIMailAnalyzer/tools/learning_curve.py`, `tests/test_learning_curve.py`.
+
+Why: the checkpoint leaves open how much a larger labelled set would buy. The 505 mails form about 240 to 260 near-duplicate groups, and the held-out-campaign result is the weak spot, so the useful question is how the gate metrics move with the number of independent groups.
+
+- [ ] **1. Tests first:** `subsample_groups(groups, fraction, seed)` keeps whole groups only (no group is split), keeps every class represented with at least the gate's 8-per-class floor when the full set has it (otherwise the fraction is reported as infeasible), is deterministic per seed, and fractions are nested (the 50% set is a subset of the 75% set for one seed); the runner calls `run_gate` once per fraction with the same recipe, baseline and seeds, and returns a list of rows `{fraction, rows, groups, accuracy, macro_f1, dcs, dcs_wilson, ece, campaign_dcs, high_precision, high_n, checks_passed}` with counts and rates only (assert no row contains any string longer than a short key, and no folder text beyond class names); a curve summary function reports the slope between consecutive fractions and flags "still improving" when accuracy gains more than 0.01 or Dangerous-called-Safe falls by more than 0.005 over the last step; a stub recipe makes the tests fast.
+- [ ] **2. Implement** `tools/learning_curve.py` (CLI: `--dataset <npz> --form tokens|words90 --fractions 0.25,0.5,0.75,1.0 --seeds 0,1,2 --out <json>`; imbalanced-learn is used for the legacy baseline only if importable, else the baseline checks are reported as not evaluated). The tool is not imported by the package or the server and prints counts only.
+- [ ] **3. Run on the real data** in the image (scratchpad dataset, tokens form, background with a log file, bounded checks): report the table, the slopes and what they imply for a 1200-mail set: state plainly what is extrapolation and what is measured, and note that the curve is over independent groups, not mails. Also run once with the group count doubled by synthetic duplication ONLY if cheap and clearly labelled as a sanity check that duplicates do not move the gate; skip otherwise.
+- [ ] **4. Commit:** `test(training): add the learning-curve tool`.
+
 ### Task 6: Server training job and reload
 
 **Files:** Modify `inference_server/v2.py`, `inference_server/server.py`; create `inference_server/training_job.py`; tests `tests/test_inference_server_train.py`.
