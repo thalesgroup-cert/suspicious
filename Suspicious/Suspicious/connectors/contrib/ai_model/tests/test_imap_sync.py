@@ -220,6 +220,21 @@ class ReadFolderTest(SimpleTestCase):
                 read_folder(imap, FOLDER, since_uid=0, limit=10)
             self.assertEqual(str(ctx.exception), type(exc).__name__)
 
+    def test_garbage_search_tokens_are_ignored(self):
+        imap = fake({2: forward(2)})
+        real_uid = imap.uid
+        answer = ("OK", [b"2 junk", None, b"(x) *"])
+        with mock.patch.object(imap, "uid", side_effect=lambda c, *a: answer if c == "SEARCH" else real_uid(c, *a)):
+            mails, skipped, _, last_uid = read_folder(imap, FOLDER, since_uid=0, limit=10)
+        self.assertEqual(([m.uid for m in mails], skipped, last_uid), ([2], 0, 2))
+
+    def test_folder_name_in_errors_is_capped(self):
+        for name in ("A" * 300, "A" * 300 + "\n"):
+            with self.assertRaises(FolderUnavailable) as ctx:
+                read_folder(fake({}), name, since_uid=0, limit=10)
+            self.assertLessEqual(len(str(ctx.exception).split(":")[0]), 64)
+            self.assertNotIn("A" * 65, str(ctx.exception))
+
     def test_empty_folder(self):
         self.assertEqual(read_folder(fake({}), FOLDER, since_uid=3, limit=10), ([], 0, 7, 3))
 
@@ -254,10 +269,14 @@ class ConnectTest(SimpleTestCase):
         plain_cls.assert_called_once_with("imap.example", 143, timeout=5)
         client.login.assert_called_once_with("u", "p")
 
-    def test_login_failure_closes_and_reraises(self):
+    def test_login_failure_closes_and_carries_only_the_class_name(self):
         error = imap_sync.imaplib.IMAP4.error
         with mock.patch.object(imap_sync.imaplib, "IMAP4") as plain_cls:
-            plain_cls.return_value.login.side_effect = error("denied")
-            with self.assertRaises(error):
-                imap_sync.connect("imap.example", 143, "u", "p", False)
+            plain_cls.return_value.login.side_effect = error(
+                "b'[AUTHENTICATIONFAILED] Dovecot ready. bad password hunter2 for u'")
+            with self.assertRaises(imap_sync.ImapLoginFailed) as ctx:
+                imap_sync.connect("imap.example", 143, "u", "hunter2", False)
         plain_cls.return_value.shutdown.assert_called_once()
+        self.assertEqual(str(ctx.exception), "error")
+        self.assertIsNone(ctx.exception.__cause__)
+        self.assertTrue(ctx.exception.__suppress_context__)

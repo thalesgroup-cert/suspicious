@@ -36,6 +36,17 @@ class ImapConnectionLost(Exception):
     """The connection broke (abort, socket error, timeout): fatal for the whole run."""
 
 
+class ImapLoginFailed(Exception):
+    """connect() could not log in. The message is the original exception's class name only: server
+    login answers can echo the user, the password or a banner. Fatal for the run, like a lost
+    connection, but a retry will not help until the credentials are fixed."""
+
+
+def _shown(folder: str) -> str:
+    """The folder name for errors and logs: ascii() form, at most 64 characters."""
+    return ascii(folder)[:64]
+
+
 @dataclass(frozen=True)
 class ReviewMail:
     folder: str
@@ -50,13 +61,16 @@ class ReviewMail:
 
 
 def connect(host, port, user, password, use_ssl, timeout=30):
-    """A logged-in IMAP4_SSL (certificate verified) or IMAP4 client. Login errors propagate."""
+    """A logged-in IMAP4_SSL (certificate verified) or IMAP4 client; ImapLoginFailed on login."""
     if use_ssl:
         client = imaplib.IMAP4_SSL(host, port, ssl_context=ssl.create_default_context(), timeout=timeout)
     else:
         client = imaplib.IMAP4(host, port, timeout=timeout)
     try:
         client.login(user, password)
+    except Exception as exc:
+        client.shutdown()
+        raise ImapLoginFailed(type(exc).__name__) from None
     except BaseException:
         client.shutdown()
         raise
@@ -76,14 +90,14 @@ def _new_uids(imap, folder: str, since_uid: int, limit: int) -> list[int]:
         typ, data = imap.uid("SEARCH", None, "UID", f"{since_uid + 1}:*")
     except imaplib.IMAP4.abort:
         raise
-    except imaplib.IMAP4.error as exc:
-        raise FolderUnavailable(ascii(folder)) from None
+    except imaplib.IMAP4.error:
+        raise FolderUnavailable(_shown(folder)) from None
     if typ != "OK":
-        raise FolderUnavailable(ascii(folder))
-    joined = b" ".join(d for d in data or () if d)
+        raise FolderUnavailable(_shown(folder))
+    joined = b" ".join(d for d in data or () if isinstance(d, bytes))
     # "n:*" answers the last UID even when none is newer: filter ourselves. Lowest first so the
     # caller's checkpoint advances monotonically.
-    return sorted(u for u in {int(x) for x in joined.split()} if u > since_uid)[:limit]
+    return sorted(u for u in {int(x) for x in re.findall(rb"\d+", joined)} if u > since_uid)[:limit]
 
 
 def _oversize(imap, uids: list[int]) -> set[int]:
@@ -169,7 +183,7 @@ def _quoted(folder: str) -> str:
     """
     bad = next((i for i, c in enumerate(folder) if ord(c) < 0x20 or ord(c) >= 0x7F), None)
     if bad is not None:
-        raise FolderUnavailable(f"{ascii(folder)}: forbidden character at index {bad}")
+        raise FolderUnavailable(f"{_shown(folder)}: forbidden character at index {bad}")
     return '"' + folder.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
@@ -178,16 +192,16 @@ def _select(imap, folder: str) -> None:
     try:
         typ, _ = imap.select(quoted, readonly=True)
     except imaplib.IMAP4.readonly as exc:  # a subclass of abort, but about this folder only
-        logger.warning("ai_model imap: cannot select %s (%s)", folder, type(exc).__name__)
-        raise FolderUnavailable(folder) from None
+        logger.warning("ai_model imap: cannot select %s (%s)", _shown(folder), type(exc).__name__)
+        raise FolderUnavailable(_shown(folder)) from None
     except imaplib.IMAP4.abort:
         raise
     except imaplib.IMAP4.error as exc:
-        logger.warning("ai_model imap: cannot select %s (%s)", folder, type(exc).__name__)
-        raise FolderUnavailable(folder) from None
+        logger.warning("ai_model imap: cannot select %s (%s)", _shown(folder), type(exc).__name__)
+        raise FolderUnavailable(_shown(folder)) from None
     if typ != "OK":
-        logger.warning("ai_model imap: cannot select %s (%s)", folder, typ)
-        raise FolderUnavailable(folder)
+        logger.warning("ai_model imap: cannot select %s (%s)", _shown(folder), typ)
+        raise FolderUnavailable(_shown(folder))
 
 
 def read_folder(imap, folder, *, since_uid, limit, known_uidvalidity=None):
@@ -201,7 +215,7 @@ def read_folder(imap, folder, *, since_uid, limit, known_uidvalidity=None):
     try:
         return _read_folder(imap, folder, since_uid, limit, known_uidvalidity)
     except (imaplib.IMAP4.abort, OSError) as exc:  # TimeoutError and ssl errors are OSErrors
-        logger.warning("ai_model imap: connection lost reading %s (%s)", ascii(folder), type(exc).__name__)
+        logger.warning("ai_model imap: connection lost reading %s (%s)", _shown(folder), type(exc).__name__)
         raise ImapConnectionLost(type(exc).__name__) from None
 
 
