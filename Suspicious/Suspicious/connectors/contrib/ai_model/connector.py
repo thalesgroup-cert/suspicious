@@ -4,6 +4,7 @@ the Cortex AI analyzer. See docs/specs for the ai_model design."""
 from __future__ import annotations
 
 import logging
+from time import monotonic  # module-level so tests can patch the clock
 
 from django.db import transaction
 from django.utils import timezone
@@ -35,6 +36,8 @@ logger = logging.getLogger("connectors.contrib.ai_model")
 DEFAULT_URL = "http://ai_inference:8090"
 DEFAULT_TIMEOUT = 20
 FOLDER_BATCH = 500  # ruling D8: new mails per folder per run
+CHUNK = 100  # mails embedded and committed together
+TIME_BUDGET_SECONDS = 400  # a run stops between chunks after this; Celery's soft limit is 540 s
 EMBED_BATCH = 32  # the /v2/embed limit
 
 
@@ -65,6 +68,25 @@ def result_from_server(payload: dict) -> ProviderResult:
             "latency_ms": payload["latency_ms"],
         },
     )
+
+
+def _embed(client, texts: list[str]) -> tuple[dict, dict]:
+    """({profile: [vector, ...]}, versions) for both profiles, in batches of EMBED_BATCH.
+    ValueError when an answer does not fit the batch or the versions change within it."""
+    vectors = {"classifier": [], "campaign": []}
+    seen = {"classifier": set(), "campaign": set()}
+    for start in range(0, len(texts), EMBED_BATCH):
+        batch = texts[start:start + EMBED_BATCH]
+        for profile in vectors:
+            answer = client.embed(batch, profile)
+            if len(answer["vectors"]) != len(batch):
+                raise ValueError("embed answer does not match the batch size")
+            vectors[profile].extend(answer["vectors"])
+            seen[profile].add((answer["preprocessing_version"], answer["embedding_version"]))
+    if any(len(v) > 1 for v in seen.values()):
+        raise ValueError("embed versions changed within a chunk")
+    classifier, campaign = (next(iter(seen[p]), ("", "")) for p in ("classifier", "campaign"))
+    return vectors, {"preprocessing_version": classifier[0], "embedding_version": campaign[1]}
 
 
 class AiModelConnector(Connector):
@@ -150,57 +172,68 @@ class AiModelConnector(Connector):
     def sync(self) -> None:
         """Nightly label sync: read the review folders (read-only) into the label ledger.
 
-        Each folder's rows and its checkpoint commit together, only after its mails were embedded,
-        so a failed embed leaves the checkpoint where it was and the next run retries. A folder
-        that cannot be read is skipped; a failed login, a lost connection or an unavailable
-        embed endpoint raises and fails the run (earlier folders stay committed).
+        Each folder is read in chunks of CHUNK mails, up to FOLDER_BATCH per run. A chunk is
+        embedded first, then its rows and the folder checkpoint commit in one transaction, so a
+        failure leaves earlier chunks committed and the next run resumes after them. The run
+        stops cleanly once TIME_BUDGET_SECONDS have passed (checked between chunks), under
+        Celery's 540 s soft limit; a full backfill is the Task 7 command. A folder that cannot
+        be read or whose embed is refused (4xx, inconsistent answer) is skipped; a failed login,
+        a lost connection or an unavailable embed endpoint raises and fails the run.
         """
         host = self.config.get("imap_host")
         if not host:
             return
+        started = monotonic()
         client = self._client()
+        folders = [f.strip() for f in (self.config.get("imap_folders") or "").split(",") if f.strip()]
         imap = imap_sync.connect(
             host, int(self.config.get("imap_port") or 993), self.config.get("imap_user") or "",
             self.config.get("imap_password") or "", self.config.get("imap_use_ssl", True) is not False,
         )
         try:
-            for folder in filter(None, (f.strip() for f in (self.config.get("imap_folders") or "").split(","))):
+            for folder in folders or FOLDERS:
                 if class_of(folder) is None:
                     logger.warning("ai_model sync: folder %s has no known class, skipped", ascii(folder)[:64])
                     continue
                 try:
-                    self._sync_folder(imap, client, folder)
+                    if not self._sync_folder(imap, client, folder, started):
+                        logger.info("ai_model sync: time budget spent, stopping at %s", ascii(folder)[:64])
+                        return
                 except imap_sync.FolderUnavailable as exc:
                     logger.warning("ai_model sync: folder unavailable: %s", exc)
+                except ValueError as exc:  # the server refused this batch; the message is not logged
+                    logger.warning("ai_model sync: embed refused for %s (%s), folder skipped",
+                                   ascii(folder)[:64], type(exc).__name__)
         finally:
             try:
                 imap.logout()
             except Exception:  # noqa: BLE001 -- the connection may already be gone
                 pass
 
-    def _sync_folder(self, imap, client, folder: str) -> None:
+    def _sync_folder(self, imap, client, folder: str, started: float) -> bool:
+        """Sync one folder chunk by chunk; False once the time budget is spent."""
         state, _ = LabelSyncState.objects.get_or_create(folder=folder)
-        mails, skipped, uidvalidity, last_uid = imap_sync.read_folder(
-            imap, folder, since_uid=state.last_uid, limit=FOLDER_BATCH, known_uidvalidity=state.uidvalidity,
-        )
-        new = [o for o in map(ledger.prepare_folder_observation, mails) if o is not None]
-        answers = {"classifier": [], "campaign": []}
-        versions = {}
-        for start in range(0, len(new), EMBED_BATCH):
-            texts = [o.mail.text for o in new[start:start + EMBED_BATCH]]
-            for profile, vectors in answers.items():
-                answer = client.embed(texts, profile)
-                if len(answer["vectors"]) != len(texts):
-                    raise ValueError("embed answer does not match the batch size")
-                vectors.extend(answer["vectors"])
-                versions[profile] = answer
-        with transaction.atomic():
-            for i, observation in enumerate(new):
-                ledger.record_folder_observation(
-                    observation, {p: v[i] for p, v in answers.items()},
-                    preprocessing_version=versions["classifier"]["preprocessing_version"],
-                    embedding_version=versions["campaign"]["embedding_version"],
-                )
-            state.uidvalidity, state.last_uid, state.skipped = uidvalidity, last_uid, skipped
-            state.last_run_at = timezone.now()
-            state.save()
+        examined_total, skipped_total = 0, 0
+        while examined_total < FOLDER_BATCH:
+            if monotonic() - started >= TIME_BUDGET_SECONDS:
+                return False
+            mails, skipped, uidvalidity, last_uid = imap_sync.read_folder(
+                imap, folder, since_uid=state.last_uid, limit=min(CHUNK, FOLDER_BATCH - examined_total),
+                known_uidvalidity=state.uidvalidity,
+            )
+            examined = len(mails) + skipped
+            examined_total, skipped_total = examined_total + examined, skipped_total + skipped
+            new = [o for o in map(ledger.prepare_folder_observation, mails) if o is not None]
+            vectors, versions = _embed(client, [o.mail.text for o in new])
+            with transaction.atomic():
+                state = LabelSyncState.objects.select_for_update().get(pk=state.pk)
+                for i, observation in enumerate(new):
+                    ledger.record_folder_observation(
+                        observation, {p: v[i] for p, v in vectors.items()}, **versions,
+                    )
+                state.uidvalidity, state.last_uid, state.skipped = uidvalidity, last_uid, skipped_total
+                state.last_run_at = timezone.now()
+                state.save()
+            if examined < CHUNK:
+                break
+        return True

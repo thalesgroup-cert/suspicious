@@ -1,15 +1,17 @@
 """The ai_model connector's nightly sync of the review folders into the label ledger (Plan D, Task 5)."""
 import json
+from datetime import datetime, timezone
 from unittest import mock
 
 from django.test import TestCase
 
 from ai_model.models import LabelRecord, LabelSyncState
+from ai_model.taxonomy import FOLDERS
 from connectors.contrib.ai_model import connector as module
 from connectors.contrib.ai_model import imap_sync
 from connectors.contrib.ai_model.connector import AiModelConnector
 from connectors.contrib.ai_model.tests.fake_imap import FakeImap
-from connectors.contrib.ai_model.tests.test_imap_sync import forward
+from connectors.contrib.ai_model.tests.test_imap_sync import forward, inner
 from connectors.providers import ProviderUnavailable
 
 PHISH, SPAM = "2_CLASSIC_PHISHING", "1_SPAM"
@@ -105,3 +107,122 @@ class LabelSyncTest(TestCase):
         self.imap.errors["SEARCH"] = OSError("reset")
         with self.assertRaises(imap_sync.ImapConnectionLost):
             self.run_sync()
+
+    def selected(self):
+        return [c[1].strip('"') for c in self.imap.commands if c[0] == "SELECT"]
+
+    def test_folders_default_to_the_eight_when_absent_empty_or_blank(self):
+        absent = {k: v for k, v in CONFIG.items() if k != "imap_folders"}
+        for config in (absent, {**CONFIG, "imap_folders": ""}, {**CONFIG, "imap_folders": " , "}):
+            with self.subTest(folders=config.get("imap_folders")):
+                self.imap.commands.clear()
+                self.run_sync(config=config)
+                self.assertEqual(self.selected(), list(FOLDERS))
+
+    def test_an_embed_refusal_skips_only_that_folder(self):
+        calls = []
+
+        def embed(texts, profile):
+            calls.append(profile)
+            if len(calls) == 1:
+                raise ValueError("inference server refused the request (HTTP 413)")
+            return embed_answer(texts, profile)
+
+        with self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs:
+            self.run_sync(embed=embed)
+        self.assertFalse(LabelRecord.objects.filter(label=PHISH).exists())
+        self.assertFalse(LabelSyncState.objects.filter(folder=PHISH, last_uid__gt=0).exists())
+        self.assertEqual(LabelSyncState.objects.get(folder=SPAM).last_uid, 11)
+        self.assertIn("ValueError", "\n".join(logs.output))
+        self.assertNotIn("413", "\n".join(logs.output))
+
+    def test_changed_embed_versions_within_a_chunk_skip_the_folder(self):
+        self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
+        answers = iter(["legacy-first128", "legacy-first128", "other-recipe", "other-recipe"])
+
+        def embed(texts, profile):
+            return {**embed_answer(texts, profile), "preprocessing_version": next(answers)}
+
+        self.run_sync(config={**CONFIG, "imap_folders": PHISH}, embed=embed)
+        self.assertFalse(LabelRecord.objects.exists())
+        self.assertFalse(LabelSyncState.objects.filter(last_uid__gt=0).exists())
+
+    def test_chunks_commit_one_by_one(self):
+        self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 6)}
+        with mock.patch.object(module, "CHUNK", 2):
+            call, _ = self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        self.assertEqual([len(c.args[0]) for c in call.call_args_list], [2, 2, 2, 2, 1, 1])
+        self.assertEqual((LabelRecord.objects.count(), LabelSyncState.objects.get().last_uid), (5, 5))
+
+    def test_a_failure_in_chunk_two_keeps_chunk_one(self):
+        self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 4)}
+        answers = [embed_answer, embed_answer, ProviderUnavailable("inference server HTTP 503")]
+
+        def embed(texts, profile):
+            step = answers.pop(0) if answers else embed_answer
+            if isinstance(step, Exception):
+                raise step
+            return step(texts, profile)
+
+        with mock.patch.object(module, "CHUNK", 2), self.assertRaises(ProviderUnavailable):
+            self.run_sync(config={**CONFIG, "imap_folders": PHISH}, embed=embed)
+        self.assertEqual(sorted(LabelRecord.objects.values_list("message_id", flat=True)),
+                         ["id.1@evil.example", "id.2@evil.example"])
+        self.assertEqual(LabelSyncState.objects.get().last_uid, 2)
+
+    def test_a_failure_on_the_second_embed_batch_commits_nothing(self):
+        self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
+        answers = [embed_answer, embed_answer, ProviderUnavailable("inference server HTTP 503")]
+
+        def embed(texts, profile):
+            step = answers.pop(0) if answers else embed_answer
+            if isinstance(step, Exception):
+                raise step
+            return step(texts, profile)
+
+        with self.assertRaises(ProviderUnavailable):
+            self.run_sync(config={**CONFIG, "imap_folders": PHISH}, embed=embed)
+        self.assertFalse(LabelRecord.objects.exists())
+        self.assertFalse(LabelSyncState.objects.filter(last_uid__gt=0).exists())
+
+    def test_a_row_write_failure_rolls_back_rows_and_checkpoint(self):
+        real = module.ledger.record_folder_observation
+        calls = []
+
+        def record(*args, **kw):
+            calls.append(1)
+            if len(calls) == 2:
+                raise RuntimeError("db gone")
+            return real(*args, **kw)
+
+        with mock.patch.object(module.ledger, "record_folder_observation", side_effect=record), \
+                self.assertRaises(RuntimeError):
+            self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        self.assertFalse(LabelRecord.objects.exists())
+        self.assertFalse(LabelSyncState.objects.filter(last_uid__gt=0).exists())
+
+    def test_the_time_budget_stops_the_run_after_a_committed_chunk(self):
+        self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 6)}
+        clock = iter([0.0, 0.0])  # sync start, before chunk 1; later calls are past the budget
+        with mock.patch.object(module, "CHUNK", 2), \
+                mock.patch.object(module, "monotonic", side_effect=lambda: next(clock, module.TIME_BUDGET_SECONDS)):
+            self.run_sync()
+        self.assertEqual((LabelRecord.objects.count(), LabelSyncState.objects.get(folder=PHISH).last_uid), (2, 2))
+        self.assertFalse(LabelSyncState.objects.filter(folder=SPAM).exists())
+        self.assertIn(("LOGOUT",), self.imap.commands)
+
+    def test_inner_message_id_matches_a_case_through_sync(self):
+        from django.contrib.auth import get_user_model
+        from case_handler.models import Case, CaseHasFileOrMail
+        from mail_feeder.models import Mail, MailHeader
+
+        header = MailHeader.objects.create(header_value=str({"Message-ID": ["<ID.70@Evil.Example>"]}),
+                                           fuzzy_hash="h")
+        mail = Mail.objects.create(subject="s", reportedBy="r", to="t", mail_id="m", mail_header=header,
+                                   date=datetime(2026, 10, 5, tzinfo=timezone.utc))
+        case = Case.objects.create(description="", reporter=get_user_model().objects.create_user("u", password="x"))
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
+        case.save(update_fields=["fileOrMail"])
+        self.imap.folders[PHISH]["messages"] = {1: forward(60, attach=(inner(70),))}
+        self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        self.assertEqual(LabelRecord.objects.get().case, case)
