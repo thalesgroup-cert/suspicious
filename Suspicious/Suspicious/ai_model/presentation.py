@@ -4,6 +4,9 @@ No numeric confidence leaves this module: people see the class, the tier and,
 on tier ``low``, the runner-up class.
 """
 
+from django.db.models import Count
+
+from ai_model.models import LabelRecord
 from api.permissions.submissions import has_elevated_view, submission_queryset
 from case_handler.models import Case
 
@@ -11,6 +14,7 @@ _AXIS = {"SAFE", "DANGEROUS"}  # the only classes that can disagree
 _TIERS = {"high", "medium", "low"}
 _AI_RULE = "ai-classifier-decisive"
 _SIMILAR_KEYS = ("case_id", "similarity", "label", "provenance")
+_FOLDER_CLASSES = ("Dangerous", "Unwanted", "Safe")  # display order of sibling labels
 
 
 def _is_int(value) -> bool:
@@ -51,12 +55,42 @@ def _visible_similar_cases(assessment, user):
     return [e for e in entries if e["case_id"] in allowed]
 
 
-def _campaign(case):
+def _sibling_labels(case, campaign) -> dict:
+    """Class to count of the siblings' active folder labels, one query for all siblings."""
+    rows = (
+        LabelRecord.objects.filter(
+            case__campaign_membership__campaign=campaign,
+            source=LabelRecord.Source.IMAP_FOLDER,
+            trust=LabelRecord.Trust.FOLDER,
+            status=LabelRecord.Status.ACTIVE,
+        )
+        .exclude(case=case)
+        .values("label_class")
+        .annotate(n=Count("case", distinct=True))
+    )
+    counts = {row["label_class"]: row["n"] for row in rows}
+    return {name: counts[name] for name in _FOLDER_CLASSES if counts.get(name)}
+
+
+def _members_disagree(labels: dict, ai_result: str) -> bool:
+    """Siblings labelled both Dangerous and Safe, or this case's AI class opposite a sibling."""
+    if "Dangerous" in labels and "Safe" in labels:
+        return True
+    ai = ai_result.upper()
+    return (ai == "DANGEROUS" and "Safe" in labels) or (ai == "SAFE" and "Dangerous" in labels)
+
+
+def _campaign(case, assessment=None, elevated: bool = False):
     membership = getattr(case, "campaign_membership", None)
     if membership is None:
         return None
     campaign = membership.campaign
-    return {"ref": campaign.ref, "size": campaign.members.count()}  # served from a prefetch when present
+    out = {"ref": campaign.ref, "size": campaign.members.count()}  # served from a prefetch when present
+    if elevated:  # analyst material, as the cross-check is
+        labels = _sibling_labels(case, campaign)
+        out["labels"] = labels
+        out["members_disagree"] = _members_disagree(labels, assessment.result if assessment else "")
+    return out
 
 
 def cross_check(case, assessment) -> dict:
@@ -103,7 +137,7 @@ def present_assessment(case, user, elevated: bool | None = None) -> dict | None:
         "analysed_at": assessment.updated_at,
         "reads": "body text only, not headers or attachments",  # the inference input is the .txt only
         "similar_cases": _visible_similar_cases(assessment, user),
-        "campaign": _campaign(case),
+        "campaign": _campaign(case, assessment, elevated),
         # The rule and list reason are analyst material, as `raw` is.
         "cross_check": cross_check(case, assessment) if elevated else None,
     }

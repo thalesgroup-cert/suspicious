@@ -57,9 +57,10 @@ class AiAssessmentDetailTest(TestCase):
             with self.subTest(kind):
                 self.assertIsNone(self._get(kind)["ai_assessment"])
 
-    def test_assessment_and_campaign_add_at_most_one_query(self):
+    def test_assessment_and_campaign_add_bounded_queries(self):
         # Baseline is the same request with the connector off. On, the campaign size is
-        # one COUNT; the assessment and campaign rows come with the case (select_related).
+        # one COUNT and the sibling labels one query; the assessment and campaign rows
+        # come with the case (select_related).
         other = Case.objects.create(description="o", reporter=self.user)
         # An analyst viewing someone else's case (the usual one): one permission lookup.
         self.case.reporter = User.objects.create_user(username="rep", password="pw-12345")
@@ -78,11 +79,16 @@ class AiAssessmentDetailTest(TestCase):
                 with CaptureQueriesContext(connection) as on:
                     body = self._get(kind)
                 self.assertEqual(body["ai_assessment"]["campaign"]["size"], 2)
-                counts = [q for q in on.captured_queries if "COUNT(" in q["sql"].upper()]
+                labels = [q for q in on.captured_queries if "labelrecord" in q["sql"].lower()]
+                self.assertEqual(len(labels), 1)  # all siblings' labels in one query
+                counts = [
+                    q for q in on.captured_queries
+                    if "COUNT(" in q["sql"].upper() and q not in labels
+                ]
                 off_counts = [q for q in off.captured_queries if "COUNT(" in q["sql"].upper()]
                 self.assertEqual(len(counts), len(off_counts) + 1)
-                # the count plus, on the investigation view, the one permission lookup
-                self.assertLessEqual(len(on), len(off) + (1 if kind == "submission" else 2))
+                # the count, the labels and, on the investigation view, the permission lookup
+                self.assertLessEqual(len(on), len(off) + (2 if kind == "submission" else 3))
 
     def test_no_request_in_context_gives_none(self):
         self._enable()
