@@ -204,16 +204,19 @@ def record_verdict(case, user, label_class) -> LabelRecord | None:
 
 
 def record_challenge(case, proposed) -> LabelRecord | None:
-    """Append the reporter's proposal (trust proposal, never trainable, never flags); None for a
-    blank or unknown proposal."""
+    """Append the reporter's proposal (trust proposal, never trainable, never flags), superseding
+    the case's earlier active proposal; None for a blank or unknown proposal."""
     if proposed not in ProposedVerdict.values:
         return None
     message_id, message_hash = _case_key(case)
-    return LabelRecord.objects.create(
-        message_id=message_id, message_id_hash=message_hash, case=case,
-        source=LabelRecord.Source.CHALLENGE, label=proposed, label_class=proposed,
-        trust=LabelRecord.Trust.PROPOSAL,
-    )
+    with transaction.atomic():
+        LabelRecord.objects.filter(case=case, source=LabelRecord.Source.CHALLENGE, status=ACTIVE).update(
+            status=SUPERSEDED)
+        return LabelRecord.objects.create(
+            message_id=message_id, message_id_hash=message_hash, case=case,
+            source=LabelRecord.Source.CHALLENGE, label=proposed, label_class=proposed,
+            trust=LabelRecord.Trust.PROPOSAL,
+        )
 
 
 def resolve_flag(record, user, note, *, keep: bool) -> None:

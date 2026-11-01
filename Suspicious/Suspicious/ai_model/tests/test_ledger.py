@@ -188,6 +188,14 @@ class RecordChallengeTest(CaseMixin, TestCase):
         self.assertEqual(row.message_id, "abc.1@evil.example")
         self.assertFalse(row.trainable)
 
+    def test_a_later_challenge_supersedes_the_earlier_one(self):
+        case = self.make_case()
+        first = ledger.record_challenge(case, "Safe")
+        second = ledger.record_challenge(case, "Dangerous")
+        other = ledger.record_challenge(self.make_case(message_id="<o.1@x.example>"), "Safe")
+        first.refresh_from_db(), other.refresh_from_db()
+        self.assertEqual((first.status, second.status, other.status), ("superseded", "active", "active"))
+
     def test_blank_or_unknown_proposal_creates_nothing(self):
         case = self.make_case()
         self.assertIsNone(ledger.record_challenge(case, ""))
