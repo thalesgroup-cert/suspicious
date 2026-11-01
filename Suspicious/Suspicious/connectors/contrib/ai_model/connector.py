@@ -5,8 +5,13 @@ from __future__ import annotations
 
 import logging
 
+from django.db import transaction
+from django.utils import timezone
+
+from ai_model import ledger
 from ai_model.campaign_profile import COLLECTION_NAME
-from ai_model.models import AiAssessment
+from ai_model.models import AiAssessment, LabelSyncState
+from ai_model.taxonomy import FOLDERS, class_of
 from case_handler.models import Case
 from connectors.base import (
     EVENT_CASE_FINALISED,
@@ -16,8 +21,10 @@ from connectors.base import (
     ConnectorManifest,
     HealthStatus,
     ProviderResult,
+    Schedule,
     valid_url,
 )
+from connectors.contrib.ai_model import imap_sync
 from connectors.contrib.ai_model.campaigns import collection_mismatch
 from connectors.contrib.ai_model.client import AiInferenceClient
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
@@ -27,6 +34,8 @@ logger = logging.getLogger("connectors.contrib.ai_model")
 
 DEFAULT_URL = "http://ai_inference:8090"
 DEFAULT_TIMEOUT = 20
+FOLDER_BATCH = 500  # ruling D8: new mails per folder per run
+EMBED_BATCH = 32  # the /v2/embed limit
 
 
 def _inconclusive(reason: str) -> ProviderResult:
@@ -74,8 +83,17 @@ class AiModelConnector(Connector):
             ConfigField("token", "secret", required=True,
                         help="Bearer token the inference server expects (AI_INFERENCE_TOKEN)."),
             ConfigField("timeout_seconds", "int", default=DEFAULT_TIMEOUT),
+            ConfigField("imap_host", "str",
+                        help="IMAP server of the review mailbox. Empty: no label sync."),
+            ConfigField("imap_port", "int", default=993),
+            ConfigField("imap_user", "str"),
+            ConfigField("imap_password", "secret"),
+            ConfigField("imap_use_ssl", "bool", default=True),
+            ConfigField("imap_folders", "str", default=",".join(FOLDERS),
+                        help="Comma-separated review folders; the digit prefix gives the class."),
         ),
         events=(EVENT_CASE_FINALISED,),
+        schedules=(Schedule("label-sync", 86400),),
         enabled_by_default=False,
         provides=PROVIDER_KIND_MAIL_AI,
     )
@@ -128,3 +146,61 @@ class AiModelConnector(Connector):
             logger.warning("ai_model: case %s refused by the inference server: %s", case_id, exc)
             return _inconclusive(str(exc))
         return result_from_server(payload)
+
+    def sync(self) -> None:
+        """Nightly label sync: read the review folders (read-only) into the label ledger.
+
+        Each folder's rows and its checkpoint commit together, only after its mails were embedded,
+        so a failed embed leaves the checkpoint where it was and the next run retries. A folder
+        that cannot be read is skipped; a failed login, a lost connection or an unavailable
+        embed endpoint raises and fails the run (earlier folders stay committed).
+        """
+        host = self.config.get("imap_host")
+        if not host:
+            return
+        client = self._client()
+        imap = imap_sync.connect(
+            host, int(self.config.get("imap_port") or 993), self.config.get("imap_user") or "",
+            self.config.get("imap_password") or "", self.config.get("imap_use_ssl", True) is not False,
+        )
+        try:
+            for folder in filter(None, (f.strip() for f in (self.config.get("imap_folders") or "").split(","))):
+                if class_of(folder) is None:
+                    logger.warning("ai_model sync: folder %s has no known class, skipped", ascii(folder)[:64])
+                    continue
+                try:
+                    self._sync_folder(imap, client, folder)
+                except imap_sync.FolderUnavailable as exc:
+                    logger.warning("ai_model sync: folder unavailable: %s", exc)
+        finally:
+            try:
+                imap.logout()
+            except Exception:  # noqa: BLE001 -- the connection may already be gone
+                pass
+
+    def _sync_folder(self, imap, client, folder: str) -> None:
+        state, _ = LabelSyncState.objects.get_or_create(folder=folder)
+        mails, skipped, uidvalidity, last_uid = imap_sync.read_folder(
+            imap, folder, since_uid=state.last_uid, limit=FOLDER_BATCH, known_uidvalidity=state.uidvalidity,
+        )
+        new = [m for m in mails if not ledger.is_observed(m)]
+        answers = {"classifier": [], "campaign": []}
+        versions = {}
+        for start in range(0, len(new), EMBED_BATCH):
+            texts = [m.text for m in new[start:start + EMBED_BATCH]]
+            for profile, vectors in answers.items():
+                answer = client.embed(texts, profile)
+                if len(answer["vectors"]) != len(texts):
+                    raise ValueError("embed answer does not match the batch size")
+                vectors.extend(answer["vectors"])
+                versions[profile] = answer
+        with transaction.atomic():
+            for i, mail in enumerate(new):
+                ledger.record_folder_observation(
+                    mail, {p: v[i] for p, v in answers.items()},
+                    preprocessing_version=versions["classifier"]["preprocessing_version"],
+                    embedding_version=versions["campaign"]["embedding_version"],
+                )
+            state.uidvalidity, state.last_uid, state.skipped = uidvalidity, last_uid, skipped
+            state.last_run_at = timezone.now()
+            state.save()

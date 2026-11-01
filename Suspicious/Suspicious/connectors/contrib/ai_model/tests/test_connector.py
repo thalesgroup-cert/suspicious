@@ -13,10 +13,11 @@ from django.utils import timezone
 
 import settings.config as settings_config
 from ai_model.models import AiAssessment
+from ai_model.taxonomy import FOLDERS
 from case_handler.models import Case, CaseHasFileOrMail
 from common.http_client import BREAKERS
 from common.storage import FakeObjectStore, StoreError
-from connectors.base import ProviderResult
+from connectors.base import ProviderResult, Schedule
 from connectors.contrib.ai_model import connector as module
 from connectors.contrib.ai_model import mailtext
 from connectors.contrib.ai_model.connector import AiModelConnector, result_from_server
@@ -60,11 +61,25 @@ class ManifestTest(SimpleTestCase):
 
     def test_config_schema(self):
         fields = {f.key: f for f in AiModelConnector.manifest.config_schema}
-        self.assertEqual(set(fields), {"url", "token", "timeout_seconds"})
+        self.assertEqual(set(fields), {"url", "token", "timeout_seconds", "imap_host", "imap_port", "imap_user",
+                                       "imap_password", "imap_use_ssl", "imap_folders"})
         self.assertEqual((fields["url"].type, fields["url"].default, fields["url"].required),
                          ("url", "http://ai_inference:8090", True))
         self.assertTrue(fields["token"].required)
         self.assertEqual((fields["timeout_seconds"].type, fields["timeout_seconds"].default), ("int", 20))
+        self.assertEqual({k: (fields[k].type, fields[k].default, fields[k].required) for k in (
+            "imap_host", "imap_port", "imap_user", "imap_password", "imap_use_ssl")}, {
+            "imap_host": ("str", None, False), "imap_port": ("int", 993, False),
+            "imap_user": ("str", None, False), "imap_password": ("secret", None, False),
+            "imap_use_ssl": ("bool", True, False)})
+        self.assertEqual((fields["imap_folders"].type, fields["imap_folders"].default),
+                         ("str", ",".join(FOLDERS)))
+        self.assertEqual(AiModelConnector.manifest.schedules, (Schedule("label-sync", 86400),))
+
+    def test_the_imap_password_is_overlaid_from_vault(self):
+        from settings.config import SECRET_FIELDS
+        registry.discover()
+        self.assertIn("imap_password", SECRET_FIELDS["integrations.ai_model"])
 
     def test_registered_as_a_builtin(self):
         registry.discover()
