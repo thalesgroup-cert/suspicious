@@ -154,6 +154,28 @@ def _fetch(imap, uid: int) -> bytes | None:
     return raw if isinstance(raw, bytes) else None
 
 
+class UidValidityChanged(Exception):
+    """fetch_one: the folder's UIDVALIDITY is not the one the UID was recorded under."""
+
+
+def fetch_one(imap, folder, uidvalidity, uid) -> ReviewMail | None:
+    """The ReviewMail at one UID, read-only like read_folder; None when it is gone, refused, above
+    the size cap or not a forward. UidValidityChanged when the folder's UIDVALIDITY differs (the UID
+    then names another mail). FolderUnavailable / ImapConnectionLost as read_folder."""
+    try:
+        _select(imap, folder)
+        if _uidvalidity(imap) != uidvalidity:
+            raise UidValidityChanged(_shown(folder))
+        raw = None if _oversize(imap, [uid]) else _fetch(imap, uid)
+        try:
+            return _review_mail(raw, folder, uidvalidity, uid) if raw else None
+        except Exception as exc:  # untrusted mail: any parse failure is "no mail"
+            logger.info("ai_model imap: unreadable mail in %s (%s)", _shown(folder), type(exc).__name__)
+            return None
+    except (imaplib.IMAP4.abort, OSError) as exc:
+        raise ImapConnectionLost(type(exc).__name__) from None
+
+
 def _date(value) -> datetime | None:
     """The Date header as an aware datetime; a naive one (no zone, or -0000) is taken as UTC. None
     when missing or unparseable."""
