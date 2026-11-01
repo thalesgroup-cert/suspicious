@@ -212,7 +212,7 @@ models, prefix per version):
 | File | Content |
 |---|---|
 | `heads/*.npz` | (Plan E Ruling E15: float32 arrays per state-dict key, not pickled `.pth`) The five heads: safe/unwanted split, spam/dangerous split, internal/external, spam/newsletter, phishing sub-type |
-| `calibration.json` | Temperature for the main decision and the tier cutoffs derived from held-out data |
+| `calibration.json` | Per-component temperatures (hierarchy, knn) and the tier cutoffs derived from held-out data |
 | `knn_index.npz` | Embeddings, label ids and case ids of the labelled mails used |
 | `campaign_profile.json` | The campaign profile (below) |
 | `manifest.json` | Version id, recipe id, preprocessing version, encoder id and hash, ledger snapshot digest, the campaigns the training labels belonged to (references and a digest), metrics and gate results, parent version, trainer revision |
