@@ -69,6 +69,31 @@ class PresentAssessmentTest(TestCase):
         self._assess(similar_cases=[{**entry, "case_id": hidden.pk}, {**entry, "case_id": mine.pk}])
         self.assertEqual(self._present()["similar_cases"], [{**entry, "case_id": mine.pk}])
 
+    def test_similar_case_is_projected_to_the_contract_keys(self):
+        mine = Case.objects.create(description="", reporter=self.user)
+        self._assess(similar_cases=[{"case_id": mine.pk, "similarity": 0.8, "excerpt": "mail text"}])
+        self.assertEqual(
+            self._present()["similar_cases"],
+            [{"case_id": mine.pk, "similarity": 0.8, "label": None, "provenance": None}],
+        )
+
+    def test_similar_case_with_a_non_integer_id_is_dropped(self):
+        mine = Case.objects.create(description="", reporter=self.user)
+        bad = [{"case_id": str(mine.pk)}, {"case_id": True}, {"case_id": None}, {}, "x"]
+        self._assess(similar_cases=[*bad, {"case_id": mine.pk}])
+        self.assertEqual([e["case_id"] for e in self._present()["similar_cases"]], [mine.pk])
+
+    def test_runner_up_skips_non_numeric_probabilities(self):
+        self._assess(
+            tier="low",
+            probabilities={"DANGEROUS": 0.5, "SAFE": "high", "UNWANTED": None, "X": 0.1},
+        )
+        self.assertEqual(self._present()["runner_up"], {"result": "X"})
+
+    def test_runner_up_is_none_when_no_probability_is_usable(self):
+        self._assess(tier="low", probabilities={"DANGEROUS": 0.5, "SAFE": "high", "UNWANTED": [1]})
+        self.assertIsNone(self._present()["runner_up"])
+
     def test_campaign_reference_and_size(self):
         self._assess()
         campaign = Campaign.objects.create()

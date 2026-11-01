@@ -8,6 +8,15 @@ from api.permissions.submissions import submission_queryset
 from case_handler.models import Case
 
 _AXIS = {"SAFE", "DANGEROUS"}  # the only classes that can disagree
+_SIMILAR_KEYS = ("case_id", "similarity", "label", "provenance")
+
+
+def _is_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _display(name: str) -> str:
@@ -18,20 +27,26 @@ def _display(name: str) -> str:
 def _runner_up(assessment):
     if assessment.tier != "low":
         return None
-    ranked = sorted(assessment.probabilities.items(), key=lambda kv: kv[1], reverse=True)
+    probabilities = assessment.probabilities if isinstance(assessment.probabilities, dict) else {}
+    usable = [(k, v) for k, v in probabilities.items() if _is_number(v)]
+    ranked = sorted(usable, key=lambda kv: kv[1], reverse=True)
     others = [name for name, _ in ranked if name.upper() != assessment.result.upper()]
     return {"result": _display(others[0])} if others else None
 
 
 def _visible_similar_cases(assessment, user):
-    entries = [e for e in assessment.similar_cases if isinstance(e, dict)]
-    ids = {e.get("case_id") for e in entries}
-    if not ids:
+    entries = [
+        {key: e.get(key) for key in _SIMILAR_KEYS}
+        for e in assessment.similar_cases
+        if isinstance(e, dict) and _is_int(e.get("case_id"))
+    ]
+    if not entries:
         return []
+    ids = {e["case_id"] for e in entries}
     allowed = set(
         submission_queryset(Case.objects.filter(pk__in=ids), user).values_list("pk", flat=True)
     )
-    return [e for e in entries if e.get("case_id") in allowed]
+    return [e for e in entries if e["case_id"] in allowed]
 
 
 def _campaign(case):
