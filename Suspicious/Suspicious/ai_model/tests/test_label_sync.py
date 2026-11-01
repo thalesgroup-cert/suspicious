@@ -63,8 +63,15 @@ class LabelSyncTest(TestCase):
 
     def test_embeds_in_batches_of_32(self):
         self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
-        call, _ = self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        with mock.patch.object(module, "CHUNK", 100):
+            call, _ = self.run_sync(config={**CONFIG, "imap_folders": PHISH})
         self.assertEqual([len(c.args[0]) for c in call.call_args_list], [32, 32, 8, 8])
+
+    def test_a_folder_is_read_in_chunks_of_25(self):
+        # Fix wave 3: fetch, match and embed of one chunk stay far inside Celery's 540 s soft limit.
+        self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
+        call, _ = self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        self.assertEqual([len(c.args[0]) for c in call.call_args_list], [25, 25, 15, 15])
 
     def test_the_folder_cap_holds_across_runs(self):
         self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 8)}
@@ -146,7 +153,7 @@ class LabelSyncTest(TestCase):
         def embed(texts, profile):
             return {**embed_answer(texts, profile), "preprocessing_version": next(answers)}
 
-        with self.assertRaises(module.LabelSyncIncomplete):
+        with mock.patch.object(module, "CHUNK", 100), self.assertRaises(module.LabelSyncIncomplete):
             self.run_sync(config={**CONFIG, "imap_folders": PHISH}, embed=embed)
         self.assertFalse(LabelRecord.objects.exists())
         self.assertFalse(LabelSyncState.objects.filter(last_uid__gt=0).exists())
@@ -184,7 +191,7 @@ class LabelSyncTest(TestCase):
                 raise step
             return step(texts, profile)
 
-        with self.assertRaises(ProviderUnavailable):
+        with mock.patch.object(module, "CHUNK", 100), self.assertRaises(ProviderUnavailable):
             self.run_sync(config={**CONFIG, "imap_folders": PHISH}, embed=embed)
         self.assertFalse(LabelRecord.objects.exists())
         self.assertFalse(LabelSyncState.objects.filter(last_uid__gt=0).exists())
@@ -241,7 +248,8 @@ class LabelSyncTest(TestCase):
         self.assertEqual(module.TIME_BUDGET_SECONDS, 300)
         self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
         clock = iter([0.0, 0.0])  # sync start, before the chunk; before batch 2 the budget is spent
-        with mock.patch.object(module, "monotonic", side_effect=lambda: next(clock, module.TIME_BUDGET_SECONDS)):
+        with mock.patch.object(module, "monotonic", side_effect=lambda: next(clock, module.TIME_BUDGET_SECONDS)), \
+                mock.patch.object(module, "CHUNK", 100):
             call, _ = self.run_sync()
         self.assertEqual([len(c.args[0]) for c in call.call_args_list], [32, 32])
         self.assertFalse(LabelRecord.objects.exists())

@@ -36,7 +36,7 @@ logger = logging.getLogger("connectors.contrib.ai_model")
 DEFAULT_URL = "http://ai_inference:8090"
 DEFAULT_TIMEOUT = 20
 FOLDER_BATCH = 500  # ruling D8: UIDs examined per folder per run (skipped and already-observed ones included)
-CHUNK = 100  # mails embedded and committed together
+CHUNK = 25  # mails fetched, matched, embedded and committed together; one chunk stays far under 540 s
 TIME_BUDGET_SECONDS = 300  # a run stops between chunks and embed batches after this; Celery's soft limit is 540 s
 EMBED_BATCH = 32  # the /v2/embed limit
 
