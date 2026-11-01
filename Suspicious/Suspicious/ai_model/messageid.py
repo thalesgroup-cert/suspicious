@@ -13,7 +13,8 @@ from mail_feeder.models import Mail
 def normalise(header: str) -> str:
     """Strip whitespace and angle brackets, lower-case. "" for empty or a value with no "@"."""
     value = (header or "").strip().strip("<>").strip().lower()
-    return value if "@" in value and not any(c.isspace() for c in value) else ""
+    local, _, domain = value.partition("@")
+    return value if local and domain and not any(c.isspace() for c in value) else ""
 
 
 def message_id_hash(normalised: str) -> str:
@@ -45,8 +46,10 @@ def match_case(message_id: str, *, sender: str = "", date=None, subject: str = "
     same sender, UTC day and subject. None when nothing matches or the fallback is ambiguous."""
     wanted = normalise(message_id)
     if wanted:
-        # ponytail: icontains scan of header_value on the local part, then confirm by parsing.
-        mails = Mail.objects.filter(mail_header__header_value__icontains=wanted.split("@")[0]).select_related("mail_header")
+        # ponytail: LIKE scan of MailHeader.header_value (unindexed), then confirm by parsing; store the
+        # Message-ID hash on Mail to make it an indexed lookup. Ids with characters the repr escapes
+        # (backslash, mixed quotes) may be missed by the prefilter.
+        mails = Mail.objects.filter(mail_header__header_value__icontains=wanted).select_related("mail_header")
         hits = [m for m in mails if wanted in {normalise(v) for v in _values(_headers(m), "message-id")}]
         return next(iter(_cases_of(hits)), None) if hits else None
     if not (date and subject and sender):

@@ -197,7 +197,11 @@ def text_from_message(message) -> str:
         try:
             text = part.get_content()
         except (LookupError, ValueError, UnicodeError, AttributeError):
-            continue
+            # Undecodable charset: keep the part, decoding its raw payload with replacement.
+            try:
+                text = (part.get_payload(decode=True) or b"").decode("utf-8", errors="replace")
+            except (LookupError, ValueError, UnicodeError, AttributeError):
+                continue
         if kind == "html":
             parser = _TextOnly()
             parser.feed(text)

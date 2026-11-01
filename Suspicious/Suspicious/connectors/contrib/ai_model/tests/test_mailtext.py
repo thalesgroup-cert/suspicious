@@ -456,3 +456,11 @@ class TextFromMessageTest(SimpleTestCase):
         from email.message import EmailMessage
         self.assertEqual(mailtext.text_from_message(EmailMessage()), "")
         self.assertEqual(mailtext.text_from_message(self.msg(html="<script>x</script>")), "")
+
+    def test_html_entities_decoded(self):
+        self.assertEqual(mailtext.text_from_message(self.msg(html="<p>Tom &amp; Jerry &eacute;</p>")), "Tom & Jerry \u00e9")
+
+    def test_bogus_charset_recovers_text(self):
+        from email import message_from_bytes, policy
+        raw = b"Subject: s\r\nContent-Type: text/plain; charset=bogus-9\r\n\r\nhello world\r\n"
+        self.assertEqual(mailtext.text_from_message(message_from_bytes(raw, policy=policy.default)), "hello world")
