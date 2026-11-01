@@ -9,8 +9,8 @@ import pytest
 
 from training import gate
 from training.gate import (
-    CHECKS, build_checks, calibrate_halves, candidate_recipe, ece, head_class_counts, legacy_recipe,
-    run_gate, wilson,
+    CHECKS, RESAMPLING_SKIPPED, build_checks, calibrate_halves, candidate_recipe, ece,
+    head_class_counts, high_tier_cross_half, legacy_recipe, run_gate, wilson,
 )
 from training.recipe import HEADS
 
@@ -64,8 +64,13 @@ def _counts(n=8):
             "unwanted": [n, n], "dangerous": [n, n, n, n]}
 
 
+def _high(correct, n, total=1000, unreachable=False, repeats=1):
+    return {"n": n, "correct": correct, "total": total, "unreachable": unreachable,
+            "repeats": repeats}
+
+
 GOOD = dict(dangerous_safe=0.05, baseline_dangerous_safe=0.05, macro_f1=0.85,
-            baseline_macro_f1=0.85, ece=0.05, head_counts=_counts(), high_precision=0.92,
+            baseline_macro_f1=0.85, ece=0.05, head_counts=_counts(), high_tier=_high(92, 100),
             campaign_dangerous_safe=0.10, baseline_campaign_dangerous_safe=0.10)
 
 
@@ -86,7 +91,8 @@ def test_all_checks_pass_on_good_values():
     ({"dangerous_safe": 0.0601}, {"dangerous_called_safe"}),
     ({"macro_f1": 0.8299}, {"macro_f1"}),
     ({"ece": 0.12}, {"calibration_error"}),
-    ({"high_precision": 0.8999}, {"high_tier_precision"}),
+    ({"high_tier": _high(8999, 10000, total=10000)}, {"high_tier_precision"}),
+    ({"high_tier": _high(92, 100, unreachable=True)}, {"high_tier_precision"}),
     ({"campaign_dangerous_safe": 0.1101}, {"campaign_dangerous_called_safe"}),
 ])
 def test_each_check_fails_past_its_threshold(change, failed):
@@ -94,7 +100,7 @@ def test_each_check_fails_past_its_threshold(change, failed):
 
 
 def test_checks_hold_at_their_tolerance():
-    assert not _failing(dangerous_safe=0.0599, macro_f1=0.8301, ece=0.1199, high_precision=0.90,
+    assert not _failing(dangerous_safe=0.0599, macro_f1=0.8301, ece=0.1199, high_tier=_high(90, 100),
                         campaign_dangerous_safe=0.1099)
 
 
@@ -123,12 +129,15 @@ def test_calibration_never_sees_the_rows_it_scores():
     groups = np.repeat(np.arange(20), 3)
     labels = rng.integers(0, 3, n)
     logits = {"hierarchy": rng.normal(size=(n, 3)) * 3, "knn": rng.normal(size=(n, 3))}
-    probs, temps = calibrate_halves(logits, labels, groups, seed=0)
+    probs, temps, in_a = calibrate_halves(logits, labels, groups, seed=0)
     assert probs.shape == (n, 3) and len(temps) == 2
+    assert in_a.dtype == bool and 0 < in_a.sum() < n
+    for g in np.unique(groups):  # a group is never split between the halves
+        assert len(set(in_a[groups == g])) == 1
     for g in (0, 7, 19):
         flipped = labels.copy()
         flipped[groups == g] = (flipped[groups == g] + 1) % 3
-        probs2, _ = calibrate_halves(logits, flipped, groups, seed=0)
+        probs2, _, _ = calibrate_halves(logits, flipped, groups, seed=0)
         np.testing.assert_array_equal(probs2[groups == g], probs[groups == g])
         assert not np.array_equal(probs2, probs)  # the other half did move
 
@@ -295,3 +304,90 @@ def test_gate_module_does_not_import_imblearn_at_top_level():
     src = open(gate.__file__).read()
     top = [line for line in src.splitlines() if line.startswith(("import ", "from "))]
     assert not any("imblearn" in line for line in top)
+
+
+# --- fix round: cross-half High tier (Ruling E13), per-repeat Wilson, resampling record -------
+
+def _tier_set(conf, correct_mask):
+    """Top class 0 at confidence conf; labels 0 where correct, else 1."""
+    conf = np.asarray(conf, dtype=float)
+    rest = (1 - conf) / 2
+    probs = np.stack([conf, rest, rest], axis=1)
+    return probs, np.where(correct_mask, 0, 1)
+
+
+def _halves(n, seed=0):
+    return np.random.default_rng(seed).permutation(n) < n // 2
+
+
+def _check5(probs, labels, in_a):
+    return build_checks(**{**GOOD, "high_tier": high_tier_cross_half(probs, labels, in_a)})[
+        "high_tier_precision"]
+
+
+def test_check5_fails_when_only_the_most_confident_row_is_right():
+    conf = np.linspace(0.60, 0.99, 1000)
+    probs, labels = _tier_set(conf, conf == conf.max())
+    check = _check5(probs, labels, _halves(1000))
+    assert not check["passed"]
+
+
+def test_check5_passes_on_a_well_separated_set():
+    rng = np.random.default_rng(0)
+    conf = np.r_[rng.uniform(0.40, 0.55, 300), rng.uniform(0.60, 0.99, 700)]
+    probs, labels = _tier_set(conf, conf >= 0.60)
+    high = high_tier_cross_half(probs, labels, _halves(1000))
+    assert high["total"] == 1000 and not high["unreachable"]
+    check = build_checks(**{**GOOD, "high_tier": high})["high_tier_precision"]
+    assert check["passed"] and check["value"] == pytest.approx(1.0)
+    assert "Wilson lower bound" in check["detail"]
+
+
+def test_check5_fails_below_the_high_count_floor():
+    # 40 right at 0.95-0.99 (4% of rows), the rest wrong below Medium: precise but too few.
+    conf = np.r_[np.linspace(0.40, 0.55, 960), np.linspace(0.95, 0.99, 40)]
+    probs, labels = _tier_set(conf, conf >= 0.95)
+    high = high_tier_cross_half(probs, labels, _halves(1000))
+    assert 0 < high["n"] < 50 and high["correct"] / high["n"] >= 0.90
+    check = build_checks(**{**GOOD, "high_tier": high})["high_tier_precision"]
+    assert not check["passed"]
+    assert "floor" in check["detail"] and "5%" in check["detail"]
+
+
+def test_run_gate_wilson_uses_per_repeat_counts():
+    X, folders, dup, camp = _data()
+    _, cand, base = _stubs()
+    report = run_gate(X, folders, dup, camp, recipe=cand, baseline_recipe=base)
+    assert report.pooled_repeats == 3
+    assert "3 times" in report.note
+    cm = np.array(report.confusion_matrix)
+    for c, row in enumerate(report.per_class):
+        assert row["support"] == cm[c].sum()  # raw pooled counts stay in the report
+        assert row["recall_ci"] == list(wilson(cm[c, c] / 3, cm[c].sum() / 3))
+        assert row["precision_ci"] == list(wilson(cm[c, c] / 3, cm[:, c].sum() / 3))
+    for t in report.tiers:
+        assert t["precision_ci"] == list(wilson(t["correct"] / 3, t["n"] / 3))
+    assert report.high_tier["total"] == 3 * len(X)
+
+
+def test_resampling_skips_reported_by_a_recipe_reach_the_report():
+    X, folders, dup, camp = _data()
+    _, cand, base = _stubs()
+
+    def skipping(X, folders, train_idx, test_idx, *, seed):
+        return {**base(X, folders, train_idx, test_idx, seed=seed), RESAMPLING_SKIPPED: ["unwanted"]}
+
+    report = run_gate(X, folders, dup, camp, recipe=cand, baseline_recipe=skipping)
+    assert report.legacy_resampling_skipped == ["unwanted"]
+    assert set(report.temperature_at_bound) == {"hierarchy"}  # not taken for a component
+    plain = run_gate(X, folders, dup, camp, recipe=cand, baseline_recipe=base)
+    assert plain.legacy_resampling_skipped == []
+
+
+def test_legacy_recipe_records_a_head_smote_cannot_resample():
+    pytest.importorskip("imblearn")
+    X, folders, _, _ = _data(n_per=8)
+    train = np.flatnonzero(folders != "1_NEWSLETTER")[::2]  # the unwanted head sees one class
+    out = legacy_recipe(X, folders, train, np.arange(8), seed=0, epochs=1)
+    assert out[RESAMPLING_SKIPPED] == ["unwanted"]
+    assert out["hierarchy"].shape == (8, 3)

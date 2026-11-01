@@ -6,7 +6,12 @@ temperatures are fitted on a random half of the groups and applied to the other 
 other way round), so no row is scored by a calibration fitted on its own group. The baseline is
 the active recipe retrained on the same folds (not the active weights, which may have seen the
 mails). A recipe is a callable recipe(X, folders, train_idx, test_idx, *, seed) returning
-{component: (len(test_idx), 3) logits}; the components are calibrated and averaged.
+{component: (len(test_idx), 3) logits}; the components are calibrated and averaged. A recipe
+may add RESAMPLING_SKIPPED: [head, ...] (legacy_recipe does), which the report collects.
+
+Check 4 counts head samples on the whole dataset, not per training fold; when it fails nothing is
+trained. Check 5 is measured cross-half (Ruling E13): the High cutoff chosen on one calibration
+half is scored on the other. Wilson intervals use per-repeat mean counts (pooled / repeats).
 """
 import math
 from dataclasses import dataclass, field
@@ -30,6 +35,8 @@ MACRO_F1_TOLERANCE = 0.02
 MAX_ECE = 0.12  # Ruling E6
 HIGH_PRECISION = 0.90
 MEDIUM_CUTOFF = 0.60
+HIGH_MIN_SHARE = 0.05  # Ruling E13: the cross-half High tier must hold at least 5% of the rows
+RESAMPLING_SKIPPED = "resampling_skipped"
 HIGH_UNREACHABLE = 1.01
 CLASSES = ("Safe", "Unwanted", "Dangerous")
 CHECKS = ("dangerous_called_safe", "macro_f1", "calibration_error", "head_samples",
@@ -38,8 +45,9 @@ CHECKS = ("dangerous_called_safe", "macro_f1", "calibration_error", "head_sample
 
 # --- statistics ----------------------------------------------------------------------------------
 
-def wilson(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    """Wilson score interval for successes out of n (Ruling E4); (0, 1) when n is 0."""
+def wilson(successes: float, n: float, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for successes out of n (Ruling E4); (0, 1) when n is 0. Counts may
+    be per-repeat means (pooled / repeats), hence floats."""
     if n == 0:
         return (0.0, 1.0)
     p = successes / n
@@ -91,13 +99,30 @@ def _head_check(head_counts):
                   else f"every head has at least {MIN_HEAD_SAMPLES} samples per class")
 
 
+def _high_check(high):
+    """Check 5 from cross-half High counts (high_tier_cross_half, summed over seeds)."""
+    n, right, total, repeats = high["n"], high["correct"], high["total"], high["repeats"]
+    precision = right / n if n else None
+    floor = HIGH_MIN_SHARE * total
+    lower = wilson(right / repeats, n / repeats)[0]
+    stats = (f"High tier cross-half precision {precision or 0.0:.4f} on {n} of {total} rows "
+             f"(Wilson lower bound {lower:.4f}, informational)")
+    if high["unreachable"]:
+        return _check(False, precision, HIGH_PRECISION,
+                      f"High tier unreachable: no cutoff reaches {HIGH_PRECISION} on a "
+                      f"calibration half; {stats}")
+    if n < floor:
+        return _check(False, precision, HIGH_PRECISION,
+                      f"{stats}; below the floor of {HIGH_MIN_SHARE:.0%} of rows ({floor:g})")
+    return _check(precision >= HIGH_PRECISION, precision, HIGH_PRECISION, stats)
+
+
 def build_checks(*, dangerous_safe, baseline_dangerous_safe, macro_f1, baseline_macro_f1, ece,
-                 head_counts, high_precision, campaign_dangerous_safe,
+                 head_counts, high_tier, campaign_dangerous_safe,
                  baseline_campaign_dangerous_safe) -> dict:
     ds_max = baseline_dangerous_safe + DANGEROUS_SAFE_TOLERANCE
     f1_min = baseline_macro_f1 - MACRO_F1_TOLERANCE
     camp_max = baseline_campaign_dangerous_safe + DANGEROUS_SAFE_TOLERANCE
-    high_ok = high_precision is not None and high_precision >= HIGH_PRECISION
     return {
         "dangerous_called_safe": _check(
             dangerous_safe <= ds_max, dangerous_safe, ds_max,
@@ -107,10 +132,7 @@ def build_checks(*, dangerous_safe, baseline_dangerous_safe, macro_f1, baseline_
         "calibration_error": _check(ece < MAX_ECE, ece, MAX_ECE,
                                     f"binned calibration error {ece:.4f}, must be below {MAX_ECE}"),
         "head_samples": _head_check(head_counts),
-        "high_tier_precision": _check(
-            high_ok, high_precision, HIGH_PRECISION,
-            "High tier unreachable: no cutoff reaches the precision" if high_precision is None
-            else f"High tier precision {high_precision:.4f}"),
+        "high_tier_precision": _high_check(high_tier),
         "campaign_dangerous_called_safe": _check(
             campaign_dangerous_safe <= camp_max, campaign_dangerous_safe, camp_max,
             f"on held-out campaigns, Dangerous called Safe {campaign_dangerous_safe:.4f}, "
@@ -142,7 +164,7 @@ def _smote_ros(SMOTE, RandomOverSampler, X, y):
 def legacy_recipe(X, folders, train_idx, test_idx, *, seed, epochs=30, threads=2) -> dict:
     """Version 0's recipe (the test bed's "asis"): SMOTE + random oversampling then class weights
     per head, head hierarchy only (no neighbour vote). A head that SMOTE cannot resample trains
-    without it, as the legacy code did. Use it as baseline_recipe while version 0 is active.
+    without it, as the legacy code did, and is listed under RESAMPLING_SKIPPED. Use it as baseline_recipe while version 0 is active.
     Needs imbalanced-learn, which the inference image does not ship."""
     try:
         from imblearn.over_sampling import SMOTE, RandomOverSampler
@@ -153,7 +175,7 @@ def legacy_recipe(X, folders, train_idx, test_idx, *, seed, epochs=30, threads=2
     previous = torch.get_num_threads()
     torch.set_num_threads(threads)
     try:
-        models = {}
+        models, skipped = {}, []
         for head in HEADS:
             rows = [(i, t) for i, f in enumerate(ftr) if (t := head_target(head, f)) is not None]
             idx, y = zip(*rows)
@@ -161,12 +183,12 @@ def legacy_recipe(X, folders, train_idx, test_idx, *, seed, epochs=30, threads=2
             try:
                 Xh, yh = _smote_ros(SMOTE, RandomOverSampler, Xh, yh)
             except ValueError:
-                pass
+                skipped.append(head)
             models[head] = _train_head(Xh, yh, NUM_OUT[head], seed, epochs)
     finally:
         torch.set_num_threads(previous)
     logits = predict(Heads(models, X.shape[1]), Knn.build(Xtr, ftr), X[test_idx]).logits
-    return {"hierarchy": logits["hierarchy"]}
+    return {"hierarchy": logits["hierarchy"], RESAMPLING_SKIPPED: skipped}
 
 
 # --- held-out predictions ------------------------------------------------------------------------
@@ -196,22 +218,25 @@ def _folds(X, folders, groups, seed):
 
 def _cross_fit(recipes, X, folders, groups, seeds):
     """Out-of-fold component logits, [recipe][seed] -> {component: (n, 3)}; all recipes get the
-    same folds."""
+    same folds. Also returns the fallback flag and the heads any recipe ran without resampling."""
     out = [[{} for _ in seeds] for _ in recipes]
-    fallback = False
+    fallback, skipped = False, set()
     for s, seed in enumerate(seeds):
         folds, fb = _folds(X, folders, groups, seed)
         fallback |= fb
         for tr, te in folds:
             for r, recipe in enumerate(recipes):
-                for c, z in recipe(X, folders, tr, te, seed=seed).items():
+                result = dict(recipe(X, folders, tr, te, seed=seed))
+                skipped.update(result.pop(RESAMPLING_SKIPPED, ()))
+                for c, z in result.items():
                     out[r][s].setdefault(c, np.zeros((len(X), 3)))[te] = z
-    return out, fallback
+    return out, fallback, skipped
 
 
-def calibrate_halves(logits: dict, labels, groups, *, seed) -> tuple[np.ndarray, list]:
+def calibrate_halves(logits: dict, labels, groups, *, seed) -> tuple[np.ndarray, list, np.ndarray]:
     """Calibrated blend of the components: temperatures fitted on a random half of the groups
-    score the other half, and the other way round. Returns (probs, [temperatures per half])."""
+    score the other half, and the other way round. Returns (probs, [temperatures per half],
+    in_a: the boolean membership of the first half)."""
     labels = np.asarray(labels)
     ug = np.unique(groups)
     in_a = np.isin(groups, np.random.default_rng(seed).choice(ug, len(ug) // 2, replace=False))
@@ -220,7 +245,7 @@ def calibrate_halves(logits: dict, labels, groups, *, seed) -> tuple[np.ndarray,
         t = {c: fit_temperature(z[fit], labels[fit]) for c, z in logits.items()}
         probs[ev] = np.mean([_softmax(z[ev] / t[c]) for c, z in logits.items()], axis=0)
         temps.append(t)
-    return probs, temps
+    return probs, temps, in_a
 
 
 def _metrics(probs, labels):
@@ -245,6 +270,22 @@ def _high_cutoff(conf, correct):
     return HIGH_UNREACHABLE, None
 
 
+def high_tier_cross_half(probs, labels, in_a) -> dict:
+    """Ruling E13: the High cutoff chosen on one half's calibrated predictions, counted on the
+    other half, both ways. unreachable when a half has no cutoff."""
+    probs, labels, in_a = np.asarray(probs), np.asarray(labels), np.asarray(in_a, dtype=bool)
+    conf, correct = probs.max(1), probs.argmax(1) == labels
+    n = right = 0
+    unreachable = False
+    for fit, ev in ((in_a, ~in_a), (~in_a, in_a)):
+        cut, _ = _high_cutoff(conf[fit], correct[fit])
+        unreachable |= cut == HIGH_UNREACHABLE
+        m = conf[ev] >= cut
+        n += int(m.sum())
+        right += int(correct[ev][m].sum())
+    return {"n": n, "correct": right, "total": len(conf), "unreachable": unreachable, "repeats": 1}
+
+
 # --- the gate ------------------------------------------------------------------------------------
 
 @dataclass
@@ -261,6 +302,10 @@ class GateReport:
     candidate: dict = field(default_factory=dict)
     fallback: bool = False  # GroupKFold used because stratified folds were infeasible
     temperature_at_bound: dict = field(default_factory=dict)
+    high_tier: dict = field(default_factory=dict)  # check 5's cross-half counts (Ruling E13)
+    pooled_repeats: int = 1
+    note: str = ""
+    legacy_resampling_skipped: list = field(default_factory=list)
 
     @property
     def eligible(self) -> bool:
@@ -271,12 +316,14 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
              repeats: int = 3, seed0: int = 0) -> GateReport:
     """Run the six checks (spec section 5) over `repeats` seeds of 5 grouped folds (Ruling E7).
     baseline_recipe is the active version's recipe (legacy_recipe for version 0); both recipes
-    are trained on the same train rows. Metrics are averaged over seeds; intervals, the confusion
-    matrix and the tiers use counts pooled over seeds."""
+    are trained on the same train rows. Metrics are averaged over seeds; the confusion matrix and
+    the tiers hold counts pooled over seeds (each mail counted once per repeat), and Wilson
+    intervals use the per-repeat mean counts (Ruling E7)."""
     X, folders = np.asarray(X, dtype=np.float32), np.asarray(folders)
     groups_dup = np.asarray(groups_dup)
     labels = np.array([main_class(f) for f in folders])
     seeds = [seed0 + r for r in range(repeats)]
+    R = len(seeds)
     head_counts = head_class_counts(folders)
     counts = {"rows": len(X), "classes": np.bincount(labels, minlength=3).tolist(),
               "heads": head_counts}
@@ -288,20 +335,21 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
         return GateReport(checks=checks, seeds=seeds, counts=counts)
 
     def held_out(groups):
-        (cand, base), fallback = _cross_fit((recipe, baseline_recipe), X, folders, groups, seeds)
+        (cand, base), fallback, skipped = _cross_fit((recipe, baseline_recipe), X, folders, groups,
+                                                     seeds)
         cal = [calibrate_halves(z, labels, groups, seed=seed) for z, seed in zip(cand, seeds)]
         base_probs = [calibrate_halves(z, labels, groups, seed=seed)[0]
                       for z, seed in zip(base, seeds)]
-        return cal, base_probs, fallback
+        return cal, base_probs, fallback, skipped
 
-    cal, base_probs, fallback = held_out(groups_dup)
-    probs = [p for p, _ in cal]
+    cal, base_probs, fallback, skipped = held_out(groups_dup)
+    probs = [p for p, _, _ in cal]
     cand_m = [_metrics(p, labels) for p in probs]
     base_m = [_metrics(p, labels) for p in base_probs]
 
     merged = _merge_groups(groups_dup, np.asarray(groups_campaign))
-    camp_cal, camp_base, camp_fallback = held_out(merged)
-    camp_ds = float(np.mean([_dangerous_safe(labels, p.argmax(1)) for p, _ in camp_cal]))
+    camp_cal, camp_base, camp_fallback, camp_skipped = held_out(merged)
+    camp_ds = float(np.mean([_dangerous_safe(labels, p.argmax(1)) for p, _, _ in camp_cal]))
     camp_base_ds = float(np.mean([_dangerous_safe(labels, p.argmax(1)) for p in camp_base]))
 
     pooled, y = np.vstack(probs), np.tile(labels, len(seeds))
@@ -315,17 +363,21 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
         hit = int(cm[c, c])
         per_class.append({"class": name, "support": support,
                           "recall": hit / support if support else 0.0,
-                          "recall_ci": list(wilson(hit, support)),
+                          "recall_ci": list(wilson(hit / R, support / R)),
                           "precision": hit / called if called else 0.0,
-                          "precision_ci": list(wilson(hit, called))})
+                          "precision_ci": list(wilson(hit / R, called / R))})
 
-    high, high_precision = _high_cutoff(conf, correct)
+    high, _ = _high_cutoff(conf, correct)  # the stored cutoff, chosen on all held-out rows
+    halves = [high_tier_cross_half(p, labels, in_a) for p, _, in_a in cal]
+    high_tier = {k: sum(h[k] for h in halves) for k in ("n", "correct", "total")}
+    high_tier.update(unreachable=any(h["unreachable"] for h in halves), repeats=R)
     tiers = []
     for name, m in (("High", conf >= high), ("Medium", (conf >= MEDIUM_CUTOFF) & (conf < high)),
                     ("Low", conf < MEDIUM_CUTOFF)):
         n, right = int(m.sum()), int(correct[m].sum())
         tiers.append({"tier": name, "n": n, "correct": right,
-                      "precision": right / n if n else 0.0, "precision_ci": list(wilson(right, n)),
+                      "precision": right / n if n else 0.0,
+                      "precision_ci": list(wilson(right / R, n / R)),
                       "dangerous_called_safe": int(((y == 2) & (pred == 0) & m).sum())})
 
     candidate = {k: _mean(cand_m, k) for k in cand_m[0]}
@@ -335,9 +387,9 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
         dangerous_safe=candidate["dangerous_called_safe"],
         baseline_dangerous_safe=baseline["dangerous_called_safe"],
         macro_f1=candidate["macro_f1"], baseline_macro_f1=baseline["macro_f1"],
-        ece=candidate["ece"], head_counts=head_counts, high_precision=high_precision,
+        ece=candidate["ece"], head_counts=head_counts, high_tier=high_tier,
         campaign_dangerous_safe=camp_ds, baseline_campaign_dangerous_safe=camp_base_ds)
-    temps = [t for _, ts in cal for t in ts]
+    temps = [t for _, ts, _ in cal for t in ts]
     return GateReport(
         checks=checks, seeds=seeds, counts=counts, per_class=per_class,
         confusion_matrix=cm.tolist(), tiers=tiers,
@@ -345,4 +397,8 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
         campaign={"dangerous_called_safe": camp_ds, "baseline_dangerous_called_safe": camp_base_ds,
                   "groups": int(len(np.unique(merged))), "fallback": camp_fallback},
         baseline=baseline, candidate=candidate, fallback=fallback,
-        temperature_at_bound={c: any(temperature_at_bound(t[c]) for t in temps) for c in temps[0]})
+        temperature_at_bound={c: any(temperature_at_bound(t[c]) for t in temps) for c in temps[0]},
+        high_tier=high_tier, pooled_repeats=R,
+        note=f"counts are pooled over {R} repeats, so each mail is counted {R} times; Wilson "
+             f"intervals use the per-repeat mean counts",
+        legacy_resampling_skipped=sorted(skipped | camp_skipped))
