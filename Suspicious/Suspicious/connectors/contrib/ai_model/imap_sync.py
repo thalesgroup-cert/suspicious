@@ -75,6 +75,8 @@ def _new_uids(imap, since_uid: int, limit: int) -> list[int]:
 
 def _fetch(imap, uid: int) -> bytes | None:
     """The raw message, or None when the answer has no literal or it is above the size cap."""
+    # ponytail: imaplib reads the whole literal before the cap applies (no streaming); a prior
+    # UID FETCH (RFC822.SIZE) would avoid downloading oversize mails.
     typ, data = imap.uid("FETCH", str(uid), "(BODY.PEEK[])")
     if typ != "OK":
         return None
@@ -116,14 +118,20 @@ def _review_mail(raw: bytes, folder: str, uidvalidity: int, uid: int) -> ReviewM
     )
 
 
-def read_folder(imap, folder, *, since_uid, limit):
-    """(mails, skipped, uidvalidity) for the lowest `limit` UIDs above `since_uid` in `folder`.
+def _quoted(folder: str) -> str:
+    """An IMAP quoted string: imaplib sends the mailbox as given, so spaces would break SELECT."""
+    return '"' + folder.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def read_folder(imap, folder, *, since_uid, limit, known_uidvalidity=None):
+    """(mails, skipped, uidvalidity, last_uid) for the lowest `limit` UIDs above `since_uid`.
 
     A mail with no message/rfc822 part, an unreadable one and one above 25 MB count in `skipped`.
-    The caller compares `uidvalidity` with its checkpoint and re-reads from 0 when it changed.
+    `last_uid` is the highest UID examined, skipped ones included (`since_uid` when none is newer).
+    When `known_uidvalidity` is given and differs from the folder's, the read starts from UID 0.
     """
     try:
-        typ, _ = imap.select(folder, readonly=True)
+        typ, _ = imap.select(_quoted(folder), readonly=True)
     except imaplib.IMAP4.error as exc:
         logger.warning("ai_model imap: cannot select %s (%s)", folder, type(exc).__name__)
         raise FolderUnavailable(folder) from None
@@ -131,8 +139,11 @@ def read_folder(imap, folder, *, since_uid, limit):
         logger.warning("ai_model imap: cannot select %s (%s)", folder, typ)
         raise FolderUnavailable(folder)
     uidvalidity = _uidvalidity(imap)
+    if known_uidvalidity is not None and known_uidvalidity != uidvalidity:
+        since_uid = 0
     mails, skipped = [], 0
-    for uid in _new_uids(imap, since_uid, limit):
+    uids = _new_uids(imap, since_uid, limit)
+    for uid in uids:
         raw = _fetch(imap, uid)
         try:
             mail = _review_mail(raw, folder, uidvalidity, uid) if raw else None
@@ -143,4 +154,4 @@ def read_folder(imap, folder, *, since_uid, limit):
             skipped += 1
         else:
             mails.append(mail)
-    return mails, skipped, uidvalidity
+    return mails, skipped, uidvalidity, (uids[-1] if uids else since_uid)

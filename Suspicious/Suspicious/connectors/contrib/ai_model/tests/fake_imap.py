@@ -1,6 +1,8 @@
 """An in-memory stand-in for imaplib.IMAP4, enough for the review-folder reader (Plan D)."""
 from __future__ import annotations
 
+import re
+
 
 class FakeImap:
     """folders: name -> {"uidvalidity": int, "messages": {uid: bytes}}.
@@ -21,7 +23,10 @@ class FakeImap:
     def select(self, mailbox="INBOX", readonly=False):
         self.commands.append(("SELECT", mailbox, readonly))
         self.untagged_responses = {}  # imaplib clears them at select
-        folder = self.folders.get(mailbox)
+        name = mailbox
+        if len(name) >= 2 and name[0] == name[-1] == '"':
+            name = re.sub(r'\\(.)', r"\1", name[1:-1])  # IMAP quoted string
+        folder = self.folders.get(name)
         if folder is None:
             self.selected = None
             return "NO", [b"[NONEXISTENT] Unknown Mailbox"]

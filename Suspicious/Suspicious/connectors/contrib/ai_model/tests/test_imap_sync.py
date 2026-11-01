@@ -44,8 +44,8 @@ def fake(messages, uidvalidity=7, **kw):
 class ReadFolderTest(SimpleTestCase):
     def test_reads_forwarded_mail_from_inner_message(self):
         imap = fake({3: forward(1)})
-        mails, skipped, uidvalidity = read_folder(imap, FOLDER, since_uid=0, limit=10)
-        self.assertEqual((skipped, uidvalidity), (0, 7))
+        mails, skipped, uidvalidity, last_uid = read_folder(imap, FOLDER, since_uid=0, limit=10)
+        self.assertEqual((skipped, uidvalidity, last_uid), (0, 7, 3))
         self.assertEqual(len(mails), 1)
         mail = mails[0]
         self.assertIsInstance(mail, ReviewMail)
@@ -60,7 +60,7 @@ class ReadFolderTest(SimpleTestCase):
         imap = fake({1: forward(1), 2: forward(2)})
         read_folder(imap, FOLDER, since_uid=0, limit=10)
         selects = [c for c in imap.commands if c[0] == "SELECT"]
-        self.assertEqual(selects, [("SELECT", FOLDER, True)])
+        self.assertEqual(selects, [("SELECT", f'"{FOLDER}"', True)])
         for command in imap.commands:
             self.assertNotIn(command[0], {"STORE", "COPY", "MOVE", "EXPUNGE", "APPEND", "DELETE"})
             if command[0] == "UID":
@@ -70,14 +70,15 @@ class ReadFolderTest(SimpleTestCase):
 
     def test_only_uids_above_since_uid_lowest_first_at_most_limit(self):
         imap = fake({u: forward(u) for u in (2, 5, 6, 9, 11)})
-        mails, _, _ = read_folder(imap, FOLDER, since_uid=5, limit=2)
+        mails, _, _, last_uid = read_folder(imap, FOLDER, since_uid=5, limit=2)
         self.assertEqual([m.uid for m in mails], [6, 9])
+        self.assertEqual(last_uid, 9)
         fetched = [c[2] for c in imap.commands if c[:2] == ("UID", "FETCH")]
         self.assertEqual(fetched, ["6", "9"])
 
     def test_search_echoing_the_last_uid_fetches_nothing(self):
         imap = fake({4: forward(4)}, search_extra=(4,))
-        self.assertEqual(read_folder(imap, FOLDER, since_uid=4, limit=10), ([], 0, 7))
+        self.assertEqual(read_folder(imap, FOLDER, since_uid=4, limit=10), ([], 0, 7, 4))
         self.assertFalse([c for c in imap.commands if c[:2] == ("UID", "FETCH")])
 
     def test_not_forward_unparseable_and_oversize_are_skipped(self):
@@ -88,20 +89,21 @@ class ReadFolderTest(SimpleTestCase):
                 3: [(b"3 (UID 3 BODY[] {30000000}", b"truncated"), b")"],
             },
         )
-        mails, skipped, _ = read_folder(imap, FOLDER, since_uid=0, limit=10)
+        mails, skipped, _, last_uid = read_folder(imap, FOLDER, since_uid=0, limit=10)
         self.assertEqual([m.uid for m in mails], [4])
+        self.assertEqual(last_uid, 4)
         self.assertEqual(skipped, 3)
 
     def test_oversize_by_length_when_no_literal_size(self):
         imap = fake({1: b""}, fetch_override={1: [(b"1 (UID 1 BODY[]", forward(1)), b")"]})
         with mock.patch.object(imap_sync, "MAX_MESSAGE_BYTES", 10):
-            self.assertEqual(read_folder(imap, FOLDER, since_uid=0, limit=10), ([], 1, 7))
+            self.assertEqual(read_folder(imap, FOLDER, since_uid=0, limit=10), ([], 1, 7, 1))
 
     def test_parse_failure_is_skipped_and_logged_without_mail_data(self):
         imap = fake({1: forward(1)})
         with mock.patch.object(imap_sync, "text_from_message", side_effect=ValueError("secret body")), \
                 self.assertLogs(imap_sync.logger, "INFO") as logs:
-            self.assertEqual(read_folder(imap, FOLDER, since_uid=0, limit=10), ([], 1, 7))
+            self.assertEqual(read_folder(imap, FOLDER, since_uid=0, limit=10), ([], 1, 7, 1))
         joined = "\n".join(logs.output)
         self.assertIn("ValueError", joined)
         self.assertIn(FOLDER, joined)
@@ -112,8 +114,37 @@ class ReadFolderTest(SimpleTestCase):
         imap = fake({1: forward(1)}, uidvalidity=42)
         self.assertEqual(read_folder(imap, FOLDER, since_uid=0, limit=10)[2], 42)
 
+    def test_skipped_tail_still_advances_last_uid(self):
+        imap = fake({1: forward(1), 2: not_forward(), 3: not_forward()})
+        mails, skipped, _, last_uid = read_folder(imap, FOLDER, since_uid=0, limit=10)
+        self.assertEqual(([m.uid for m in mails], skipped, last_uid), ([1], 2, 3))
+
+    def test_changed_uidvalidity_rereads_from_start_in_same_call(self):
+        imap = fake({1: forward(1), 2: forward(2)}, uidvalidity=8)
+        mails, _, uidvalidity, last_uid = read_folder(
+            imap, FOLDER, since_uid=2, limit=10, known_uidvalidity=7)
+        self.assertEqual(([m.uid for m in mails], uidvalidity, last_uid), ([1, 2], 8, 2))
+        self.assertEqual(sum(c[0] == "SELECT" for c in imap.commands), 1)
+
+    def test_same_uidvalidity_keeps_since_uid(self):
+        imap = fake({1: forward(1), 2: forward(2)})
+        mails, _, _, _ = read_folder(imap, FOLDER, since_uid=1, limit=10, known_uidvalidity=7)
+        self.assertEqual([m.uid for m in mails], [2])
+
+    def test_folder_name_is_quoted(self):
+        name = 'Review "A" \\ 2'
+        imap = FakeImap({name: {"uidvalidity": 7, "messages": {1: forward(1)}}})
+        mails, _, _, _ = read_folder(imap, name, since_uid=0, limit=10)
+        self.assertEqual([m.folder for m in mails], [name])
+        self.assertEqual(imap.commands[0], ("SELECT", '"Review \\"A\\" \\\\ 2"', True))
+
+    def test_folder_with_space(self):
+        imap = FakeImap({"2 CLONE": {"uidvalidity": 7, "messages": {1: forward(1)}}})
+        self.assertEqual(len(read_folder(imap, "2 CLONE", since_uid=0, limit=10)[0]), 1)
+        self.assertEqual(imap.commands[0], ("SELECT", '"2 CLONE"', True))
+
     def test_empty_folder(self):
-        self.assertEqual(read_folder(fake({}), FOLDER, since_uid=0, limit=10), ([], 0, 7))
+        self.assertEqual(read_folder(fake({}), FOLDER, since_uid=3, limit=10), ([], 0, 7, 3))
 
     def test_missing_folder_raises(self):
         with self.assertRaises(FolderUnavailable) as ctx:
