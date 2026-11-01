@@ -170,6 +170,14 @@ class RecordVerdictTest(CaseMixin, TestCase):
         self.assertIsNone(ledger.record_verdict(case, self.user, "Failure"))
         self.assertFalse(LabelRecord.objects.exists())
 
+    def test_a_result_outside_the_label_classes_keeps_the_earlier_verdict_active(self):
+        case = self.make_case()
+        safe = ledger.record_verdict(case, self.user, "Safe")
+        for result in ("Unchallenged", "AllowListed", "Failure"):
+            self.assertIsNone(ledger.record_verdict(case, self.user, result))
+        safe.refresh_from_db()
+        self.assertEqual((safe.status, case_row(case).count()), ("active", 1))
+
 
 class RecordChallengeTest(CaseMixin, TestCase):
     def test_creates_a_proposal_row_never_trainable(self):

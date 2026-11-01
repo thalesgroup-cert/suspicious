@@ -177,9 +177,12 @@ def _folders_for(case, message_hash: str):
 
 
 def record_verdict(case, user, label_class) -> LabelRecord | None:
-    """Append the analyst's verdict; None for a result outside the label classes or the same class
-    as the case's active verdict row. A different class supersedes that row; a hard conflict flags
-    the folder rows (ruling D6)."""
+    """Append the analyst's verdict; None for the same class as the case's active verdict row. A
+    different class supersedes that row; a hard conflict flags the folder rows (ruling D6).
+
+    Deliberate: a result outside Safe, Unwanted, Dangerous, Suspicious and Inconclusive
+    (Unchallenged, AllowListed, Failure) is not a label. It stores nothing and does not supersede
+    the earlier verdict row, which stays the case's last analyst label."""
     if label_class not in LabelRecord.LabelClass.values:
         return None
     # ponytail: no lock on the case; two verdicts on one case at the same instant can both append.
