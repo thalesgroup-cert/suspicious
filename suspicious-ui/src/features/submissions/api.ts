@@ -112,7 +112,26 @@ export type UrlArtifact = {
   analyzed_url_id: number | null;
 };
 
+export type AiAssessment = {
+  result: string;
+  sub_class: string;
+  tier: "high" | "medium" | "low" | "";
+  runner_up: { result: string } | null;
+  model_version: string;
+  analysed_at: string;
+  reads: string;
+  similar_cases: {
+    case_id: number | null;
+    similarity: number | null;
+    label: string | null;
+    provenance: string | null;
+  }[];
+  campaign: { ref: string; size: number } | null;
+  cross_check: { facts: { kind: "rule" | "source" | "list"; text: string }[]; disagrees: boolean };
+};
+
 export type SubmissionDetails = SubmissionRow & {
+  ai_assessment?: AiAssessment | null;
   analyzer_reports: SubmissionAnalyzerReport[];
   case_infos?: SubmissionCaseInfos;
   raw?: SubmissionRawDetails;

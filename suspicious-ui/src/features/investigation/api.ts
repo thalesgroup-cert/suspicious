@@ -127,6 +127,7 @@ type InvestigationCaseInfos = {
 };
 
 export type InvestigationDetails = {
+  ai_assessment?: import("../submissions/api").AiAssessment | null;
   id: number;
   reporter_email: string;
   status: InvestigationStatus;
