@@ -4,8 +4,8 @@ from typing import Any
 
 from rest_framework import serializers
 
-from case_handler.models import Case
 from api.utils.ai_assessment import ai_assessment_for
+from case_handler.models import Case
 from cortex_job.models import AnalyzerReport
 
 
