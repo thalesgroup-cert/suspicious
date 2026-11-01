@@ -7,9 +7,27 @@ import json
 from dataclasses import dataclass
 from datetime import timezone
 
-from ai_model.messageid import match_case, message_id_hash, stored_sender
+from django.db import transaction
+from django.db.models import Count, Q
+from django.utils import timezone as dj_timezone
+
+from ai_model.messageid import match_case, message_id_hash, stored_message_id, stored_sender
 from ai_model.models import AiAssessment, LabelRecord
 from ai_model.taxonomy import class_of
+from case_handler.models import ProposedVerdict
+
+ACTIVE, SUPERSEDED, FLAGGED = LabelRecord.Status.ACTIVE, LabelRecord.Status.SUPERSEDED, LabelRecord.Status.FLAGGED
+MISMATCH = "folder_verdict_mismatch"
+# Hard conflicts only: {folder class: the verdict class it conflicts with}. Unwanted, Suspicious and
+# Inconclusive never flag.
+CONFLICT = {"Dangerous": "Safe", "Safe": "Dangerous"}
+
+
+def enabled() -> bool:
+    """Ruling D6: verdict and challenge rows only while the ai_model connector is enabled."""
+    from connectors.delivery import get_state
+    from connectors.registry import registry
+    return "ai_model" in registry.names() and get_state("ai_model").enabled
 
 
 @dataclass(frozen=True)
@@ -78,7 +96,12 @@ def prepare_folder_observation(mail) -> FolderObservation | None:
     message is already observed there, else its key, matched case and snapshot."""
     label_class = class_of(mail.folder)
     message_id, message_hash = _folder_key(mail)
-    if label_class is None or _observed(message_hash, mail.folder):
+    if label_class is None:
+        return None
+    if _observed(message_hash, mail.folder):
+        # Back in a folder whose row is flagged (or still active): that row is the label again, so a
+        # row left active in another folder is superseded. The pre-pass's only write.
+        _folder_rows(message_hash).filter(status=ACTIVE).exclude(label=mail.folder).update(status=SUPERSEDED)
         return None
     case = _match(mail)
     return FolderObservation(mail, message_id, message_hash, label_class, case, _snapshot(mail, case))
@@ -89,14 +112,16 @@ def record_folder_observation(observation: FolderObservation, vectors, *, prepro
     """Append the folder row; None when a concurrent write got there first (re-checked here).
 
     `vectors` is {"classifier": [float, ...], "campaign": [float, ...]}. The new row supersedes
-    the message's active rows in other folders (ruling D5). Run it in a transaction.
+    the message's active rows in other folders (ruling D5), and is written flagged when it is a
+    hard conflict with the active verdict. Run it in a transaction (the sync's chunk transaction).
     """
     mail = observation.mail
     if _observed(observation.message_hash, mail.folder):
         return None
-    _folder_rows(observation.message_hash).filter(status=LabelRecord.Status.ACTIVE).update(
-        status=LabelRecord.Status.SUPERSEDED
-    )
+    _folder_rows(observation.message_hash).filter(status=ACTIVE).update(status=SUPERSEDED)
+    conflict = CONFLICT.get(observation.label_class)
+    flagged = bool(conflict) and _verdicts_for(observation.case, observation.message_hash).filter(
+        label_class=conflict).exists()
     return LabelRecord.objects.create(
         message_id=observation.message_id,
         message_id_hash=observation.message_hash,
@@ -111,4 +136,101 @@ def record_folder_observation(observation: FolderObservation, vectors, *, prepro
         campaign_embedding=json.dumps(vectors["campaign"]),
         embedding_version=embedding_version,
         snapshot=observation.snapshot,
+        status=FLAGGED if flagged else ACTIVE,
+        flag_reason=MISMATCH if flagged else "",
     )
+
+
+def _stored_mail(case):
+    return getattr(getattr(case, "fileOrMail", None), "mail", None)
+
+
+def _case_key(case) -> tuple[str, str]:
+    """(message_id, message_id_hash) of the case's stored mail. With no mail or no Message-ID the
+    key is per case: the content key of folder rows needs the forwarded mail's text, which the
+    verdict path does not read; folder rows still join on the case."""
+    mail = _stored_mail(case)
+    message_id = stored_message_id(mail) if mail is not None else ""
+    if message_id:
+        return message_id, message_id_hash(message_id)
+    return "", message_id_hash(f"no-message-id:case:{case.pk}")
+
+
+def _verdicts_for(case, message_hash: str):
+    """Active verdict rows a folder row of this case (or, unmatched, this message) is checked against."""
+    rows = LabelRecord.objects.filter(source=LabelRecord.Source.ANALYST_VERDICT, status=ACTIVE)
+    return rows.filter(case=case) if case is not None else rows.filter(message_id_hash=message_hash)
+
+
+def _folders_for(case, message_hash: str):
+    """Active folder rows a verdict on this case is checked against: the case's rows, and rows of the
+    same message that matched no case. A row of another case is not this verdict's mail."""
+    return LabelRecord.objects.filter(source=LabelRecord.Source.IMAP_FOLDER, status=ACTIVE).filter(
+        Q(case=case) | Q(case__isnull=True, message_id_hash=message_hash))
+
+
+def record_verdict(case, user, label_class) -> LabelRecord | None:
+    """Append the analyst's verdict; None for a result outside the label classes or the same class
+    as the case's active verdict row. A different class supersedes that row; a hard conflict flags
+    the folder rows (ruling D6)."""
+    if label_class not in LabelRecord.LabelClass.values:
+        return None
+    # ponytail: no lock on the case; two verdicts on one case at the same instant can both append.
+    with transaction.atomic():
+        current = LabelRecord.objects.filter(case=case, source=LabelRecord.Source.ANALYST_VERDICT, status=ACTIVE)
+        if current.filter(label_class=label_class).exists():
+            return None
+        current.update(status=SUPERSEDED)
+        message_id, message_hash = _case_key(case)
+        row = LabelRecord.objects.create(
+            message_id=message_id, message_id_hash=message_hash, case=case,
+            source=LabelRecord.Source.ANALYST_VERDICT, source_ref=user.get_username()[:255],
+            label=label_class, label_class=label_class, trust=LabelRecord.Trust.VERDICT,
+        )
+        folder_classes = [f for f, v in CONFLICT.items() if v == label_class]
+        _folders_for(case, message_hash).filter(label_class__in=folder_classes).update(
+            status=FLAGGED, flag_reason=MISMATCH)
+        return row
+
+
+def record_challenge(case, proposed) -> LabelRecord | None:
+    """Append the reporter's proposal (trust proposal, never trainable, never flags); None for a
+    blank or unknown proposal."""
+    if proposed not in ProposedVerdict.values:
+        return None
+    message_id, message_hash = _case_key(case)
+    return LabelRecord.objects.create(
+        message_id=message_id, message_id_hash=message_hash, case=case,
+        source=LabelRecord.Source.CHALLENGE, label=proposed, label_class=proposed,
+        trust=LabelRecord.Trust.PROPOSAL,
+    )
+
+
+def resolve_flag(record, user, note, *, keep: bool) -> None:
+    """Close a flag: keep makes the row active again (superseding any other active folder row of
+    the message), else it is superseded. flag_reason stays as the audit trail (ruling D4)."""
+    if record.status != FLAGGED:
+        raise ValueError("only a flagged row can be resolved")
+    with transaction.atomic():
+        if keep and record.source == LabelRecord.Source.IMAP_FOLDER:
+            _folder_rows(record.message_id_hash).filter(status=ACTIVE).exclude(pk=record.pk).update(
+                status=SUPERSEDED)
+        record.status = ACTIVE if keep else SUPERSEDED
+        record.resolved_by, record.resolved_at, record.resolution_note = user, dj_timezone.now(), note
+        record.save(update_fields=["status", "resolved_by", "resolved_at", "resolution_note"])
+
+
+def ledger_summary() -> dict:
+    """Counts of the current rows (superseded ones are history) by source and class, the flagged
+    count and the trainable count."""
+    rows = LabelRecord.objects.exclude(status=SUPERSEDED).order_by()
+
+    def by(field):
+        return dict(rows.values_list(field).annotate(n=Count("id")))
+
+    return {
+        "by_source": by("source"),
+        "by_class": by("label_class"),
+        "flagged": rows.filter(status=FLAGGED).count(),
+        "trainable": rows.filter(trust=LabelRecord.Trust.FOLDER, status=ACTIVE).count(),
+    }

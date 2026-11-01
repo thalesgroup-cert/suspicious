@@ -23,6 +23,21 @@ class LabelRecordTest(TestCase):
         self.assertFalse(make(trust="proposal").trainable)
         self.assertFalse(make(trust="verdict").trainable)
 
+    def test_append_only(self):
+        user = get_user_model().objects.create_user(username="u", password="p")
+        case = Case.objects.create(description="", reporter=user)
+        rec = make()
+        rec.status, rec.flag_reason, rec.resolution_note, rec.resolved_by = "flagged", "x", "n", user
+        rec.case = case
+        rec.save()
+        for field, value in (("label", "2_CLASSIC_PHISHING"), ("label_class", "Safe"), ("embedding", "[1]"),
+                             ("snapshot", {"a": 1}), ("case", None)):
+            rec = LabelRecord.objects.get(pk=rec.pk)
+            setattr(rec, field, value)
+            with self.assertRaises(ValueError, msg=field):
+                rec.save()
+        self.assertEqual(LabelRecord.objects.get(pk=rec.pk).label, "1_SPAM")
+
     def test_null_case_and_set_null(self):
         user = get_user_model().objects.create_user(username="u", password="p")
         case = Case.objects.create(description="", reporter=user)

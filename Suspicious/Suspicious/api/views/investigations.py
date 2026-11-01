@@ -11,6 +11,7 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ai_model import ledger
 from case_handler.lifecycle import IllegalTransition, LifecycleState, transition
 from case_handler.models import Case, Result
 from cortex_job.cortex_utils.case_targets import collect_case_targets
@@ -84,8 +85,18 @@ def _apply_verdict(case: Case, user, validated: dict, *, notify_reporter: bool =
             "last_update",
         ]
     )
+    _record_verdict(case, user, case.results)
     # The reporter's review email rides on this event; every other subscriber (search index, SIEM) still needs it.
     emit(EVENT_CASE_MODIFIED, case, exclude=() if notify_reporter else ("smtp_notify",))
+
+
+def _record_verdict(case: Case, user, label_class: str) -> None:
+    """The analyst verdict row of the label ledger (ruling D6); its failure never fails the verdict."""
+    try:
+        if ledger.enabled():
+            ledger.record_verdict(case, user, label_class)
+    except Exception as exc:  # noqa: BLE001 -- the ledger is provenance, the verdict is saved
+        logger.warning("label ledger verdict row not written for case %s: %s", case.pk, type(exc).__name__)
 
 
 def _redo_analysis(case: Case) -> tuple[int, dict]:

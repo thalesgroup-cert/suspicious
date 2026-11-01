@@ -42,6 +42,11 @@ def stored_sender(mail) -> str:
     return _address(mail.mail_from) or next((_address(v) for v in _values(_headers(mail), "from")), "")
 
 
+def stored_message_id(mail) -> str:
+    """The stored mail's normalised Message-ID, "" when it has none."""
+    return next((n for n in map(normalise, _values(_headers(mail), "message-id")) if n), "")
+
+
 def _cases_of(mails):
     """One case per mail, newest first, each case once."""
     return list({c.pk: c for c in Case.objects.filter(fileOrMail__mail__in=mails).order_by("-pk")}.values())

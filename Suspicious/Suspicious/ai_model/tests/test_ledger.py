@@ -30,7 +30,7 @@ def observe(mail):
     return observation and ledger.record_folder_observation(observation, VECTORS, **VERSIONS)
 
 
-class RecordFolderObservationTest(TestCase):
+class CaseMixin:
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="u", password="x")
 
@@ -45,6 +45,9 @@ class RecordFolderObservationTest(TestCase):
         case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
         case.save(update_fields=["fileOrMail"])
         return case
+
+
+class RecordFolderObservationTest(CaseMixin, TestCase):
 
     def test_creates_active_folder_row_with_case_vectors_and_snapshot(self):
         case = self.make_case(is_denylisted=True)
@@ -131,3 +134,185 @@ class RecordFolderObservationTest(TestCase):
         observe(review())
         self.assertIsNone(ledger.prepare_folder_observation(review(uid=9)))
         self.assertIsNone(ledger.prepare_folder_observation(review(folder="9_ODD")))
+
+
+def case_row(case):
+    return LabelRecord.objects.filter(case=case)
+
+
+class RecordVerdictTest(CaseMixin, TestCase):
+    def test_creates_a_verdict_row_keyed_on_the_case_mail(self):
+        case = self.make_case()
+        row = ledger.record_verdict(case, self.user, "Safe")
+        self.assertEqual((row.source, row.trust, row.source_ref, row.label, row.label_class, row.status),
+                         ("analyst_verdict", "verdict", "u", "Safe", "Safe", "active"))
+        self.assertEqual((row.message_id, row.message_id_hash, row.case),
+                         ("abc.1@evil.example", message_id_hash("abc.1@evil.example"), case))
+        self.assertFalse(row.trainable)
+
+    def test_case_without_mail_has_an_empty_message_id(self):
+        case = Case.objects.create(description="", reporter=self.user)
+        row = ledger.record_verdict(case, self.user, "Dangerous")
+        self.assertEqual(row.message_id, "")
+        self.assertEqual(len(row.message_id_hash), 64)
+
+    def test_identical_adds_nothing_different_supersedes(self):
+        case = self.make_case()
+        first = ledger.record_verdict(case, self.user, "Safe")
+        self.assertIsNone(ledger.record_verdict(case, self.user, "Safe"))
+        second = ledger.record_verdict(case, self.user, "Dangerous")
+        first.refresh_from_db()
+        self.assertEqual((first.status, second.status), ("superseded", "active"))
+        self.assertEqual(case_row(case).count(), 2)
+
+    def test_a_result_outside_the_label_classes_stores_nothing(self):
+        case = self.make_case()
+        self.assertIsNone(ledger.record_verdict(case, self.user, "Failure"))
+        self.assertFalse(LabelRecord.objects.exists())
+
+
+class RecordChallengeTest(CaseMixin, TestCase):
+    def test_creates_a_proposal_row_never_trainable(self):
+        case = self.make_case()
+        row = ledger.record_challenge(case, "Safe")
+        self.assertEqual((row.source, row.trust, row.label_class, row.case), ("challenge", "proposal", "Safe", case))
+        self.assertEqual(row.message_id, "abc.1@evil.example")
+        self.assertFalse(row.trainable)
+
+    def test_blank_or_unknown_proposal_creates_nothing(self):
+        case = self.make_case()
+        self.assertIsNone(ledger.record_challenge(case, ""))
+        self.assertIsNone(ledger.record_challenge(case, "Unwanted"))
+        self.assertFalse(LabelRecord.objects.exists())
+
+    def test_a_proposal_never_flags_a_folder_row(self):
+        case = self.make_case()
+        folder = observe(review(folder="0_LEGIT_INTERNAL_COMMUNICATION"))
+        ledger.record_challenge(case, "Dangerous")
+        folder.refresh_from_db()
+        self.assertEqual(folder.status, "active")
+
+
+class ConflictTest(CaseMixin, TestCase):
+    def assert_flagged(self, row):
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.flag_reason), ("flagged", "folder_verdict_mismatch"))
+        self.assertFalse(row.trainable)
+
+    def test_safe_verdict_after_a_dangerous_folder_flags_the_folder_row(self):
+        case = self.make_case()
+        folder = observe(review())
+        verdict = ledger.record_verdict(case, self.user, "Safe")
+        self.assert_flagged(folder)
+        self.assertEqual(verdict.status, "active")
+
+    def test_dangerous_folder_after_a_safe_verdict_is_flagged(self):
+        case = self.make_case()
+        ledger.record_verdict(case, self.user, "Safe")
+        self.assert_flagged(observe(review()))
+
+    def test_safe_folder_against_a_dangerous_verdict_both_orders(self):
+        case = self.make_case()
+        folder = observe(review(folder="0_LEGIT_EXTERNAL_COMMUNICATION"))
+        ledger.record_verdict(case, self.user, "Dangerous")
+        self.assert_flagged(folder)
+        other = self.make_case(message_id="<other.2@evil.example>")
+        ledger.record_verdict(other, self.user, "Dangerous")
+        self.assert_flagged(observe(review(folder="0_LEGIT_EXTERNAL_COMMUNICATION", message_id="other.2@evil.example")))
+
+    def test_soft_classes_never_flag(self):
+        case = self.make_case()
+        spam = observe(review(folder="1_SPAM"))
+        for verdict in ("Safe", "Dangerous", "Suspicious", "Inconclusive"):
+            ledger.record_verdict(case, self.user, verdict)
+        spam.refresh_from_db()
+        self.assertEqual(spam.status, "active")
+        ledger.record_verdict(case, self.user, "Suspicious")
+        self.assertEqual(observe(review(folder="2_WHALING_PHISHING")).status, "active")
+
+    def test_a_folder_row_of_another_case_is_not_flagged(self):
+        case = self.make_case()
+        folder = observe(review())
+        other = Case.objects.create(description="", reporter=self.user)
+        LabelRecord.objects.filter(pk=folder.pk).update(case=other)
+        ledger.record_verdict(case, self.user, "Safe")
+        folder.refresh_from_db()
+        self.assertEqual(folder.status, "active")
+
+    def test_an_unmatched_folder_row_with_the_same_message_id_is_flagged(self):
+        folder = observe(review())
+        self.assertIsNone(folder.case)
+        ledger.record_verdict(self.make_case(), self.user, "Safe")
+        self.assert_flagged(folder)
+
+    def test_a_superseded_verdict_does_not_flag_a_later_folder_row(self):
+        case = self.make_case()
+        ledger.record_verdict(case, self.user, "Safe")
+        ledger.record_verdict(case, self.user, "Dangerous")
+        self.assertEqual(observe(review()).status, "active")
+
+    def test_moved_back_to_a_flagged_folder_supersedes_the_other_active_row(self):
+        case = self.make_case()
+        flagged = observe(review())
+        ledger.record_verdict(case, self.user, "Safe")
+        moved = observe(review(folder="1_SPAM"))
+        self.assertIsNone(observe(review(uid=80)))
+        moved.refresh_from_db()
+        self.assertEqual(moved.status, "superseded")
+        self.assert_flagged(flagged)
+
+
+class ResolveFlagTest(CaseMixin, TestCase):
+    def flagged(self):
+        case = self.make_case()
+        row = observe(review())
+        ledger.record_verdict(case, self.user, "Safe")
+        row.refresh_from_db()
+        return row
+
+    def test_keep_reactivates_and_fills_the_resolution(self):
+        row = self.flagged()
+        ledger.resolve_flag(row, self.user, "folder is right", keep=True)
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.flag_reason, row.resolved_by, row.resolution_note),
+                         ("active", "folder_verdict_mismatch", self.user, "folder is right"))
+        self.assertIsNotNone(row.resolved_at)
+        self.assertTrue(row.trainable)
+
+    def test_keep_supersedes_a_row_active_in_another_folder(self):
+        row = self.flagged()
+        moved = observe(review(folder="1_SPAM"))
+        ledger.resolve_flag(row, self.user, "", keep=True)
+        moved.refresh_from_db()
+        self.assertEqual(moved.status, "superseded")
+
+    def test_drop_supersedes(self):
+        row = self.flagged()
+        ledger.resolve_flag(row, self.user, "verdict is right", keep=False)
+        row.refresh_from_db()
+        self.assertEqual(row.status, "superseded")
+
+    def test_unflagged_row_raises(self):
+        row = observe(review())
+        with self.assertRaises(ValueError):
+            ledger.resolve_flag(row, self.user, "", keep=True)
+
+
+class LedgerSummaryTest(CaseMixin, TestCase):
+    def test_counts(self):
+        case = self.make_case()
+        observe(review())
+        observe(review(folder="1_SPAM", message_id="n.1@x.example"))
+        ledger.record_verdict(case, self.user, "Safe")
+        ledger.record_challenge(case, "Safe")
+        self.assertEqual(ledger.ledger_summary(), {
+            "by_source": {"imap_folder": 2, "analyst_verdict": 1, "challenge": 1},
+            "by_class": {"Dangerous": 1, "Unwanted": 1, "Safe": 2},
+            "flagged": 1,
+            "trainable": 1,
+        })
+
+    def test_superseded_rows_are_not_counted(self):
+        observe(review())
+        observe(review(folder="1_SPAM"))
+        self.assertEqual(ledger.ledger_summary()["by_class"], {"Unwanted": 1})

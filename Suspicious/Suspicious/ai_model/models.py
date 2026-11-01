@@ -96,6 +96,20 @@ class LabelRecord(models.Model):
             models.Index(fields=["trust", "status"]),
         ]
 
+    # Ruling D4: the only columns a save() may change; case only from null. QuerySet.update()
+    # bypasses this check, so the ledger module updates these columns only.
+    MUTABLE = frozenset({"status", "flag_reason", "case_id", "resolved_by_id", "resolved_at", "resolution_note"})
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            old = type(self).objects.filter(pk=self.pk).values().first()
+            if old is not None:
+                changed = {f.attname for f in self._meta.concrete_fields
+                           if getattr(self, f.attname) != old[f.attname]}
+                if changed - self.MUTABLE or ("case_id" in changed and old["case_id"] is not None):
+                    raise ValueError(f"LabelRecord is append-only: {sorted(changed)} cannot change")
+        super().save(*args, **kwargs)
+
     @property
     def trainable(self) -> bool:
         return self.trust == self.Trust.FOLDER and self.status == self.Status.ACTIVE
