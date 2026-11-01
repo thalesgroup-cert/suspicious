@@ -303,6 +303,7 @@ class GateReport:
     candidate: dict = field(default_factory=dict)
     fallback: bool = False  # GroupKFold used because stratified folds were infeasible
     temperature_at_bound: dict = field(default_factory=dict)
+    temperatures: list = field(default_factory=list)  # {component: T} per seed and half
     high_tier: dict = field(default_factory=dict)  # check 5's cross-half counts (Ruling E13)
     pooled_repeats: int = 1
     note: str = ""
@@ -399,6 +400,7 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
                   "groups": int(len(np.unique(merged))), "fallback": camp_fallback},
         baseline=baseline, candidate=candidate, fallback=fallback,
         temperature_at_bound={c: any(temperature_at_bound(t[c]) for t in temps) for c in temps[0]},
+        temperatures=temps,
         high_tier=high_tier, pooled_repeats=R,
         note=f"counts are pooled over {R} repeats, so each mail is counted {R} times; Wilson "
              f"intervals use the per-repeat mean counts",

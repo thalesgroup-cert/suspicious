@@ -215,6 +215,8 @@ def test_run_gate_report_contents_and_eligibility():
                                     "campaign_dangerous_called_safe"}
     assert isinstance(report.fallback, bool)
     assert set(report.temperature_at_bound) == {"hierarchy"}
+    assert len(report.temperatures) == 6  # 3 seeds x 2 calibration halves
+    assert all(set(t) == {"hierarchy"} and t["hierarchy"] > 0 for t in report.temperatures)
     assert report.counts["rows"] == n
     json.dumps(asdict(report))  # plain values only, no arrays and no mail data
     # Same candidate and baseline: the comparison checks pass.
