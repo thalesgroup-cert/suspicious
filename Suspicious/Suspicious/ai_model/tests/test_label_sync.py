@@ -128,8 +128,11 @@ class LabelSyncTest(TestCase):
                 raise ValueError("inference server refused the request (HTTP 413)")
             return embed_answer(texts, profile)
 
-        with self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs:
+        with self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs, \
+                self.assertRaises(module.LabelSyncIncomplete) as caught:
             self.run_sync(embed=embed)
+        self.assertEqual(str(caught.exception), f"embed refused for 1 folder(s): {PHISH!a}")
+        self.assertIs(caught.exception.retryable, False)
         self.assertFalse(LabelRecord.objects.filter(label=PHISH).exists())
         self.assertFalse(LabelSyncState.objects.filter(folder=PHISH, last_uid__gt=0).exists())
         self.assertEqual(LabelSyncState.objects.get(folder=SPAM).last_uid, 11)
@@ -143,7 +146,8 @@ class LabelSyncTest(TestCase):
         def embed(texts, profile):
             return {**embed_answer(texts, profile), "preprocessing_version": next(answers)}
 
-        self.run_sync(config={**CONFIG, "imap_folders": PHISH}, embed=embed)
+        with self.assertRaises(module.LabelSyncIncomplete):
+            self.run_sync(config={**CONFIG, "imap_folders": PHISH}, embed=embed)
         self.assertFalse(LabelRecord.objects.exists())
         self.assertFalse(LabelSyncState.objects.filter(last_uid__gt=0).exists())
 
@@ -226,3 +230,31 @@ class LabelSyncTest(TestCase):
         self.imap.folders[PHISH]["messages"] = {1: forward(60, attach=(inner(70),))}
         self.run_sync(config={**CONFIG, "imap_folders": PHISH})
         self.assertEqual(LabelRecord.objects.get().case, case)
+
+    def test_a_row_value_error_is_not_reported_as_an_embed_refusal(self):
+        with mock.patch.object(module.ledger, "record_folder_observation", side_effect=ValueError("row")), \
+                self.assertRaises(ValueError) as caught:
+            self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        self.assertNotIsInstance(caught.exception, module.LabelSyncIncomplete)
+
+    def test_the_budget_is_checked_between_embed_batches(self):
+        self.assertEqual(module.TIME_BUDGET_SECONDS, 300)
+        self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
+        clock = iter([0.0, 0.0])  # sync start, before the chunk; before batch 2 the budget is spent
+        with mock.patch.object(module, "monotonic", side_effect=lambda: next(clock, module.TIME_BUDGET_SECONDS)):
+            call, _ = self.run_sync()
+        self.assertEqual([len(c.args[0]) for c in call.call_args_list], [32, 32])
+        self.assertFalse(LabelRecord.objects.exists())
+        self.assertFalse(LabelSyncState.objects.filter(last_uid__gt=0).exists())
+        self.assertFalse(LabelSyncState.objects.filter(folder=SPAM).exists())
+
+    def test_a_uidvalidity_reset_applies_once_across_chunks(self):
+        self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        self.imap.folders[PHISH] = {"uidvalidity": 8, "messages": {1: forward(1), 2: forward(5), 3: forward(6)}}
+        with mock.patch.object(module, "CHUNK", 1):
+            self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        searches = [c[-1] for c in self.imap.commands if c[:2] == ("UID", "SEARCH")]
+        self.assertEqual(searches[-4:], ["1:*", "2:*", "3:*", "4:*"])
+        self.assertEqual(LabelRecord.objects.count(), 5)
+        state = LabelSyncState.objects.get()
+        self.assertEqual((state.uidvalidity, state.last_uid), (8, 3))
