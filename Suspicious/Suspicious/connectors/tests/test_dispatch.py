@@ -138,6 +138,24 @@ class DispatchTest(TestCase):
         row = ConnectorDelivery.objects.get()
         self.assertEqual((row.event, row.status), ("sync", "success"))
 
+    def test_run_sync_now_does_not_retry_a_non_retryable_failure(self):
+        ConnectorState.objects.create(name="dummy", enabled=True)
+        from connectors import delivery as delivery_mod
+
+        class Final(Exception):
+            retryable = False
+
+        for exc, retried in ((Final("bad credentials"), False), (RuntimeError("down"), True)):
+            with self.subTest(exc=type(exc).__name__), \
+                    mock.patch.object(DummyConnector, "sync", side_effect=exc):
+                if retried:
+                    with self.assertRaises(delivery_mod.RetryableDeliveryError):
+                        delivery_mod.run_sync_now("dummy", attempt=1)
+                else:
+                    delivery_mod.run_sync_now("dummy", attempt=1)
+        self.assertEqual(list(ConnectorDelivery.objects.order_by("pk").values_list("status", flat=True)),
+                         [ConnectorDelivery.STATUS_FAILED] * 2)
+
     def test_run_sync_now_skips_disabled(self):
         ConnectorState.objects.create(name="dummy", enabled=False)
         from connectors.delivery import run_sync_now

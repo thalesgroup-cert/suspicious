@@ -128,7 +128,8 @@ def run_sync_now(connector_name: str, attempt: int = 1) -> None:
         _record(connector_name, "sync", None,
                 ConnectorDelivery.STATUS_FAILED, str(exc), started, attempt)
         logger.exception("Sync failed: %s attempt %d", connector_name, attempt)
-        if attempt < MAX_ATTEMPTS:
+        # An error marked retryable=False (bad credentials) waits for an operator, not a retry.
+        if attempt < MAX_ATTEMPTS and getattr(exc, "retryable", True) is not False:
             raise RetryableDeliveryError(str(exc)) from exc
         return
     _record(connector_name, "sync", None,

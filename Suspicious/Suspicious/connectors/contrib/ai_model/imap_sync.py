@@ -41,6 +41,8 @@ class ImapLoginFailed(Exception):
     login answers can echo the user, the password or a banner. Fatal for the run, like a lost
     connection, but a retry will not help until the credentials are fixed."""
 
+    retryable = False  # run_sync_now records the failure without retrying
+
 
 def _shown(folder: str) -> str:
     """The folder name for errors and logs: ascii() form, at most 64 characters."""

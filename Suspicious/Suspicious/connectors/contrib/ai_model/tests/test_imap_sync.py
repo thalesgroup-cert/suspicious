@@ -280,3 +280,8 @@ class ConnectTest(SimpleTestCase):
         self.assertEqual(str(ctx.exception), "error")
         self.assertIsNone(ctx.exception.__cause__)
         self.assertTrue(ctx.exception.__suppress_context__)
+
+
+class LoginFailedTest(SimpleTestCase):
+    def test_a_login_failure_is_not_retried(self):
+        self.assertIs(imap_sync.ImapLoginFailed("error").retryable, False)
