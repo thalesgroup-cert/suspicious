@@ -11,7 +11,8 @@ may add RESAMPLING_SKIPPED: [head, ...] (legacy_recipe does), which the report c
 
 Check 4 counts head samples on the whole dataset, not per training fold; when it fails nothing is
 trained. Check 5 is measured cross-half (Ruling E13): the High cutoff chosen on one calibration
-half is scored on the other. Wilson intervals use per-repeat mean counts (pooled / repeats).
+half, by the same rule as the stored cutoff (Ruling E17), is scored on the other.
+Wilson intervals use per-repeat mean counts (pooled / repeats).
 """
 import math
 from dataclasses import dataclass, field
@@ -33,7 +34,9 @@ MIN_HEAD_SAMPLES = 8
 DANGEROUS_SAFE_TOLERANCE = 0.01
 MACRO_F1_TOLERANCE = 0.02
 MAX_ECE = 0.12  # Ruling E6
-HIGH_PRECISION = 0.90
+HIGH_PRECISION = 0.90  # check 5's threshold
+HIGH_CUTOFF_PRECISION = 0.95  # Ruling E17: the precision the High cutoff is chosen for
+HIGH_CUTOFF_FLOOR = 0.85  # Ruling E17: the High cutoff never goes below this
 MEDIUM_CUTOFF = 0.60
 TIER_CUTOFF_KEYS = ("high", "medium")  # the keys of GateReport.tier_cutoffs, checked by bundle.py
 HIGH_MIN_SHARE = 0.05  # Ruling E13: the cross-half High tier must hold at least 5% of the rows
@@ -108,9 +111,11 @@ def _high_check(high):
     lower = wilson(right / repeats, n / repeats)[0]
     stats = (f"High tier cross-half precision {precision or 0.0:.4f} on {n} of {total} rows "
              f"(Wilson lower bound {lower:.4f}, informational)")
+    if high.get("floored"):
+        stats += f"; High cutoff held at the {HIGH_CUTOFF_FLOOR} floor"
     if high["unreachable"]:
         return _check(False, precision, HIGH_PRECISION,
-                      f"High tier unreachable: no cutoff reaches {HIGH_PRECISION} on a "
+                      f"High tier unreachable: no cutoff reaches {HIGH_CUTOFF_PRECISION} on a "
                       f"calibration half; {stats}")
     if n < floor:
         return _check(False, precision, HIGH_PRECISION,
@@ -262,29 +267,40 @@ def _mean(rows, key):
 
 
 def _high_cutoff(conf, correct):
-    """Smallest cutoff at or above Medium whose rows reach HIGH_PRECISION; (1.01, None) if none."""
-    # ponytail: O(n^2) scan over unique confidences, fine for a few thousand pooled rows.
-    for t in np.unique(conf[conf >= MEDIUM_CUTOFF]):
-        precision = correct[conf >= t].mean()
-        if precision >= HIGH_PRECISION:
-            return float(t), float(precision)
-    return HIGH_UNREACHABLE, None
+    """Ruling E17: (max(HIGH_CUTOFF_FLOOR, t), floored) where t is the smallest confidence whose
+    rows at or above it reach HIGH_CUTOFF_PRECISION and floored says the floor decided;
+    (HIGH_UNREACHABLE, False) when no confidence does."""
+    conf, correct = np.asarray(conf, dtype=float), np.asarray(correct, dtype=bool)
+    if not len(conf):
+        return HIGH_UNREACHABLE, False
+    order = np.argsort(-conf, kind="stable")
+    c = conf[order]
+    precision = np.cumsum(correct[order]) / np.arange(1, len(c) + 1)  # rows >= c[i], ties below
+    last_tie = np.r_[c[1:] != c[:-1], True]  # where the rows >= c[i] are exactly the prefix
+    ok = last_tie & (precision >= HIGH_CUTOFF_PRECISION)
+    if not ok.any():
+        return HIGH_UNREACHABLE, False
+    t = float(c[ok].min())
+    return max(HIGH_CUTOFF_FLOOR, t), t < HIGH_CUTOFF_FLOOR
 
 
 def high_tier_cross_half(probs, labels, in_a) -> dict:
-    """Ruling E13: the High cutoff chosen on one half's calibrated predictions, counted on the
-    other half, both ways. unreachable when a half has no cutoff."""
+    """Ruling E13: the High cutoff chosen on one half's calibrated predictions (by the stored
+    cutoff's rule, Ruling E17), counted on the other half, both ways. unreachable when a half has
+    no cutoff; floored when the 0.85 floor decided a half's cutoff."""
     probs, labels, in_a = np.asarray(probs), np.asarray(labels), np.asarray(in_a, dtype=bool)
     conf, correct = probs.max(1), probs.argmax(1) == labels
     n = right = 0
-    unreachable = False
+    unreachable = floored = False
     for fit, ev in ((in_a, ~in_a), (~in_a, in_a)):
-        cut, _ = _high_cutoff(conf[fit], correct[fit])
+        cut, fl = _high_cutoff(conf[fit], correct[fit])
         unreachable |= cut == HIGH_UNREACHABLE
+        floored |= fl
         m = conf[ev] >= cut
         n += int(m.sum())
         right += int(correct[ev][m].sum())
-    return {"n": n, "correct": right, "total": len(conf), "unreachable": unreachable, "repeats": 1}
+    return {"n": n, "correct": right, "total": len(conf), "unreachable": unreachable,
+            "floored": floored, "repeats": 1}
 
 
 # --- the gate ------------------------------------------------------------------------------------
@@ -372,7 +388,8 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
     high, _ = _high_cutoff(conf, correct)  # the stored cutoff, chosen on all held-out rows
     halves = [high_tier_cross_half(p, labels, in_a) for p, _, in_a in cal]
     high_tier = {k: sum(h[k] for h in halves) for k in ("n", "correct", "total")}
-    high_tier.update(unreachable=any(h["unreachable"] for h in halves), repeats=R)
+    high_tier.update(unreachable=any(h["unreachable"] for h in halves),
+                     floored=any(h["floored"] for h in halves), repeats=R)
     tiers = []
     for name, m in (("High", conf >= high), ("Medium", (conf >= MEDIUM_CUTOFF) & (conf < high)),
                     ("Low", conf < MEDIUM_CUTOFF)):

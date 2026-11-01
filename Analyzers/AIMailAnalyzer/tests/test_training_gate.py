@@ -209,7 +209,7 @@ def test_run_gate_report_contents_and_eligibility():
     assert [t["tier"] for t in report.tiers] == ["High", "Medium", "Low"]
     assert sum(t["n"] for t in report.tiers) == 3 * n
     assert report.tier_cutoffs["medium"] == 0.60
-    assert report.tier_cutoffs["high"] >= 0.60
+    assert report.tier_cutoffs["high"] >= 0.85  # Ruling E17 floor
     assert "dangerous_called_safe" in report.campaign and "fallback" in report.campaign
     assert set(report.baseline) >= {"dangerous_called_safe", "macro_f1",
                                     "campaign_dangerous_called_safe"}
@@ -343,6 +343,34 @@ def test_check5_passes_on_a_well_separated_set():
     check = build_checks(**{**GOOD, "high_tier": high})["high_tier_precision"]
     assert check["passed"] and check["value"] == pytest.approx(1.0)
     assert "Wilson lower bound" in check["detail"]
+
+
+def test_high_cutoff_is_floored_at_085_and_targets_095_precision():
+    # Ruling E17. Every row is right from 0.70 up: the smallest such cutoff is 0.70, floored.
+    conf = np.linspace(0.50, 0.99, 50)
+    assert gate._high_cutoff(conf, conf >= 0.70) == (0.85, True)
+    # Rows from 0.90 up are all right, below 0.90 half are: 0.95 is first reached near 0.90.
+    conf = np.linspace(0.60, 0.99, 400)
+    correct = (conf >= 0.90) | (np.arange(400) % 2 == 0)
+    cut, floored = gate._high_cutoff(conf, correct)
+    assert 0.85 < cut < 0.90 and not floored
+    assert correct[conf >= cut].mean() >= 0.95
+    assert correct[conf >= conf[conf < cut].max()].mean() < 0.95  # the smallest such cutoff
+    assert gate._high_cutoff(np.array([]), np.array([], dtype=bool)) == (1.01, False)
+
+
+def test_check5_names_the_085_floor_when_it_leaves_high_too_small():
+    # Above 0.60 the rows are 91% right (the old rule put High at 0.60), but the 0.85 floor leaves
+    # 30 of 1000 rows in High: below the 5% floor, and the detail says why.
+    conf = np.r_[np.linspace(0.40, 0.55, 370), np.linspace(0.600, 0.605, 54),
+                 np.linspace(0.61, 0.84, 546), np.linspace(0.86, 0.99, 30)]
+    probs, labels = _tier_set(conf, conf >= 0.61)
+    assert (conf >= 0.61).sum() / (conf >= 0.60).sum() >= 0.90
+    high = high_tier_cross_half(probs, labels, _halves(1000))
+    assert high["floored"] and high["n"] == 30
+    check = build_checks(**{**GOOD, "high_tier": high})["high_tier_precision"]
+    assert not check["passed"]
+    assert "0.85 floor" in check["detail"] and "5%" in check["detail"]
 
 
 def test_check5_fails_below_the_high_count_floor():
