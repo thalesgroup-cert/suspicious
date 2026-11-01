@@ -359,6 +359,16 @@ def test_high_cutoff_is_floored_at_085_and_targets_095_precision():
     assert gate._high_cutoff(np.array([]), np.array([], dtype=bool)) == (1.01, False)
 
 
+def test_high_cutoff_judges_a_tied_confidence_as_one_block():
+    # 10 right rows at 0.99, then 20 rows tied at 0.90 of which only the first is right. A prefix
+    # inside the tie (11 of 11 right) reaches 0.95, but a cutoff of 0.90 takes the whole block:
+    # 11 of 30. The cutoff must stay at 0.99.
+    conf = np.r_[np.full(10, 0.99), np.full(20, 0.90)]
+    correct = np.r_[np.ones(11, bool), np.zeros(19, bool)]
+    assert correct[conf >= 0.90].mean() < 0.95
+    assert gate._high_cutoff(conf, correct) == (0.99, False)
+
+
 def test_check5_names_the_085_floor_when_it_leaves_high_too_small():
     # Above 0.60 the rows are 91% right (the old rule put High at 0.60), but the 0.85 floor leaves
     # 30 of 1000 rows in High: below the 5% floor, and the detail says why.
