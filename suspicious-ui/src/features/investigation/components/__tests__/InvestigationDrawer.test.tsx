@@ -249,6 +249,22 @@ describe("InvestigationDrawer - overview", () => {
     expect(screen.queryByText("Not classified")).toBeNull();
   });
 
+  it("an ai_assessment replaces the legacy AI section; null keeps it", () => {
+    const ci = { ...details().case_infos, score_ai: 7, confidence_ai: 80 };
+    const { unmount } = renderWithProviders(
+      <InvestigationDrawer {...props({ detailsQuery: loaded(details({ case_infos: ci, ai_assessment: { result: "Dangerous", sub_class: "CREDENTIAL_PHISHING", tier: "high", runner_up: null, model_version: "v1", analysed_at: "2026-09-21T10:00:00Z", reads: "body only", similar_cases: [], campaign: null, cross_check: { facts: [], disagrees: false } } })) })} />
+    );
+    expect(screen.getByRole("heading", { name: "AI model assessment" })).toBeInTheDocument();
+    expect(screen.queryByText("score 7")).toBeNull();
+    expect(screen.queryByText("AI classifier")).toBeNull();
+    unmount();
+    renderWithProviders(
+      <InvestigationDrawer {...props({ detailsQuery: loaded(details({ case_infos: ci, ai_assessment: null })) })} />
+    );
+    expect(screen.getByText("score 7")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "AI model assessment" })).toBeNull();
+  });
+
   it("nothing ran: stats show a dash and no bar", () => {
     const r = { ...row, tests_done: 0 };
     const d = details({ ...r, analyzer_reports: [], case_infos: { score: 0, confidence: 0, classification: "SAFE" } });

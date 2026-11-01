@@ -1,8 +1,9 @@
 import * as React from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
-import type { SubmissionAnalyzerReport, SubmissionCaseInfos, SubmissionResult, SubmissionRow } from "@/features/submissions/api";
+import type { AiAssessment, SubmissionAnalyzerReport, SubmissionCaseInfos, SubmissionResult, SubmissionRow } from "@/features/submissions/api";
 import { prettyResult, reportSucceeded, riskPalette } from "@/features/submissions/utils";
 import { RiskChip } from "@/features/submissions/components/AnalyzerReportCard";
+import { AiAssessmentSection } from "@/features/submissions/components/AiAssessmentSection";
 import { AllowListSection } from "@/features/submissions/components/AllowListSection";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
@@ -18,10 +19,11 @@ export type OverviewTabProps = {
   observableCount: number;
   noAnalyzersRan: boolean;
   verdictHex?: string;
+  aiAssessment?: AiAssessment | null;
   onSeeAll: () => void;
 };
 
-export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyzersRan, verdictHex, onSeeAll }: OverviewTabProps) {
+export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyzersRan, verdictHex, aiAssessment, onSeeAll }: OverviewTabProps) {
   // Highest-risk successful analyzers above "Low risk": a failed run carries no verdict signal.
   const topRisks = React.useMemo(
     () =>
@@ -91,7 +93,9 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
                 {prettyResult(String(ci.classification ?? "").toUpperCase() as SubmissionResult)}
               </Typography>
             </Box>
-            {hasAi ? (
+            {aiAssessment ? (
+              <AiAssessmentSection assessment={aiAssessment} />
+            ) : hasAi ? (
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>AI classifier</Typography>
                 {aiUnclassified ? (
