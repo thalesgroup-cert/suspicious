@@ -66,11 +66,14 @@ class CaseChallengeService:
         self._record_proposal(proposed)
 
     def _record_proposal(self, proposed: str) -> None:
-        """The reporter's proposal in the label ledger, after the commit; never fails the challenge."""
+        """The reporter's proposal in the label ledger; never fails the challenge. Runs after the
+        challenge's own atomic block but possibly inside a caller's (the token view), so in its own
+        savepoint: a DB error rolls back the ledger write only."""
         from ai_model import ledger
         try:
-            if proposed and ledger.enabled():
-                ledger.record_challenge(self.case, proposed)
+            with transaction.atomic():
+                if proposed and ledger.enabled():
+                    ledger.record_challenge(self.case, proposed)
         except Exception as exc:  # noqa: BLE001 -- the ledger is provenance, the challenge is saved
             logger.warning("label ledger challenge row not written for case %s: %s", self.case.pk,
                            type(exc).__name__)

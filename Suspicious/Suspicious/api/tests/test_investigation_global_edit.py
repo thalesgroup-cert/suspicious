@@ -117,3 +117,16 @@ class InvestigationVerdictLedgerTest(TestCase):
         self.assertEqual(self.case.results, "Safe")
         self.assertIn("RuntimeError", logs.output[0])
         self.assertNotIn("secret@mail.example", logs.output[0])
+
+    @patch("api.views.investigations.emit")
+    def test_a_ledger_db_error_keeps_the_verdict(self, _emit):
+        from django.db import IntegrityError, transaction
+        from ai_model.models import LabelRecord
+        self._enable(True)
+        with patch.object(LabelRecord, "_save_table", side_effect=IntegrityError("x")), \
+                self.assertLogs("api.views.investigations", "WARNING"):
+            with transaction.atomic():
+                resp = self._patch()
+        self.assertEqual(resp.status_code, 200)
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.results, "Safe")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 
+from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -91,10 +92,12 @@ def _apply_verdict(case: Case, user, validated: dict, *, notify_reporter: bool =
 
 
 def _record_verdict(case: Case, user, label_class: str) -> None:
-    """The analyst verdict row of the label ledger (ruling D6); its failure never fails the verdict."""
+    """The analyst verdict row of the label ledger (ruling D6); its failure never fails the verdict.
+    Its own savepoint: a DB error rolls back the ledger write only, not a caller's transaction."""
     try:
-        if ledger.enabled():
-            ledger.record_verdict(case, user, label_class)
+        with transaction.atomic():
+            if ledger.enabled():
+                ledger.record_verdict(case, user, label_class)
     except Exception as exc:  # noqa: BLE001 -- the ledger is provenance, the verdict is saved
         logger.warning("label ledger verdict row not written for case %s: %s", case.pk, type(exc).__name__)
 
