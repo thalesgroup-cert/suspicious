@@ -183,11 +183,11 @@ class AiModelConnector(Connector):
         mails, skipped, uidvalidity, last_uid = imap_sync.read_folder(
             imap, folder, since_uid=state.last_uid, limit=FOLDER_BATCH, known_uidvalidity=state.uidvalidity,
         )
-        new = [m for m in mails if not ledger.is_observed(m)]
+        new = [o for o in map(ledger.prepare_folder_observation, mails) if o is not None]
         answers = {"classifier": [], "campaign": []}
         versions = {}
         for start in range(0, len(new), EMBED_BATCH):
-            texts = [m.text for m in new[start:start + EMBED_BATCH]]
+            texts = [o.mail.text for o in new[start:start + EMBED_BATCH]]
             for profile, vectors in answers.items():
                 answer = client.embed(texts, profile)
                 if len(answer["vectors"]) != len(texts):
@@ -195,9 +195,9 @@ class AiModelConnector(Connector):
                 vectors.extend(answer["vectors"])
                 versions[profile] = answer
         with transaction.atomic():
-            for i, mail in enumerate(new):
+            for i, observation in enumerate(new):
                 ledger.record_folder_observation(
-                    mail, {p: v[i] for p, v in answers.items()},
+                    observation, {p: v[i] for p, v in answers.items()},
                     preprocessing_version=versions["classifier"]["preprocessing_version"],
                     embedding_version=versions["campaign"]["embedding_version"],
                 )

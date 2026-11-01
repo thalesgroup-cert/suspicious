@@ -1,3 +1,4 @@
+import hashlib
 import json
 from collections import defaultdict
 from datetime import datetime, timezone as tz
@@ -25,7 +26,8 @@ def review(folder="2_CLASSIC_PHISHING", message_id="abc.1@evil.example", uid=5, 
 
 
 def observe(mail):
-    return ledger.record_folder_observation(mail, VECTORS, **VERSIONS)
+    observation = ledger.prepare_folder_observation(mail)
+    return observation and ledger.record_folder_observation(observation, VECTORS, **VERSIONS)
 
 
 class RecordFolderObservationTest(TestCase):
@@ -85,10 +87,47 @@ class RecordFolderObservationTest(TestCase):
         row = observe(review(message_id="nobody@nowhere.example", inner_message_ids=("inner.1@evil.example",)))
         self.assertEqual(row.case, case)
 
-    def test_no_message_id_matches_on_sender_date_subject_and_keys_on_the_uid(self):
+    def test_no_message_id_matches_on_sender_date_subject_and_keys_on_the_content(self):
         case = self.make_case()
         row = observe(review(message_id=""))
         self.assertEqual((row.case, row.message_id), (case, ""))
-        self.assertEqual(row.message_id_hash, message_id_hash("no-message-id:2_CLASSIC_PHISHING:7:5"))
-        self.assertIsNone(observe(review(message_id="")))
-        self.assertIsNotNone(observe(review(message_id="", uid=6)))
+        key = ("no-message-id:bob@evil.example|2026-05-01T10:00:00+00:00|urgent: verify|"
+               + hashlib.sha256(b"body").hexdigest())
+        self.assertEqual(row.message_id_hash, message_id_hash(key))
+        self.assertEqual(LabelRecord.objects.get().source_ref, "2_CLASSIC_PHISHING:7:5")
+
+    def test_no_message_id_survives_a_uidvalidity_reset_and_a_move(self):
+        first = observe(review(message_id=""))
+        self.assertIsNone(observe(review(message_id="", uid=40, uidvalidity=8)))
+        moved = observe(review(message_id="", folder="1_SPAM", uid=3))
+        first.refresh_from_db()
+        self.assertEqual((first.status, moved.status), ("superseded", "active"))
+        self.assertIsNotNone(observe(review(message_id="", uid=6, text="another body")))
+
+    def test_moved_back_reactivates_the_first_folder(self):
+        a = observe(review())
+        b = observe(review(folder="1_SPAM"))
+        again = observe(review(uid=77))
+        a.refresh_from_db(), b.refresh_from_db()
+        self.assertEqual((a.status, b.status, again.status), ("superseded", "superseded", "active"))
+        self.assertEqual(again.label, "2_CLASSIC_PHISHING")
+
+    def test_a_flagged_row_reread_adds_no_trainable_row(self):
+        row = observe(review())
+        LabelRecord.objects.filter(pk=row.pk).update(status="flagged", flag_reason="verdict_conflict")
+        self.assertIsNone(observe(review(uid=78)))
+        self.assertFalse(any(r.trainable for r in LabelRecord.objects.all()))
+
+    def test_record_rechecks_for_a_concurrent_write(self):
+        observation = ledger.prepare_folder_observation(review())
+        observe(review())  # another run got there between the pre-pass and the write
+        self.assertIsNone(ledger.record_folder_observation(observation, VECTORS, **VERSIONS))
+        self.assertEqual(LabelRecord.objects.count(), 1)
+
+    def test_prepare_does_the_matching_and_the_snapshot(self):
+        case = self.make_case()
+        observation = ledger.prepare_folder_observation(review())
+        self.assertEqual((observation.case, observation.snapshot["sender_domain"]), (case, "evil.example"))
+        observe(review())
+        self.assertIsNone(ledger.prepare_folder_observation(review(uid=9)))
+        self.assertIsNone(ledger.prepare_folder_observation(review(folder="9_ODD")))
