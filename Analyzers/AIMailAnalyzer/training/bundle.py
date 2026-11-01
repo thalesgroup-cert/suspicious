@@ -15,6 +15,7 @@ import errno
 import re
 import shutil
 import stat
+import struct
 import tempfile
 import zipfile
 from dataclasses import dataclass
@@ -219,19 +220,21 @@ def _read_file(dir_fd, name, rel, spent):
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
             raise BundleError(f"{rel}: not a plain regular file")
-        cap = _cap(rel)
-        chunks, n = [], 0
-        while True:
-            chunk = os.read(fd, min(1 << 20, cap + 1 - n))
+        cap = min(_cap(rel), MAX_TOTAL - spent)
+        if st.st_size > cap:
+            raise BundleError(f"{rel}: size above the per-file cap" if st.st_size > _cap(rel)
+                              else "bundle size above the total cap")
+        parts, n = [], 0
+        while True:  # one allocation of at most cap + 1 bytes per read, no list of chunks
+            chunk = os.read(fd, min(cap, st.st_size) + 1 - n)
             if not chunk:
                 break
-            chunks.append(chunk)
+            parts.append(chunk)
             n += len(chunk)
             if n > cap:
-                raise BundleError(f"{rel}: size above the per-file cap")
-            if spent + n > MAX_TOTAL:
-                raise BundleError("bundle size above the total cap")
-        return b"".join(chunks), spent + n
+                raise BundleError(f"{rel}: size above the per-file cap" if n > _cap(rel)
+                                  else "bundle size above the total cap")
+        return (parts[0] if len(parts) == 1 else b"".join(parts)), spent + n
     finally:
         os.close(fd)
 
@@ -280,20 +283,45 @@ def _parse_json(data, rel):
     return obj
 
 
-def _npz_shapes(data, rel, limit):
-    """Stored members only, few of them, total size bounded, and every array header consistent
-    with its member size, checked with Python's zip reader (the same one np.load uses) before any
-    array is read: a deflate bomb or a lying header is never inflated or allocated.
-    Returns {array name: (shape, dtype)}."""
+_EOCD = struct.Struct("<4s4H2LH")  # end of central directory record, no zip64, no comment
+MAX_CD_BYTES = 64 * 1024
+
+
+def _zip_layout_ok(data, rel, max_len):
+    """Parse the end record ourselves, before zipfile builds one ZipInfo per directory entry (a
+    flood of empty entries would otherwise cost far more memory than the file). Accept only the
+    layout np.savez writes: local headers from byte 0, the directory right after the last member,
+    the end record last, no comment, no zip64."""
+    if len(data) > max_len:
+        raise BundleError(f"{rel}: archive too large")
+    if data[:4] != b"PK\x03\x04" or len(data) < _EOCD.size:
+        raise BundleError(f"{rel}: archive does not start at a local header")
+    sig, disk, cd_disk, n_disk, n_total, cd_size, cd_off, clen = _EOCD.unpack(data[-_EOCD.size:])
+    if sig != b"PK\x05\x06" or disk or cd_disk or n_disk != n_total or clen:
+        raise BundleError(f"{rel}: archive end record not accepted")
+    if n_total > MAX_ZIP_MEMBERS:
+        raise BundleError(f"{rel}: too many archive entries")
+    if cd_size > MAX_CD_BYTES or cd_off + cd_size != len(data) - _EOCD.size:
+        raise BundleError(f"{rel}: archive directory not accepted")
+
+
+def _npz_shapes(data, rel, max_len):
+    """Stored members only, laid out as np.savez writes them, and every array header exactly
+    consistent with its member size, all checked before any array is read: a deflate bomb, a
+    directory flood or a lying header is never inflated or allocated. Returns
+    {array name: (shape, dtype)}."""
+    _zip_layout_ok(data, rel, max_len)
     out = {}
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             infos = z.infolist()
-            if (len(infos) > MAX_ZIP_MEMBERS or any(i.compress_type != zipfile.ZIP_STORED for i in infos)
-                    or sum(i.file_size for i in infos) > limit):
-                raise BundleError(f"{rel}: archive members not plain or too large")
+            if any(i.compress_type != zipfile.ZIP_STORED for i in infos):
+                raise BundleError(f"{rel}: archive members not stored")
+            if min((i.header_offset for i in infos), default=0) != 0:
+                raise BundleError(f"{rel}: data before the first member")
             for i in infos:
-                if not i.filename.endswith(".npy") or i.filename in out:
+                name = i.filename[:-4]
+                if not i.filename.endswith(".npy") or name in out:
                     raise BundleError(f"{rel}: unexpected archive member")
                 with z.open(i) as f:
                     ver = np.lib.format.read_magic(f)
@@ -302,9 +330,12 @@ def _npz_shapes(data, rel, limit):
                     read = (np.lib.format.read_array_header_1_0 if ver == (1, 0)
                             else np.lib.format.read_array_header_2_0)
                     shape, _, dtype = read(f)
-                if dtype.hasobject or math.prod(shape) * dtype.itemsize > i.file_size:
+                    header_len = f.tell()
+                if dtype.hasobject or any(d < 0 for d in shape):
+                    raise BundleError(f"{rel}: array header not accepted")
+                if header_len + math.prod(shape) * dtype.itemsize != i.file_size or i.file_size != i.compress_size:
                     raise BundleError(f"{rel}: array header does not fit the member")
-                out[i.filename[:-4]] = (shape, dtype)
+                out[name] = (shape, dtype)
     except BundleError:
         raise
     except Exception:

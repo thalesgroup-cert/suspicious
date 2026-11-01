@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import os
 import re
@@ -511,7 +512,7 @@ def test_torch_load_not_called_and_not_in_source(bdir):
 
 
 _PROBE = textwrap.dedent("""
-    import resource, sys
+    import sys
     sys.path.insert(0, %r)
     from training.bundle import read_bundle, BundleError
     try:
@@ -519,7 +520,9 @@ _PROBE = textwrap.dedent("""
         r = "ok"
     except BundleError:
         r = "refused"
-    print(r, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    # VmHWM, not ru_maxrss: a forked child inherits the parent's peak in ru_maxrss
+    hwm = [l for l in open("/proc/self/status") if l.startswith("VmHWM:")][0].split()[1]
+    print(r, hwm)
 """) % str(Path(bundle_mod.__file__).parent.parent)
 
 
@@ -551,6 +554,7 @@ def test_fake_central_directory_before_end_record(bdir):
     """The reviewer's differential: a bomb zip (and a forged directory) in front of the real
     archive. Python's reader sees only the real one; either way nothing inflates."""
     p = bdir / "heads" / "safe.npz"
+    base = _probe(bdir)  # clean bundle, before anything is rewritten
     legit = p.read_bytes()
     _bomb_zip(bdir / "bomb.tmp")
     bomb = (bdir / "bomb.tmp").read_bytes()
@@ -559,7 +563,6 @@ def test_fake_central_directory_before_end_record(bdir):
     forged = bomb[i:]  # central directory + end record of the bomb
     p.write_bytes(bomb[:i] + forged[:-22] + legit)
     _rehash(bdir, "heads/safe.npz")
-    base = _probe(bdir)
     res, mb = _probe(bdir)
     assert res in ("ok", "refused") and mb - base[1] < 100
 
@@ -568,8 +571,11 @@ def test_fifo_refused_without_blocking(bdir):
     (bdir / "campaign_profile.json").unlink()
     os.mkfifo(bdir / "campaign_profile.json")
 
+    class Blocked(Exception):  # not an OSError, so read_bundle cannot swallow it
+        pass
+
     def boom(*_):
-        raise TimeoutError("read_bundle blocked on a FIFO")
+        raise Blocked("read_bundle blocked on a FIFO")
 
     old = signal.signal(signal.SIGALRM, boom)
     signal.alarm(5)
@@ -682,3 +688,160 @@ def test_missing_parent_is_bundle_error(tmp_path):
 def test_temperature_range_is_recipe_bounds():
     from training import recipe
     assert bundle_mod.TEMPERATURE_RANGE == tuple(float(x) for x in recipe.T_BOUNDS)
+
+
+# --- fix wave 3 -----------------------------------------------------------------------------------
+
+import struct
+
+_CD = struct.Struct("<4s4B4HL2L5H2L")  # central directory entry, 46 bytes
+
+
+def _flood(path, n=1_000_000):
+    """A local header, then n empty central directory entries and an end record."""
+    entry = _CD.pack(b"PK\x01\x02", 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    cd = entry * n
+    eocd = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 65535, 65535, len(cd) & 0xFFFFFFFF, 30, 0)
+    Path(path).write_bytes(b"PK\x03\x04" + bytes(26) + cd + eocd)
+
+
+@pytest.mark.parametrize("rel", ["heads/safe.npz", "knn_index.npz"])
+def test_directory_flood_small_rss(bdir, rel):
+    base = _probe(bdir)  # measured before the file is rewritten
+    assert base[0] == "ok"
+    _flood(bdir / rel)
+    assert 40 * 2**20 < (bdir / rel).stat().st_size < 50 * 2**20
+    _rehash(bdir, rel)
+    res, mb = _probe(bdir)
+    assert res == "refused" and mb - base[1] < 100
+
+
+def _npy(arr):
+    b = io.BytesIO()
+    np.lib.format.write_array(b, arr, allow_pickle=False)
+    return b.getvalue()
+
+
+def _zip_stored(path, members, extra=b""):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as z:
+            for name, data in members:
+                zi = zipfile.ZipInfo(name)
+                zi.extra = extra
+                z.writestr(zi, data)
+
+
+def _knn_members(emb=None):
+    emb = np.zeros((3, DIM), np.float32) if emb is None else emb
+    return [("embeddings.npy", _npy(emb)), ("label_ids.npy", _npy(np.array([0, 1, 2], np.int64))),
+            ("case_ids.npy", _npy(np.array([1, 2, 3], np.int64)))]
+
+
+def _refuse_knn(bdir, match):
+    _rehash(bdir, "knn_index.npz")
+    with pytest.raises(BundleError, match=match):
+        rb(bdir)
+
+
+def test_knn_valid_handmade_archive_loads(bdir):
+    _zip_stored(bdir / "knn_index.npz", _knn_members())
+    _rehash(bdir, "knn_index.npz")
+    assert rb(bdir).knn.embeddings.shape == (3, DIM)
+
+
+def test_prefix_before_first_member_refused(bdir):
+    p = bdir / "knn_index.npz"
+    p.write_bytes(b"\x93NUMPY\x01\x00" + p.read_bytes())
+    _refuse_knn(bdir, "local header")
+
+
+def test_duplicate_member_refused(bdir):
+    _zip_stored(bdir / "knn_index.npz", _knn_members() + [_knn_members()[0]])
+    _refuse_knn(bdir, "unexpected archive member")
+
+
+def test_lying_central_directory_size_refused(bdir):
+    """The last member is large enough that the header read stops before its end, so zipfile's
+    own CRC check does not fire: only the exact size check sees the lie."""
+    n = 100
+    members = [("label_ids.npy", _npy(np.zeros(n, np.int64))), ("case_ids.npy", _npy(np.arange(n))),
+               ("embeddings.npy", _npy(np.zeros((n, DIM), np.float32)))]
+    p = bdir / "knn_index.npz"
+    _zip_stored(p, members)
+    data = bytearray(p.read_bytes())
+    i = data.rindex(b"PK\x01\x02")
+    fs, = struct.unpack_from("<L", data, i + 24)
+    struct.pack_into("<LL", data, i + 20, fs - 8, fs - 8)  # compress_size, file_size
+    p.write_bytes(bytes(data))
+    _refuse_knn(bdir, "does not fit")
+
+
+def test_sizes_must_agree(bdir):
+    p = bdir / "knn_index.npz"
+    data = bytearray(p.read_bytes())
+    i = data.index(b"PK\x01\x02")
+    fs, = struct.unpack_from("<L", data, i + 24)
+    struct.pack_into("<L", data, i + 20, fs + 1)  # compress_size != file_size
+    p.write_bytes(bytes(data))
+    _refuse_knn(bdir, "does not fit|not a valid archive")
+
+
+def test_65_entries_refused(bdir):
+    _zip_stored(bdir / "knn_index.npz", [(f"a{i}.npy", b"") for i in range(65)])
+    _refuse_knn(bdir, "too many archive entries")
+
+
+def test_64_entries_reach_the_member_checks(bdir):
+    _zip_stored(bdir / "knn_index.npz", [(f"a{i}.npy", b"") for i in range(64)])
+    _refuse_knn(bdir, "not a valid archive")  # past the count check, stopped by the header read
+
+
+def test_npy_version_3_refused(bdir):
+    members = _knn_members()
+    raw = bytearray(members[0][1])
+    raw[6] = 3
+    members[0] = ("embeddings.npy", bytes(raw))
+    _zip_stored(bdir / "knn_index.npz", members)
+    _refuse_knn(bdir, "unsupported array format")
+
+
+def test_member_without_npy_suffix_refused(bdir):
+    members = _knn_members()
+    members[0] = ("embeddings", members[0][1])
+    _zip_stored(bdir / "knn_index.npz", members)
+    _refuse_knn(bdir, "unexpected archive member")
+
+
+def test_head_byte_limit_counts_zip_overhead(bdir):
+    """Valid arrays, but each local header carries a 60 KB extra field: only the byte limit sees it."""
+    sd = _sd()
+    members = [(k, _npy(v.numpy())) for k, v in sd.items()]
+    _zip_stored(bdir / "heads" / "safe.npz", [(k + ".npy", d) for k, d in members], extra=b"\x99\x99" + struct.pack("<H", 60000) + bytes(60000))
+    _rehash(bdir, "heads/safe.npz")
+    with pytest.raises(BundleError, match="safe.npz: archive too large"):
+        rb(bdir)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_knn_non_finite_embeddings_refused(bdir, bad):
+    emb = np.zeros((3, DIM), np.float32)
+    emb[1, 2] = bad
+    _zip_stored(bdir / "knn_index.npz", _knn_members(emb))
+    _refuse_knn(bdir, "embeddings")
+
+
+def test_directory_size_cap(bdir):
+    """A directory entry count within 64 but a directory over 64 KB (long names) is refused."""
+    _zip_stored(bdir / "knn_index.npz", [(("n" * 2000) + f"{i}.npy", b"") for i in range(40)])
+    _refuse_knn(bdir, "directory not accepted")
+
+
+def test_gap_before_directory_refused(bdir):
+    """Junk between the last member and the directory: Python's reader would adjust for it."""
+    p = bdir / "knn_index.npz"
+    data = p.read_bytes()
+    i = data.index(b"PK\x01\x02")
+    p.write_bytes(data[:i] + b"junkjunk" + data[i:])
+    _refuse_knn(bdir, "directory not accepted")
