@@ -85,14 +85,14 @@ class LabelSyncIncomplete(Exception):
     retryable = False
 
 
-def _embed(client, texts: list[str], started: float) -> tuple[dict, dict]:
+def _embed(client, texts: list[str], started: float, budget) -> tuple[dict, dict]:
     """({profile: [vector, ...]}, versions) for both profiles, in batches of EMBED_BATCH.
     EmbedRefused on a 4xx, an answer that does not fit the batch or versions changing within it;
     _BudgetSpent when the time budget runs out before a later batch."""
     vectors = {"classifier": [], "campaign": []}
     seen = {"classifier": set(), "campaign": set()}
     for start in range(0, len(texts), EMBED_BATCH):
-        if start and monotonic() - started >= TIME_BUDGET_SECONDS:
+        if start and budget is not None and monotonic() - started >= budget:
             raise _BudgetSpent
         batch = texts[start:start + EMBED_BATCH]
         for profile in vectors:
@@ -190,7 +190,7 @@ class AiModelConnector(Connector):
             return _inconclusive(str(exc))
         return result_from_server(payload)
 
-    def sync(self) -> None:
+    def sync(self, *, unlimited: bool = False) -> None:
         """Nightly label sync: read the review folders (read-only) into the label ledger.
 
         Each folder is read in chunks of CHUNK mails, up to FOLDER_BATCH per run. A chunk is
@@ -198,7 +198,7 @@ class AiModelConnector(Connector):
         failure leaves earlier chunks committed and the next run resumes after them. The run
         stops cleanly once TIME_BUDGET_SECONDS have passed (checked between chunks), under
         Celery's 540 s soft limit, also between embed batches (the cut chunk is not committed);
-        a full backfill is the Task 7 command. A folder that cannot be read is skipped. A folder
+        unlimited (the backfill command) lifts the per-folder cap and the time budget. A folder that cannot be read is skipped. A folder
         whose embed is refused (4xx, inconsistent answer) is skipped too, and once the other
         folders ran LabelSyncIncomplete (not retried) fails the delivery. A failed login, a lost
         connection or an unavailable embed endpoint raises at once and fails the run.
@@ -207,6 +207,8 @@ class AiModelConnector(Connector):
         if not host:
             return
         started = monotonic()
+        cap = None if unlimited else FOLDER_BATCH
+        budget = None if unlimited else TIME_BUDGET_SECONDS
         client = self._client()
         folders = [f.strip() for f in (self.config.get("imap_folders") or "").split(",") if f.strip()]
         imap = imap_sync.connect(
@@ -220,7 +222,7 @@ class AiModelConnector(Connector):
                     logger.warning("ai_model sync: folder %s has no known class, skipped", ascii(folder)[:64])
                     continue
                 try:
-                    if not self._sync_folder(imap, client, folder, started):
+                    if not self._sync_folder(imap, client, folder, started, cap, budget):
                         logger.info("ai_model sync: time budget spent, stopping at %s", ascii(folder)[:64])
                         break
                 except imap_sync.FolderUnavailable as exc:
@@ -237,22 +239,22 @@ class AiModelConnector(Connector):
             names = ", ".join(ascii(f)[:64] for f in refused)
             raise LabelSyncIncomplete(f"embed refused for {len(refused)} folder(s): {names}")
 
-    def _sync_folder(self, imap, client, folder: str, started: float) -> bool:
+    def _sync_folder(self, imap, client, folder: str, started: float, cap, budget) -> bool:
         """Sync one folder chunk by chunk; False once the time budget is spent."""
         state, _ = LabelSyncState.objects.get_or_create(folder=folder)
         examined_total, skipped_total = 0, 0
-        while examined_total < FOLDER_BATCH:
-            if monotonic() - started >= TIME_BUDGET_SECONDS:
+        while cap is None or examined_total < cap:
+            if budget is not None and monotonic() - started >= budget:
                 return False
             mails, skipped, uidvalidity, last_uid = imap_sync.read_folder(
-                imap, folder, since_uid=state.last_uid, limit=min(CHUNK, FOLDER_BATCH - examined_total),
+                imap, folder, since_uid=state.last_uid, limit=CHUNK if cap is None else min(CHUNK, cap - examined_total),
                 known_uidvalidity=state.uidvalidity,
             )
             examined = len(mails) + skipped
             examined_total, skipped_total = examined_total + examined, skipped_total + skipped
             new = [o for o in map(ledger.prepare_folder_observation, mails) if o is not None]
             try:
-                vectors, versions = _embed(client, [o.mail.text for o in new], started)
+                vectors, versions = _embed(client, [o.mail.text for o in new], started, budget)
             except _BudgetSpent:
                 return False
             with transaction.atomic():
