@@ -145,7 +145,7 @@ class RecordVerdictTest(CaseMixin, TestCase):
         case = self.make_case()
         row = ledger.record_verdict(case, self.user, "Safe")
         self.assertEqual((row.source, row.trust, row.source_ref, row.label, row.label_class, row.status),
-                         ("analyst_verdict", "verdict", "u", "Safe", "Safe", "active"))
+                         ("analyst_verdict", "verdict", f"user:{self.user.pk}", "Safe", "Safe", "active"))
         self.assertEqual((row.message_id, row.message_id_hash, row.case),
                          ("abc.1@evil.example", message_id_hash("abc.1@evil.example"), case))
         self.assertFalse(row.trainable)
@@ -175,7 +175,8 @@ class RecordChallengeTest(CaseMixin, TestCase):
     def test_creates_a_proposal_row_never_trainable(self):
         case = self.make_case()
         row = ledger.record_challenge(case, "Safe")
-        self.assertEqual((row.source, row.trust, row.label_class, row.case), ("challenge", "proposal", "Safe", case))
+        self.assertEqual((row.source, row.trust, row.label_class, row.case, row.source_ref),
+                         ("challenge", "proposal", "Safe", case, ""))
         self.assertEqual(row.message_id, "abc.1@evil.example")
         self.assertFalse(row.trainable)
 

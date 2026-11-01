@@ -191,7 +191,7 @@ def record_verdict(case, user, label_class) -> LabelRecord | None:
         message_id, message_hash = _case_key(case)
         row = LabelRecord.objects.create(
             message_id=message_id, message_id_hash=message_hash, case=case,
-            source=LabelRecord.Source.ANALYST_VERDICT, source_ref=user.get_username()[:255],
+            source=LabelRecord.Source.ANALYST_VERDICT, source_ref=f"user:{user.pk}",
             label=label_class, label_class=label_class, trust=LabelRecord.Trust.VERDICT,
         )
         folder_classes = [f for f, v in CONFLICT.items() if v == label_class]

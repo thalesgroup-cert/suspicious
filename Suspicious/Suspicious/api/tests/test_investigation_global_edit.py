@@ -85,7 +85,7 @@ class InvestigationVerdictLedgerTest(TestCase):
         self.assertEqual(self._patch().status_code, 200)
         row = LabelRecord.objects.get()
         self.assertEqual((row.case, row.source, row.label_class, row.source_ref),
-                         (self.case, "analyst_verdict", "Safe", "vl_analyst"))
+                         (self.case, "analyst_verdict", "Safe", f"user:{self.analyst.pk}"))
 
     @patch("api.views.investigations.emit")
     def test_disabled_writes_nothing(self, _emit):

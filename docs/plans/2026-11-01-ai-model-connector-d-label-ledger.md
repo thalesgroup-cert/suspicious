@@ -104,7 +104,7 @@
 **Files:** Modify `ai_model/ledger.py`, `api/views/investigations.py` (`_apply_verdict`), `tasp/services/challenge.py` (`mark_challenged`), tests `ai_model/tests/test_ledger.py`, `api/tests/` (verdict hook), `tasp/tests/` (challenge hook).
 
 - [ ] **1. Tests first:**
-  - `record_verdict(case, user, "Safe")` creates `source="analyst_verdict"`, `trust="verdict"`, `source_ref` = the username, `message_id` from the case's mail (empty when none); an identical later verdict adds nothing, a different one adds a row and supersedes the older verdict row.
+  - `record_verdict(case, user, "Safe")` creates `source="analyst_verdict"`, `trust="verdict"`, `source_ref` = `"user:<pk>"` (no username or address in the ledger), `message_id` from the case's mail (empty when none); an identical later verdict adds nothing, a different one adds a row and supersedes the older verdict row.
   - `record_challenge(case, "Safe")` creates `source="challenge"`, `trust="proposal"`; a blank proposal creates nothing; a proposal row is never `trainable`.
   - Conflict rule: an active folder row of class Dangerous and a verdict row of class Safe for the same case (and the reverse) set the folder row to `flagged` with `flag_reason="folder_verdict_mismatch"`, whichever row arrives second; Unwanted or Suspicious or Inconclusive on either side never flags; a flagged row is not `trainable`.
   - `resolve_flag(record, user, note, keep=True)` sets status `active` and fills the resolution fields; `keep=False` sets `superseded`; resolving an unflagged row raises `ValueError`.
