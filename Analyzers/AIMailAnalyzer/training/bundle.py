@@ -284,6 +284,7 @@ def _parse_json(data, rel):
 
 
 _EOCD = struct.Struct("<4s4H2LH")  # end of central directory record, no zip64, no comment
+_LOCAL = struct.Struct("<26x2H")  # local file header: name and extra field lengths
 MAX_CD_BYTES = 64 * 1024
 
 
@@ -291,18 +292,35 @@ def _zip_layout_ok(data, rel, max_len):
     """Parse the end record ourselves, before zipfile builds one ZipInfo per directory entry (a
     flood of empty entries would otherwise cost far more memory than the file). Accept only the
     layout np.savez writes: local headers from byte 0, the directory right after the last member,
-    the end record last, no comment, no zip64."""
+    the end record last, no comment, no zip64. Returns (claimed entry count, directory offset)."""
     if len(data) > max_len:
         raise BundleError(f"{rel}: archive too large")
     if data[:4] != b"PK\x03\x04" or len(data) < _EOCD.size:
         raise BundleError(f"{rel}: archive does not start at a local header")
     sig, disk, cd_disk, n_disk, n_total, cd_size, cd_off, clen = _EOCD.unpack(data[-_EOCD.size:])
-    if sig != b"PK\x05\x06" or disk or cd_disk or n_disk != n_total or clen:
+    # zipfile follows a zip64 locator right before the end record and then trusts the zip64
+    # record's counts instead; np.savez never writes zip64 end records at these sizes
+    zip64 = (data[-_EOCD.size - 20:-_EOCD.size - 16] == b"PK\x06\x07"
+             or 0xFFFF in (n_disk, n_total) or 0xFFFFFFFF in (cd_size, cd_off))
+    if sig != b"PK\x05\x06" or zip64 or disk or cd_disk or n_disk != n_total or clen:
         raise BundleError(f"{rel}: archive end record not accepted")
     if n_total > MAX_ZIP_MEMBERS:
         raise BundleError(f"{rel}: too many archive entries")
     if cd_size > MAX_CD_BYTES or cd_off + cd_size != len(data) - _EOCD.size:
         raise BundleError(f"{rel}: archive directory not accepted")
+    return n_total, cd_off
+
+
+def _members_contiguous(data, infos, cd_off):
+    """Members back to back from byte 0 and the directory right after the last one: no gaps.
+    Runs after every member was opened (zipfile checked each local header there)."""
+    end = 0
+    for i in sorted(infos, key=lambda i: i.header_offset):
+        if i.header_offset != end:
+            return False
+        nlen, xlen = _LOCAL.unpack_from(data, end)  # z.open already checked each signature
+        end += _LOCAL.size + nlen + xlen + i.compress_size
+    return end == cd_off
 
 
 def _npz_shapes(data, rel, max_len):
@@ -310,15 +328,15 @@ def _npz_shapes(data, rel, max_len):
     consistent with its member size, all checked before any array is read: a deflate bomb, a
     directory flood or a lying header is never inflated or allocated. Returns
     {array name: (shape, dtype)}."""
-    _zip_layout_ok(data, rel, max_len)
+    n_total, cd_off = _zip_layout_ok(data, rel, max_len)
     out = {}
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             infos = z.infolist()
+            if len(infos) != n_total:
+                raise BundleError(f"{rel}: archive entry count does not match the directory")
             if any(i.compress_type != zipfile.ZIP_STORED for i in infos):
                 raise BundleError(f"{rel}: archive members not stored")
-            if min((i.header_offset for i in infos), default=0) != 0:
-                raise BundleError(f"{rel}: data before the first member")
             for i in infos:
                 name = i.filename[:-4]
                 if not i.filename.endswith(".npy") or name in out:
@@ -336,6 +354,8 @@ def _npz_shapes(data, rel, max_len):
                 if header_len + math.prod(shape) * dtype.itemsize != i.file_size or i.file_size != i.compress_size:
                     raise BundleError(f"{rel}: array header does not fit the member")
                 out[name] = (shape, dtype)
+            if not _members_contiguous(data, infos, cd_off):
+                raise BundleError(f"{rel}: archive members not contiguous")
     except BundleError:
         raise
     except Exception:

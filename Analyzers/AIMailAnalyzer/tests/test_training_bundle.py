@@ -480,7 +480,10 @@ def test_head_extra_key_refused(bdir):
 
 
 def test_head_wrong_shape_refused(bdir):
-    _bad_head(bdir, _sd(DIM + 3))
+    _save(bdir / "heads" / "safe.npz", _sd(DIM + 3))
+    _rehash(bdir, "heads/safe.npz")
+    with pytest.raises(BundleError, match="safe.npz: array .* does not match the head"):  # before np.load
+        rb(bdir)
 
 
 def test_head_nan_refused(bdir):
@@ -779,13 +782,20 @@ def test_lying_central_directory_size_refused(bdir):
 
 
 def test_sizes_must_agree(bdir):
+    """compress_size one byte short of file_size on a member larger than zipfile's read buffer
+    (so its CRC check does not fire; a larger compress_size overlaps the next member and zipfile
+    refuses it itself)."""
+    n = 100
+    members = [("label_ids.npy", _npy(np.zeros(n, np.int64))), ("case_ids.npy", _npy(np.arange(n))),
+               ("embeddings.npy", _npy(np.zeros((n, DIM), np.float32)))]
     p = bdir / "knn_index.npz"
+    _zip_stored(p, members)
     data = bytearray(p.read_bytes())
-    i = data.index(b"PK\x01\x02")
+    i = data.rindex(b"PK\x01\x02")
     fs, = struct.unpack_from("<L", data, i + 24)
-    struct.pack_into("<L", data, i + 20, fs + 1)  # compress_size != file_size
+    struct.pack_into("<L", data, i + 20, fs - 1)
     p.write_bytes(bytes(data))
-    _refuse_knn(bdir, "does not fit|not a valid archive")
+    _refuse_knn(bdir, "does not fit")
 
 
 def test_65_entries_refused(bdir):
@@ -845,3 +855,164 @@ def test_gap_before_directory_refused(bdir):
     i = data.index(b"PK\x01\x02")
     p.write_bytes(data[:i] + b"junkjunk" + data[i:])
     _refuse_knn(bdir, "directory not accepted")
+
+
+# --- fix wave 4 -----------------------------------------------------------------------------------
+
+_EOCD = struct.Struct("<4s4H2LH")
+
+
+def _eocd(data):
+    return list(_EOCD.unpack(data[-22:]))
+
+
+def _zip64_flood(legit, n):
+    """The reviewer's bypass: the legit archive's members, then its directory plus n empty
+    entries, a zip64 end record and locator (which zipfile follows), and a 32-bit end record that
+    claims 3 entries and a directory covering only the zip64 record and locator."""
+    _, _, _, _, cnt, csz, coff, _ = _eocd(legit)
+    body = legit[:coff]
+    cd = legit[coff:coff + csz] + _CD.pack(b"PK\x01\x02", 20, 0, 20, 0, *[0] * 14) * n
+    total = cnt + n
+    z64 = struct.pack("<4sQ2H2L4Q", b"PK\x06\x06", 44, 45, 45, 0, 0, total, total, len(cd), len(body))
+    loc = struct.pack("<4sLQL", b"PK\x06\x07", 0, len(body) + len(cd), 1)
+    return body + cd + z64 + loc + _EOCD.pack(b"PK\x05\x06", 0, 0, 3, 3, 76, len(body) + len(cd), 0)
+
+
+def test_zip64_locator_refused(bdir):
+    p = bdir / "knn_index.npz"
+    raw = _zip64_flood(p.read_bytes(), 10)
+    assert len(zipfile.ZipFile(io.BytesIO(raw)).infolist()) == 13  # zipfile follows the locator
+    p.write_bytes(raw)
+    _refuse_knn(bdir, "end record not accepted")
+
+
+@pytest.mark.parametrize("rel,n", [("knn_index.npz", 1_000_000), ("heads/safe.npz", 1000)])
+def test_zip64_directory_flood_small_rss(bdir, rel, n):
+    base = _probe(bdir)  # clean bundle, measured the same way
+    assert base[0] == "ok"
+    p = bdir / rel
+    p.write_bytes(_zip64_flood(p.read_bytes(), n))
+    _rehash(bdir, rel)
+    res, mb = _probe(bdir)
+    assert res == "refused" and mb - base[1] < 100
+
+
+@pytest.mark.parametrize("idx,val", [(3, 0xFFFF), (4, 0xFFFF), (5, 0xFFFFFFFF), (6, 0xFFFFFFFF)])
+def test_zip64_marker_fields_refused(bdir, idx, val):
+    p = bdir / "knn_index.npz"
+    data = p.read_bytes()
+    e = _eocd(data)
+    e[idx] = val
+    p.write_bytes(data[:-22] + _EOCD.pack(*e))
+    _refuse_knn(bdir, "end record not accepted")
+
+
+def test_gap_before_directory_with_shifted_offset_refused(bdir):
+    """16 bytes before the directory, the offset moved to match: flush with the end record, but a
+    gap after the last member."""
+    p = bdir / "knn_index.npz"
+    data = p.read_bytes()
+    e = _eocd(data)
+    e[6] += 16
+    p.write_bytes(data[:e[6] - 16] + bytes(16) + data[e[6] - 16:-22] + _EOCD.pack(*e))
+    assert len(zipfile.ZipFile(p).infolist()) == 3  # zipfile itself reads it fine
+    _refuse_knn(bdir, "members not contiguous")
+
+
+def test_lying_entry_count_refused(bdir):
+    p = bdir / "knn_index.npz"
+    data = p.read_bytes()
+    e = _eocd(data)
+    e[3] = e[4] = 2  # three entries in the directory
+    p.write_bytes(data[:-22] + _EOCD.pack(*e))
+    _refuse_knn(bdir, "entry count")
+
+
+def _npy_header(shape, payload):
+    h = repr({"descr": "<f4", "fortran_order": False, "shape": shape}).encode()
+    h += b" " * (63 - (10 + len(h)) % 64) + b"\n"
+    return b"\x93NUMPY\x01\x00" + struct.pack("<H", len(h)) + h + payload
+
+
+@pytest.mark.parametrize("rel", ["knn_index.npz", "heads/safe.npz"])
+def test_two_negative_dims_refused_before_load(bdir, rel):
+    """(-1, -DIM) has a positive product, so the exact size equation alone accepts it."""
+    bad = ("embeddings.npy" if rel == "knn_index.npz" else "fc1.weight.npy",
+           _npy_header((-1, -DIM), bytes(4 * DIM)))
+    if rel == "knn_index.npz":
+        members = [bad] + _knn_members()[1:]
+    else:
+        members = [(k + ".npy", _npy(v.numpy())) for k, v in _sd(out=NUM_OUT["safe"]).items()]
+        members = [bad if m[0] == bad[0] else m for m in members]
+        assert bad in members
+    _zip_stored(bdir / rel, members)
+    _rehash(bdir, rel)
+    with pytest.raises(BundleError, match="array header not accepted"):  # the header parse, before np.load
+        rb(bdir)
+
+
+@pytest.mark.parametrize("idx,val", [(0, b"PK\x05\x07"), (1, 1), (2, 1), (3, 2), (7, 1)])
+def test_end_record_fields_refused(bdir, idx, val):
+    """Bad signature, disk numbers, per-disk count, comment length: our parse refuses them all."""
+    p = bdir / "knn_index.npz"
+    data = p.read_bytes()
+    e = _eocd(data)
+    e[idx] = val
+    p.write_bytes(data[:-22] + _EOCD.pack(*e))
+    _refuse_knn(bdir, "end record not accepted")
+
+
+def test_member_marked_deflated_refused(bdir):
+    """Stored bytes, but the directory says deflate: refused by the stored check, not by inflate."""
+    p = bdir / "knn_index.npz"
+    data = bytearray(p.read_bytes())
+    i = data.index(b"PK\x01\x02")
+    struct.pack_into("<H", data, i + 10, zipfile.ZIP_DEFLATED)
+    struct.pack_into("<H", data, 8, zipfile.ZIP_DEFLATED)  # first local header too
+    p.write_bytes(bytes(data))
+    _refuse_knn(bdir, "not stored")
+
+
+def test_object_dtype_header_refused(bdir):
+    """An object array header whose size fits the member exactly (8 bytes per item)."""
+    h = repr({"descr": "|O", "fortran_order": False, "shape": (3, DIM)}).encode()
+    h += b" " * (63 - (10 + len(h)) % 64) + b"\n"
+    obj = b"\x93NUMPY\x01\x00" + struct.pack("<H", len(h)) + h + bytes(8 * 3 * DIM)
+    _zip_stored(bdir / "knn_index.npz", [("embeddings.npy", obj)] + _knn_members()[1:])
+    _refuse_knn(bdir, "array header not accepted")
+
+
+def test_gap_between_members_refused(bdir):
+    """16 bytes after the first member, every later offset shifted to match: only the walk over
+    the local headers sees it."""
+    p = bdir / "knn_index.npz"
+    data = p.read_bytes()
+    e = _eocd(data)
+    infos = sorted(zipfile.ZipFile(p).infolist(), key=lambda i: i.header_offset)
+    cut = infos[1].header_offset
+    cd = bytearray(data[e[6]:-22])
+    j = 0
+    while j < len(cd):
+        nl, el, cl = struct.unpack_from("<3H", cd, j + 28)
+        off, = struct.unpack_from("<L", cd, j + 42)
+        if off >= cut:
+            struct.pack_into("<L", cd, j + 42, off + 16)
+        j += 46 + nl + el + cl
+    e[6] += 16
+    p.write_bytes(data[:cut] + bytes(16) + data[cut:e[6] - 16] + bytes(cd) + _EOCD.pack(*e))
+    assert len(zipfile.ZipFile(p).infolist()) == 3
+    _refuse_knn(bdir, "members not contiguous")
+
+
+def test_arrays_loaded_without_pickle(bdir):
+    real = np.load
+    seen = []
+
+    def spy(*a, **kw):
+        seen.append(kw.get("allow_pickle"))
+        return real(*a, **kw)
+
+    with mock.patch.object(np, "load", spy):
+        rb(bdir)
+    assert seen and set(seen) == {False}
