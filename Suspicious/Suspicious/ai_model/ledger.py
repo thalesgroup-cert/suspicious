@@ -96,12 +96,7 @@ def prepare_folder_observation(mail) -> FolderObservation | None:
     message is already observed there, else its key, matched case and snapshot."""
     label_class = class_of(mail.folder)
     message_id, message_hash = _folder_key(mail)
-    if label_class is None:
-        return None
-    if _observed(message_hash, mail.folder):
-        # Back in a folder whose row is flagged (or still active): that row is the label again, so a
-        # row left active in another folder is superseded. The pre-pass's only write.
-        _folder_rows(message_hash).filter(status=ACTIVE).exclude(label=mail.folder).update(status=SUPERSEDED)
+    if label_class is None or _observed(message_hash, mail.folder):
         return None
     case = _match(mail)
     return FolderObservation(mail, message_id, message_hash, label_class, case, _snapshot(mail, case))
@@ -112,13 +107,15 @@ def record_folder_observation(observation: FolderObservation, vectors, *, prepro
     """Append the folder row; None when a concurrent write got there first (re-checked here).
 
     `vectors` is {"classifier": [float, ...], "campaign": [float, ...]}. The new row supersedes
-    the message's active rows in other folders (ruling D5), and is written flagged when it is a
-    hard conflict with the active verdict. Run it in a transaction (the sync's chunk transaction).
+    every other non-superseded row of the message (active or flagged, all in other folders since
+    this one has none; ruling D5): a move is the analysts' newer label, so a flag on the old folder
+    row is moot and the new row is conflict-checked again. It is written flagged when it is a hard
+    conflict with the active verdict. Run it in a transaction (the sync's chunk transaction).
     """
     mail = observation.mail
     if _observed(observation.message_hash, mail.folder):
         return None
-    _folder_rows(observation.message_hash).filter(status=ACTIVE).update(status=SUPERSEDED)
+    _folder_rows(observation.message_hash).exclude(status=SUPERSEDED).update(status=SUPERSEDED)
     conflict = CONFLICT.get(observation.label_class)
     flagged = bool(conflict) and _verdicts_for(observation.case, observation.message_hash).filter(
         label_class=conflict).exists()

@@ -251,15 +251,28 @@ class ConflictTest(CaseMixin, TestCase):
         ledger.record_verdict(case, self.user, "Dangerous")
         self.assertEqual(observe(review()).status, "active")
 
-    def test_moved_back_to_a_flagged_folder_supersedes_the_other_active_row(self):
+    def test_a_move_supersedes_a_flagged_row_and_moving_back_rechecks(self):
         case = self.make_case()
-        flagged = observe(review())
+        first = observe(review())
         ledger.record_verdict(case, self.user, "Safe")
         moved = observe(review(folder="1_SPAM"))
-        self.assertIsNone(observe(review(uid=80)))
+        first.refresh_from_db()
+        self.assertEqual((first.status, first.flag_reason, moved.status),
+                         ("superseded", "folder_verdict_mismatch", "active"))
+        back = observe(review(uid=80))
         moved.refresh_from_db()
         self.assertEqual(moved.status, "superseded")
-        self.assert_flagged(flagged)
+        self.assertNotEqual(back.pk, first.pk)
+        self.assert_flagged(back)
+
+    def test_the_pre_pass_writes_nothing(self):
+        case = self.make_case()
+        observe(review())
+        ledger.record_verdict(case, self.user, "Safe")
+        LabelRecord.objects.create(message_id="abc.1@evil.example", message_id_hash=message_id_hash(
+            "abc.1@evil.example"), source="imap_folder", label="1_SPAM", label_class="Unwanted", trust="folder")
+        self.assertIsNone(ledger.prepare_folder_observation(review(uid=80)))
+        self.assertEqual(LabelRecord.objects.get(label="1_SPAM").status, "active")
 
 
 class ResolveFlagTest(CaseMixin, TestCase):
@@ -279,12 +292,13 @@ class ResolveFlagTest(CaseMixin, TestCase):
         self.assertIsNotNone(row.resolved_at)
         self.assertTrue(row.trainable)
 
-    def test_keep_supersedes_a_row_active_in_another_folder(self):
+    def test_a_superseded_row_is_never_reactivated(self):
         row = self.flagged()
-        moved = observe(review(folder="1_SPAM"))
-        ledger.resolve_flag(row, self.user, "", keep=True)
-        moved.refresh_from_db()
-        self.assertEqual(moved.status, "superseded")
+        observe(review(folder="1_SPAM"))
+        row.refresh_from_db()
+        self.assertEqual(row.status, "superseded")
+        with self.assertRaises(ValueError):
+            ledger.resolve_flag(row, self.user, "", keep=True)
 
     def test_drop_supersedes(self):
         row = self.flagged()
