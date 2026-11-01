@@ -35,6 +35,7 @@ MACRO_F1_TOLERANCE = 0.02
 MAX_ECE = 0.12  # Ruling E6
 HIGH_PRECISION = 0.90
 MEDIUM_CUTOFF = 0.60
+TIER_CUTOFF_KEYS = ("high", "medium")  # the keys of GateReport.tier_cutoffs, checked by bundle.py
 HIGH_MIN_SHARE = 0.05  # Ruling E13: the cross-half High tier must hold at least 5% of the rows
 RESAMPLING_SKIPPED = "resampling_skipped"
 HIGH_UNREACHABLE = 1.01
@@ -393,7 +394,7 @@ def run_gate(X, folders, groups_dup, groups_campaign, *, baseline_recipe, recipe
     return GateReport(
         checks=checks, seeds=seeds, counts=counts, per_class=per_class,
         confusion_matrix=cm.tolist(), tiers=tiers,
-        tier_cutoffs={"high": high, "medium": MEDIUM_CUTOFF},
+        tier_cutoffs=dict(zip(TIER_CUTOFF_KEYS, (high, MEDIUM_CUTOFF))),
         campaign={"dangerous_called_safe": camp_ds, "baseline_dangerous_called_safe": camp_base_ds,
                   "groups": int(len(np.unique(merged))), "fallback": camp_fallback},
         baseline=baseline, candidate=candidate, fallback=fallback,
