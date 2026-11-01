@@ -110,32 +110,33 @@ def record_folder_observation(observation: FolderObservation, vectors, *, prepro
     every other non-superseded row of the message (active or flagged, all in other folders since
     this one has none; ruling D5): a move is the analysts' newer label, so a flag on the old folder
     row is moot and the new row is conflict-checked again. It is written flagged when it is a hard
-    conflict with the active verdict. Run it in a transaction (the sync's chunk transaction).
+    conflict with the active verdict. Runs in a transaction (savepoint inside the sync's chunk).
     """
     mail = observation.mail
-    if _observed(observation.message_hash, mail.folder):
-        return None
-    _folder_rows(observation.message_hash).exclude(status=SUPERSEDED).update(status=SUPERSEDED)
-    conflict = CONFLICT.get(observation.label_class)
-    flagged = bool(conflict) and _verdicts_for(observation.case, observation.message_hash).filter(
-        label_class=conflict).exists()
-    return LabelRecord.objects.create(
-        message_id=observation.message_id,
-        message_id_hash=observation.message_hash,
-        case=observation.case,
-        source=LabelRecord.Source.IMAP_FOLDER,
-        source_ref=f"{mail.folder}:{mail.uidvalidity}:{mail.uid}",
-        label=mail.folder,
-        label_class=observation.label_class,
-        trust=LabelRecord.Trust.FOLDER,
-        embedding=json.dumps(vectors["classifier"]),
-        preprocessing_version=preprocessing_version,
-        campaign_embedding=json.dumps(vectors["campaign"]),
-        embedding_version=embedding_version,
-        snapshot=observation.snapshot,
-        status=FLAGGED if flagged else ACTIVE,
-        flag_reason=MISMATCH if flagged else "",
-    )
+    with transaction.atomic():
+        if _observed(observation.message_hash, mail.folder):
+            return None
+        _folder_rows(observation.message_hash).exclude(status=SUPERSEDED).update(status=SUPERSEDED)
+        conflict = CONFLICT.get(observation.label_class)
+        locked = _conflicting_verdicts(observation.case, observation.message_hash, conflict) if conflict else []
+        flagged = bool(list(locked))
+        return LabelRecord.objects.create(
+            message_id=observation.message_id,
+            message_id_hash=observation.message_hash,
+            case=observation.case,
+            source=LabelRecord.Source.IMAP_FOLDER,
+            source_ref=f"{mail.folder}:{mail.uidvalidity}:{mail.uid}",
+            label=mail.folder,
+            label_class=observation.label_class,
+            trust=LabelRecord.Trust.FOLDER,
+            embedding=json.dumps(vectors["classifier"]),
+            preprocessing_version=preprocessing_version,
+            campaign_embedding=json.dumps(vectors["campaign"]),
+            embedding_version=embedding_version,
+            snapshot=observation.snapshot,
+            status=FLAGGED if flagged else ACTIVE,
+            flag_reason=MISMATCH if flagged else "",
+        )
 
 
 def _stored_mail(case):
@@ -157,6 +158,15 @@ def _verdicts_for(case, message_hash: str):
     """Active verdict rows a folder row of this case (or, unmatched, this message) is checked against."""
     rows = LabelRecord.objects.filter(source=LabelRecord.Source.ANALYST_VERDICT, status=ACTIVE)
     return rows.filter(case=case) if case is not None else rows.filter(message_id_hash=message_hash)
+
+
+def _conflicting_verdicts(case, message_hash: str, verdict_class: str):
+    """The active verdict rows of that class, read with a row lock inside the caller's transaction so
+    a verdict change cannot commit between this check and the folder row's insert.
+    ponytail: locks existing rows only; a verdict row inserted by a transaction still open at that
+    moment can be missed (next-key locking depends on the index the read uses), leaving that pair
+    unflagged. A periodic re-check over active pairs closes it if it is ever seen."""
+    return _verdicts_for(case, message_hash).filter(label_class=verdict_class).select_for_update()
 
 
 def _folders_for(case, message_hash: str):

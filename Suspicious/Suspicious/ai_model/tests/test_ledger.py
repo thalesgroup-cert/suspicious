@@ -220,6 +220,11 @@ class ConflictTest(CaseMixin, TestCase):
         ledger.record_verdict(other, self.user, "Dangerous")
         self.assert_flagged(observe(review(folder="0_LEGIT_EXTERNAL_COMMUNICATION", message_id="other.2@evil.example")))
 
+    def test_the_folder_second_check_locks_the_verdict_rows(self):
+        # The test database is SQLite, which drops FOR UPDATE; check the queryset asks for it.
+        case = self.make_case()
+        self.assertTrue(ledger._conflicting_verdicts(case, "h", "Safe").query.select_for_update)
+
     def test_soft_classes_never_flag(self):
         case = self.make_case()
         spam = observe(review(folder="1_SPAM"))
