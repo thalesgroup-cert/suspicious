@@ -1,12 +1,19 @@
 """Backfill the label ledger from what already exists: a verdict row for every case an analyst
-last updated, a proposal row for every challenged case, and (--folders) the whole review folders
-with no per-run cap and no time budget. Prints counts only, never mail data.
+last updated that has no verdict row yet, a proposal row for every challenged case, a late case
+match for folder rows that matched no case, and (--folders) the whole review folders with no
+per-run cap and no time budget. Prints counts only, never mail data.
+
+History before the ledger cannot tell an analyst's edit from a later re-score (Redo analysis keeps
+last_update_by), so a backfilled verdict is the case's current class under its last editor, dated
+at the case's last update. A case that already has a verdict row (any status) is skipped, so the
+backfill never supersedes a verdict recorded live.
 
 Idempotent: a rerun adds nothing for what is recorded. A database error in the verdict or
 proposal loops is not caught: the command fails loudly and a rerun continues."""
 from django.core.management.base import BaseCommand, CommandError
 
 from ai_model import ledger
+from ai_model.messageid import match_case
 from ai_model.models import LabelRecord
 from case_handler.models import Case, ProposedVerdict
 from connectors.contrib.ai_model import imap_sync
@@ -46,11 +53,11 @@ class Command(BaseCommand):
         for case in cases.iterator(chunk_size=CHUNK):
             if case.results not in LabelRecord.LabelClass.values:
                 continue
-            if self._has(case, LabelRecord.Source.ANALYST_VERDICT, case.results):
-                continue
+            if LabelRecord.objects.filter(case=case, source=LabelRecord.Source.ANALYST_VERDICT).exists():
+                continue  # recorded live or by an earlier backfill: never rewrite it
             verdicts += 1
             if not dry:
-                ledger.record_verdict(case, case.last_update_by, case.results)
+                ledger.record_verdict(case, case.last_update_by, case.results, observed_at=case.last_update)
         challenged = Case.objects.exclude(challenge_proposed_result="").select_related(*RELATED)
         for case in challenged.iterator(chunk_size=CHUNK):
             proposed = case.challenge_proposed_result
@@ -64,6 +71,8 @@ class Command(BaseCommand):
                 ledger.record_challenge(case, proposed)
         verb = "would create" if dry else "created"
         self.stdout.write(f"{verb} {verdicts} verdict row(s), {proposals} proposal row(s)")
+        rematched = self._rematch(dry)
+        self.stdout.write(f"{'would re-match' if dry else 're-matched'} {rematched} folder row(s)")
 
         if opts["folders"]:
             if dry:
@@ -78,6 +87,24 @@ class Command(BaseCommand):
             except (imap_sync.ImapLoginFailed, imap_sync.ImapConnectionLost, ProviderUnavailable) as exc:
                 raise CommandError(type(exc).__name__) from None
             self.stdout.write(f"folders synced: {folder_rows.count() - before} folder row(s) created")
+
+    @staticmethod
+    def _rematch(dry: bool) -> int:
+        """Set the case of folder rows that matched no case when they were read, by their stored
+        Message-ID (a row without one cannot be matched again). Only null to a case."""
+        rows = LabelRecord.objects.filter(
+            source=LabelRecord.Source.IMAP_FOLDER, case__isnull=True,
+        ).exclude(message_id="").only("pk", "message_id")
+        n = 0
+        for row in rows.iterator(chunk_size=CHUNK):
+            case = match_case(row.message_id)
+            if case is None:
+                continue
+            if dry:
+                n += 1
+            else:
+                n += LabelRecord.objects.filter(pk=row.pk, case__isnull=True).update(case=case)
+        return n
 
     @staticmethod
     def _has(case, source, label_class) -> bool:

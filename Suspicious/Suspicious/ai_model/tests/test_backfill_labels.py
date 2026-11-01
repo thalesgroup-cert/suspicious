@@ -8,6 +8,8 @@ from django.core.management.base import CommandError
 
 from django.test import TestCase
 
+from ai_model import ledger
+from ai_model.messageid import message_id_hash
 from ai_model.models import LabelRecord
 from case_handler.models import Case
 from ai_model.tests.test_label_sync import CONFIG, PHISH, embed_answer
@@ -121,3 +123,60 @@ class BackfillLabelsTest(CaseMixin, TestCase):
                 mock.patch.object(module.AiInferenceClient, "embed", side_effect=embed_answer):
             self.assertIn("0 folder row", self.run_command("--folders"))
         self.assertEqual(LabelRecord.objects.filter(source="imap_folder").count(), 7)
+
+
+class BackfillHistoryTest(CaseMixin, TestCase):
+    """The backfill must not rewrite history (fix wave 1) and re-matches unmatched folder rows (4)."""
+
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch("ai_model.ledger.enabled", return_value=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def run_command(self, *args):
+        out = StringIO()
+        call_command(COMMAND, *args, stdout=out)
+        return out.getvalue()
+
+    def test_a_redone_case_keeps_the_analyst_verdict(self):
+        # The analyst said Dangerous (live row); "Redo analysis" re-scored the case to Safe, and
+        # last_update_by still names the analyst. The backfill must not record Safe under them.
+        case = self.make_case(results="Dangerous", last_update_by=self.user)
+        ledger.record_verdict(case, self.user, "Dangerous")
+        Case.objects.filter(pk=case.pk).update(results="Safe")
+        self.assertIn("0 verdict", self.run_command())
+        rows = LabelRecord.objects.filter(source="analyst_verdict", case=case)
+        self.assertEqual(list(rows.values_list("label_class", "status")), [("Dangerous", "active")])
+
+    def test_a_case_with_only_a_superseded_verdict_row_is_skipped(self):
+        case = self.make_case(results="Safe", last_update_by=self.user)
+        ledger.record_verdict(case, self.user, "Safe")
+        LabelRecord.objects.filter(case=case).update(status="superseded")
+        self.assertIn("0 verdict", self.run_command())
+        self.assertEqual(LabelRecord.objects.filter(case=case).count(), 1)
+
+    def test_backfilled_verdict_is_observed_at_the_case_last_update(self):
+        case = self.make_case(results="Dangerous", last_update_by=self.user)
+        self.run_command()
+        row = LabelRecord.objects.get(source="analyst_verdict", case=case)
+        self.assertEqual(row.observed_at, Case.objects.get(pk=case.pk).last_update)
+
+    def _folder_row(self, message_id):
+        return LabelRecord.objects.create(
+            message_id=message_id, message_id_hash=message_id_hash(message_id or "x"),
+            source="imap_folder", label="2_CLASSIC_PHISHING", label_class="Dangerous", trust="folder",
+        )
+
+    def test_unmatched_folder_rows_are_matched_late(self):
+        case = self.make_case("<late@x.example>")
+        late = self._folder_row("late@x.example")
+        nobody = self._folder_row("nobody@x.example")
+        no_id = self._folder_row("")
+        self.assertIn("would re-match 1 folder row", self.run_command("--dry-run"))
+        self.assertIsNone(LabelRecord.objects.get(pk=late.pk).case)
+        self.assertIn("re-matched 1 folder row", self.run_command())
+        self.assertEqual(LabelRecord.objects.get(pk=late.pk).case, case)
+        self.assertIsNone(LabelRecord.objects.get(pk=nobody.pk).case)
+        self.assertIsNone(LabelRecord.objects.get(pk=no_id.pk).case)
+        self.assertIn("re-matched 0 folder row", self.run_command())

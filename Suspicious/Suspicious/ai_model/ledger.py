@@ -176,13 +176,14 @@ def _folders_for(case, message_hash: str):
         Q(case=case) | Q(case__isnull=True, message_id_hash=message_hash))
 
 
-def record_verdict(case, user, label_class) -> LabelRecord | None:
+def record_verdict(case, user, label_class, *, observed_at=None) -> LabelRecord | None:
     """Append the analyst's verdict; None for the same class as the case's active verdict row. A
     different class supersedes that row; a hard conflict flags the folder rows (ruling D6).
 
     Deliberate: a result outside Safe, Unwanted, Dangerous, Suspicious and Inconclusive
     (Unchallenged, AllowListed, Failure) is not a label. It stores nothing and does not supersede
-    the earlier verdict row, which stays the case's last analyst label."""
+    the earlier verdict row, which stays the case's last analyst label. observed_at (default now)
+    lets the backfill date a row at the case's last update."""
     if label_class not in LabelRecord.LabelClass.values:
         return None
     # ponytail: no lock on the case; two verdicts on one case at the same instant can both append.
@@ -196,6 +197,7 @@ def record_verdict(case, user, label_class) -> LabelRecord | None:
             message_id=message_id, message_id_hash=message_hash, case=case,
             source=LabelRecord.Source.ANALYST_VERDICT, source_ref=f"user:{user.pk}",
             label=label_class, label_class=label_class, trust=LabelRecord.Trust.VERDICT,
+            observed_at=observed_at or dj_timezone.now(),
         )
         folder_classes = [f for f, v in CONFLICT.items() if v == label_class]
         _folders_for(case, message_hash).filter(label_class__in=folder_classes).update(
