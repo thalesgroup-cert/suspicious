@@ -93,9 +93,7 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
                 {prettyResult(String(ci.classification ?? "").toUpperCase() as SubmissionResult)}
               </Typography>
             </Box>
-            {aiAssessment ? (
-              <AiAssessmentSection assessment={aiAssessment} />
-            ) : hasAi ? (
+            {!aiAssessment && hasAi ? (
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>AI classifier</Typography>
                 {aiUnclassified ? (
@@ -117,6 +115,8 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
           </Stack>
         </Section>
       ) : null}
+
+      {aiAssessment ? <AiAssessmentSection assessment={aiAssessment} /> : null}
 
       {multi ? (
         <Section title="Summary">

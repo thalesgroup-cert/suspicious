@@ -201,10 +201,21 @@ describe("SubmissionDrawer - overview", () => {
     expect(await screen.findByRole("heading", { name: "AI model assessment" })).toBeInTheDocument();
     expect(screen.queryByText("score 7")).toBeNull();
     expect(screen.queryByText("conf 80%")).toBeNull();
+    expect(screen.queryByText("AI classifier")).toBeNull();
     unmount();
     renderWithProviders(<SubmissionDrawer {...withData(null)} />);
     expect(await screen.findByText("score 7")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "AI model assessment" })).toBeNull();
+  });
+
+  it("an ai_assessment renders without case_infos", async () => {
+    const p = multi();
+    const data = (p.details as never as { data: Record<string, unknown> }).data;
+    data.case_infos = undefined;
+    data.ai_assessment = { result: "Dangerous", sub_class: null, tier: "high", runner_up: null, model_version: "v1", analysed_at: "2026-09-21T10:00:00Z", reads: "body only", similar_cases: [], campaign: null, cross_check: { facts: [], disagrees: false } };
+    renderWithProviders(<SubmissionDrawer {...p} />);
+    expect(await screen.findByRole("heading", { name: "AI model assessment" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sources" })).toBeNull();
   });
 
   it("multi-observable: Summary with the sentence and the observable count", async () => {
