@@ -73,7 +73,8 @@ class Command(BaseCommand):
             if pending:
                 self._write(client, pending)
         except (imap_sync.ImapConnectionLost, imap_sync.ImapLoginFailed, imap_sync.ImapTlsFailed,
-                ProviderUnavailable, ValueError, OSError, imaplib.IMAP4.error, DatabaseError) as exc:
+                ProviderUnavailable, ValueError, OSError, imaplib.IMAP4.error, DatabaseError,
+                KeyError, TypeError) as exc:  # KeyError, TypeError: a malformed embed answer
             raise CommandError(type(exc).__name__) from None
         finally:
             if imap is not None:

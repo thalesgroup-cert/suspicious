@@ -13,6 +13,9 @@ import numpy as np
 # training.recipe.PREPROCESSING_VERSION (Ruling E16): the form ledger rows are embedded in for
 # training. Rows in another form are re-embedded (ai_model_reembed_ledger) before any export.
 TRAINING_PREPROCESSING = "chunkmean-tokens-v1"
+# The encoder's output width (paraphrase-multilingual-mpnet-base-v2): every classifier and campaign
+# vector the ledger stores and exports has this many floats.
+ENCODER_WIDTH = 768
 MIN_HEAD_SAMPLES = 8  # training.gate.MIN_HEAD_SAMPLES
 MAX_ROWS = 8000  # training.dataset.MAX_ROWS
 NO_CASE = -1  # training.dataset.NO_CASE
@@ -64,6 +67,8 @@ def _matrix(name, vectors):
         raise DatasetRefused(f"{name}: rows of different widths") from None
     if m.ndim != 2 or not m.shape[1]:
         raise DatasetRefused(f"{name}: rows of different widths or empty")
+    if m.shape[1] != ENCODER_WIDTH:
+        raise DatasetRefused(f"{name}: width {m.shape[1]}, expected {ENCODER_WIDTH}")
     if not np.isfinite(m).all():
         raise DatasetRefused(f"{name}: non-finite values")
     return m

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from datetime import timezone
 
@@ -15,6 +16,7 @@ from django.utils import timezone as dj_timezone
 from ai_model.messageid import match_case, message_id_hash, stored_message_id, stored_sender
 from ai_model.models import AiAssessment, LabelRecord
 from ai_model.taxonomy import canonical, class_of
+from ai_model.training_data import ENCODER_WIDTH
 from case_handler.models import ProposedVerdict
 
 ACTIVE, SUPERSEDED, FLAGGED = LabelRecord.Status.ACTIVE, LabelRecord.Status.SUPERSEDED, LabelRecord.Status.FLAGGED
@@ -266,7 +268,11 @@ def replace_embedding(record, vector, preprocessing_version: str) -> bool:
     """The one exception to append-only, for ai_model_reembed_ledger: a folder row's classifier
     embedding re-computed from the same mail in another preprocessing. Changes `embedding` and
     `preprocessing_version` only, and only while the row still has the version the caller read
-    (False otherwise: changed meanwhile). LabelRecord.save() still refuses both fields."""
+    (False otherwise: changed meanwhile). LabelRecord.save() still refuses both fields.
+    ValueError unless vector is ENCODER_WIDTH finite floats (the message names no value)."""
+    if (not isinstance(vector, (list, tuple)) or len(vector) != ENCODER_WIDTH
+            or not all(type(x) in (float, int) and math.isfinite(x) for x in vector)):
+        raise ValueError(f"embedding: expected {ENCODER_WIDTH} finite floats")
     return bool(LabelRecord.objects.filter(
         pk=record.pk, source=LabelRecord.Source.IMAP_FOLDER,
         preprocessing_version=record.preprocessing_version,

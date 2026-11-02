@@ -10,6 +10,7 @@ from unittest import mock
 import numpy as np
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import DatabaseError
 from django.test import SimpleTestCase, TestCase
 
 from ai_model import export, ledger, registry, training_data
@@ -26,14 +27,15 @@ from connectors.contrib.ai_model.tests.fake_imap import FakeImap
 from connectors.contrib.ai_model.tests.test_imap_sync import forward
 
 TP = "chunkmean-tokens-v1"
+W = 768  # the encoder width
 
 
-def make_row(n, folder=PHISH, *, case=None, pv=TP, status="active", trust="folder", dim=4,
+def make_row(n, folder=PHISH, *, case=None, pv=TP, status="active", trust="folder", dim=W,
              source="imap_folder", ref=None):
     return LabelRecord.objects.create(
         message_id=f"m{n}", message_id_hash=f"{n:064x}", case=case, source=source,
         source_ref=ref or f"{folder}:7:{n}", label=folder, label_class="Dangerous", trust=trust,
-        embedding=json.dumps([float(n)] * dim), campaign_embedding=json.dumps([1.0, float(n)]),
+        embedding=json.dumps([float(n)] * dim), campaign_embedding=json.dumps([1.0, float(n)] + [0.0] * (W - 2)),
         preprocessing_version=pv, embedding_version="cmp-e1", status=status)
 
 
@@ -49,10 +51,11 @@ def full_ledger(per_folder=8, start=0):
 
 class TrainingDataTest(SimpleTestCase):
     def rows(self, per_folder=8):
-        return [(f, [1.0, 2.0], [3.0], i) for i, f in enumerate(f for f in FOLDERS for _ in range(per_folder))]
+        return [(f, [1.0] * W, [3.0] * W, i) for i, f in enumerate(f for f in FOLDERS for _ in range(per_folder))]
 
     def test_constants(self):
         self.assertEqual(training_data.TRAINING_PREPROCESSING, TP)
+        self.assertEqual(training_data.ENCODER_WIDTH, W)
         self.assertEqual(set(training_data.HEAD_TARGETS["safe_suspicious"]), set(FOLDERS))
 
     def test_builds_the_four_arrays_with_the_reader_dtypes(self):
@@ -62,15 +65,15 @@ class TrainingDataTest(SimpleTestCase):
         with np.load(io.BytesIO(training_data.build_dataset(rows)), allow_pickle=False) as npz:
             self.assertEqual(sorted(npz.files), ["campaign_embeddings", "case_ids", "embeddings", "folders"])
             self.assertEqual(npz["embeddings"].dtype, np.float32)
-            self.assertEqual(npz["embeddings"].shape, (64, 2))
-            self.assertEqual(npz["campaign_embeddings"].shape, (64, 1))
+            self.assertEqual(npz["embeddings"].shape, (64, W))
+            self.assertEqual(npz["campaign_embeddings"].shape, (64, W))
             self.assertEqual(npz["folders"].dtype.kind, "U")
             self.assertEqual(npz["case_ids"].dtype, np.int64)
             self.assertEqual(npz["case_ids"][:4].tolist(), [0, -1, -1, 3])
 
     def test_refuses_a_short_head_class_naming_head_and_class(self):
         rows = [r for r in self.rows() if r[0] != "2_WHALING_PHISHING"]
-        rows += [("2_WHALING_PHISHING", [1.0, 2.0], [3.0], 900 + i) for i in range(7)]
+        rows += [("2_WHALING_PHISHING", [1.0] * W, [3.0] * W, 900 + i) for i in range(7)]
         with self.assertRaisesRegex(training_data.DatasetRefused,
                                     r"head dangerous class 3 \(2_WHALING_PHISHING\) has 7 rows, needs 8"):
             training_data.build_dataset(rows)
@@ -80,13 +83,21 @@ class TrainingDataTest(SimpleTestCase):
                 self.assertRaisesRegex(training_data.DatasetRefused, "64 rows, at most 10"):
             training_data.build_dataset(self.rows())
         rows = self.rows()
-        rows[0] = (rows[0][0], [1.0], [3.0], 0)
+        rows[0] = (rows[0][0], [1.0], [3.0] * W, 0)
         with self.assertRaisesRegex(training_data.DatasetRefused, "embeddings"):
             training_data.build_dataset(rows)
         rows = self.rows()
-        rows[0] = (rows[0][0], [float("nan"), 1.0], [3.0], 0)
+        rows[0] = (rows[0][0], [float("nan")] + [1.0] * (W - 1), [3.0] * W, 0)
         with self.assertRaisesRegex(training_data.DatasetRefused, "non-finite"):
             training_data.build_dataset(rows)
+
+    def test_refuses_vectors_of_another_width(self):
+        for i in (1, 2):  # the classifier, then the campaign vectors, all 4 wide
+            rows = [(r[0], [1.0] * 4 if i == 1 else r[1], [3.0] * 4 if i == 2 else r[2], r[3])
+                    for r in self.rows()]
+            name = "embeddings" if i == 1 else "campaign_embeddings"
+            with self.assertRaisesRegex(training_data.DatasetRefused, f"^{name}: width 4, expected 768$"):
+                training_data.build_dataset(rows)
 
     def test_digest_is_order_free(self):
         a = training_data.digest([("h2", "1_SPAM"), ("h1", "2_CLONE_PHISHING")])
@@ -98,18 +109,28 @@ class ReplaceEmbeddingTest(TestCase):
     def test_changes_only_embedding_and_version(self):
         row = make_row(1, pv="legacy-first128")
         before = LabelRecord.objects.filter(pk=row.pk).values().get()
-        self.assertTrue(ledger.replace_embedding(row, [0.5, 0.25], TP))
+        self.assertTrue(ledger.replace_embedding(row, [0.5] * W, TP))
         after = LabelRecord.objects.filter(pk=row.pk).values().get()
-        self.assertEqual((json.loads(after["embedding"]), after["preprocessing_version"]), ([0.5, 0.25], TP))
+        self.assertEqual((json.loads(after["embedding"]), after["preprocessing_version"]), ([0.5] * W, TP))
         changed = {k for k in before if before[k] != after[k]}
         self.assertEqual(changed, {"embedding", "preprocessing_version"})
 
     def test_a_row_changed_meanwhile_is_not_overwritten(self):
         row = make_row(1, pv="legacy-first128")
         stale = LabelRecord.objects.get(pk=row.pk)
-        self.assertTrue(ledger.replace_embedding(row, [0.5], TP))
-        self.assertFalse(ledger.replace_embedding(stale, [0.9], TP))
-        self.assertEqual(json.loads(LabelRecord.objects.get(pk=row.pk).embedding), [0.5])
+        self.assertTrue(ledger.replace_embedding(row, [0.5] * W, TP))
+        self.assertFalse(ledger.replace_embedding(stale, [0.9] * W, TP))
+        self.assertEqual(json.loads(LabelRecord.objects.get(pk=row.pk).embedding), [0.5] * W)
+
+    def test_refuses_a_vector_that_is_not_768_finite_floats(self):
+        row = make_row(1, pv="legacy-first128")
+        before = LabelRecord.objects.filter(pk=row.pk).values().get()
+        for vector in ([0.5] * (W - 1), [0.5] * (W + 1), [float("nan")] + [0.5] * (W - 1),
+                       [float("inf")] * W, ["0.5"] * W, [True] * W, None, "x" * W):
+            with self.assertRaises(ValueError) as caught:
+                ledger.replace_embedding(row, vector, TP)
+            self.assertEqual(str(caught.exception), "embedding: expected 768 finite floats")
+        self.assertEqual(LabelRecord.objects.filter(pk=row.pk).values().get(), before)
 
     def test_save_still_refuses_embedding_and_other_changes(self):
         row = make_row(1, pv="legacy-first128")
@@ -146,7 +167,7 @@ class ExportTest(CaseMixin, TestCase):
         self.assertEqual(result.url, "fake://ai-datasets/job-1/dataset.npz?expires=900")
         self.assertEqual(result.rows, 65)
         with self.load(result) as npz:
-            self.assertEqual(npz["embeddings"].shape, (65, 4))
+            self.assertEqual(npz["embeddings"].shape, (65, W))
             self.assertEqual(npz["case_ids"].tolist().count(case.pk), 1)
             self.assertEqual(npz["case_ids"].tolist().count(-1), 64)
             self.assertEqual(sorted(set(npz["folders"].tolist())), sorted(FOLDERS))
@@ -193,7 +214,7 @@ EMBED_CALLS = []
 
 def embed(texts, profile, preprocessing="legacy-first128"):
     EMBED_CALLS.append((len(texts), profile, preprocessing))
-    return {"vectors": [[0.5, float(len(t) > 0)] for t in texts], "preprocessing_version": preprocessing,
+    return {"vectors": [[0.5] * (W - 1) + [float(len(t) > 0)] for t in texts], "preprocessing_version": preprocessing,
             "embedding_version": "cmp-e1"}
 
 
@@ -231,8 +252,8 @@ class ReembedCommandTest(TestCase):
         self.assertIn("bad locator 1", out)
         stale = LabelRecord.objects.exclude(preprocessing_version=TP).values_list("message_id", flat=True)
         self.assertEqual(sorted(stale), ["m50", "m51", "m52", "m53"])
-        self.assertEqual(json.loads(LabelRecord.objects.get(message_id="m1").embedding), [0.5, 1.0])
-        self.assertEqual(LabelRecord.objects.get(pk=fresh.pk).embedding, json.dumps([54.0] * 4))
+        self.assertEqual(json.loads(LabelRecord.objects.get(message_id="m1").embedding), [0.5] * (W - 1) + [1.0])
+        self.assertEqual(LabelRecord.objects.get(pk=fresh.pk).embedding, json.dumps([54.0] * W))
         for secret in ("Urgent", "evil.example", "analyst", "reviewer", "imap-pa55"):
             self.assertNotIn(secret, out)
 
@@ -269,3 +290,30 @@ class ReembedCommandTest(TestCase):
                 self.assertRaises(CommandError) as caught:
             call_command(self.CMD, stdout=StringIO())
         self.assertEqual(str(caught.exception), "ImapLoginFailed")
+
+    def test_a_batch_is_one_transaction(self):
+        for uid in range(1, 4):
+            make_row(uid, pv="legacy-first128")
+        real, calls = ledger.replace_embedding, []
+
+        def second_fails(*args, **kwargs):
+            calls.append(1)
+            if len(calls) == 2:
+                raise DatabaseError("lost")
+            return real(*args, **kwargs)
+
+        with mock.patch("ai_model.ledger.replace_embedding", side_effect=second_fails), \
+                self.assertRaises(CommandError) as caught:
+            self.run_cmd()
+        self.assertEqual(str(caught.exception), "DatabaseError")
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(LabelRecord.objects.filter(preprocessing_version=TP).exists())  # row 1 rolled back
+
+    def test_a_malformed_answer_is_a_class_only_command_error(self):
+        make_row(1, pv="legacy-first128")
+        for answer, name in (({}, "KeyError"), ({"preprocessing_version": TP, "vectors": None}, "TypeError"),
+                             (["secret"], "TypeError")):
+            with self.assertRaises(CommandError) as caught:
+                self.run_cmd(embed=lambda texts, profile, preprocessing=None, a=answer: a)
+            self.assertEqual(str(caught.exception), name)
+        self.assertFalse(LabelRecord.objects.filter(preprocessing_version=TP).exists())
