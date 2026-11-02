@@ -169,6 +169,65 @@ class StartTest(RetrainBase):
         self.assertEqual(retrain.poll_once(job.job_id), J.FAILED)
 
 
+class MutantTest(RetrainBase):
+    """Pins behaviour the first suite left open (review of Task 8b)."""
+
+    def test_put_urls_outlive_the_server_wall_limit(self):
+        retrain.start_retrain()
+        for url in self.train.call_args.args[0]["bundle_urls"].values():
+            self.assertTrue(url.endswith("?expires=15300"), url)
+
+    def test_a_lost_slot_race_is_refused_and_drops_the_dataset(self):
+        RetrainJob.objects.create(job_id="other", target_version="v9", state=J.RUNNING, running_slot=1,
+                                  prefix="p", trigger="manual")
+        with mock.patch.object(retrain, "running_job", return_value=None), \
+                self.assertRaisesRegex(retrain.RetrainRefused, "another retrain job is running"):
+            retrain.start_retrain()
+        self.assertEqual(list(self.store.list(registry.DATASET_BUCKET)), [])
+        self.train.assert_not_called()
+
+    def test_eligible_must_be_true_not_truthy(self):
+        job = retrain.start_retrain()
+        answer = succeeded()
+        answer["report"]["eligible"] = "yes"
+        self.status.return_value = answer
+        retrain.poll_once(job.job_id)
+        job.refresh_from_db()
+        self.assertIs(job.version.manifest["eligible"], False)
+
+    def test_finish_settles_once_under_a_locking_read(self):
+        job = retrain.start_retrain()
+        self.upload_some(job, registry.BUNDLE_FILE_NAMES)
+        stale = RetrainJob.objects.get(pk=job.pk)
+        report = succeeded()["report"]
+        with mock.patch.object(RetrainJob.objects, "select_for_update",
+                               wraps=RetrainJob.objects.select_for_update) as sfu:
+            retrain._finish(stale, J.SUCCEEDED, report=report)
+        self.assertTrue(sfu.called)
+        retrain._finish(stale, J.SUCCEEDED, report=report)
+        retrain._finish(stale, J.FAILED, "Late")
+        job.refresh_from_db()
+        self.assertEqual((job.state, job.error), (J.SUCCEEDED, ""))
+        self.assertEqual(ModelVersion.objects.filter(status=S.CANDIDATE).count(), 1)
+        self.assertEqual(len(self.bundle_keys(job)), len(registry.BUNDLE_FILE_NAMES))  # bundle kept
+
+    def test_cancel_of_a_job_the_server_does_not_know_fails_it(self):
+        job = retrain.start_retrain()
+        self.cancel.side_effect = TrainJobGone("inference server HTTP 404")
+        retrain.cancel_retrain()
+        job.refresh_from_db()
+        self.assertEqual((job.state, job.error), (J.FAILED, "TrainJobGone"))
+
+    def test_poll_error_mapping(self):
+        job = retrain.start_retrain()
+        self.status.side_effect = ValueError("inference server refused the request (HTTP 400)")
+        self.assertEqual(retrain.poll_once(job.job_id), J.RUNNING)
+        self.status.side_effect = ProviderUnavailable("token rejected", retryable=False)
+        self.assertEqual(retrain.poll_once(job.job_id), J.FAILED)
+        job.refresh_from_db()
+        self.assertEqual(job.error, "ProviderUnavailable")
+
+
 class PollTest(RetrainBase):
     def start(self):
         self.job = retrain.start_retrain()
