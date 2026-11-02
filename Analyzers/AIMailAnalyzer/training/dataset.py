@@ -15,7 +15,10 @@ import numpy as np
 from training.bundle import MAX_INPUT_DIM, BundleError, npz_shapes
 
 MAX_DATASET_BYTES = 200 * 2**20  # Ruling E9's download cap
-MAX_ROWS = 8000  # groups.py's ceiling: its dense n x n similarity costs about 0.33 GB at 8k rows
+# groups.py's ceiling: its dense n x n similarity costs about 0.33 GB at 8k rows when few rows are
+# joined and about 1.6 GB in the worst case (every row joined). Task 8 sizes the ai_inference
+# mem_limit on that 1.6 GB plus the training memory and the resident encoder.
+MAX_ROWS = 8000
 MAX_FOLDER_CHARS = 64
 FOLDERS = (
     "0_LEGIT_INTERNAL_COMMUNICATION", "0_LEGIT_EXTERNAL_COMMUNICATION", "1_SPAM", "1_NEWSLETTER",

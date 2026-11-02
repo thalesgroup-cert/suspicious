@@ -642,6 +642,19 @@ def test_first_job_sweeps_leftover_job_dirs_not_the_import(train, env, monkeypat
     assert sorted(os.listdir(base)) == ["keep"]
 
 
+def test_sweep_leaves_directories_of_other_users(tmp_path, monkeypatch):
+    (tmp_path / "ai-train-theirs").mkdir()
+    (tmp_path / "ai-train-file").write_bytes(b"x")  # not a directory: left alone too
+    os.symlink(tmp_path / "ai-train-theirs", tmp_path / "ai-train-link")
+    c = training_job.JobController(tmp_base=str(tmp_path))
+    monkeypatch.setattr(training_job.os, "getuid", lambda: os.stat(tmp_path).st_uid + 1)
+    c._sweep()
+    assert sorted(os.listdir(tmp_path)) == ["ai-train-file", "ai-train-link", "ai-train-theirs"]
+    monkeypatch.undo()
+    c._sweep()  # ours now: the directory goes, the symlink and the file are not followed
+    assert sorted(os.listdir(tmp_path)) == ["ai-train-file", "ai-train-link"]
+
+
 def test_tmp_base_comes_from_the_environment_at_first_use(tmp_path, monkeypatch):
     c = training_job.JobController()
     monkeypatch.setenv("AI_TRAIN_TMPDIR", str(tmp_path))

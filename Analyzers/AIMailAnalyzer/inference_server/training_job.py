@@ -56,7 +56,9 @@ logger = logging.getLogger("inference_server.training")
 # Presigned URLs carry their credential in the query string. httpx logs every request line at INFO
 # ("HTTP Request: PUT http://...?X-Amz-Signature=..."): its loggers stay at WARNING (Task 6b's
 # reload path must not lower them), and RedactUrls strips query strings from any record that does
-# get through, on the httpx/httpcore loggers and on every root handler.
+# get through, on the httpx/httpcore loggers and on every root handler. It covers the loggers this
+# code uses and handlers on root/httpx/httpcore; not logging.lastResort, nor handlers that other
+# loggers attach for themselves (records that do not propagate to root).
 _URL_QUERY = re.compile(r"(https?://[^\s?#'\"<>]*)[?#][^\s'\"<>]*", re.IGNORECASE)
 _AMZ_PARAM = re.compile(r"X-Amz-[A-Za-z-]+=[^&\s'\"<>]*", re.IGNORECASE)
 
@@ -402,8 +404,14 @@ class JobController:
         except OSError:
             return
         for name in names:
-            if name.startswith(TMP_PREFIX):
-                shutil.rmtree(os.path.join(base, name), ignore_errors=True)
+            path = os.path.join(base, name)
+            try:
+                st = os.lstat(path)
+            except OSError:
+                continue
+            # only our own real directories: never another user's, never through a symlink
+            if name.startswith(TMP_PREFIX) and stat.S_ISDIR(st.st_mode) and st.st_uid == os.getuid():
+                shutil.rmtree(path, ignore_errors=True)
 
     def _evict(self):
         """ponytail: keep the last MAX_JOBS_KEPT jobs; Django polls a job within minutes."""
