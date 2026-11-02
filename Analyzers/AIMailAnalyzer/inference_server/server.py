@@ -15,6 +15,7 @@ INFERENCE_RELOAD_CHECK_SECONDS and hot-swapped when they change. POST /reload
 forces the same check immediately. A file that fails to load (half-copied,
 corrupt) never replaces a working model.
 """
+import collections
 import logging
 import os
 import threading
@@ -202,8 +203,44 @@ class ModelStore:
         }
 
 
+class FairSemaphore:
+    """A bounded semaphore served in arrival order. threading.Semaphore lets a thread that releases
+    and asks again take the slot back before a waiting thread wakes, so a request that loops over
+    texts (one slot per text, /v2/embed) could starve a classify. Here a new acquire queues behind
+    the waiters."""
+
+    def __init__(self, n: int):
+        self._cond = threading.Condition()
+        self._max = self.free = n
+        self._queue = collections.deque()
+
+    def acquire(self):
+        with self._cond:
+            me = object()
+            self._queue.append(me)
+            while self._queue[0] is not me or not self.free:
+                self._cond.wait()
+            self._queue.popleft()
+            self.free -= 1
+            self._cond.notify_all()  # the next in line may find a slot too
+
+    def release(self):
+        with self._cond:
+            if self.free >= self._max:
+                raise ValueError("released too many times")
+            self.free += 1
+            self._cond.notify_all()
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+
+
 store = ModelStore(MODEL_DIRS)
-_inference_slots = threading.BoundedSemaphore(MAX_CONCURRENCY)
+_inference_slots = FairSemaphore(MAX_CONCURRENCY)
 
 
 @asynccontextmanager

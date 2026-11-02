@@ -273,7 +273,7 @@ def test_exclude_case_ids_leaves_the_case_out_of_the_vote(app, token_env, tmp_pa
     assert without["probabilities"]["DANGEROUS"] < with_self["DANGEROUS"]
 
 
-@pytest.mark.parametrize("ids", [["1"], [True], [1.0], list(range(1001)), [2**63]])
+@pytest.mark.parametrize("ids", [["1"], [True], [1.0], list(range(1001)), [2**63], [-1]])
 def test_exclude_case_ids_are_strict(app, token_env, ids):
     client, *_ = app
     r = client.post("/v2/models/ai_mail/classify",

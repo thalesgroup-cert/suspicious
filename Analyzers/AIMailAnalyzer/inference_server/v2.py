@@ -22,7 +22,13 @@ MAX_CLASSIFY_BODY = 32 * 2**20
 
 # Version 0 (no bundle loaded): the legacy classifier as-is.
 ACTIVE_VERSION = bundles.LEGACY_VERSION
-CaseId = Annotated[int, Field(strict=True, ge=-(2**63), le=2**63 - 1)]
+# >= 0: -1 marks the case-less rows of a bundle's knn index, so it would exclude all of them
+CaseId = Annotated[int, Field(strict=True, ge=0, le=2**63 - 1)]
+NO_TOKENIZER = "token chunking is not available with this encoder"
+
+
+def _can_chunk_by_tokens(vectorizer) -> bool:
+    return hasattr(vectorizer, "tokenizer") and hasattr(vectorizer, "max_seq_length")
 
 
 class ClassifyRequest(BaseModel):
@@ -142,6 +148,10 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
             with slots:
                 legacy = classify(models, body)
         else:
+            if (active.preprocessing_version == PREPROCESSING_VERSION_TOKENS
+                    and not _can_chunk_by_tokens(store.vectorizer)):
+                raise HTTPException(422, NO_TOKENIZER)
+            # one slot for the whole request: at most 8 chunk passes plus the campaign pass
             try:
                 legacy = bundles.classify_bundle(active, store.vectorizer, body, slots,
                                                  exclude_case_ids=req.exclude_case_ids)
@@ -183,12 +193,18 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
             )
         texts = [t[:max_chars].encode("utf-8", "replace").decode("utf-8") for t in req.texts]
         pv = bundles.PREPROCESSING_LEGACY if req.profile == "campaign" else req.preprocessing
-        with slots:
-            if pv == bundles.PREPROCESSING_LEGACY:
+        by_tokens = pv == PREPROCESSING_VERSION_TOKENS
+        if by_tokens and not _can_chunk_by_tokens(vectorizer):
+            raise HTTPException(422, NO_TOKENIZER)
+        if pv == bundles.PREPROCESSING_LEGACY:
+            with slots:  # one batched pass, as before
                 vectors = vectorizer.encode(texts, show_progress_bar=False)
-            else:
-                by_tokens = pv == PREPROCESSING_VERSION_TOKENS
-                vectors = [chunk_mean_embedding(vectorizer, t, by_tokens=by_tokens) for t in texts]
+        else:
+            # a slot per text (up to 8 passes each), so a classify gets in between texts
+            vectors = []
+            for t in texts:
+                with slots:
+                    vectors.append(chunk_mean_embedding(vectorizer, t, by_tokens=by_tokens))
         return {
             "vectors": [[float(x) for x in row] for row in vectors],
             "preprocessing_version": pv,

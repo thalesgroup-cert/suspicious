@@ -11,8 +11,13 @@ pytest.importorskip("sentence_transformers")
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
+import threading  # noqa: E402
+import time  # noqa: E402
+
 from inference_server import server, v2  # noqa: E402
-from test_inference_server_reload import TokenVectorizer, app, token_env  # noqa: E402,F401
+from test_inference_server import BODY, FakeVectorizer  # noqa: E402
+from test_inference_server_reload import (TokenVectorizer, app, make_bundle,  # noqa: E402,F401
+                                          reload, token_env)
 from training import recipe  # noqa: E402
 
 TEXT = " ".join(f"w{i}" for i in range(40))  # several chunks of the fake 12-token window
@@ -68,7 +73,7 @@ def test_chunked_embedding_runs_inside_the_inference_semaphore(app, token_env, m
     real = v2.chunk_mean_embedding
 
     def spy(*args, **kwargs):
-        held.append(server._inference_slots._value < server.MAX_CONCURRENCY)
+        held.append(server._inference_slots.free < server.MAX_CONCURRENCY)
         return real(*args, **kwargs)
 
     monkeypatch.setattr(v2, "chunk_mean_embedding", spy)
@@ -84,3 +89,73 @@ def test_caps_still_apply_with_a_preprocessing(app, token_env):
     big = "x" * (v2.MAX_CLASSIFY_BODY + 1)
     assert embed(client, token_env, texts=[big],
                  preprocessing="chunkmean-tokens-v1").status_code == 413
+
+
+def test_token_chunking_without_an_encoder_tokenizer_is_422(app, token_env, monkeypatch):
+    client = app[0]
+    monkeypatch.setattr(server.store, "vectorizer", FakeVectorizer())
+    resp = embed(client, token_env, preprocessing="chunkmean-tokens-v1")
+    assert resp.status_code == 422
+    assert resp.json() == {"detail": "token chunking is not available with this encoder"}
+    assert embed(client, token_env, preprocessing="chunkmean-words90-v1").status_code == 200
+
+
+def test_token_bundle_classify_without_an_encoder_tokenizer_is_422(app, token_env, tmp_path, monkeypatch):
+    client, holder, storage, _ = app
+    spec, _ = make_bundle(tmp_path, storage)
+    assert reload(client, token_env, active=spec).status_code == 200
+    monkeypatch.setattr(server.store, "vectorizer", FakeVectorizer())
+    resp = client.post("/v2/models/ai_mail/classify", json={"mail_body": BODY}, headers=token_env)
+    assert resp.status_code == 422
+    assert resp.json() == {"detail": "token chunking is not available with this encoder"}
+
+
+def test_a_classify_completes_while_a_32_text_embed_runs(app, token_env):
+    """One free inference slot: the embed takes it per text, so a classify gets in between texts
+    instead of waiting for all 32."""
+    client = app[0]
+    taken = server.MAX_CONCURRENCY - 1
+    for _ in range(taken):
+        server._inference_slots.acquire()
+    TokenVectorizer.delay = 0.02
+    done = {}
+    try:
+        def run_embed():
+            r = embed(client, token_env, texts=[f"{TEXT} {i}" for i in range(32)],
+                      preprocessing="chunkmean-tokens-v1")
+            done["embed"] = (time.monotonic(), r.status_code)
+
+        worker = threading.Thread(target=run_embed)
+        worker.start()
+        while not TokenVectorizer.batches:
+            time.sleep(0.005)
+        r = client.post("/v2/models/ai_mail/classify", json={"mail_body": BODY}, headers=token_env)
+        done["classify"] = (time.monotonic(), r.status_code)
+        worker.join()
+    finally:
+        TokenVectorizer.delay = 0.0
+        for _ in range(taken):
+            server._inference_slots.release()
+    assert done["classify"][1] == 200 and done["embed"][1] == 200
+    assert done["classify"][0] < done["embed"][0]
+
+
+def test_fair_semaphore_serves_a_waiter_before_a_releaser_that_asks_again():
+    sem, order = server.FairSemaphore(1), []
+    sem.acquire()
+
+    def waiter():
+        with sem:
+            order.append("waiter")
+
+    t = threading.Thread(target=waiter)
+    t.start()
+    while not sem._queue:
+        time.sleep(0.001)
+    sem.release()
+    with sem:
+        order.append("releaser")
+    t.join()
+    assert order == ["waiter", "releaser"]
+    with pytest.raises(ValueError):
+        sem.release()
