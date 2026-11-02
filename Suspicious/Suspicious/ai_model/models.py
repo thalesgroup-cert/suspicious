@@ -127,3 +127,61 @@ class LabelSyncState(models.Model):
     last_uid = models.BigIntegerField(default=0)
     last_run_at = models.DateTimeField(null=True, blank=True)
     skipped = models.IntegerField(default=0)
+
+
+class ModelVersion(models.Model):
+    """One registered model version. Status changes only through ai_model.registry."""
+
+    class Status(models.TextChoices):
+        CANDIDATE = "candidate"
+        SHADOW = "shadow"
+        ACTIVE = "active"
+        PREVIOUS = "previous"
+        DISCARDED = "discarded"
+        FAILED = "failed"
+
+    class Trigger(models.TextChoices):
+        MANUAL = "manual"
+        SCHEDULE = "schedule"
+        IMPORT = "import"
+
+    version_id = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=10, choices=Status.choices, db_index=True)
+    # 1 while active, NULL otherwise. MariaDB has no partial unique index, so this unique column is
+    # what stops two active versions. Set and cleared only by ai_model.registry.
+    active_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    bundle_prefix = models.CharField(max_length=255, blank=True)  # "" for version 0 (no bundle)
+    manifest = models.JSONField(default=dict)
+    manifest_sha256 = models.CharField(max_length=64, blank=True)  # blank for version 0
+    campaign_profile = models.JSONField(default=dict)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children"
+    )
+    trigger = models.CharField(max_length=10, choices=Trigger.choices)
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    job_id = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["version_id", "job_id"], name="ai_model_version_job_unique"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.version_id} ({self.status})"
+
+
+class ModelEvent(models.Model):
+    """One row per registry transition."""
+
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="events")
+    action = models.CharField(max_length=32)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    at = models.DateTimeField(default=timezone.now)
+    note = models.TextField(blank=True)

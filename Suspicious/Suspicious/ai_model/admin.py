@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import LabelRecord, LabelSyncState
+from .models import LabelRecord, LabelSyncState, ModelEvent, ModelVersion
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
@@ -27,3 +27,16 @@ class LabelRecordAdmin(ReadOnlyAdmin):
 @admin.register(LabelSyncState)
 class LabelSyncStateAdmin(ReadOnlyAdmin):
     list_display = ("folder", "uidvalidity", "last_uid", "last_run_at", "skipped")
+
+
+@admin.register(ModelVersion)
+class ModelVersionAdmin(ReadOnlyAdmin):
+    list_display = ("version_id", "status", "trigger", "created_at", "job_id")
+    list_filter = ("status", "trigger")
+    search_fields = ("version_id", "job_id")
+
+
+@admin.register(ModelEvent)
+class ModelEventAdmin(ReadOnlyAdmin):
+    list_display = ("id", "version", "action", "user", "at")
+    list_filter = ("action",)
