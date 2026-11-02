@@ -2,7 +2,8 @@
 so untrusted bytes. An uncompressed npz with exactly four arrays, one row per ledger mail:
 `embeddings` (float32 (n, d), the classifier input, token chunk-mean), `campaign_embeddings`
 (float32 (n, d2), the first-128 cmp-e1 vector that the groups are built from, Ruling E18),
-`folders` (fixed-width unicode, one of FOLDERS) and `case_ids` (int64, unique). No mail text.
+`folders` (fixed-width unicode, one of FOLDERS) and `case_ids` (int64, unique, except NO_CASE,
+which marks a row that matched no case and may repeat). No mail text.
 The archive goes through bundle.py's checks (stored members only, layout as np.savez writes it,
 every array header consistent with its member) before np.load(allow_pickle=False) reads it."""
 import io
@@ -24,6 +25,7 @@ FOLDERS = (
     "0_LEGIT_INTERNAL_COMMUNICATION", "0_LEGIT_EXTERNAL_COMMUNICATION", "1_SPAM", "1_NEWSLETTER",
     "2_CLASSIC_PHISHING", "2_CLONE_PHISHING", "2_BLACKMAILING_PHISHING", "2_WHALING_PHISHING",
 )
+NO_CASE = -1
 ARRAYS = ("embeddings", "campaign_embeddings", "folders", "case_ids")
 
 
@@ -96,6 +98,10 @@ def read_dataset(path) -> Dataset:
             raise DatasetError(f"{k}: non-finite values")
     if not np.isin(arrays["folders"], FOLDERS).all():
         raise DatasetError("folders: unknown folder name")
-    if len(np.unique(arrays["case_ids"])) != n:
+    ids = arrays["case_ids"]
+    if (ids < NO_CASE).any():
+        raise DatasetError(f"case_ids: must be {NO_CASE} (no case) or a case id")
+    known = ids[ids != NO_CASE]
+    if len(np.unique(known)) != len(known):
         raise DatasetError("case_ids: must be unique")
     return Dataset(**arrays)

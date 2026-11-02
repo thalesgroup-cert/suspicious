@@ -1025,12 +1025,20 @@ def test_read_dataset_round_trip(tmp_path):
     assert list(d.folders[:10]) == [FOLDERS[0]] * 10 and d.case_ids[0] == 1
 
 
+def test_read_dataset_allows_repeated_minus_one_for_rows_without_a_case(tmp_path):
+    ids = np.arange(80, dtype=np.int64)
+    ids[::2] = -1  # no case: the ledger row matched none
+    d = dataset_mod.read_dataset(_write(tmp_path, make_dataset(case_ids=ids)))
+    assert (d.case_ids == ids).all()
+
+
 @pytest.mark.parametrize("override, why", [
     ({"case_ids": None}, "arrays"),
     ({"extra": np.zeros(3)}, "arrays"),
     ({"case_ids": np.arange(80, dtype=np.int32)}, "case_ids"),
     ({"case_ids": np.zeros(80, dtype=np.int64)}, "case_ids"),
     ({"case_ids": np.arange(79, dtype=np.int64)}, "case_ids"),
+    ({"case_ids": np.arange(-2, 78, dtype=np.int64)}, "case_ids"),
     ({"embeddings": np.zeros((80, 16), dtype=np.float64)}, "embeddings"),
     ({"embeddings": np.full((80, 16), np.nan, dtype=np.float32)}, "embeddings"),
     ({"embeddings": np.zeros((80,), dtype=np.float32)}, "embeddings"),
