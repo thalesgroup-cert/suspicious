@@ -30,6 +30,8 @@ RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --sys
 # weights without rebuilding this image, and the server hot-reloads them.
 COPY mail_analysis.py mail_archive.py ResNetMLP.py ./
 COPY inference_server/ ./inference_server/
+# The retrain recipe, gate and bundle format: the /v2/train worker imports them.
+COPY training/ ./training/
 COPY vectorizers/ ./vectorizers/
 
 # The vectorizer's own weights are excluded from the build context

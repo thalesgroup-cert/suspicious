@@ -2,11 +2,12 @@
 import time
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from .auth import require_token
+from .training_job import _JOB_ID, MAX_BODY, TrainRequest
 
 # The single version the server holds today: the legacy classifier as-is.
 ACTIVE_VERSION = {
@@ -27,10 +28,40 @@ class EmbedRequest(BaseModel):
     profile: Literal["classifier", "campaign"]
 
 
-def make_v2_router(*, store, classify, slots, max_chars) -> APIRouter:
+def make_v2_router(*, store, classify, slots, max_chars, trainer) -> APIRouter:
     """classify is server._classify(models, mail_body), which returns the legacy
-    result dict; slots is the server's concurrency semaphore."""
+    result dict; slots is the server's concurrency semaphore; trainer is the
+    training_job.JobController (training runs in its own process, outside slots)."""
     router = APIRouter(prefix="/v2")
+
+    @router.post("/train", dependencies=[Depends(require_token)])
+    async def train(request: Request):
+        body = bytearray()
+        async for chunk in request.stream():  # capped while reading, Content-Length or not
+            body += chunk
+            if len(body) > MAX_BODY:
+                raise HTTPException(413, "request body too large")
+        try:
+            req = TrainRequest.model_validate_json(bytes(body))
+        except ValidationError as e:
+            # no input values in the answer: they may be presigned URLs
+            errors = e.errors(include_url=False, include_input=False, include_context=False)
+            raise HTTPException(422, [{"loc": err["loc"], "msg": err["msg"]} for err in errors])
+        status, payload = trainer.start(req)
+        return JSONResponse(payload, status_code=status)
+
+    def _job(job_id, view):
+        if not _JOB_ID.fullmatch(job_id) or view is None:
+            raise HTTPException(404, "unknown job")
+        return view
+
+    @router.get("/train/{job_id}", dependencies=[Depends(require_token)])
+    def train_state(job_id: str):
+        return _job(job_id, trainer.get(job_id))
+
+    @router.post("/train/{job_id}/cancel", dependencies=[Depends(require_token)])
+    def train_cancel(job_id: str):
+        return JSONResponse(_job(job_id, trainer.cancel(job_id)), status_code=202)
 
     @router.get("/health/live")
     def live():

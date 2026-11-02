@@ -32,6 +32,7 @@ import mail_analysis
 from mail_analysis import MODEL_SPECS
 from ResNetMLP import ResNetMLP
 
+from .training_job import JobController
 from .v2 import make_v2_router
 
 logger = logging.getLogger("inference_server")
@@ -289,7 +290,9 @@ def _classify(models: dict, mail_body: str) -> dict:
 
 # Token-protected /v2 API; needs _classify, so it is mounted here rather than
 # right after app = FastAPI(...).
+trainer = JobController()
 app.include_router(
-    make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS)
+    make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS,
+                   trainer=trainer)
 )
 
