@@ -1,17 +1,28 @@
-"""The training subprocess (started by training_job.JobController with multiprocessing spawn).
+"""The training worker: `python -m inference_server.training_worker <workdir>`, started by
+training_job.popen_launcher with subprocess.Popen in its own session (process group).
 
-It has no network and no credentials: the controller downloads the dataset into the job's private
-directory and uploads what this process leaves in out/bundle. Inputs are the directory and the
-validated params (plain values; the recipes are looked up in RECIPES, never named by the caller).
+Inputs: the job's private 0700 directory (argv), the validated params as JSON on stdin (at most
+MAX_PARAMS bytes; the recipes are looked up in RECIPES, never named by the caller) and an explicit
+minimal environment built by the controller (PATH, HOME and TMPDIR set to the job directory,
+LANG, PYTHONDONTWRITEBYTECODE, the BLAS/OpenMP thread variables and AI_TRAIN_* limits; no token,
+no storage key, no proxy). It has no network use: the controller downloads the dataset into the
+directory and uploads what this process leaves in out/bundle.
 Outputs, all under <workdir>/out: `progress` (one number, percent of this process's work),
 `result.json` (the manifest pin and the gate summary, or {"error": reason}) and `bundle/`.
 An unexpected exception ends the process with a non-zero exit code, which the controller reports
-as the code alone."""
+as the code alone; stdout and stderr go to files in the job directory.
+
+Boundary: the worker runs as the same UID as the server, so this is NOT a boundary against code
+execution inside the worker (such code could read the server's /proc/<pid>/environ). The controls
+are that the worker only parses validated data (params checked by the server, the dataset read by
+training.dataset's hardened npz reader with no pickle) and receives no secret by construction."""
 import json
-import multiprocessing
 import os
+import signal
+import sys
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import asdict
 from functools import partial
 
@@ -22,38 +33,33 @@ from training.bundle import BundleError, write_bundle
 from training.dataset import DatasetError, read_dataset
 from training.gate import N_SPLITS, candidate_recipe, legacy_recipe, run_gate
 from training.groups import campaign_groups, near_duplicate_groups
-from training.recipe import COMPONENTS, Knn, fit_heads
+from training.recipe import COMPONENTS, Knn, fit_heads, temperature_at_bound
 
 DATASET = "dataset.npz"
 OUT = "out"
 PROGRESS = "progress"
 RESULT = "result.json"
 BUNDLE = "bundle"
+MAX_PARAMS = 32 * 1024
 RECIPE_ID = "candidate-v1"  # training.gate.candidate_recipe
 NEAR_DUPLICATE_THRESHOLD = 0.95  # spec E1, the test bed's near_dup_groups
 RECIPES = {"candidate": candidate_recipe, "legacy": legacy_recipe}  # baseline ids
-# Variables the worker has no use for; the parent's environment is inherited through spawn.
-SECRET_ENV = ("AI_INFERENCE_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
-              "AWS_SESSION_TOKEN")
 
 
 class Rejected(Exception):
     """A reason the candidate cannot be built, safe to report (names a head, class or rule)."""
 
 
-def _scrub_env():
-    for k in SECRET_ENV:
-        os.environ.pop(k, None)
-
-
 def _exit_with_parent():
-    """A spawned worker whose server died (SIGKILL, OOM) would otherwise train on as an orphan."""
+    """The worker has its own session, so a server killed by SIGKILL or the OOM killer does not
+    take it down: it exits itself once it is reparented."""
     ppid = os.getppid()
 
     def watch():
         while True:
             time.sleep(2)
             if os.getppid() != ppid:
+                os.killpg(os.getpgrp(), signal.SIGKILL)  # this process and anything it started
                 os._exit(70)
 
     threading.Thread(target=watch, daemon=True).start()
@@ -142,18 +148,53 @@ def train(workdir, params, threads, report_progress):
     return {"manifest_sha256": sha, "summary": summary}
 
 
-def main(workdir, params, threads, max_memory_mb=0):
-    """Entry point; workdir is the controller's private 0700 directory."""
-    if multiprocessing.parent_process() is not None:  # a real child, not an in-process test
-        _scrub_env()
-        _exit_with_parent()
-        _limit_memory(max_memory_mb)
+@contextmanager
+def thread_limits(threads):
+    """BLAS/OpenMP pools capped for the duration (the environment variables already set the
+    defaults; this also covers pools that ignore them)."""
+    from threadpoolctl import threadpool_limits  # a scikit-learn dependency
+    with threadpool_limits(limits=threads):
+        yield
+
+
+def setup(threads, max_memory_mb):
+    """Process-wide limits, applied first in a real worker: torch's inter-op pool must be sized
+    before any parallel work starts."""
+    torch.set_num_interop_threads(1)
     torch.set_num_threads(threads)
+    _limit_memory(max_memory_mb)
+    _exit_with_parent()
+
+
+def read_params(stream) -> dict:
+    raw = stream.read(MAX_PARAMS + 1)
+    if len(raw) > MAX_PARAMS:
+        raise SystemExit("params too large")
+    params = json.loads(raw)
+    if not isinstance(params, dict):
+        raise SystemExit("params must be an object")
+    return params
+
+
+def run(workdir, params, threads):
+    """Train and write out/result.json; workdir is the controller's private 0700 directory."""
     out = os.path.join(workdir, OUT)
     os.mkdir(out, 0o700)
     try:
-        result = train(workdir, params, threads,
-                       lambda pct: _write_atomic(out, PROGRESS, f"{pct:.1f}"))
+        with thread_limits(threads):
+            result = train(workdir, params, threads,
+                           lambda pct: _write_atomic(out, PROGRESS, f"{pct:.1f}"))
     except (DatasetError, BundleError, Rejected) as e:
         result = {"error": str(e)}
     _write_atomic(out, RESULT, json.dumps(result, allow_nan=False))
+
+
+def cli():
+    workdir = sys.argv[1]
+    threads = int(os.environ.get("AI_TRAIN_THREADS", "2"))
+    setup(threads, int(os.environ.get("AI_TRAIN_MAX_MEMORY_MB") or 0))
+    run(workdir, read_params(sys.stdin.buffer), threads)
+
+
+if __name__ == "__main__":
+    cli()

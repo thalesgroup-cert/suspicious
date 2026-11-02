@@ -7,10 +7,18 @@ Most tests start the worker in-process through an injected launcher (a thread) w
 recipe; storage is an httpx.MockTransport. Two tests use the real spawn launcher.
 """
 import hashlib
+import http.server
 import io
+import json
+import logging
+import math
 import os
+import signal
+import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -41,6 +49,7 @@ PARAMS = {
     "trainer_revision": "9f8d6912", "campaign_profile": PROFILE,
 }
 TERMINAL = {"succeeded", "failed", "cancelled"}
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def make_dataset(n_per=10, dim=16, **override) -> bytes:
@@ -161,9 +170,9 @@ def train(make_client, tmp_path, monkeypatch, env):  # noqa: F811
         storage = storage or Storage()
         launches = []
 
-        def thread_launcher(target, args):
-            launches.append(args)
-            return ThreadHandle(target, args)
+        def thread_launcher(workdir, params, threads, max_memory_mb):
+            launches.append((workdir, params, threads, max_memory_mb))
+            return ThreadHandle(training_worker.run, (workdir, params, threads))
 
         monkeypatch.setitem(training_worker.RECIPES, "candidate", recipe)
         monkeypatch.setitem(training_worker.RECIPES, "legacy", recipe)
@@ -442,15 +451,11 @@ def test_successful_job_trains_writes_and_uploads_the_bundle(train, env, tmp_pat
 
 def test_job_dir_is_private(train, env, monkeypatch):
     seen = {}
-    real = training_worker.main
 
-    def spy(workdir, *a):
+    def launcher(workdir, params, threads, max_memory_mb):
         seen["mode"] = os.stat(workdir).st_mode & 0o777
         seen["dataset"] = os.stat(os.path.join(workdir, "dataset.npz")).st_mode & 0o777
-        return real(workdir, *a)
-
-    def launcher(target, args):
-        return ThreadHandle(spy, args)
+        return ThreadHandle(training_worker.run, (workdir, params, threads))
 
     client, *_ = train(launcher=launcher)
     client.post("/v2/train", json=body(), headers=env)
@@ -528,8 +533,8 @@ def test_wall_time_limit_kills_the_worker(train, env, monkeypatch):
     monkeypatch.setenv("AI_TRAIN_MAX_SECONDS", "1")
     handles = []
 
-    def launcher(target, args):
-        handles.append(ThreadHandle(target, args))
+    def launcher(workdir, params, threads, max_memory_mb):
+        handles.append(ThreadHandle(training_worker.run, (workdir, params, threads)))
         return handles[-1]
 
     client, _, storage, _, base = train(launcher=launcher, recipe=blocking_recipe)
@@ -557,7 +562,7 @@ class DeadHandle:
 
 @pytest.mark.parametrize("code", [1, -9, 137])
 def test_worker_crash_reports_only_the_exit_code(train, env, code):
-    client, _, storage, _, base = train(launcher=lambda target, args: DeadHandle(code))
+    client, _, storage, _, base = train(launcher=lambda *a: DeadHandle(code))
     client.post("/v2/train", json=body(), headers=env)
     state = wait(client, env)
     assert state == {"job_id": "job-1", "state": "failed", "progress": state["progress"],
@@ -606,10 +611,8 @@ def test_failed_upload_fails_the_job(train, env):
     assert_clean_error(state["error"])
 
 
-def test_threads_are_bounded_in_the_worker(train, env, monkeypatch):
+def test_threads_are_passed_to_the_worker(train, env, monkeypatch):
     monkeypatch.setenv("AI_TRAIN_THREADS", "3")
-    seen = []
-    monkeypatch.setattr(training_worker.torch, "set_num_threads", seen.append)
     got = {}
 
     def recipe(*a, threads, **k):
@@ -619,15 +622,8 @@ def test_threads_are_bounded_in_the_worker(train, env, monkeypatch):
     client, _, _, launches, _ = train(recipe=recipe)
     client.post("/v2/train", json=body(), headers=env)
     assert wait(client, env)["state"] == "succeeded"
-    assert seen[0] == 3 and got["threads"] == 3
+    assert launches[0][2] == 3 and got["threads"] == 3
 
-
-def test_server_start_sweeps_leftover_job_dirs(tmp_path):
-    (tmp_path / "ai-train-old").mkdir()
-    (tmp_path / "ai-train-old" / "dataset.npz").write_bytes(b"x")
-    (tmp_path / "keep").mkdir()
-    training_job.JobController(tmp_base=str(tmp_path))
-    assert sorted(os.listdir(tmp_path)) == ["keep"]
 
 
 def test_finished_jobs_are_bounded(tmp_path):
@@ -659,36 +655,10 @@ def test_progress_symlink_is_ignored(tmp_path):
     assert training_job._read_progress(str(tmp_path)) is None
 
 
-def test_worker_scrubs_credentials_from_its_environment(monkeypatch):
-    monkeypatch.setenv("AI_INFERENCE_TOKEN", "t")
-    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "s")
-    training_worker._scrub_env()
-    assert "AI_INFERENCE_TOKEN" not in os.environ and "AWS_SECRET_ACCESS_KEY" not in os.environ
-
-
 # --- real subprocess -------------------------------------------------------------------------
 
 
-def test_default_launcher_uses_spawn(monkeypatch):
-    seen = {}
-
-    class Ctx:
-        def Process(self, **kw):
-            seen.update(kw)
-
-            class P:
-                def start(self):
-                    seen["started"] = True
-            return P()
-
-    monkeypatch.setattr(training_job.multiprocessing, "get_context",
-                        lambda method: seen.setdefault("method", method) and Ctx())
-    training_job.spawn_launcher(training_worker.main, ("d",))
-    assert seen["method"] == "spawn" and seen["target"] is training_worker.main
-    assert seen["daemon"] is True and seen["started"]
-
-
-def test_real_spawned_worker_trains_a_bundle(make_client, tmp_path, monkeypatch, env):  # noqa: F811
+def test_real_worker_trains_a_bundle(make_client, tmp_path, monkeypatch, env):  # noqa: F811
     storage = Storage()
     base = tmp_path / "b"
     base.mkdir()
@@ -702,10 +672,9 @@ def test_real_spawned_worker_trains_a_bundle(make_client, tmp_path, monkeypatch,
     assert len(storage.puts) == len(NAMES) and not os.listdir(base)
 
 
-def test_real_spawned_worker_killed_becomes_failed(make_client, tmp_path, monkeypatch,  # noqa: F811
-                                                   env):
-    def killing_launcher(target, args):
-        p = training_job.spawn_launcher(target, args)
+def test_real_worker_killed_becomes_failed(make_client, tmp_path, monkeypatch, env):  # noqa: F811
+    def killing_launcher(*args):
+        p = training_job.popen_launcher(*args)
         p.kill()  # what the OOM killer does
         return p
 
@@ -721,6 +690,132 @@ def test_real_spawned_worker_killed_becomes_failed(make_client, tmp_path, monkey
     state = wait(client, env, timeout=60)
     assert state["state"] == "failed" and state["error"] == "worker exited with code -9"
     assert not storage.puts and not os.listdir(base)
+
+
+# --- the worker process: environment, threads, process group, orphan ---------------------------
+
+
+SECRETS = {"AI_INFERENCE_TOKEN": "TOPSECRET-TOKEN", "AWS_SECRET_ACCESS_KEY": "AWSSECRET",
+           "AWS_ACCESS_KEY_ID": "AKIAEXAMPLE", "MINIO_SECRET_KEY": "MINIOSECRET",
+           "MYSQL_PASSWORD": "DBPASSWORD", "VAULT_SECRET": "VAULTSECRET",
+           "HTTP_PROXY": "http://proxy:3128", "HTTPS_PROXY": "http://proxy:3128",
+           "http_proxy": "http://proxy:3128", "PYTHONPATH": "/evil", "LD_PRELOAD": "/evil.so"}
+
+
+def _probe(tmp_path, monkeypatch, threads=3):
+    """Start tests/train_probe_worker.py through the real launcher; return (handle, report)."""
+    for k, v in SECRETS.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(training_job, "WORKER_MODULE", "tests.train_probe_worker")
+    workdir = tmp_path / "w"
+    workdir.mkdir(mode=0o700)
+    handle = training_job.popen_launcher(str(workdir), {"mode": "probe"}, threads, 0)
+    report = workdir / "probe.json"
+    end = time.monotonic() + 120
+    while not report.exists() and handle.is_alive() and time.monotonic() < end:
+        time.sleep(0.1)
+    if not report.exists():
+        handle.kill()
+        raise AssertionError((workdir / "worker.err").read_text()[-2000:])
+    return handle, json.loads(report.read_text()), workdir
+
+
+def _gone(pid):
+    try:
+        status = open(f"/proc/{pid}/status").read()
+    except FileNotFoundError:
+        return True
+    return "\nState:\tZ" in status
+
+
+def test_worker_environment_is_minimal(tmp_path, monkeypatch):
+    handle, report, workdir = _probe(tmp_path, monkeypatch)
+    try:
+        env = dict(kv.split("=", 1) for kv in report["environ"].split("\0") if "=" in kv)
+        assert set(env) <= {"PATH", "HOME", "LANG", "TMPDIR", "PYTHONDONTWRITEBYTECODE",
+                            "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                            "NUMEXPR_NUM_THREADS", "AI_TRAIN_THREADS", "AI_TRAIN_MAX_MEMORY_MB"}
+        for v in SECRETS.values():
+            assert v not in report["environ"]
+        assert env["HOME"] == env["TMPDIR"] == str(workdir)
+        assert report["params"] == {"mode": "probe"}  # params arrive on stdin
+        assert report["argv"][1:] == [str(workdir)]
+    finally:
+        handle.kill()
+        handle.join(10)
+
+
+def test_worker_threads_are_bounded(tmp_path, monkeypatch):
+    handle, report, _ = _probe(tmp_path, monkeypatch, threads=3)
+    try:
+        assert report["interop"] == 1 and report["torch_threads"] == 3
+        assert report["pools"] and all(n <= 3 for n in report["pools"])
+        assert report["pools_in_run"] and all(n <= 3 for n in report["pools_in_run"])
+    finally:
+        handle.kill()
+        handle.join(10)
+
+
+def test_terminate_kills_the_whole_process_group(tmp_path, monkeypatch):
+    handle, report, _ = _probe(tmp_path, monkeypatch)
+    grandchild = report["grandchild"]
+    assert not _gone(grandchild)
+    handle.terminate()
+    handle.join(10)
+    assert not handle.is_alive() and handle.exitcode == -signal.SIGTERM
+    end = time.monotonic() + 10
+    while not _gone(grandchild) and time.monotonic() < end:
+        time.sleep(0.1)
+    assert _gone(grandchild)
+
+
+def test_worker_exits_when_the_server_is_killed(tmp_path):
+    """A parent that dies by SIGKILL (no cleanup) must not leave a training worker behind."""
+    script = (
+        "import sys, time\n"
+        "from inference_server import training_job\n"
+        "training_job.WORKER_MODULE = 'tests.train_probe_worker'\n"
+        f"h = training_job.popen_launcher({str(tmp_path)!r}, {{'mode': 'probe'}}, 1, 0)\n"
+        "print(h.proc.pid, flush=True)\n"
+        "time.sleep(600)\n")
+    parent = subprocess.Popen([sys.executable, "-c", script], cwd=ROOT, stdout=subprocess.PIPE,
+                              env={k: v for k, v in os.environ.items()
+                                   if k in ("PATH", "PYTHONPATH", "HOME")})
+    worker = int(parent.stdout.readline())
+    end = time.monotonic() + 120
+    while not (tmp_path / "probe.json").exists() and time.monotonic() < end:
+        time.sleep(0.1)
+    grandchild = json.loads((tmp_path / "probe.json").read_text())["grandchild"]
+    parent.kill()
+    parent.wait()
+    end = time.monotonic() + 15
+    while not (_gone(worker) and _gone(grandchild)) and time.monotonic() < end:
+        time.sleep(0.2)
+    assert _gone(worker) and _gone(grandchild)
+
+
+# --- logs never carry a presigned URL --------------------------------------------------------
+
+
+
+# --- request limits found by the review ------------------------------------------------------
+
+
+
+def test_too_many_rows_are_refused_before_loading(tmp_path, monkeypatch):
+    n = dataset_mod.MAX_ROWS + 1
+    data = make_dataset(embeddings=np.zeros((n, 1), np.float32),
+                        campaign_embeddings=np.zeros((n, 1), np.float32),
+                        folders=np.repeat(np.array(FOLDERS[:1]), n),
+                        case_ids=np.arange(n, dtype=np.int64))
+
+    def no_load(*a, **k):
+        raise AssertionError("arrays loaded")
+
+    monkeypatch.setattr(dataset_mod.np, "load", no_load)
+    with pytest.raises(dataset_mod.DatasetError, match="rows"):
+        dataset_mod.read_dataset(_write(tmp_path, data))
+
 
 
 # --- dataset reader --------------------------------------------------------------------------

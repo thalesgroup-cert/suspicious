@@ -3,10 +3,13 @@
 One job at a time, state in memory only (a restart forgets it; Django then sees 404 and fails the
 row). Per job, a monitor thread:
 1. makes a private 0700 directory (mkdtemp) and downloads the dataset into it;
-2. starts training_worker.main in a separate process (multiprocessing spawn) with the validated
-   params, the thread count and nothing else (no URL, no credential);
-3. reads the worker's progress file, enforces cancel and the wall-time limit (terminate, then kill
-   after a grace period), reads the result file;
+2. starts `python -m inference_server.training_worker <dir>` with subprocess.Popen in a new
+   session, an explicit minimal environment (see popen_launcher) and the validated params as JSON
+   on stdin: no URL, no token, no storage key. The worker runs as the same UID, so this keeps
+   secrets out of it by construction but is not a boundary against code running inside it (see
+   training_worker's docstring);
+3. reads the worker's progress file, enforces cancel and the wall-time limit (SIGTERM to the
+   worker's process group, then SIGKILL after a grace period), reads the result file;
 4. PUTs each bundle file to its own presigned URL, manifest last;
 5. removes the directory, on every exit path. Leftovers of a crashed server are swept at start.
 
@@ -21,11 +24,13 @@ import hashlib
 import json
 import logging
 import math
-import multiprocessing
 import os
 import re
 import shutil
+import signal
 import stat
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -185,6 +190,18 @@ def _read_small(path, cap) -> Optional[bytes]:
         os.close(fd)
 
 
+def _log_worker_tail(workdir):
+    """The end of the worker's stderr, for the operator (the job error stays the exit code)."""
+    path = os.path.join(workdir, WORKER_LOG)
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(max(0, os.path.getsize(path) - 2048))
+            tail = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return
+    logger.warning("training worker failed; end of its stderr:\n%s", tail)
+
+
 def _read_progress(workdir) -> Optional[float]:
     """The worker's percent, clamped to [0, 100]; None for anything that is not one number."""
     raw = _read_small(os.path.join(workdir, training_worker.OUT, training_worker.PROGRESS), 16)
@@ -197,13 +214,77 @@ def _read_progress(workdir) -> Optional[float]:
     return min(max(v, 0.0), 100.0) if math.isfinite(v) else None
 
 
-def spawn_launcher(target, args):
-    """Default launcher: a fresh interpreter (spawn), so the worker's torch thread count and memory
-    are its own and cancel can kill it. daemon=True: it dies with the server's normal exit."""
-    p = multiprocessing.get_context("spawn").Process(target=target, args=args, daemon=True,
-                                                     name="ai-train")
-    p.start()
-    return p
+WORKER_MODULE = "inference_server.training_worker"
+PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+THREAD_ENV = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS")
+WORKER_LOG = "worker.err"
+
+
+class PopenHandle:
+    """multiprocessing.Process-like view of the worker. Signals go to its whole process group
+    (start_new_session=True made it the leader), so anything it started dies with it.
+    exitcode is negative for a signal, like multiprocessing's."""
+
+    def __init__(self, proc):
+        self.proc = proc
+
+    @property
+    def exitcode(self):
+        return self.proc.poll()
+
+    def is_alive(self):
+        return self.proc.poll() is None
+
+    def join(self, timeout=None):
+        try:
+            self.proc.wait(timeout)
+        except subprocess.TimeoutExpired:
+            pass
+
+    def _signal(self, sig):
+        try:
+            os.killpg(self.proc.pid, sig)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+    def terminate(self):
+        self._signal(signal.SIGTERM)
+
+    def kill(self):
+        self._signal(signal.SIGKILL)
+
+
+def worker_env(workdir, threads, max_memory_mb) -> dict:
+    """The worker's whole environment. Nothing is inherited from the server (no token, no storage
+    or database secret, no proxy, no PYTHONPATH or LD_PRELOAD); TMPDIR keeps scratch files inside
+    the job directory, which is removed at the end."""
+    env = {"PATH": os.environ.get("PATH") or os.defpath, "HOME": workdir, "TMPDIR": workdir,
+           "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
+           "AI_TRAIN_THREADS": str(threads), "AI_TRAIN_MAX_MEMORY_MB": str(max_memory_mb)}
+    env.update({k: str(threads) for k in THREAD_ENV})
+    return env
+
+
+def popen_launcher(workdir, params, threads, max_memory_mb):
+    """Default launcher. No shell; the module name is a constant and the params travel as JSON on
+    stdin (at most training_worker.MAX_PARAMS bytes); stdout and stderr go to a 0600 file in the
+    job directory."""
+    data = json.dumps(params, allow_nan=False).encode()
+    if len(data) > training_worker.MAX_PARAMS:
+        raise JobError("params too large")
+    fd = os.open(os.path.join(workdir, WORKER_LOG), os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                 | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as log:
+        proc = subprocess.Popen([sys.executable, "-s", "-m", WORKER_MODULE, workdir],
+                                cwd=PACKAGE_ROOT, env=worker_env(workdir, threads, max_memory_mb),
+                                stdin=subprocess.PIPE, stdout=log, stderr=log, close_fds=True,
+                                start_new_session=True)
+    try:
+        proc.stdin.write(data)  # below the pipe buffer: never blocks
+        proc.stdin.close()
+    except BrokenPipeError:
+        pass  # the worker died first; its exit code tells
+    return PopenHandle(proc)
 
 
 # --- jobs ------------------------------------------------------------------------------------
@@ -231,7 +312,7 @@ def _env_int(name, default, low):
 
 
 class JobController:
-    def __init__(self, *, launcher=spawn_launcher, transport=None, tmp_base=None,
+    def __init__(self, *, launcher=popen_launcher, transport=None, tmp_base=None,
                  grace_seconds=10.0, poll_seconds=0.5):
         self.launcher = launcher
         self.transport = transport  # tests inject an httpx.MockTransport
@@ -320,8 +401,7 @@ class JobController:
                 self._download(client, dataset_url, os.path.join(workdir, training_worker.DATASET),
                                job, deadline)
                 self._checkpoint(job, deadline)
-                handle = self.launcher(training_worker.main,
-                                       (workdir, params, threads, max_memory_mb))
+                handle = self.launcher(workdir, params, threads, max_memory_mb)
                 while handle.is_alive():
                     handle.join(self.poll_seconds)
                     pct = _read_progress(workdir)
@@ -329,6 +409,7 @@ class JobController:
                         job.progress = pct * 0.98  # the last 2% are the uploads
                     self._checkpoint(job, deadline)
                 if handle.exitcode != 0:
+                    _log_worker_tail(workdir)
                     raise JobError(f"worker exited with code {handle.exitcode}")
                 result, blobs = self._collect(workdir)
                 for name in UPLOAD_NAMES:
@@ -348,8 +429,10 @@ class JobController:
             # the state turns terminal only once the worker is gone and the directory removed, so
             # a new job cannot start beside a dying one
             try:
-                if handle is not None and handle.is_alive():
-                    self._stop(handle)
+                if handle is not None:
+                    if handle.is_alive():
+                        self._stop(handle)
+                    handle.kill()  # anything left in the worker's process group
             finally:
                 if workdir:
                     shutil.rmtree(workdir, ignore_errors=True)
