@@ -1,4 +1,6 @@
 """Token-protected /v2 API of the inference server."""
+import json
+import logging
 import time
 from typing import Annotated, Literal
 
@@ -7,9 +9,16 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
+from training.recipe import NoNeighbours
+
 from . import bundles
 from .auth import require_token
 from .training_job import JOB_ID_RE, MAX_BODY, TrainRequest
+
+logger = logging.getLogger("inference_server.v2")
+# A classify body holds a whole mail (truncated to max_chars after parsing); JSON escapes can take
+# 6 bytes per character, so the cap leaves room for that and still bounds what is read.
+MAX_CLASSIFY_BODY = 32 * 2**20
 
 # Version 0 (no bundle loaded): the legacy classifier as-is.
 ACTIVE_VERSION = bundles.LEGACY_VERSION
@@ -23,15 +32,23 @@ class ClassifyRequest(BaseModel):
     exclude_case_ids: list[CaseId] = Field(default_factory=list, max_length=1000)
 
 
-async def _read_json(request: Request, model):
+async def _read_json(request: Request, model, cap=MAX_BODY, *, mail_text=False):
     """The body, capped while reading (Content-Length or not), validated by model. 422 answers
-    carry no input values: they may be presigned URLs."""
+    carry `loc` and `msg` only, never input values: they may be presigned URLs or mail text.
+    mail_text: parse with json.loads, which accepts a lone surrogate escape ("\\ud800") that
+    pydantic's parser refuses; classify then replaces it, as before this reader existed."""
     body = bytearray()
     async for chunk in request.stream():
         body += chunk
-        if len(body) > MAX_BODY:
+        if len(body) > cap:
             raise HTTPException(413, "request body too large")
     try:
+        if mail_text:
+            try:
+                data = json.loads(bytes(body))
+            except ValueError:
+                raise HTTPException(422, [{"loc": [], "msg": "Invalid JSON"}]) from None
+            return model.model_validate(data)
         return model.model_validate_json(bytes(body))
     except ValidationError as e:
         errors = e.errors(include_url=False, include_input=False, include_context=False)
@@ -65,6 +82,8 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
             raise HTTPException(409, "a reload is already running") from None
         except bundles.ReloadError as e:
             raise HTTPException(422, str(e)) from None
+        except bundles.ReloadFailed:
+            raise HTTPException(500, "reload failed") from None
         return versions  # {"active": {...}, "shadow": {...} (when loaded)}
 
     def _job(job_id, view):
@@ -94,10 +113,14 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
         return {"name": "ai_mail", "versions": holder.describe()}
 
     @router.post("/models/ai_mail/classify", dependencies=[Depends(require_token)])
-    def classify_mail(req: ClassifyRequest):
+    async def classify_mail(request: Request):
+        req = await _read_json(request, ClassifyRequest, MAX_CLASSIFY_BODY, mail_text=True)
+        return await run_in_threadpool(_classify, req)
+
+    def _classify(req: ClassifyRequest):
         # Only the active version exists until the registry lands.
         if req.versions != ["active"]:
-            raise HTTPException(400, f"Unsupported versions {req.versions!r}, expected ['active']")
+            raise HTTPException(400, "Unsupported versions, expected ['active']")
         active, _ = holder.state  # read once: a concurrent reload does not change this request
         if active is None:
             detail = store.unavailable("personal")
@@ -120,8 +143,11 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
             try:
                 legacy = bundles.classify_bundle(active, store.vectorizer, body, slots,
                                                  exclude_case_ids=req.exclude_case_ids)
-            except ValueError as e:  # every neighbour excluded
+            except NoNeighbours as e:  # every neighbour excluded
                 raise HTTPException(422, str(e)) from None
+            except Exception as e:  # noqa: BLE001 - the class only: a message may hold mail data
+                logger.error("bundle classify failed: %s", type(e).__name__)
+                raise HTTPException(500, "classification failed") from None
         return {
             "results": {"active": {
                 "version": active.version_id if active else ACTIVE_VERSION["id"],
@@ -142,6 +168,10 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
         }
 
     @router.post("/embed", dependencies=[Depends(require_token)])
+    async def embed_route(request: Request):
+        req = await _read_json(request, EmbedRequest, MAX_CLASSIFY_BODY, mail_text=True)
+        return await run_in_threadpool(embed, req)
+
     def embed(req: EmbedRequest):
         # Version 0: both profiles use the legacy encode, so they give the same vectors.
         vectorizer = store.vectorizer

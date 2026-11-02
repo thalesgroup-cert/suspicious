@@ -158,6 +158,10 @@ def _unit(X):
     return X / np.maximum(np.linalg.norm(X, axis=1, keepdims=True), 1e-12)
 
 
+class NoNeighbours(ValueError):
+    """The neighbour index is empty, or exclude_case_ids left no row."""
+
+
 @dataclass
 class Knn:
     embeddings: np.ndarray  # labelled embeddings, one row per ledger mail
@@ -178,7 +182,7 @@ class Knn:
             keep = ~np.isin(self.case_ids, np.asarray(exclude_case_ids, dtype=np.int64))
             emb, labels = emb[keep], labels[keep]
         if len(emb) == 0:
-            raise ValueError("empty neighbour index")
+            raise NoNeighbours("empty neighbour index")
         d = 1.0 - _unit(X) @ _unit(emb).T
         k = min(K, d.shape[1])
         nn_idx = np.argsort(d, axis=1, kind="stable")[:, :k]

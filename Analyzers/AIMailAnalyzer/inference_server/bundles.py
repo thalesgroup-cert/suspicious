@@ -15,6 +15,7 @@ The loaded models live in one tuple (active, shadow), replaced under a lock: a c
 the tuple once and finishes on the objects it read. `active` None means the legacy v1 weights in
 the operator-owned models/ directory (rollback to version 0). `shadow` is stored and reported but
 not used by classify yet (Plan F)."""
+import logging
 import os
 import shutil
 import tempfile
@@ -35,10 +36,11 @@ from training.recipe import (
 )
 
 from .training_job import (
-    JOB_ID_PATTERN, MAX_URL, UPLOAD_NAMES, JobError, allowed_hosts, check_url,
+    JOB_ID_PATTERN, MAX_URL, UPLOAD_NAMES, JobError, _env_int, allowed_hosts, check_url,
     default_base_dir, download, install_log_redaction, make_client, sweep,
 )
 
+logger = logging.getLogger("inference_server.bundles")
 PREPROCESSING_LEGACY = "legacy-first128"
 KNOWN_PREPROCESSING = (PREPROCESSING_LEGACY, PREPROCESSING_VERSION_TOKENS,
                        PREPROCESSING_VERSION_WORDS90)
@@ -57,6 +59,10 @@ class ReloadError(Exception):
 
 class ReloadBusy(Exception):
     pass
+
+
+class ReloadFailed(Exception):
+    """An unexpected error while loading: a 500 with a generic body (logged by class name)."""
 
 
 # --- request -----------------------------------------------------------------------------------
@@ -96,8 +102,10 @@ class LoadedModel:
     calibration: dict  # temperatures used by predict; tiers and scores are Task 9's
 
     def describe(self) -> dict:
+        # calibrated: temperatures are applied on this path (not for legacy-first128 bundles)
+        calibrated = self.preprocessing_version != PREPROCESSING_LEGACY
         return {"id": self.version_id, "preprocessing": self.preprocessing_version,
-                "campaign_embedding_version": CAMPAIGN_EMBEDDING_VERSION, "calibrated": True,
+                "campaign_embedding_version": CAMPAIGN_EMBEDDING_VERSION, "calibrated": calibrated,
                 "manifest_sha256": self.manifest_sha256}
 
     def legacy_models(self) -> dict:
@@ -161,7 +169,7 @@ class ModelHolder:
             self._reload_lock.release()
 
     def _load(self, role, spec, urls, base, vectorizer, width) -> LoadedModel:
-        deadline = time.monotonic() + float(os.environ.get("AI_RELOAD_MAX_SECONDS", "300"))
+        deadline = time.monotonic() + _env_int("AI_RELOAD_MAX_SECONDS", 300, 1)
 
         def check():
             if time.monotonic() > deadline:
@@ -181,6 +189,9 @@ class ModelHolder:
             bundle = read_bundle(workdir, manifest_sha256=spec.manifest_sha256)
         except (JobError, BundleError) as e:
             raise ReloadError(f"{role}: {e}" if isinstance(e, BundleError) else str(e)) from None
+        except Exception as e:  # noqa: BLE001 - the class only; the directory goes in finally
+            logger.error("reload %s failed: %s", role, type(e).__name__)
+            raise ReloadFailed() from None
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
@@ -209,7 +220,7 @@ def classify_bundle(model: LoadedModel, vectorizer, body: str, slots,
     pass (cmp-e1). Main probabilities are training.recipe.predict's calibrated blend; sub-type
     probabilities are weighted by the main probability as the legacy path does. Contributing
     phrases are not computed (an occlusion pass would cost up to 40 chunked re-embeddings).
-    Raises ValueError when exclude_case_ids leaves no neighbour."""
+    Raises training.recipe.NoNeighbours when exclude_case_ids leaves no neighbour."""
     by_tokens = model.preprocessing_version == PREPROCESSING_VERSION_TOKENS
     with slots:
         x = chunk_mean_embedding(vectorizer, body, by_tokens=by_tokens)

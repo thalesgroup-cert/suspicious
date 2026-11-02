@@ -565,3 +565,90 @@ def test_knn_vote_exclusion_unit():
         knn.vote(x, exclude_case_ids=[10, 11, 12, 13])
     no_ids = Knn(np.eye(4, dtype=np.float32), np.array([0, 1, 2, 2]))
     assert no_ids.vote(x, exclude_case_ids=[10]).tolist() == knn.vote(x).tolist()
+
+
+# --- fix wave (review of Task 6b) ------------------------------------------------------------
+
+
+def test_calibrated_only_where_temperatures_apply(app, token_env, tmp_path):
+    client, holder, storage, _ = app
+    meta = lambda: client.get("/v2/models/ai_mail", headers=token_env).json()["versions"]  # noqa
+    assert meta()["active"]["calibrated"] is False  # active null: legacy weights
+    spec, _ = make_bundle(tmp_path, storage, version="v0-import", preprocessing="legacy-first128",
+                          heads=legacy_heads(tmp_path / "models"))
+    assert reload(client, token_env, active=spec).json()["active"]["calibrated"] is False
+    assert meta()["active"]["calibrated"] is False
+    spec, _ = make_bundle(tmp_path, storage, version="v-cm")
+    assert reload(client, token_env, active=spec).json()["active"]["calibrated"] is True
+
+
+@pytest.mark.parametrize("path, payload", [
+    ("/v2/models/ai_mail/classify", {"mail_body": BODY, "exclude_case_ids": [True]}),
+    ("/v2/models/ai_mail/classify", {"mail_body": BODY, "exclude_case_ids": ["SECRETVALUE"]}),
+    ("/v2/models/ai_mail/classify", {"mail_body": "SECRETVALUE " * 3,
+                                     "exclude_case_ids": list(range(1001))}),
+    ("/v2/models/ai_mail/classify", {"mail_body": {"x": "SECRETVALUE"}}),
+    ("/v2/models/ai_mail/classify", {"mail_body": 12345678}),
+    ("/v2/embed", {"texts": ["SECRETVALUE"], "profile": "SECRETVALUE"}),
+    ("/v2/embed", {"texts": ["SECRETVALUE"] * 33, "profile": "classifier"}),
+])
+def test_validation_errors_never_echo_the_request(app, token_env, path, payload):
+    client, *_ = app
+    r = client.post(path, json=payload, headers=token_env)
+    assert r.status_code == 422
+    assert "SECRETVALUE" not in r.text and "12345678" not in r.text
+    for err in r.json()["detail"]:
+        assert set(err) == {"loc", "msg"}
+
+
+def test_classify_body_cap_is_large_but_bounded(app, token_env, monkeypatch):
+    client, *_ = app
+    from inference_server import v2
+    assert v2.MAX_CLASSIFY_BODY >= 16 * server.MAX_MAIL_CHARS
+    monkeypatch.setattr(v2, "MAX_CLASSIFY_BODY", 1000)
+    r = client.post("/v2/models/ai_mail/classify", json={"mail_body": "x" * 2000},
+                    headers=token_env)
+    assert r.status_code == 413
+
+
+def test_no_neighbours_is_its_own_error():
+    knn = Knn(np.ones((1, 4), np.float32), np.array([0]), np.array([5], dtype=np.int64))
+    with pytest.raises(recipe.NoNeighbours):
+        knn.vote(np.ones((1, 4), np.float32), exclude_case_ids=[5])
+    assert issubclass(recipe.NoNeighbours, ValueError)
+
+
+def test_other_classify_errors_are_a_generic_500(app, token_env, tmp_path, monkeypatch, caplog):
+    client, holder, storage, _ = app
+    spec, _ = make_bundle(tmp_path, storage)
+    assert reload(client, token_env, active=spec).status_code == 200
+
+    def boom(*a, **k):
+        raise ValueError("SECRETVALUE in a message")
+
+    monkeypatch.setattr(bundles, "classify_bundle", boom)
+    r = client.post("/v2/models/ai_mail/classify", json={"mail_body": BODY}, headers=token_env)
+    assert r.status_code == 500 and "SECRETVALUE" not in r.text
+    assert "ValueError" in caplog.text and "SECRETVALUE" not in caplog.text
+
+
+def test_reload_time_limit_env_falls_back_on_a_bad_value(app, token_env, tmp_path, monkeypatch):
+    client, holder, storage, _ = app
+    monkeypatch.setenv("AI_RELOAD_MAX_SECONDS", "not-a-number")
+    spec, _ = make_bundle(tmp_path, storage)
+    assert reload(client, token_env, active=spec).status_code == 200
+
+
+def test_unexpected_reload_error_is_a_generic_500(loaded, token_env, tmp_path, monkeypatch,
+                                                  caplog):
+    client, holder, storage, base = loaded
+    spec, _ = make_bundle(tmp_path, storage, version="v-new")
+
+    def boom(*a, **k):
+        raise RuntimeError("SECRETVALUE")
+
+    monkeypatch.setattr(bundles, "read_bundle", boom)
+    r = reload(client, token_env, active=spec)
+    assert r.status_code == 500 and "SECRETVALUE" not in r.text
+    assert "RuntimeError" in caplog.text and "SECRETVALUE" not in caplog.text
+    assert holder.state[0].version_id == "v-old" and not os.listdir(base)
