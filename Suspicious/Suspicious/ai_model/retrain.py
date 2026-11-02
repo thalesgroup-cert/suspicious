@@ -101,7 +101,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         raise RetrainRefused("another retrain job is running") from None
     from .tasks import poll_retrain
     # Queued before the call: if this process dies during it, the poll still settles the job.
-    poll_retrain.apply_async((job_id,), countdown=POLL_SECONDS)
+    poll_retrain.apply_async((job_id,), countdown=poll_countdown())
     from connectors.contrib.ai_model.client import ServerBusy
     from connectors.providers import ProviderUnavailable
     body = {"job_id": job_id, "dataset_url": exported.url, "bundle_urls": bundle_urls, "params": params}
@@ -122,30 +122,26 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
 
 
 def poll_once(job_id: str) -> str:
-    """Ask the server once and settle the job if it ended. Returns the job's state after."""
+    """Ask the server once and settle the job if it ended. Returns the job's state after.
+    The server's answer comes first: a job it finished is registered even when polled after
+    MAX_AGE; MAX_AGE only ends a job that is still running (or that nobody can ask about)."""
     from connectors.contrib.ai_model.client import TrainJobGone
     from connectors.providers import ProviderUnavailable
 
     job = RetrainJob.objects.get(job_id=job_id)
     if job.state != J.RUNNING:
         return job.state
-    client = _connector(check_enabled=False)._client()
-    if timezone.now() - job.started_at > MAX_AGE:
-        try:
-            client.train_cancel(job_id)
-        except Exception as exc:  # noqa: BLE001 — best effort, the job is failed either way
-            logger.info("Retrain %s: cancel on timeout failed: %s", job_id, type(exc).__name__)
-        return _finish(job, J.FAILED, "TimedOut").state
+    client, answer = None, None
     try:
+        client = _connector(check_enabled=False)._client()  # ValueError: no token or bad url
         answer = client.train_status(job_id)
     except TrainJobGone:  # the server restarted or never got the job
         return _finish(job, J.FAILED, "TrainJobGone").state
     except ProviderUnavailable as exc:
-        if exc.retryable:
-            return J.RUNNING
-        return _finish(job, J.FAILED, type(exc).__name__).state
-    except ValueError:
-        return J.RUNNING
+        if not exc.retryable:
+            return _finish(job, J.FAILED, type(exc).__name__).state
+    except ValueError:  # a 4xx, or the connector is misconfigured: ask again later
+        pass
     state = answer.get("state") if isinstance(answer, dict) else None
     if state == "succeeded":
         return _finish(job, J.SUCCEEDED, report=answer.get("report")).state
@@ -153,7 +149,22 @@ def poll_once(job_id: str) -> str:
         return _finish(job, J.FAILED, "TrainingFailed").state  # the server's text is not kept
     if state == "cancelled":
         return _finish(job, J.CANCELLED).state
+    if timezone.now() - job.started_at > MAX_AGE:
+        try:
+            client.train_cancel(job_id)
+        except Exception as exc:  # noqa: BLE001 — best effort (client may be None), failed either way
+            logger.info("Retrain %s: cancel on timeout failed: %s", job_id, type(exc).__name__)
+        return _finish(job, J.FAILED, "TimedOut").state
     return J.RUNNING
+
+
+def poll_countdown() -> int:
+    """Seconds before the next poll: at least POLL_SECONDS, and longer than the client timeout, so
+    a slow POST /v2/train is not answered 404 by a poll that overtook it."""
+    try:
+        return max(POLL_SECONDS, int(_connector(check_enabled=False)._client().timeout) + 5)
+    except Exception:  # noqa: BLE001 — a misconfigured connector still gets polled
+        return POLL_SECONDS
 
 
 def _manifest(job, report):

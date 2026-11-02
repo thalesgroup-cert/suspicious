@@ -326,8 +326,46 @@ class PollTest(RetrainBase):
         RetrainJob.objects.filter(pk=job.pk).update(started_at=timezone.now() - timedelta(hours=6, seconds=1))
         self.assertEqual(retrain.poll_once(job.job_id), J.FAILED)
         self.cancel.assert_called_once_with(job.job_id)
-        self.status.assert_not_called()
+        self.status.assert_called_once_with(job.job_id)  # the server is asked first
         self.check_cleaned(job, J.FAILED, "TimedOut")
+
+    def test_a_job_the_server_finished_is_registered_even_when_polled_late(self):
+        job = self.start()
+        RetrainJob.objects.filter(pk=job.pk).update(started_at=timezone.now() - timedelta(hours=7))
+        self.status.return_value = succeeded()
+        self.assertEqual(retrain.poll_once(job.job_id), J.SUCCEEDED)
+        self.cancel.assert_not_called()
+        self.assert_active_unchanged()
+
+    def test_the_poll_chain_survives_a_missing_token(self):
+        job = self.start()
+        tasks.poll_retrain.apply_async.reset_mock()
+        self.config = dict(CONFIG, token="")
+        tasks.poll_retrain(job.job_id)
+        tasks.poll_retrain.apply_async.assert_called_once_with((job.job_id,), countdown=30)
+        self.assertEqual(RetrainJob.objects.get(pk=job.pk).state, J.RUNNING)
+
+    def test_the_poll_chain_survives_a_database_error_while_settling(self):
+        from django.db import DatabaseError
+        job = self.start()
+        tasks.poll_retrain.apply_async.reset_mock()
+        self.status.return_value = view("failed")
+        with mock.patch.object(retrain, "_finish", side_effect=DatabaseError("gone")), \
+                self.assertRaises(DatabaseError):
+            tasks.poll_retrain(job.job_id)
+        tasks.poll_retrain.apply_async.assert_called_once_with((job.job_id,), countdown=30)
+
+    def test_the_chain_ends_with_the_job(self):
+        job = self.start()
+        tasks.poll_retrain.apply_async.reset_mock()
+        self.status.return_value = view("cancelled")
+        tasks.poll_retrain(job.job_id)
+        tasks.poll_retrain.apply_async.assert_not_called()
+
+    def test_the_countdown_outlasts_the_client_timeout(self):
+        self.config = dict(CONFIG, timeout_seconds=60)
+        job = retrain.start_retrain()
+        tasks.poll_retrain.apply_async.assert_called_once_with((job.job_id,), countdown=65)
 
     def test_a_stale_job_does_not_block_the_next_start(self):
         job = self.start()
