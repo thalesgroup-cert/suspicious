@@ -296,11 +296,10 @@ services:
       # Hosts the presigned dataset and bundle URLs may point at (host:port, comma separated);
       # empty refuses every URL. The object store as Django presigns it (get_store()).
       AI_BUNDLE_HOSTS: "${AI_BUNDLE_HOSTS:-rustfs:9000}"
-      # Threads of the training worker; the BLAS pools follow so they do not oversubscribe.
+      # Threads of the training worker only: the server passes it to the worker as its
+      # OMP/MKL/OPENBLAS thread counts. Classify keeps torch's default threads. A future CPU
+      # limit on this container needs its own server-thread variable, or classify oversubscribes.
       AI_TRAIN_THREADS: "${AI_TRAIN_THREADS:-2}"
-      OMP_NUM_THREADS: "${AI_TRAIN_THREADS:-2}"
-      MKL_NUM_THREADS: "${AI_TRAIN_THREADS:-2}"
-      OPENBLAS_NUM_THREADS: "${AI_TRAIN_THREADS:-2}"
     volumes:
       # Weights are bind-mounted (not baked into the image) so the retrain
       # pipeline can promote new ones in place; the server hot-reloads them.
