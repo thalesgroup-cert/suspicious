@@ -10,7 +10,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from ai_model import registry, retrain, tasks
-from ai_model.models import ModelVersion, RetrainJob
+from ai_model.models import LabelRecord, ModelVersion, RetrainJob
 from ai_model.tests.test_label_sync import CONFIG
 from ai_model.tests.test_training_export import full_ledger, make_row
 from common.storage.fake import FakeObjectStore
@@ -439,6 +439,40 @@ class ScheduleTest(RetrainBase):
         retrain.start_retrain()
         tasks.maybe_start_retrain()  # running: no exception
         self.assertEqual(RetrainJob.objects.count(), 1)
+
+    def test_a_refused_scheduled_start_backs_off_for_seven_days(self):
+        registry.ensure_version_zero()
+        ModelVersion.objects.update(created_at=timezone.now() - timedelta(days=31))
+        stale = make_row(999, pv="legacy-first128")
+        tasks.maybe_start_retrain()
+        refused = RetrainJob.objects.get()
+        self.assertEqual((refused.state, refused.error, refused.running_slot, refused.trigger),
+                         (J.FAILED, "Refused", None, "schedule"))
+        LabelRecord.objects.filter(pk=stale.pk).delete()
+        tasks.maybe_start_retrain()  # within 7 days: nothing
+        self.assertEqual(RetrainJob.objects.count(), 1)
+        RetrainJob.objects.update(started_at=timezone.now() - timedelta(days=8))
+        tasks.maybe_start_retrain()
+        self.assertEqual(RetrainJob.objects.filter(state=J.RUNNING).count(), 1)
+
+    def test_a_failed_scheduled_job_also_backs_off_but_a_manual_one_does_not(self):
+        registry.ensure_version_zero()
+        ModelVersion.objects.update(created_at=timezone.now() - timedelta(days=31))
+        job = retrain.start_retrain()
+        self.status.return_value = view("failed")
+        retrain.poll_once(job.job_id)
+        tasks.maybe_start_retrain()  # the failed job was manual: a scheduled start goes ahead
+        self.assertEqual(RetrainJob.objects.filter(state=J.RUNNING, trigger="schedule").count(), 1)
+        retrain.poll_once(RetrainJob.objects.get(state=J.RUNNING).job_id)  # fails too
+        tasks.maybe_start_retrain()
+        self.assertFalse(RetrainJob.objects.filter(state=J.RUNNING).exists())
+
+    def test_a_running_job_writes_no_refused_row(self):
+        registry.ensure_version_zero()
+        ModelVersion.objects.update(created_at=timezone.now() - timedelta(days=31))
+        retrain.start_retrain()
+        tasks.maybe_start_retrain()
+        self.assertFalse(RetrainJob.objects.filter(error="Refused").exists())
 
 
 class BeatTest(TestCase):

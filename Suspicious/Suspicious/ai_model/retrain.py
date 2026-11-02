@@ -24,7 +24,8 @@ logger = logging.getLogger("ai_model.retrain")
 J = RetrainJob.State
 
 POLL_SECONDS = 30
-MAX_AGE = timedelta(hours=6)  # a job still running after this is cancelled and failed
+MAX_AGE = timedelta(hours=6)
+BACKOFF = timedelta(days=7)  # after a failed or refused scheduled retrain  # a job still running after this is cancelled and failed
 # The PUT URLs are used when training ends, so they must outlive the server's wall limit
 # (AI_TRAIN_MAX_SECONDS, 4 h by default). One key per job and the manifest hash pinned in the
 # registry bound what a leaked URL can do: overwrite an unregistered key, which reload refuses.
@@ -40,6 +41,10 @@ GATE_KEYS = ("checks", "candidate", "baseline", "campaign", "tier_cutoffs")
 
 class RetrainRefused(Exception):
     """The retrain did not start; the message says why (no URL, no mail text)."""
+
+
+class JobRunning(RetrainRefused):
+    """Another retrain job holds the running slot."""
 
 
 class IncompleteUpload(Exception):
@@ -62,16 +67,19 @@ def _parent(user):
             or registry.ensure_version_zero(user))
 
 
+def _new_ids(now):
+    return f"rt-{now:%Y%m%d%H%M%S}-{secrets.token_hex(3)}", f"v{now:%Y%m%d%H%M%S}"
+
+
 def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
     """Start one training job. RetrainRefused when the connector is disabled, a job is running,
     the export refuses (its message passes through) or the server refuses the request."""
     connector = _connector()
     job = running_job()
     if job is not None and poll_once(job.job_id) == J.RUNNING:  # finishes a stale job first
-        raise RetrainRefused(f"retrain job {job.job_id} is running")
+        raise JobRunning(f"retrain job {job.job_id} is running")
     now = timezone.now()
-    job_id = f"rt-{now:%Y%m%d%H%M%S}-{secrets.token_hex(3)}"
-    version_id = f"v{now:%Y%m%d%H%M%S}"
+    job_id, version_id = _new_ids(now)
     prefix = registry.bundle_prefix_for(version_id, job_id)
     try:
         exported = export_ledger(job_id)  # creates the dataset bucket
@@ -102,7 +110,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
                 started_at=now)
     except IntegrityError:  # another start won the running slot
         _delete_dataset(job_id)
-        raise RetrainRefused("another retrain job is running") from None
+        raise JobRunning("another retrain job is running") from None
     from .tasks import poll_retrain
     # Queued before the call: if this process dies during it, the poll still settles the job.
     poll_retrain.apply_async((job_id,), countdown=poll_countdown())
@@ -251,7 +259,9 @@ def cancel_retrain():
 
 def maybe_start():
     """The daily check: start a retrain when `retrain_enabled` is true, no job runs and the newest
-    candidate, shadow, active or previous version is older than `retrain_interval_days`."""
+    candidate, shadow, active or previous version is older than `retrain_interval_days`.
+    Backoff: a scheduled job that failed (or a scheduled start that was refused, recorded as a
+    failed job with error "Refused") within BACKOFF stops the check until it is older."""
     if not ledger.enabled():
         return None
     config = _connector().config
@@ -266,9 +276,19 @@ def maybe_start():
               .order_by("-created_at").first())
     if newest and newest.created_at > timezone.now() - timedelta(days=days):
         return None
+    now = timezone.now()
+    if RetrainJob.objects.filter(trigger=ModelVersion.Trigger.SCHEDULE, state=J.FAILED,
+                                 started_at__gte=now - BACKOFF).exists():
+        return None
     try:
-        # ponytail: a refused or failed start is tried again the next day, no backoff.
         return start_retrain(trigger=ModelVersion.Trigger.SCHEDULE)
+    except JobRunning:
+        return None
     except RetrainRefused as exc:
         logger.info("Scheduled retrain not started: %s", exc)
+        job_id, version_id = _new_ids(now)
+        RetrainJob.objects.create(
+            job_id=job_id, target_version=version_id, state=J.FAILED, running_slot=None,
+            prefix=registry.bundle_prefix_for(version_id, job_id), trigger=ModelVersion.Trigger.SCHEDULE,
+            started_at=now, finished_at=now, error="Refused")
         return None
