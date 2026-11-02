@@ -335,6 +335,12 @@ def test_empty_allow_list_refuses_everything(train, env, monkeypatch):
     assert not launches and not storage.requests
 
 
+def test_punycode_hosts_fail_closed():
+    host = "xn--bcher-kva.example:9000"
+    with pytest.raises(training_job.JobError):
+        training_job.check_url(f"http://{host}/a", {host}, "x")
+
+
 def test_allow_list_is_host_and_port(monkeypatch):
     monkeypatch.setenv("AI_BUNDLE_HOSTS", "RustFS:9000, [::1]:8080, bad, http://x:1/, u@h:1")
     assert training_job.allowed_hosts() == {"rustfs:9000", "::1:8080"}
@@ -904,6 +910,21 @@ def test_redaction_filter(message):
 # --- request limits found by the review ------------------------------------------------------
 
 
+@pytest.mark.parametrize("raw", [
+    '"x": NaN', '"x": Infinity', '"x": -Infinity', '"x": 1e999', '"x": ' + "9" * 5000,
+    '"x": ' + "[" * 40 + "]" * 40,
+])
+def test_campaign_profile_must_be_strict_json(train, env, raw):
+    client, _, _, launches, _ = train()
+    text = json.dumps(body()).replace('"min_members": 3', raw)
+    r = client.post("/v2/train", content=text, headers={**env, "Content-Type": "application/json"})
+    assert r.status_code == 422, r.text
+    assert not launches
+
+
+def test_dataset_row_cap_matches_the_group_ceiling():
+    assert dataset_mod.MAX_ROWS == 8000
+
 
 def test_too_many_rows_are_refused_before_loading(tmp_path, monkeypatch):
     n = dataset_mod.MAX_ROWS + 1
@@ -919,6 +940,27 @@ def test_too_many_rows_are_refused_before_loading(tmp_path, monkeypatch):
     with pytest.raises(dataset_mod.DatasetError, match="rows"):
         dataset_mod.read_dataset(_write(tmp_path, data))
 
+
+def test_too_many_rows_fail_the_job_without_grouping(train, env, monkeypatch):
+    n = dataset_mod.MAX_ROWS + 1
+    data = make_dataset(embeddings=np.zeros((n, 1), np.float32),
+                        campaign_embeddings=np.zeros((n, 1), np.float32),
+                        folders=np.repeat(np.array(FOLDERS[:1]), n),
+                        case_ids=np.arange(n, dtype=np.int64))
+
+    def no_groups(*a, **k):
+        raise AssertionError("groups computed")
+
+    monkeypatch.setattr(training_worker, "near_duplicate_groups", no_groups)
+    client, _, storage, *_ = train(storage=Storage(dataset=data))
+    client.post("/v2/train", json=body(), headers=env)
+    state = wait(client, env)
+    assert state["state"] == "failed" and "rows" in state["error"] and not storage.puts
+
+
+
+def test_read_timeout_is_short():
+    assert training_job.TIMEOUT.read <= 10
 
 
 # --- dataset reader --------------------------------------------------------------------------

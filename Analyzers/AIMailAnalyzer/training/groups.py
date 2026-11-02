@@ -8,7 +8,8 @@ def _cosine(X: np.ndarray) -> np.ndarray:
     # ponytail: dense n x n float32 similarity (4 n^2 bytes) plus the boolean adjacency (n^2).
     # Measured extra peak, 768-dim, few edges: 0.12 GB at 5k rows, 0.33 GB at 8k, 1.9 GB at 20k;
     # each joined pair adds about 12 bytes in the sparse graph. Ceiling about 8k rows beside the
-    # encoder; past that, switch to a radius-neighbours graph.
+    # encoder; past that, switch to a radius-neighbours graph. training.dataset.MAX_ROWS enforces it
+    # for the server's training job.
     X = np.asarray(X, dtype=np.float32)
     Xn = X / np.maximum(np.linalg.norm(X, axis=1, keepdims=True), np.float32(1e-12))
     return Xn @ Xn.T

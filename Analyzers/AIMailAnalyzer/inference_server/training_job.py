@@ -16,9 +16,12 @@ row). Per job, a monitor thread:
 URLs (Ruling E9): http or https, no userinfo, no fragment, printable ASCII only, and the
 host:port (as parsed, the scheme's default port when none is given) must be in AI_BUNDLE_HOSTS. The allow-list is the
 control: names are compared as strings, nothing is resolved, so an allowed name points wherever
-the deployment's DNS says. Redirects are never followed, proxies and .netrc are ignored, the
-dataset must announce its Content-Length, be at most 200 MB and match it exactly, and is read raw
-(no content decoding). Errors name the step, never a URL or query string.
+the deployment's DNS says. Internationalised host names never pass (fails closed): a non-ASCII
+URL is refused outright, and for a punycode host (xn--...) httpx reports the decoded name, which
+differs from urlsplit's, so the parsers disagree; use an ASCII name or an IP address. Redirects are
+never followed, proxies and .netrc are ignored, the dataset must announce its Content-Length, be
+at most 200 MB and match it exactly, and is read raw (no content decoding). Errors name the step,
+never a URL or query string.
 """
 import hashlib
 import json
@@ -41,7 +44,7 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from training.bundle import BUNDLE_FILES, MANIFEST, BundleError, _read_file
+from training.bundle import BUNDLE_FILES, JSON_CAPS, MANIFEST, BundleError, _read_file, _shape_ok
 from training.recipe import PREPROCESSING_VERSION_TOKENS, PREPROCESSING_VERSION_WORDS90
 
 from . import training_worker
@@ -111,7 +114,9 @@ TMP_PREFIX = "ai-train-"
 TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
 _URL_CHARS = re.compile(r"[\x21-\x7e]+")  # printable ASCII, no space or control character
 DEFAULT_PORTS = {"http": 80, "https": 443}
-TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=60.0, pool=5.0)
+# A cancel or the wall-time limit is checked between chunks: during a stalled download it waits up
+# to the read timeout and then ends as failed (ReadTimeout), not cancelled.
+TIMEOUT = httpx.Timeout(connect=5.0, read=10.0, write=60.0, pool=5.0)
 
 
 class JobError(Exception):
@@ -148,6 +153,14 @@ class TrainParams(BaseModel):
     @field_validator("campaign_profile")
     @classmethod
     def _profile(cls, v):
+        # strict JSON within the bundle's limits: NaN, Infinity and 1e999 (parsed as inf) are
+        # refused here rather than when the finished bundle is written
+        try:
+            size = len(json.dumps(v, allow_nan=False))
+        except (ValueError, TypeError, RecursionError):
+            raise ValueError("campaign_profile must be strict JSON") from None
+        if size > JSON_CAPS["campaign_profile.json"] or not _shape_ok(v):
+            raise ValueError("campaign_profile too large or nested too deeply")
         d = v.get("distance_threshold")
         if isinstance(d, bool) or not isinstance(d, (int, float)) or not 0 < d < 1:
             raise ValueError("distance_threshold must be a number in (0, 1)")

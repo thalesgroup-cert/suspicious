@@ -15,7 +15,7 @@ import numpy as np
 from training.bundle import MAX_INPUT_DIM, BundleError, _npz_shapes
 
 MAX_DATASET_BYTES = 200 * 2**20  # Ruling E9's download cap
-MAX_ROWS = 20000  # groups.py builds a dense n x n similarity (about 1.9 GB extra at 20k rows)
+MAX_ROWS = 8000  # groups.py's ceiling: its dense n x n similarity costs about 0.33 GB at 8k rows
 MAX_FOLDER_CHARS = 64
 FOLDERS = (
     "0_LEGIT_INTERNAL_COMMUNICATION", "0_LEGIT_EXTERNAL_COMMUNICATION", "1_SPAM", "1_NEWSLETTER",

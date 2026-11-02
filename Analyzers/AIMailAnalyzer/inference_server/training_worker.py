@@ -67,8 +67,8 @@ def _exit_with_parent():
 
 def _limit_memory(max_memory_mb):
     """Optional address-space cap (AI_TRAIN_MAX_MEMORY_MB). Off by default: torch reserves virtual
-    memory well above what it touches, so a tight value fails early; the container limit is the
-    main control and the controller reports an OOM kill as the exit code."""
+    memory well above what it touches, so a tight value fails early; the container memory limit
+    (mem_limit on the ai_inference service, Task 8) is the main control and the controller reports an OOM kill as the exit code."""
     if max_memory_mb:
         import resource
         b = int(max_memory_mb) * 2**20
