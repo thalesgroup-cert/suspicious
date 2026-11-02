@@ -631,6 +631,30 @@ def test_threads_are_passed_to_the_worker(train, env, monkeypatch):
     assert launches[0][2] == 3 and got["threads"] == 3
 
 
+def test_first_job_sweeps_leftover_job_dirs_not_the_import(train, env, monkeypatch):
+    client, controller, storage, launches, base = train()
+    (base / "ai-train-old").mkdir()
+    (base / "ai-train-old" / "dataset.npz").write_bytes(b"x")
+    (base / "keep").mkdir()
+    assert sorted(os.listdir(base)) == ["ai-train-old", "keep"]  # constructing swept nothing
+    client.post("/v2/train", json=body(), headers=env)
+    assert wait(client, env)["state"] == "succeeded"
+    assert sorted(os.listdir(base)) == ["keep"]
+
+
+def test_tmp_base_comes_from_the_environment_at_first_use(tmp_path, monkeypatch):
+    c = training_job.JobController()
+    monkeypatch.setenv("AI_TRAIN_TMPDIR", str(tmp_path))
+    assert c.base_dir() == str(tmp_path)
+
+
+def test_importing_the_server_does_not_touch_the_temp_dir(tmp_path):
+    (tmp_path / "ai-train-old").mkdir()
+    env = {k: v for k, v in os.environ.items() if k in ("PATH", "PYTHONPATH", "HOME")}
+    subprocess.run([sys.executable, "-c", "import inference_server.server"], cwd=ROOT, check=True,
+                   env={**env, "AI_TRAIN_TMPDIR": str(tmp_path)}, capture_output=True, timeout=120)
+    assert os.listdir(tmp_path) == ["ai-train-old"]
+
 
 def test_finished_jobs_are_bounded(tmp_path):
     c = training_job.JobController(tmp_base=str(tmp_path))
@@ -957,6 +981,15 @@ def test_too_many_rows_fail_the_job_without_grouping(train, env, monkeypatch):
     state = wait(client, env)
     assert state["state"] == "failed" and "rows" in state["error"] and not storage.puts
 
+
+def test_report_flags_final_temperatures_at_a_bound(train, env):
+    client, *_ = train()
+    client.post("/v2/train", json=body(), headers=env)
+    report = wait(client, env)["report"]
+    assert set(report["temperature_at_bound"]) == {"hierarchy", "knn"}
+    assert all(isinstance(v, bool) for v in report["temperature_at_bound"].values())
+    assert set(report["temperature"]) == {"hierarchy", "knn"}
+    assert all(math.isfinite(v) for v in report["temperature"].values())
 
 
 def test_read_timeout_is_short():

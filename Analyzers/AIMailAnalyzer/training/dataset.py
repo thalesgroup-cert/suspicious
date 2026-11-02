@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from training.bundle import MAX_INPUT_DIM, BundleError, _npz_shapes
+from training.bundle import MAX_INPUT_DIM, BundleError, npz_shapes
 
 MAX_DATASET_BYTES = 200 * 2**20  # Ruling E9's download cap
 MAX_ROWS = 8000  # groups.py's ceiling: its dense n x n similarity costs about 0.33 GB at 8k rows
@@ -66,7 +66,7 @@ def _matrix(name, shape, dtype, rows=None):
 def read_dataset(path) -> Dataset:
     data = _read(path)
     try:
-        shapes = _npz_shapes(data, "dataset", MAX_DATASET_BYTES)
+        shapes = npz_shapes(data, "dataset", MAX_DATASET_BYTES)
     except BundleError as e:
         raise DatasetError(str(e)) from None
     if set(shapes) != set(ARRAYS):

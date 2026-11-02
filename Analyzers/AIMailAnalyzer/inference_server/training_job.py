@@ -44,7 +44,9 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from training.bundle import BUNDLE_FILES, JSON_CAPS, MANIFEST, BundleError, _read_file, _shape_ok
+from training.bundle import (
+    BUNDLE_FILES, JSON_CAPS, MANIFEST, BundleError, json_shape_ok, read_file_capped,
+)
 from training.recipe import PREPROCESSING_VERSION_TOKENS, PREPROCESSING_VERSION_WORDS90
 
 from . import training_worker
@@ -102,7 +104,7 @@ def install_log_redaction():
 install_log_redaction()
 
 JOB_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
-_JOB_ID = re.compile(JOB_ID_PATTERN)
+JOB_ID_RE = re.compile(JOB_ID_PATTERN)
 LABEL_PATTERN = r"^[A-Za-z0-9._:/+-]{1,128}$"  # ids, digests, revisions written to the manifest
 UPLOAD_NAMES = (*BUNDLE_FILES, MANIFEST)  # upload order: the manifest last
 MAX_DOWNLOAD = 200 * 2**20  # Ruling E9
@@ -159,7 +161,7 @@ class TrainParams(BaseModel):
             size = len(json.dumps(v, allow_nan=False))
         except (ValueError, TypeError, RecursionError):
             raise ValueError("campaign_profile must be strict JSON") from None
-        if size > JSON_CAPS["campaign_profile.json"] or not _shape_ok(v):
+        if size > JSON_CAPS["campaign_profile.json"] or not json_shape_ok(v):
             raise ValueError("campaign_profile too large or nested too deeply")
         d = v.get("distance_threshold")
         if isinstance(d, bool) or not isinstance(d, (int, float)) or not 0 < d < 1:
@@ -379,22 +381,29 @@ class JobController:
                  grace_seconds=10.0, poll_seconds=0.5):
         self.launcher = launcher
         self.transport = transport  # tests inject an httpx.MockTransport
-        self.tmp_base = tmp_base or os.environ.get("AI_TRAIN_TMPDIR") or tempfile.gettempdir()
+        self.tmp_base = tmp_base  # None: AI_TRAIN_TMPDIR, else the system temp dir, at first use
         self.grace_seconds = grace_seconds
         self.poll_seconds = poll_seconds
         self.jobs: dict = {}
         self._lock = threading.Lock()
-        self._sweep()
+        self._swept = False
+
+    def base_dir(self) -> str:
+        return self.tmp_base or os.environ.get("AI_TRAIN_TMPDIR") or tempfile.gettempdir()
 
     def _sweep(self):
-        """Job directories left by a server that died mid-job (one server process per container)."""
+        """Job directories left by a server that died mid-job, removed at the first job (not at
+        import). Safe only because the server runs as ONE process (a single uvicorn worker, see
+        server.py): a second process would sweep a live job's directory, and the single-job
+        lock would not span processes."""
+        base = self.base_dir()
         try:
-            names = os.listdir(self.tmp_base)
+            names = os.listdir(base)
         except OSError:
             return
         for name in names:
             if name.startswith(TMP_PREFIX):
-                shutil.rmtree(os.path.join(self.tmp_base, name), ignore_errors=True)
+                shutil.rmtree(os.path.join(base, name), ignore_errors=True)
 
     def _evict(self):
         """ponytail: keep the last MAX_JOBS_KEPT jobs; Django polls a job within minutes."""
@@ -412,6 +421,9 @@ class JobController:
                 return 200, self.jobs[req.job_id].view()
             if any(j.state not in TERMINAL for j in self.jobs.values()):
                 return 409, {"detail": "a training job is already running"}
+            if not self._swept:  # no job runs yet in this process
+                self._sweep()
+                self._swept = True
             job = self.jobs[req.job_id] = Job(req.job_id)
             self._evict()
             try:
@@ -458,7 +470,7 @@ class JobController:
         workdir, handle = None, None
         final = ("failed", None, "internal error")  # if a BaseException escapes
         try:
-            workdir = tempfile.mkdtemp(prefix=TMP_PREFIX, dir=self.tmp_base)  # mode 0700
+            workdir = tempfile.mkdtemp(prefix=TMP_PREFIX, dir=self.base_dir())  # mode 0700
             with self._client() as client:
                 self._checkpoint(job, deadline)
                 job.state = "running"
@@ -583,7 +595,7 @@ class JobController:
             try:
                 for name in UPLOAD_NAMES:
                     fd, base = (heads, name[6:]) if name.startswith("heads/") else (root, name)
-                    blobs[name], spent = _read_file(fd, base, name, spent)
+                    blobs[name], spent = read_file_capped(fd, base, name, spent)
             finally:
                 os.close(heads)
         except BundleError as e:

@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 
 from .auth import require_token
-from .training_job import _JOB_ID, MAX_BODY, TrainRequest
+from .training_job import JOB_ID_RE, MAX_BODY, TrainRequest
 
 # The single version the server holds today: the legacy classifier as-is.
 ACTIVE_VERSION = {
@@ -51,7 +51,7 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer) -> APIRouter:
         return JSONResponse(payload, status_code=status)
 
     def _job(job_id, view):
-        if not _JOB_ID.fullmatch(job_id) or view is None:
+        if not JOB_ID_RE.fullmatch(job_id) or view is None:
             raise HTTPException(404, "unknown job")
         return view
 

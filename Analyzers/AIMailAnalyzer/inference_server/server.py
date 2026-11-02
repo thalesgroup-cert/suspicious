@@ -290,6 +290,8 @@ def _classify(models: dict, mail_body: str) -> dict:
 
 # Token-protected /v2 API; needs _classify, so it is mounted here rather than
 # right after app = FastAPI(...).
+# The training job controller keeps one job and its state in this process: the server must run as
+# a single uvicorn worker (the Dockerfile CMD), or the one-job lock and the leftover sweep break.
 trainer = JobController()
 app.include_router(
     make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS,

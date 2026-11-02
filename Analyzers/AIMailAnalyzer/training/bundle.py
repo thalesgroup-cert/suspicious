@@ -208,7 +208,7 @@ def _cap(rel):
     return min(MAX_FILE, JSON_CAPS.get(rel, MAX_FILE))
 
 
-def _read_file(dir_fd, name, rel, spent):
+def read_file_capped(dir_fd, name, rel, spent):
     """Read one regular, single-link file from an open directory; return (bytes, new total)."""
     try:
         fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
@@ -239,7 +239,7 @@ def _read_file(dir_fd, name, rel, spent):
         os.close(fd)
 
 
-def _shape_ok(v):
+def json_shape_ok(v):
     """Depth and node-count bound for parsed JSON (iterative)."""
     stack, nodes = [(v, 0)], 0
     while stack:
@@ -278,7 +278,7 @@ def _parse_json(data, rel):
                          object_pairs_hook=_no_dups)
     except (ValueError, RecursionError):
         raise BundleError(f"{rel}: not strict JSON") from None
-    if not _shape_ok(obj):
+    if not json_shape_ok(obj):
         raise BundleError(f"{rel}: nested too deeply or too large")
     return obj
 
@@ -323,7 +323,7 @@ def _members_contiguous(data, infos, cd_off):
     return end == cd_off
 
 
-def _npz_shapes(data, rel, max_len):
+def npz_shapes(data, rel, max_len):
     """Stored members only, laid out as np.savez writes them, and every array header exactly
     consistent with its member size, all checked before any array is read: a deflate bomb, a
     directory flood or a lying header is never inflated or allocated. Returns
@@ -367,7 +367,7 @@ def _load_head(data, head, input_dim):
     rel = f"heads/{head}.npz"
     model = ResNetMLP(input_dim, NUM_OUT[head])
     ref = model.state_dict()
-    shapes = _npz_shapes(data, rel, sum(v.numel() * 4 for v in ref.values()) + ZIP_SLACK)
+    shapes = npz_shapes(data, rel, sum(v.numel() * 4 for v in ref.values()) + ZIP_SLACK)
     if set(shapes) != set(ref):
         raise BundleError(f"{rel}: keys do not match the head")
     for k, (shape, dtype) in shapes.items():
@@ -389,7 +389,7 @@ def _load_head(data, head, input_dim):
 
 def _load_knn(data, input_dim):
     rel = "knn_index.npz"
-    if set(_npz_shapes(data, rel, MAX_FILE)) != {"embeddings", "label_ids", "case_ids"}:
+    if set(npz_shapes(data, rel, MAX_FILE)) != {"embeddings", "label_ids", "case_ids"}:
         raise BundleError(f"{rel}: wrong arrays")
     try:
         with np.load(io.BytesIO(data), allow_pickle=False) as npz:
@@ -414,7 +414,7 @@ def read_bundle(dir, *, manifest_sha256: str) -> Bundle:
     root = _open_dir(os.fspath(dir))
     try:
         top = set(os.listdir(root))
-        raw, spent = _read_file(root, MANIFEST, MANIFEST, 0)
+        raw, spent = read_file_capped(root, MANIFEST, MANIFEST, 0)
         if not hmac.compare_digest(hashlib.sha256(raw).hexdigest().encode(), pin):
             raise BundleError(f"{MANIFEST}: hash does not match the pinned manifest hash")
         manifest = _parse_json(raw, MANIFEST)
@@ -438,9 +438,9 @@ def read_bundle(dir, *, manifest_sha256: str) -> Bundle:
             data = {}
             for rel in BUNDLE_FILES:
                 if rel.startswith("heads/"):
-                    data[rel], spent = _read_file(heads_fd, rel[6:], rel, spent)
+                    data[rel], spent = read_file_capped(heads_fd, rel[6:], rel, spent)
                 else:
-                    data[rel], spent = _read_file(root, rel, rel, spent)
+                    data[rel], spent = read_file_capped(root, rel, rel, spent)
                 if not hmac.compare_digest(hashlib.sha256(data[rel]).hexdigest(), files[rel]):
                     raise BundleError(f"{rel}: hash mismatch")
         finally:

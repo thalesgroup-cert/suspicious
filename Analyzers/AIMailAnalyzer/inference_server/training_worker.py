@@ -145,6 +145,8 @@ def train(workdir, params, threads, report_progress):
     report_progress(100.0)
     summary = {k: gate[k] for k in ("eligible", "checks", "candidate", "baseline", "campaign",
                                     "tier_cutoffs")}
+    summary["temperature"] = temperature
+    summary["temperature_at_bound"] = {c: temperature_at_bound(t) for c, t in temperature.items()}
     return {"manifest_sha256": sha, "summary": summary}
 
 
