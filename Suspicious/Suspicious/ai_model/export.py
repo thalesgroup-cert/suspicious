@@ -32,7 +32,15 @@ def trainable_rows():
 
 def export_ledger(job_id: str) -> LedgerExport:
     """ExportRefused (a clear message) when rows are in another preprocessing, a head class has
-    fewer than 8 rows or there are too many rows; RegistryError for a bad job_id."""
+    fewer than 8 rows or there are too many rows; RegistryError for a bad job_id.
+
+    case_ids: a row without a case is NO_CASE (-1). Two active folder rows of the same case (two
+    messages matched to it) keep the id on the first row in pk order and write -1 on the later
+    ones, as the reader wants real ids unique; classify's exclude_case_ids then leaves only the
+    first row out of that case's neighbours.
+
+    Every row synced before Task 8a is legacy-first128, so this refuses until
+    `manage.py ai_model_reembed_ledger` has run once."""
     key = registry.dataset_key_for(job_id)
     rows = trainable_rows().order_by("pk")
     stale = rows.exclude(preprocessing_version=TRAINING_PREPROCESSING).count()
