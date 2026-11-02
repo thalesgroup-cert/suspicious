@@ -166,8 +166,10 @@ class ModelVersion(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["version_id", "job_id"], name="ai_model_version_job_unique"
+            models.CheckConstraint(
+                condition=models.Q(status="active", active_slot=1, active_slot__isnull=False)
+                | (~models.Q(status="active") & models.Q(active_slot__isnull=True)),
+                name="ai_model_active_slot_matches_status",
             )
         ]
 
