@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from training.recipe import NoNeighbours
+from training.recipe import PREPROCESSING_VERSION_TOKENS, NoNeighbours, chunk_mean_embedding
 
 from . import bundles
 from .auth import require_token
@@ -58,6 +58,8 @@ async def _read_json(request: Request, model, cap=MAX_BODY, *, mail_text=False):
 class EmbedRequest(BaseModel):
     texts: list[str] = Field(max_length=32)
     profile: Literal["classifier", "campaign"]
+    # the classifier embedding's form; the campaign profile is always first-128 (cmp-e1)
+    preprocessing: Literal[bundles.KNOWN_PREPROCESSING] = bundles.PREPROCESSING_LEGACY
 
 
 def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> APIRouter:
@@ -180,11 +182,16 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
                 503, f"Vectorizer unavailable: {store.vectorizer_error or 'still loading, try again shortly'}"
             )
         texts = [t[:max_chars].encode("utf-8", "replace").decode("utf-8") for t in req.texts]
+        pv = bundles.PREPROCESSING_LEGACY if req.profile == "campaign" else req.preprocessing
         with slots:
-            vectors = vectorizer.encode(texts, show_progress_bar=False)
+            if pv == bundles.PREPROCESSING_LEGACY:
+                vectors = vectorizer.encode(texts, show_progress_bar=False)
+            else:
+                by_tokens = pv == PREPROCESSING_VERSION_TOKENS
+                vectors = [chunk_mean_embedding(vectorizer, t, by_tokens=by_tokens) for t in texts]
         return {
             "vectors": [[float(x) for x in row] for row in vectors],
-            "preprocessing_version": ACTIVE_VERSION["preprocessing"],
+            "preprocessing_version": pv,
             "embedding_version": ACTIVE_VERSION["campaign_embedding_version"],
         }
 
