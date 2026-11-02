@@ -371,6 +371,72 @@ class Job:
                 "report": self.report, "error": self.error}
 
 
+def default_base_dir() -> str:
+    """Where job and reload directories go: AI_TRAIN_TMPDIR, else the system temp dir (read at
+    each use, not at import)."""
+    return os.environ.get("AI_TRAIN_TMPDIR") or tempfile.gettempdir()
+
+
+def sweep(base, prefix):
+    """Remove leftovers named prefix* under base: only real directories owned by this uid, never
+    through a symlink. Call it only where no live directory of that prefix can exist."""
+    try:
+        names = os.listdir(base)
+    except OSError:
+        return
+    for name in names:
+        path = os.path.join(base, name)
+        try:
+            st = os.lstat(path)
+        except OSError:
+            continue
+        if name.startswith(prefix) and stat.S_ISDIR(st.st_mode) and st.st_uid == os.getuid():
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def make_client(transport=None) -> httpx.Client:
+    """The only HTTP client for presigned URLs: no redirects, no proxy or .netrc from the
+    environment, short timeouts."""
+    return httpx.Client(transport=transport, follow_redirects=False, trust_env=False,
+                        timeout=TIMEOUT)
+
+
+def download(client, url, path, *, cap, what, check=lambda: None):
+    """GET url (an httpx.URL from check_url) into a new 0600 file at path. The response must be a
+    200 with an identity encoding and a Content-Length of at most cap, and the raw body must match
+    it exactly; the cap is also enforced while streaming. check() runs after each chunk (cancel,
+    deadline). Errors are JobError naming `what`, never the URL."""
+    try:
+        with client.stream("GET", url, headers={"Accept-Encoding": "identity"}) as r:
+            if 300 <= r.status_code < 400:
+                raise JobError(f"{what}: redirect refused")
+            if r.status_code != 200:
+                raise JobError(f"{what}: HTTP {r.status_code}")
+            if r.headers.get("content-encoding", "identity").strip().lower() != "identity":
+                raise JobError(f"{what}: content encoding refused")
+            length = r.headers.get("content-length", "")
+            if not re.fullmatch(r"[0-9]{1,12}", length):
+                raise JobError(f"{what}: missing or invalid content length")
+            expected = int(length)
+            if expected > cap:
+                raise JobError(f"{what}: size above the cap")
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                got = 0
+                for chunk in r.iter_raw():
+                    got += len(chunk)
+                    if got > cap:
+                        raise JobError(f"{what}: size above the cap")
+                    if got > expected:
+                        raise JobError(f"{what}: body longer than its content length")
+                    fh.write(chunk)
+                    check()
+            if got != expected:
+                raise JobError(f"{what}: body shorter than its content length")
+    except httpx.HTTPError as e:
+        raise JobError(f"{what}: {type(e).__name__}") from None
+
+
 def _env_int(name, default, low):
     try:
         return max(low, int(os.environ.get(name, default)))
@@ -391,27 +457,14 @@ class JobController:
         self._swept = False
 
     def base_dir(self) -> str:
-        return self.tmp_base or os.environ.get("AI_TRAIN_TMPDIR") or tempfile.gettempdir()
+        return self.tmp_base or default_base_dir()
 
     def _sweep(self):
         """Job directories left by a server that died mid-job, removed at the first job (not at
         import). Safe only because the server runs as ONE process (a single uvicorn worker, see
         server.py): a second process would sweep a live job's directory, and the single-job
         lock would not span processes."""
-        base = self.base_dir()
-        try:
-            names = os.listdir(base)
-        except OSError:
-            return
-        for name in names:
-            path = os.path.join(base, name)
-            try:
-                st = os.lstat(path)
-            except OSError:
-                continue
-            # only our own real directories: never another user's, never through a symlink
-            if name.startswith(TMP_PREFIX) and stat.S_ISDIR(st.st_mode) and st.st_uid == os.getuid():
-                shutil.rmtree(path, ignore_errors=True)
+        sweep(self.base_dir(), TMP_PREFIX)
 
     def _evict(self):
         """ponytail: keep the last MAX_JOBS_KEPT jobs; Django polls a job within minutes."""
@@ -462,8 +515,7 @@ class JobController:
     # -- the job -----------------------------------------------------------------------------
 
     def _client(self):
-        return httpx.Client(transport=self.transport, follow_redirects=False, trust_env=False,
-                            timeout=TIMEOUT)
+        return make_client(self.transport)
 
     def _checkpoint(self, job, deadline):
         if job.cancel.is_set():
@@ -533,36 +585,8 @@ class JobController:
             handle.join(self.grace_seconds)
 
     def _download(self, client, url, path, job, deadline):
-        what = "dataset download"
-        try:
-            with client.stream("GET", url, headers={"Accept-Encoding": "identity"}) as r:
-                if 300 <= r.status_code < 400:
-                    raise JobError(f"{what}: redirect refused")
-                if r.status_code != 200:
-                    raise JobError(f"{what}: HTTP {r.status_code}")
-                if r.headers.get("content-encoding", "identity").strip().lower() != "identity":
-                    raise JobError(f"{what}: content encoding refused")
-                length = r.headers.get("content-length", "")
-                if not re.fullmatch(r"[0-9]{1,12}", length):
-                    raise JobError(f"{what}: missing or invalid content length")
-                expected = int(length)
-                if expected > MAX_DOWNLOAD:
-                    raise JobError(f"{what}: size above the cap")
-                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-                with os.fdopen(fd, "wb") as fh:
-                    got = 0
-                    for chunk in r.iter_raw():
-                        got += len(chunk)
-                        if got > MAX_DOWNLOAD:
-                            raise JobError(f"{what}: size above the cap")
-                        if got > expected:
-                            raise JobError(f"{what}: body longer than its content length")
-                        fh.write(chunk)
-                        self._checkpoint(job, deadline)
-                if got != expected:
-                    raise JobError(f"{what}: body shorter than its content length")
-        except httpx.HTTPError as e:
-            raise JobError(f"{what}: {type(e).__name__}") from None
+        download(client, url, path, cap=MAX_DOWNLOAD, what="dataset download",
+                 check=lambda: self._checkpoint(job, deadline))
 
     def _upload(self, client, url, data, name):
         what = f"bundle upload {name}"

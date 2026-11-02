@@ -93,7 +93,8 @@ def chunk_mean_embedding(vectorizer, text: str, *, words: int = 90, max_chunks: 
     manifest."""
     chunks = chunk_by_tokens(vectorizer, text, max_chunks=max_chunks) if by_tokens \
         else _word_chunks(text, words, max_chunks)
-    return np.asarray(vectorizer.encode(chunks), dtype=np.float32).mean(axis=0)
+    vectors = vectorizer.encode(chunks, show_progress_bar=False)  # no bar in the server log
+    return np.asarray(vectors, dtype=np.float32).mean(axis=0)
 
 
 def truncation_rate(vectorizer, texts, words: int = 90) -> float:
@@ -167,12 +168,18 @@ class Knn:
     def build(cls, X, folders, case_ids=None):
         return cls(np.asarray(X, dtype=np.float32), np.array([main_class(f) for f in folders]), case_ids)
 
-    def vote(self, X) -> np.ndarray:
+    def vote(self, X, *, exclude_case_ids=None) -> np.ndarray:
         """Distance-weighted cosine 5-NN class probabilities (sklearn's weights="distance":
-        1/d, and exact matches take the whole vote)."""
-        if len(self.embeddings) == 0:
+        1/d, and exact matches take the whole vote). exclude_case_ids: rows whose case id is listed
+        are left out (a case already in the ledger is not its own neighbour); ignored for an index
+        without case ids."""
+        emb, labels = self.embeddings, self.labels
+        if exclude_case_ids is not None and len(exclude_case_ids) and self.case_ids is not None:
+            keep = ~np.isin(self.case_ids, np.asarray(exclude_case_ids, dtype=np.int64))
+            emb, labels = emb[keep], labels[keep]
+        if len(emb) == 0:
             raise ValueError("empty neighbour index")
-        d = 1.0 - _unit(X) @ _unit(self.embeddings).T
+        d = 1.0 - _unit(X) @ _unit(emb).T
         k = min(K, d.shape[1])
         nn_idx = np.argsort(d, axis=1, kind="stable")[:, :k]
         nd = np.take_along_axis(d, nn_idx, axis=1)
@@ -180,7 +187,7 @@ class Knn:
         w = np.where(exact.any(1, keepdims=True), exact.astype(float), 1.0 / np.maximum(nd, 1e-12))
         out = np.zeros((len(d), 3))
         for c in range(3):
-            out[:, c] = (w * (self.labels[nn_idx] == c)).sum(1)
+            out[:, c] = (w * (labels[nn_idx] == c)).sum(1)
         return out / out.sum(1, keepdims=True)
 
 
@@ -208,15 +215,18 @@ def _log(P):
     return np.log(np.clip(P, 1e-9, 1.0))  # exp_e_combined.softmax_T's clip
 
 
-def predict(heads: Heads, knn: Knn, X, *, temperature: dict | None = None) -> Predictions:
-    """temperature: {"hierarchy": T, "knn": T}; None means 1.0 for both (uncalibrated)."""
+def predict(heads: Heads, knn: Knn, X, *, temperature: dict | None = None,
+            exclude_case_ids=None) -> Predictions:
+    """temperature: {"hierarchy": T, "knn": T}; None means 1.0 for both (uncalibrated).
+    exclude_case_ids is passed to Knn.vote."""
     temperature = temperature or {c: 1.0 for c in COMPONENTS}
     Xt = torch.tensor(np.asarray(X), dtype=torch.float32)
     with torch.no_grad():
         p = {h: torch.softmax(m.eval()(Xt), dim=1).double().numpy() for h, m in heads.models.items()}
     ss, sd = p["safe_suspicious"], p["spam_dangerous"]
     hierarchy = np.stack([ss[:, 0], sd[:, 0] * ss[:, 1], sd[:, 1] * ss[:, 1]], axis=1)  # combine_main
-    logits = {"hierarchy": _log(smooth(hierarchy)), "knn": _log(smooth(knn.vote(X)))}
+    vote = knn.vote(X, exclude_case_ids=exclude_case_ids)
+    logits = {"hierarchy": _log(smooth(hierarchy)), "knn": _log(smooth(vote))}
     cal = {c: _softmax(logits[c] / temperature[c]) for c in COMPONENTS}
     return Predictions((cal["hierarchy"] + cal["knn"]) / 2, cal["hierarchy"], cal["knn"], logits,
                        {h: p[h] for h in SUB_HEADS})

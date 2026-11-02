@@ -32,6 +32,7 @@ import mail_analysis
 from mail_analysis import MODEL_SPECS
 from ResNetMLP import ResNetMLP
 
+from .bundles import ModelHolder
 from .training_job import JobController
 from .v2 import make_v2_router
 
@@ -293,8 +294,9 @@ def _classify(models: dict, mail_body: str) -> dict:
 # The training job controller keeps one job and its state in this process: the server must run as
 # a single uvicorn worker (the Dockerfile CMD), or the one-job lock and the leftover sweep break.
 trainer = JobController()
+holder = ModelHolder()  # loaded bundles (POST /v2/reload); empty = the legacy weights in models/
 app.include_router(
     make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS,
-                   trainer=trainer)
+                   trainer=trainer, holder=holder)
 )
 
