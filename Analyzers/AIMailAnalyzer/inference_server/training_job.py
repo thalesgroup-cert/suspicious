@@ -48,6 +48,56 @@ from . import training_worker
 
 logger = logging.getLogger("inference_server.training")
 
+# Presigned URLs carry their credential in the query string. httpx logs every request line at INFO
+# ("HTTP Request: PUT http://...?X-Amz-Signature=..."): its loggers stay at WARNING (Task 6b's
+# reload path must not lower them), and RedactUrls strips query strings from any record that does
+# get through, on the httpx/httpcore loggers and on every root handler.
+_URL_QUERY = re.compile(r"(https?://[^\s?#'\"<>]*)[?#][^\s'\"<>]*", re.IGNORECASE)
+_AMZ_PARAM = re.compile(r"X-Amz-[A-Za-z-]+=[^&\s'\"<>]*", re.IGNORECASE)
+
+
+def redact(text: str) -> str:
+    return _AMZ_PARAM.sub("X-Amz-(redacted)", _URL_QUERY.sub(r"\1?(redacted)", text))
+
+
+class RedactUrls(logging.Filter):
+    """Rewrites a record whose message or traceback holds a URL query string or an X-Amz-*
+    parameter. Never drops a record."""
+
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+        except Exception:  # noqa: BLE001 - a broken record is the formatter's business
+            return True
+        clean = redact(msg)
+        if clean != msg:
+            record.msg, record.args = clean, None
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            record.exc_text = redact(record.exc_text)
+        return True
+
+
+_REDACT = RedactUrls()
+
+
+def install_log_redaction():
+    """Idempotent: the filter on the httpx/httpcore loggers and on the root handlers present now
+    (called at import and again when a job starts, after the server configured logging)."""
+    for name in ("httpx", "httpcore"):
+        lg = logging.getLogger(name)
+        if lg.level == logging.NOTSET or lg.level < logging.WARNING:
+            lg.setLevel(logging.WARNING)
+        if _REDACT not in lg.filters:
+            lg.addFilter(_REDACT)
+    for h in logging.getLogger().handlers:
+        if _REDACT not in h.filters:
+            h.addFilter(_REDACT)
+
+
+install_log_redaction()
+
 JOB_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
 _JOB_ID = re.compile(JOB_ID_PATTERN)
 LABEL_PATTERN = r"^[A-Za-z0-9._:/+-]{1,128}$"  # ids, digests, revisions written to the manifest
@@ -343,6 +393,7 @@ class JobController:
     # -- API ---------------------------------------------------------------------------------
 
     def start(self, req: TrainRequest) -> tuple[int, dict]:
+        install_log_redaction()
         with self._lock:
             if req.job_id in self.jobs:
                 return 200, self.jobs[req.job_id].view()

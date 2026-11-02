@@ -797,6 +797,109 @@ def test_worker_exits_when_the_server_is_killed(tmp_path):
 # --- logs never carry a presigned URL --------------------------------------------------------
 
 
+class _Storage(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        if self.path.startswith("/redirect"):
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:1/x?{SECRET}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Length", "5")
+        self.end_headers()
+        self.wfile.write(b"hello")
+
+    def do_PUT(self):
+        self.rfile.read(int(self.headers["Content-Length"]))
+        self.send_response(403 if self.path.startswith("/denied") else 200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+
+@pytest.fixture
+def real_storage(monkeypatch):
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Storage)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    host = f"127.0.0.1:{srv.server_address[1]}"
+    monkeypatch.setenv("AI_BUNDLE_HOSTS", host)
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:1")
+    yield host
+    srv.shutdown()
+
+
+def _exercise(controller, host, tmp_path):
+    job = training_job.Job("j")
+    hosts = training_job.allowed_hosts()
+    results = []
+    with controller._client() as client:
+        for path, op in (("ok", "get"), ("ok", "put"), ("redirect", "get"), ("denied", "put")):
+            url = training_job.check_url(f"http://{host}/{path}/k?{SECRET}&X-Amz-Credential=AKIA",
+                                         hosts, "x")
+            try:
+                if op == "get":
+                    controller._download(client, url, str(tmp_path / f"{path}.bin"), job,
+                                         time.monotonic() + 30)
+                else:
+                    controller._upload(client, url, b"A" * 100, "manifest.json")
+                results.append("ok")
+            except training_job.JobError as e:
+                results.append(str(e))
+        url = training_job.check_url(f"http://{host}/ok/k?{SECRET}", hosts, "x")
+    refused = training_job.check_url(f"http://127.0.0.1:1/k?{SECRET}", {"127.0.0.1:1"}, "x")
+    with controller._client() as client:
+        try:
+            controller._upload(client, refused, b"A", "manifest.json")
+        except training_job.JobError as e:
+            results.append(str(e))
+    return results
+
+
+def _assert_no_secret(caplog):
+    text = caplog.text + "".join(r.getMessage() for r in caplog.records)
+    assert "deadbeef" not in text and "X-Amz-Signature=" not in text and "AKIA" not in text
+
+
+def test_presigned_urls_never_reach_the_logs(real_storage, caplog, tmp_path):
+    caplog.set_level(logging.DEBUG)
+    controller = training_job.JobController(tmp_base=str(tmp_path))
+    training_job.install_log_redaction()
+    results = _exercise(controller, real_storage, tmp_path)
+    assert results[:2] == ["ok", "ok"] and "redirect" in results[2] and "HTTP 403" in results[3]
+    assert "ConnectError" in results[4]
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING
+    assert logging.getLogger("httpcore").getEffectiveLevel() >= logging.WARNING
+    _assert_no_secret(caplog)
+
+
+def test_log_filter_redacts_even_when_httpx_logs_at_debug(real_storage, caplog, tmp_path,
+                                                          monkeypatch):
+    """Task 6b or an operator may lower the httpx level: the root-handler filter still holds."""
+    caplog.set_level(logging.DEBUG)
+    training_job.install_log_redaction()
+    for name in ("httpx", "httpcore"):  # lowered after the install, as a later change might
+        monkeypatch.setattr(logging.getLogger(name), "level", logging.DEBUG)
+    controller = training_job.JobController(tmp_base=str(tmp_path))
+    _exercise(controller, real_storage, tmp_path)
+    assert any("HTTP Request" in r.getMessage() for r in caplog.records)  # it did log
+    _assert_no_secret(caplog)
+    logging.getLogger("inference_server").warning("x http://h:1/p?%s y", SECRET, exc_info=False)
+    _assert_no_secret(caplog)
+
+
+@pytest.mark.parametrize("message", [
+    f"PUT http://h:9000/b/k?{SECRET} done", f"'https://h/k?a=b&{SECRET}'",
+    "X-Amz-Signature=abc&X-Amz-Credential=AKIA%2F", "see https://h:1/x#frag?y",
+])
+def test_redaction_filter(message):
+    record = logging.LogRecord("x", logging.INFO, __file__, 1, "%s", (message,), None)
+    assert training_job.RedactUrls().filter(record)
+    out = record.getMessage()
+    assert "deadbeef" not in out and "AKIA" not in out and "a=b" not in out and "frag" not in out
+
 
 # --- request limits found by the review ------------------------------------------------------
 
