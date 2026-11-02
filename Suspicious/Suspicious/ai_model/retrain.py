@@ -77,11 +77,15 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         exported = export_ledger(job_id)  # creates the dataset bucket
     except ExportRefused as exc:
         raise RetrainRefused(str(exc)) from None
-    registry.ensure_bucket()
-    store = registry.get_store()
-    bucket, _, key = prefix.partition("/")
-    bundle_urls = {n: store.presign_put(bucket, key + n, UPLOAD_EXPIRY) for n in registry.BUNDLE_FILE_NAMES}
-    parent = _parent(user)
+    try:
+        registry.ensure_bucket()
+        store = registry.get_store()
+        bucket, _, key = prefix.partition("/")
+        bundle_urls = {n: store.presign_put(bucket, key + n, UPLOAD_EXPIRY) for n in registry.BUNDLE_FILE_NAMES}
+        parent = _parent(user)
+    except Exception as exc:  # noqa: BLE001 — no job yet: drop the exported dataset, say the class
+        _delete_dataset(job_id)
+        raise RetrainRefused(f"could not prepare the training job: {type(exc).__name__}") from None
     params = {
         "version_id": version_id, "seed": SEED, "repeats": REPEATS,
         "baseline": "legacy" if parent.version_id == "v0" else "candidate",
@@ -197,24 +201,39 @@ def _finish(job, state, error="", report=None):
         locked.finished_at = timezone.now()
         locked.save(update_fields=["state", "error", "running_slot", "finished_at", "version"])
     if state != J.SUCCEEDED:
-        _delete_prefix(locked.prefix)
+        _delete_bundle(locked)
     _delete_dataset(locked.job_id)
     logger.info("Retrain %s: %s %s", locked.job_id, state, error)
     return locked
 
 
-def _delete_prefix(prefix):
-    bucket, _, key = prefix.partition("/")
+def _delete_under(bucket, key):
+    """Delete every object whose key starts with key. A key of fewer than 3 characters, or of
+    slashes only, is refused (it would reach other jobs' objects)."""
+    if len(key) < 3 or not key.strip("/"):
+        logger.warning("Retrain cleanup refused a short key")
+        return
     store = registry.get_store()
     try:
         if store.bucket_exists(bucket):
             store.delete_many(bucket, [o.name for o in store.list(bucket, key)])
     except Exception as exc:  # noqa: BLE001 — the job is settled; leftovers are unregistered
-        logger.warning("Retrain cleanup of a bundle prefix failed: %s", type(exc).__name__)
+        logger.warning("Retrain cleanup failed: %s", type(exc).__name__)
+
+
+def _delete_bundle(job):
+    """The job's bundle files, at the prefix derived again from its ids (not the stored prefix)."""
+    try:
+        prefix = registry.bundle_prefix_for(job.target_version, job.job_id)
+    except registry.RegistryError:
+        logger.warning("Retrain cleanup refused a job with malformed ids")
+        return
+    bucket, _, key = prefix.partition("/")
+    _delete_under(bucket, key)
 
 
 def _delete_dataset(job_id):
-    _delete_prefix(f"{registry.DATASET_BUCKET}/{registry.dataset_key_for(job_id)}")
+    _delete_under(registry.DATASET_BUCKET, registry.dataset_key_for(job_id))
 
 
 def cancel_retrain():

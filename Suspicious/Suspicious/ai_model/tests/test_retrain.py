@@ -186,6 +186,25 @@ class MutantTest(RetrainBase):
         self.assertEqual(list(self.store.list(registry.DATASET_BUCKET)), [])
         self.train.assert_not_called()
 
+    def test_a_failure_after_the_export_deletes_the_dataset(self):
+        from common.storage.base import StoreError
+        with mock.patch.object(registry, "ensure_bucket", side_effect=StoreError("unavailable", "down")), \
+                self.assertRaisesRegex(retrain.RetrainRefused, "StoreError"):
+            retrain.start_retrain()
+        self.assertEqual(list(self.store.list(registry.DATASET_BUCKET)), [])
+        self.assertFalse(RetrainJob.objects.exists())
+
+    def test_cleanup_ignores_a_tampered_prefix(self):
+        self.store.ensure_bucket(registry.BUCKET)
+        self.store.put(registry.BUCKET, "v1/j1/manifest.json", BytesIO(b"x"))  # another version's bundle
+        job = retrain.start_retrain()
+        self.upload_some(job)
+        RetrainJob.objects.filter(pk=job.pk).update(prefix="ai-models/")
+        self.status.return_value = view("failed")
+        retrain.poll_once(job.job_id)
+        names = [o.name for o in self.store.list(registry.BUCKET)]
+        self.assertEqual(names, ["v1/j1/manifest.json"])  # only this job's own keys went
+
     def test_eligible_must_be_true_not_truthy(self):
         job = retrain.start_retrain()
         answer = succeeded()
