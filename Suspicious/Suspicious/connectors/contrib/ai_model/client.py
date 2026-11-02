@@ -28,6 +28,14 @@ _SETUP_REFUSED = {
 }
 
 
+class ServerBusy(Exception):
+    """409: another training job or reload is running on the server."""
+
+
+class TrainJobGone(Exception):
+    """GET /v2/train/{job_id} answered 404: the server does not know the job (restarted, evicted)."""
+
+
 def _detail(response) -> str:
     try:
         detail = response.json().get("detail", "")
@@ -72,16 +80,36 @@ class AiInferenceClient:
             payload["preprocessing"] = preprocessing
         return self._post("/v2/embed", payload)
 
-    def _post(self, path: str, payload: dict) -> dict:
+    def train(self, body: dict) -> dict:
+        """POST /v2/train (202 new job, 200 known job_id). ServerBusy on 409. The body carries
+        presigned URLs: it is never logged and no error repeats it."""
+        return self._post("/v2/train", body, special={409: ServerBusy})
+
+    def train_status(self, job_id: str) -> dict:
+        """GET /v2/train/{job_id}: {"state", "progress", "report", "error"}. TrainJobGone on 404."""
+        return self._request("get", f"/v2/train/{job_id}", None, special={404: TrainJobGone})
+
+    def train_cancel(self, job_id: str) -> dict:
+        return self._post(f"/v2/train/{job_id}/cancel", {}, special={404: TrainJobGone})
+
+    def reload(self, body: dict) -> dict:
+        """POST /v2/reload. ServerBusy on 409 (another reload runs)."""
+        return self._post("/v2/reload", body, special={409: ServerBusy})
+
+    def _post(self, path: str, payload: dict, special=None) -> dict:
+        return self._request("post", path, payload, special)
+
+    def _request(self, method: str, path: str, payload, special=None) -> dict:
         """The server's JSON answer. ProviderUnavailable for what a retry may fix (connection,
         timeout, 5xx), and, with retryable=False, for what only an operator can (models or
         vectorizer not loaded, token missing or rejected, wrong url, rate limit); ValueError
-        when the server refused just this request (400, 413, 422 and other 4xx)."""
+        when the server refused just this request (400, 413, 422 and other 4xx); special maps a
+        status to an exception class, raised with the status only."""
+        kwargs = {"headers": self._headers, "timeout": self.timeout}
+        if method == "post":
+            kwargs["json"] = payload
         try:
-            response = self.session.post(
-                self.url + path, json=payload,
-                headers=self._headers, timeout=self.timeout,
-            )
+            response = getattr(self.session, method)(self.url + path, **kwargs)
         except requests.RequestException as exc:
             raise ProviderUnavailable(f"inference server unreachable: {type(exc).__name__}") from exc
         status = response.status_code
@@ -90,11 +118,13 @@ class AiInferenceClient:
             needs_operator = _NEEDS_OPERATOR.search(_detail(response)) if status == 503 else None
             suffix = f": {needs_operator.group(0).lower()}" if needs_operator else ""
             raise ProviderUnavailable(f"inference server HTTP {status}{suffix}", retryable=not needs_operator)
+        if special and status in special:
+            raise special[status](f"inference server HTTP {status}")
         if status in _SETUP_REFUSED:
             raise ProviderUnavailable(
                 f"inference server {_SETUP_REFUSED[status].format(path=path)} (HTTP {status})", retryable=False
             )
-        if status != 200:
+        if not 200 <= status < 300:
             # The status only: a 422 detail echoes the request body, so the mail text.
             raise ValueError(f"inference server refused the request (HTTP {status})")
         try:

@@ -188,3 +188,44 @@ class ModelEvent(models.Model):
     )
     at = models.DateTimeField(default=timezone.now)
     note = models.TextField(blank=True)
+
+
+class RetrainJob(models.Model):
+    """One /v2/train job (ai_model.retrain). Written before the server is called, so a crash leaves
+    a visible job that the next poll or start fails. No URL and no server error text is stored."""
+
+    class State(models.TextChoices):
+        RUNNING = "running"
+        SUCCEEDED = "succeeded"
+        FAILED = "failed"
+        CANCELLED = "cancelled"
+
+    job_id = models.CharField(max_length=64, unique=True)
+    target_version = models.CharField(max_length=64)  # the candidate's version_id if the job succeeds
+    state = models.CharField(max_length=10, choices=State.choices, db_index=True)
+    # 1 while running, NULL otherwise: the unique column allows one running job (as active_slot).
+    running_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    prefix = models.CharField(max_length=255)  # the bundle prefix, ai-models/<version_id>/<job_id>/
+    params = models.JSONField(default=dict)  # the /v2/train params: ids, digests, campaign profile
+    rows = models.PositiveIntegerField(default=0)
+    parent = models.ForeignKey(ModelVersion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    version = models.ForeignKey(ModelVersion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    trigger = models.CharField(max_length=10, choices=ModelVersion.Trigger.choices)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error = models.CharField(max_length=64, blank=True)  # an exception class name, never a message
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(state="running", running_slot=1, running_slot__isnull=False)
+                | (~models.Q(state="running") & models.Q(running_slot__isnull=True)),
+                name="ai_model_running_slot_matches_state",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.job_id} ({self.state})"

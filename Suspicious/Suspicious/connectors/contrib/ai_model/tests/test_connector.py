@@ -62,7 +62,8 @@ class ManifestTest(SimpleTestCase):
     def test_config_schema(self):
         fields = {f.key: f for f in AiModelConnector.manifest.config_schema}
         self.assertEqual(set(fields), {"url", "token", "timeout_seconds", "imap_host", "imap_port", "imap_user",
-                                       "imap_password", "imap_use_ssl", "imap_folders"})
+                                       "imap_password", "imap_use_ssl", "imap_folders",
+                                       "retrain_enabled", "retrain_interval_days"})
         self.assertEqual((fields["url"].type, fields["url"].default, fields["url"].required),
                          ("url", "http://ai_inference:8090", True))
         self.assertTrue(fields["token"].required)
@@ -74,6 +75,9 @@ class ManifestTest(SimpleTestCase):
             "imap_use_ssl": ("bool", True, False)})
         self.assertEqual((fields["imap_folders"].type, fields["imap_folders"].default),
                          ("str", ",".join(FOLDERS)))
+        self.assertEqual((fields["retrain_enabled"].type, fields["retrain_enabled"].default), ("bool", False))
+        self.assertEqual((fields["retrain_interval_days"].type, fields["retrain_interval_days"].default),
+                         ("int", 30))
         self.assertEqual(AiModelConnector.manifest.schedules, (Schedule("label-sync", 86400),))
 
     def test_the_imap_password_is_overlaid_from_vault(self):
