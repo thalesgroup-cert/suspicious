@@ -701,6 +701,10 @@ LOGGING = {
             "propagate": False,
         },
 
+        # The S3 client logs request URLs, presigned signatures included, at DEBUG.
+        "botocore": {"level": "WARNING"},
+        "urllib3":  {"level": "WARNING"},
+
         "api.views.oidc_views": {
             "handlers":  ["suspicious_file", "console"],
             "level":     _trace_level,

@@ -543,3 +543,14 @@ class CommandTest(RetrainBase):
                 self.assertRaisesRegex(CommandError, "still running"):
             self.run_cmd("--wait", "--timeout", "60")
         self.assertEqual(RetrainJob.objects.get().state, J.RUNNING)
+
+
+class LoggingTest(TestCase):
+    def test_the_s3_client_loggers_stay_at_warning(self):
+        # botocore and urllib3 log request URLs (presigned signatures included) at DEBUG
+        # pinned in LOGGING, not inherited from root, so a DEBUG root does not lower them
+        import logging
+        from django.conf import settings
+        for name in ("botocore", "urllib3"):
+            self.assertEqual(settings.LOGGING["loggers"][name]["level"], "WARNING", name)
+            self.assertEqual(logging.getLogger(name).getEffectiveLevel(), logging.WARNING, name)
