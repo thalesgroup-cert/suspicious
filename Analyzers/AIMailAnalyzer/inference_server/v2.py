@@ -52,7 +52,7 @@ async def _read_json(request: Request, model, cap=MAX_BODY, *, mail_text=False):
         if mail_text:
             try:
                 data = json.loads(bytes(body))
-            except ValueError:
+            except (ValueError, RecursionError):  # RecursionError: deeply nested JSON
                 raise HTTPException(422, [{"loc": [], "msg": "Invalid JSON"}]) from None
             return model.model_validate(data)
         return model.model_validate_json(bytes(body))

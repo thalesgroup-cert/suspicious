@@ -159,3 +159,42 @@ def test_fair_semaphore_serves_a_waiter_before_a_releaser_that_asks_again():
     assert order == ["waiter", "releaser"]
     with pytest.raises(ValueError):
         sem.release()
+
+
+def test_fair_semaphore_drops_a_waiter_whose_wait_raises():
+    sem, raised = server.FairSemaphore(1), []
+    sem.acquire()
+    real_wait = sem._cond.wait
+
+    def wait_once(*a, **k):
+        sem._cond.wait = real_wait
+        raise KeyboardInterrupt  # any BaseException
+
+    sem._cond.wait = wait_once
+
+    def waiter():
+        try:
+            sem.acquire()
+        except KeyboardInterrupt:
+            raised.append(True)
+
+    t = threading.Thread(target=waiter, daemon=True)
+    t.start()
+    t.join(2)
+    assert raised == [True] and not sem._queue
+    sem.release()
+    got = []
+    t2 = threading.Thread(target=lambda: (sem.acquire(), got.append(True)), daemon=True)
+    t2.start()
+    t2.join(2)
+    assert got == [True] and not sem._queue
+
+
+@pytest.mark.parametrize("route,body", [
+    ("/v2/embed", b'{"texts": ' + b"[" * 100000 + b"]" * 100000 + b', "profile": "campaign"}'),
+    ("/v2/models/ai_mail/classify", b'{"mail_body": ' + b"[" * 100000 + b"]" * 100000 + b"}"),
+])
+def test_deeply_nested_json_is_a_422_without_echo(app, token_env, route, body):
+    resp = app[0].post(route, content=body, headers={**token_env, "Content-Type": "application/json"})
+    assert resp.status_code == 422
+    assert resp.json() == {"detail": [{"loc": [], "msg": "Invalid JSON"}]}

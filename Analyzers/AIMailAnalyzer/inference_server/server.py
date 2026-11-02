@@ -218,8 +218,13 @@ class FairSemaphore:
         with self._cond:
             me = object()
             self._queue.append(me)
-            while self._queue[0] is not me or not self.free:
-                self._cond.wait()
+            try:
+                while self._queue[0] is not me or not self.free:
+                    self._cond.wait()
+            except BaseException:  # interrupted while queued: leave the queue, wake the next one
+                self._queue.remove(me)
+                self._cond.notify_all()
+                raise
             self._queue.popleft()
             self.free -= 1
             self._cond.notify_all()  # the next in line may find a slot too
