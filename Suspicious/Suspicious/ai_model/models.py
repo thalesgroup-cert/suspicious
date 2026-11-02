@@ -98,9 +98,10 @@ class LabelRecord(models.Model):
 
     # Ruling D4: the only columns a save() may change; case only from null.
     # ponytail: a guard on save() only, not a database rule. Not covered: QuerySet.update() and
-    # bulk_update() (ai_model.ledger uses update() on these columns only); a new instance given an
-    # existing pk (_state.adding is True, so the check is skipped and save() updates the row); raw
-    # SQL. The row is read then written without a lock (TOCTOU), so two concurrent saves are each
+    # bulk_update() (ai_model.ledger uses update() on these columns only, plus embedding and
+    # preprocessing_version in replace_embedding, the re-embed command's write); a new instance
+    # given an existing pk (_state.adding is True, so the check is skipped and save() updates the
+    # row); raw SQL. The row is read then written without a lock (TOCTOU), so two concurrent saves are each
     # checked against the row as it was. A DB trigger is the upgrade if the ledger gets other writers.
     MUTABLE = frozenset({"status", "flag_reason", "case_id", "resolved_by_id", "resolved_at", "resolution_note"})
 

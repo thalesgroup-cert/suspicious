@@ -13,6 +13,7 @@ from ai_model import ledger
 from ai_model.campaign_profile import COLLECTION_NAME
 from ai_model.models import AiAssessment, LabelSyncState
 from ai_model.taxonomy import FOLDERS, class_of
+from ai_model.training_data import TRAINING_PREPROCESSING
 from case_handler.models import Case
 from connectors.base import (
     EVENT_CASE_FINALISED,
@@ -87,7 +88,9 @@ class LabelSyncIncomplete(Exception):
 
 
 def _embed(client, texts: list[str], started: float, budget) -> tuple[dict, dict]:
-    """({profile: [vector, ...]}, versions) for both profiles, in batches of EMBED_BATCH.
+    """({profile: [vector, ...]}, versions) for both profiles, in batches of EMBED_BATCH; the
+    classifier vectors in TRAINING_PREPROCESSING, the campaign ones in the server's first-128 form.
+    The versions stored are the ones the server answered with.
     EmbedRefused on a 4xx, an answer that does not fit the batch or versions changing within it;
     _BudgetSpent when the time budget runs out before a later batch."""
     vectors = {"classifier": [], "campaign": []}
@@ -98,7 +101,8 @@ def _embed(client, texts: list[str], started: float, budget) -> tuple[dict, dict
         batch = texts[start:start + EMBED_BATCH]
         for profile in vectors:
             try:
-                answer = client.embed(batch, profile)
+                answer = (client.embed(batch, profile, preprocessing=TRAINING_PREPROCESSING)
+                          if profile == "classifier" else client.embed(batch, profile))
             except ValueError as exc:  # the message is not kept: only the class
                 raise EmbedRefused(type(exc).__name__) from None
             if len(answer["vectors"]) != len(batch):

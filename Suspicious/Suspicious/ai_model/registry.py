@@ -16,6 +16,7 @@ from common.storage import get_store
 from .models import ModelEvent, ModelVersion
 
 BUCKET = "ai-models"
+DATASET_BUCKET = "ai-datasets"  # the ledger exports the training jobs download (ai_model.export)
 PRESIGN_EXPIRY = timedelta(minutes=15)
 # ponytail: a copy of training.bundle.BUNDLE_FILES + manifest.json (Django cannot import torch);
 # Analyzers/AIMailAnalyzer/tests/test_registry_names.py compares it. Upgrade: a shared module.
@@ -53,6 +54,16 @@ def ensure_bucket() -> None:
     """Create the bucket if absent (there is no deployment-time bootstrap for buckets).
     Callers that presign PUT urls (the retrain start) must call this first."""
     get_store().ensure_bucket(BUCKET)
+
+
+def dataset_key_for(job_id: str) -> str:
+    """One dataset per training job, in DATASET_BUCKET."""
+    return f"{_check_id(job_id, 'job_id')}/dataset.npz"
+
+
+def ensure_dataset_bucket() -> None:
+    """ensure_bucket for DATASET_BUCKET."""
+    get_store().ensure_bucket(DATASET_BUCKET)
 
 
 def _event(version, action, user, note=""):

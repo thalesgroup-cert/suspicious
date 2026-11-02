@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `POST /v2/embed` takes an optional `preprocessing` (`legacy-first128` by default,
+  `chunkmean-tokens-v1`, `chunkmean-words90-v1`); the `campaign` profile always uses the first 128
+  tokens. The label sync now embeds folder rows in `chunkmean-tokens-v1`, the form retraining uses
+  (up to 8 encoder passes per mail instead of 1). `python manage.py ai_model_reembed_ledger
+  [--limit N] [--dry-run]` re-reads the mails of older rows over IMAP and re-embeds them; the
+  training export refuses while such rows remain.
 - A label ledger for the `ai_model` connector (`ai_model.models.LabelRecord`, append-only). A sync
   about every 24 hours (schedule 86400 s, counted from when Celery beat started) reads the analysts'
   review folders over IMAP, read-only (`BODY.PEEK[]`), matches each forwarded mail to a case by

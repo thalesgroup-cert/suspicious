@@ -19,9 +19,9 @@ CONFIG = {"url": "http://ai_inference:8090", "token": "s3cret-token", "imap_host
           "imap_user": "reviewer", "imap_password": "imap-pa55", "imap_folders": f"{PHISH}, {SPAM}, 9_ODD"}
 
 
-def embed_answer(texts, profile):
+def embed_answer(texts, profile, preprocessing="legacy-first128"):
     return {"vectors": [[float(len(t)), 1.0 if profile == "campaign" else 0.0] for t in texts],
-            "preprocessing_version": "legacy-first128", "embedding_version": "cmp-e1"}
+            "preprocessing_version": preprocessing, "embedding_version": "cmp-e1"}
 
 
 class LabelSyncTest(TestCase):
@@ -60,6 +60,14 @@ class LabelSyncTest(TestCase):
         self.assertEqual((spam.last_uid, spam.uidvalidity, spam.skipped), (11, 3, 1))
         self.assertIsNotNone(phish.last_run_at)
         self.assertFalse(LabelSyncState.objects.filter(folder="9_ODD").exists())
+
+    def test_classifier_is_embedded_in_the_training_preprocessing(self):
+        call, _ = self.run_sync(config={**CONFIG, "imap_folders": PHISH})
+        kwargs = {c.args[1]: c.kwargs for c in call.call_args_list}
+        self.assertEqual(kwargs["classifier"], {"preprocessing": "chunkmean-tokens-v1"})
+        self.assertEqual(kwargs["campaign"], {})
+        self.assertEqual(set(LabelRecord.objects.values_list("preprocessing_version", "embedding_version")),
+                         {("chunkmean-tokens-v1", "cmp-e1")})
 
     def test_embeds_in_batches_of_32(self):
         self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
@@ -129,7 +137,7 @@ class LabelSyncTest(TestCase):
     def test_an_embed_refusal_skips_only_that_folder(self):
         calls = []
 
-        def embed(texts, profile):
+        def embed(texts, profile, **kw):
             calls.append(profile)
             if len(calls) == 1:
                 raise ValueError("inference server refused the request (HTTP 413)")
@@ -150,7 +158,7 @@ class LabelSyncTest(TestCase):
         self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
         answers = iter(["legacy-first128", "legacy-first128", "other-recipe", "other-recipe"])
 
-        def embed(texts, profile):
+        def embed(texts, profile, **kw):
             return {**embed_answer(texts, profile), "preprocessing_version": next(answers)}
 
         with mock.patch.object(module, "CHUNK", 100), self.assertRaises(module.LabelSyncIncomplete):
@@ -169,7 +177,7 @@ class LabelSyncTest(TestCase):
         self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 4)}
         answers = [embed_answer, embed_answer, ProviderUnavailable("inference server HTTP 503")]
 
-        def embed(texts, profile):
+        def embed(texts, profile, **kw):
             step = answers.pop(0) if answers else embed_answer
             if isinstance(step, Exception):
                 raise step
@@ -185,7 +193,7 @@ class LabelSyncTest(TestCase):
         self.imap.folders[PHISH]["messages"] = {u: forward(u) for u in range(1, 41)}
         answers = [embed_answer, embed_answer, ProviderUnavailable("inference server HTTP 503")]
 
-        def embed(texts, profile):
+        def embed(texts, profile, **kw):
             step = answers.pop(0) if answers else embed_answer
             if isinstance(step, Exception):
                 raise step

@@ -42,6 +42,23 @@ def _locator(source_ref):
         return None
 
 
+def imap_port(config) -> int:
+    """The connector's imap_port (993 when unset); CommandError when it is not a port."""
+    try:
+        raw = config.get("imap_port")
+        port = 993 if raw in (None, "") else int(raw)
+        if not 0 < port < 65536:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise CommandError("invalid imap_port") from None
+    return port
+
+
+def open_imap(config, port):
+    return imap_sync.connect(config.get("imap_host"), port, config.get("imap_user") or "",
+                             config.get("imap_password") or "", config.get("imap_use_ssl", True) is not False)
+
+
 class Command(BaseCommand):
     help = "Report the cosine similarity between the live and the filed text of labelled mails. Read-only."
 
@@ -57,13 +74,7 @@ class Command(BaseCommand):
         if not config.get("imap_host"):
             raise CommandError("no imap_host configured for the ai_model connector")
 
-        try:
-            raw = config.get("imap_port")
-            port = 993 if raw in (None, "") else int(raw)
-            if not 0 < port < 65536:
-                raise ValueError
-        except (TypeError, ValueError):
-            raise CommandError("invalid imap_port") from None
+        port = imap_port(config)
         skipped = {"no archive": 0, "bad locator": 0, "UIDVALIDITY mismatch": 0, "fetch failed": 0,
                    "zero vector": 0}
         pairs = []  # (label_class, live text, filed text)
@@ -85,10 +96,7 @@ class Command(BaseCommand):
                     skipped["bad locator"] += 1
                     continue
                 if imap is None:
-                    imap = imap_sync.connect(
-                        config.get("imap_host"), port,
-                        config.get("imap_user") or "", config.get("imap_password") or "",
-                        config.get("imap_use_ssl", True) is not False)
+                    imap = open_imap(config, port)
                 try:
                     mail = imap_sync.fetch_one(imap, *where)
                 except imap_sync.UidValidityChanged:

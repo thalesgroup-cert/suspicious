@@ -162,6 +162,12 @@ class EmbedTest(SimpleTestCase):
             headers={"Authorization": "Bearer s3cret"}, timeout=7,
         )
 
+    def test_sends_the_preprocessing_when_given(self):
+        client = client_with(post=mock.Mock(return_value=reply(200, {"vectors": []})))
+        client.embed(["hi"], "classifier", preprocessing="chunkmean-tokens-v1")
+        self.assertEqual(client.session.post.call_args.kwargs["json"],
+                         {"texts": ["hi"], "profile": "classifier", "preprocessing": "chunkmean-tokens-v1"})
+
     def test_503_is_provider_unavailable(self):
         client = client_with(post=mock.Mock(return_value=reply(503, {"detail": "Vectorizer unavailable: still loading"})))
         with self.assertRaises(ProviderUnavailable) as caught:

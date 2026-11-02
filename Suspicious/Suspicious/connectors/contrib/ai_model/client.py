@@ -63,10 +63,14 @@ class AiInferenceClient:
     def classify(self, mail_body: str) -> dict:
         return self._post(_MODEL_PATH + "/classify", {"mail_body": mail_body, "versions": ["active"]})
 
-    def embed(self, texts: list[str], profile: str) -> dict:
+    def embed(self, texts: list[str], profile: str, preprocessing: str | None = None) -> dict:
         """POST /v2/embed: {"vectors", "preprocessing_version", "embedding_version"}.
+        preprocessing: the classifier embedding's form (None: the server default, legacy-first128).
         Same error handling as classify."""
-        return self._post("/v2/embed", {"texts": texts, "profile": profile})
+        payload = {"texts": texts, "profile": profile}
+        if preprocessing is not None:
+            payload["preprocessing"] = preprocessing
+        return self._post("/v2/embed", payload)
 
     def _post(self, path: str, payload: dict) -> dict:
         """The server's JSON answer. ProviderUnavailable for what a retry may fix (connection,

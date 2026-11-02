@@ -1,5 +1,6 @@
 """The label ledger writers (Plan D). Append-only: a row is never updated except its status,
-flag_reason and resolution fields (rulings D4, D5)."""
+flag_reason and resolution fields (rulings D4, D5), and, through replace_embedding only, the
+classifier embedding and its preprocessing version (Plan E, Task 8a)."""
 from __future__ import annotations
 
 import hashlib
@@ -259,6 +260,17 @@ def resolve_flag(record, user, note, *, keep: bool) -> None:
         fresh.save(update_fields=["status", "resolved_by", "resolved_at", "resolution_note"])
     record.status, record.resolved_by, record.resolved_at, record.resolution_note = (
         fresh.status, fresh.resolved_by, fresh.resolved_at, fresh.resolution_note)
+
+
+def replace_embedding(record, vector, preprocessing_version: str) -> bool:
+    """The one exception to append-only, for ai_model_reembed_ledger: a folder row's classifier
+    embedding re-computed from the same mail in another preprocessing. Changes `embedding` and
+    `preprocessing_version` only, and only while the row still has the version the caller read
+    (False otherwise: changed meanwhile). LabelRecord.save() still refuses both fields."""
+    return bool(LabelRecord.objects.filter(
+        pk=record.pk, source=LabelRecord.Source.IMAP_FOLDER,
+        preprocessing_version=record.preprocessing_version,
+    ).update(embedding=json.dumps([float(x) for x in vector]), preprocessing_version=preprocessing_version))
 
 
 def ledger_summary() -> dict:
