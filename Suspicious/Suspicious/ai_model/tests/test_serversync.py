@@ -79,6 +79,24 @@ class SyncTest(TestCase):
         self.assertNotIn("fake://", str(ctx.exception))
         self.assertNotIn("http", str(ctx.exception).lower())
 
+    def test_a_4xx_on_the_metadata_get_is_not_a_refused_reload(self):
+        self.go()
+        self.client.metadata.side_effect = ValueError("inference server refused the request (HTTP 422)")
+        with self.assertLogs("ai_model.serversync", "WARNING") as logs:
+            self.assertFalse(serversync.sync(self.client))
+        self.assertIn("ValueError", logs.output[0])
+        self.assertNotIn("422", logs.output[0])
+        self.client.reload.assert_not_called()
+
+    def test_the_beat_task_logs_a_refusal_by_class_only(self):
+        with mock.patch("ai_model.ledger.enabled", return_value=True), \
+                mock.patch("connectors.registry.registry.instantiate"), \
+                mock.patch.object(serversync, "sync", side_effect=serversync.ReloadRefused("x")), \
+                self.assertLogs("ai_model.tasks", "WARNING") as logs:
+            tasks.sync_server()  # does not raise
+        self.assertIn("ReloadRefused", logs.output[0])
+        self.assertIsNone(logs.records[0].exc_info)
+
     def test_unavailable_and_busy_return_false_and_log_the_class(self):
         self.go()
         self.client.metadata.return_value = meta("v0")

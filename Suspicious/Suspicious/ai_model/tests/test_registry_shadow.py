@@ -42,13 +42,10 @@ class SetShadowTest(TestCase):
             registry.set_shadow(eligible("v5"), self.user)
 
     def test_check_constraint(self):
-        a, b = eligible("v1"), eligible("v2")
-        registry.set_shadow(a)
+        b = eligible("v2")  # no other row holds slot 1, so only the CHECK can reject these
         for change in ({"status": S.SHADOW, "shadow_slot": None}, {"shadow_slot": 1}):
             with self.assertRaises(IntegrityError), transaction.atomic():
                 ModelVersion.objects.filter(pk=b.pk).update(**change)
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            ModelVersion.objects.filter(pk=b.pk).update(status=S.SHADOW, shadow_slot=1)
 
     def test_discard_and_set_active_free_the_slot(self):
         a = registry.set_shadow(eligible("v1"))

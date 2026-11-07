@@ -1,6 +1,10 @@
 """Celery tasks of the retrain (ai_model.retrain). Short tasks only: training runs in the inference
 server, so no task outlives the broker's visibility timeout."""
+import logging
+
 from celery import shared_task
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -54,4 +58,7 @@ def sync_server() -> None:
         client = registry.instantiate("ai_model")._client()
     except ValueError:
         return
-    serversync.sync(client)
+    try:
+        serversync.sync(client)
+    except serversync.ReloadRefused as exc:
+        logger.warning("ai_model server sync refused: %s", type(exc).__name__)

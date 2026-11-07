@@ -46,10 +46,11 @@ def sync(client=None) -> bool:
     try:
         if server_matches(client):
             return True
-        client.reload(wanted_state())
+        try:
+            client.reload(wanted_state())
+        except ValueError:
+            raise ReloadRefused("the inference server refused the reload") from None
         return server_matches(client)
-    except ValueError:
-        raise ReloadRefused("the inference server refused the reload") from None
-    except (ProviderUnavailable, ServerBusy) as exc:
+    except (ProviderUnavailable, ServerBusy, ValueError) as exc:  # not ReloadRefused
         logger.warning("ai_model server sync failed: %s", type(exc).__name__)
         return False
