@@ -212,7 +212,7 @@ class AnalyzeTest(TestCase):
     def test_a_good_answer_is_mapped(self):
         result, read, call = self.analyze(classify={"return_value": payload("DANGEROUS", 7.4, 0.815, "WHALING")})
         read.assert_called_once_with(self.archive)
-        call.assert_called_once_with("the mail")
+        call.assert_called_once_with("the mail", exclude_case_ids=[self.case.id])
         self.assertEqual((result.result, result.score, result.confidence, result.category),
                          ("DANGEROUS", 7, 82, "Whaling"))
 
@@ -222,7 +222,7 @@ class AnalyzeTest(TestCase):
             self.archive.archive.save()
             with mock.patch.object(module.AiInferenceClient, "classify", return_value=payload()) as call:
                 result = self.connector.analyze("mail_ai", self.case.id)
-        call.assert_called_once_with(GOOD["m1.txt"].decode())
+        call.assert_called_once_with(GOOD["m1.txt"].decode(), exclude_case_ids=[self.case.id])
         self.assertEqual(result.result, "SAFE")
 
     def test_the_client_is_built_from_the_connector_config(self):

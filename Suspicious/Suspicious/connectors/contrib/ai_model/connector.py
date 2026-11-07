@@ -192,7 +192,9 @@ class AiModelConnector(Connector):
             return _inconclusive("archive_unreadable")
         client = self._client()
         try:
-            payload = client.classify(body)
+            # Always the case itself: smaller than a ledger lookup, and a no-op when it is not in
+            # the bundle's neighbour index.
+            payload = client.classify(body, exclude_case_ids=[case_id])
         except ValueError as exc:  # the server refused this mail: a verdict of "can't tell"
             logger.warning("ai_model: case %s refused by the inference server: %s", case_id, exc)
             return _inconclusive(str(exc))

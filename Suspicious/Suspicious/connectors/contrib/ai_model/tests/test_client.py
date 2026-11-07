@@ -34,6 +34,12 @@ class ClassifyTest(SimpleTestCase):
             headers={"Authorization": "Bearer s3cret"}, timeout=7,
         )
 
+    def test_sends_the_case_to_leave_out_of_the_neighbour_vote(self):
+        client = client_with(post=mock.Mock(return_value=reply(200, {"results": {}})))
+        client.classify("hello", exclude_case_ids=[42])
+        self.assertEqual(client.session.post.call_args.kwargs["json"],
+                         {"mail_body": "hello", "versions": ["active"], "exclude_case_ids": [42]})
+
     def test_connection_errors_and_timeouts_are_retryable(self):
         for error in (requests.ConnectionError("down"), requests.Timeout("slow")):
             with self.subTest(error=type(error).__name__):

@@ -68,8 +68,13 @@ class AiInferenceClient:
             return False, f"model metadata: HTTP {response.status_code}"
         return True, "ready, token accepted"
 
-    def classify(self, mail_body: str) -> dict:
-        return self._post(_MODEL_PATH + "/classify", {"mail_body": mail_body, "versions": ["active"]})
+    def classify(self, mail_body: str, exclude_case_ids: list[int] | None = None) -> dict:
+        """exclude_case_ids: cases left out of a bundle's neighbour vote (the case itself, so a case
+        already in the label ledger does not vote for its own verdict). Version 0 ignores it."""
+        payload = {"mail_body": mail_body, "versions": ["active"]}
+        if exclude_case_ids:
+            payload["exclude_case_ids"] = list(exclude_case_ids)
+        return self._post(_MODEL_PATH + "/classify", payload)
 
     def embed(self, texts: list[str], profile: str, preprocessing: str | None = None) -> dict:
         """POST /v2/embed: {"vectors", "preprocessing_version", "embedding_version"}.
