@@ -216,7 +216,9 @@ class RetrainJob(models.Model):
     )
     started_at = models.DateTimeField(default=timezone.now)
     finished_at = models.DateTimeField(null=True, blank=True)
-    error = models.CharField(max_length=64, blank=True)  # an exception class name, never a message
+    # A class name, or the server's own short `error` filtered by retrain.server_error; never an
+    # exception message from Django.
+    error = models.CharField(max_length=200, blank=True)
 
     class Meta:
         constraints = [

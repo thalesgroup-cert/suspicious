@@ -8,6 +8,7 @@ half-uploaded job registers nothing and its bundle prefix and dataset are delete
 go into the request body only: never logged, stored or printed. Errors are stored as class names."""
 import dataclasses
 import logging
+import re
 import secrets
 from datetime import timedelta
 
@@ -34,6 +35,19 @@ SEED, REPEATS = 0, 3  # fixed: the same ledger digest and seed give the same met
 ENCODER_ID = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 TRAINER_REVISION = "plan-e-candidate-v1"
 GATE_KEYS = ("checks", "candidate", "baseline", "campaign", "tier_cutoffs")
+
+
+_UNSAFE = re.compile(r"[^A-Za-z0-9 _.:,()/=-]")
+ERROR_MAX = 200  # RetrainJob.error
+
+
+def server_error(text) -> str:
+    """The server's `error` of a failed job, kept for the operator: only [A-Za-z0-9 _.:,()/=-],
+    at most ERROR_MAX characters; anything holding a URL ("://") or a query ("?") is dropped whole.
+    The server's reasons name fields, heads and classes (e.g. the head floor), never mail text."""
+    if not isinstance(text, str) or "://" in text or "?" in text:
+        return "TrainingFailed"
+    return _UNSAFE.sub("", text)[:ERROR_MAX].strip() or "TrainingFailed"
 
 
 class RetrainRefused(Exception):
@@ -155,7 +169,7 @@ def poll_once(job_id: str) -> str:
     if state == "succeeded":
         return _finish(job, J.SUCCEEDED, report=answer.get("report")).state
     if state == "failed":
-        return _finish(job, J.FAILED, "TrainingFailed").state  # the server's text is not kept
+        return _finish(job, J.FAILED, server_error(answer.get("error"))).state
     if state == "cancelled":
         return _finish(job, J.CANCELLED).state
     if timezone.now() - job.started_at > MAX_AGE:
@@ -204,7 +218,7 @@ def _finish(job, state, error="", report=None):
             except (registry.RegistryError, IncompleteUpload, KeyError, TypeError, AttributeError,
                     IntegrityError) as exc:
                 state, error = J.FAILED, type(exc).__name__
-        locked.state, locked.error, locked.running_slot = state, error[:64], None
+        locked.state, locked.error, locked.running_slot = state, error[:ERROR_MAX], None
         locked.finished_at = timezone.now()
         locked.save(update_fields=["state", "error", "running_slot", "finished_at", "version"])
     if state != J.SUCCEEDED:

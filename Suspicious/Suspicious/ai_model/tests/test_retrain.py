@@ -320,7 +320,8 @@ class PollTest(RetrainBase):
 
     def test_failed_cancelled_gone_and_half_uploaded_register_nothing_and_clean_up(self):
         cases = (
-            (dict(return_value=view("failed", "training: gate: head dangerous")), J.FAILED, "TrainingFailed"),
+            (dict(return_value=view("failed", "training: gate: head dangerous")), J.FAILED,
+             "training: gate: head dangerous"),
             (dict(return_value=view("cancelled")), J.CANCELLED, ""),
             (dict(side_effect=TrainJobGone("inference server HTTP 404")), J.FAILED, "TrainJobGone"),
             (dict(return_value=succeeded(uploaded=registry.BUNDLE_FILE_NAMES[:3])), J.FAILED, "IncompleteUpload"),
@@ -335,12 +336,25 @@ class PollTest(RetrainBase):
                 self.assertEqual(retrain.poll_once(job.job_id), state)
                 self.check_cleaned(job, state, error)
 
-    def test_the_server_error_text_is_not_stored(self):
-        job = self.start()
-        self.status.return_value = view("failed", "https://rustfs:9000/x?X-Amz-Signature=abc")
-        retrain.poll_once(job.job_id)
-        job.refresh_from_db()
-        self.assertEqual(job.error, "TrainingFailed")
+    def test_the_server_error_text_is_kept_filtered(self):
+        cases = (
+            ("training: gate: head dangerous class 3 has 3 samples (needs 8)",
+             "training: gate: head dangerous class 3 has 3 samples (needs 8)"),
+            ("worker exited with code -9", "worker exited with code -9"),
+            ("https://rustfs:9000/x?X-Amz-Signature=abc", "TrainingFailed"),  # a URL: dropped whole
+            ("bad value? yes", "TrainingFailed"),
+            ("a<b>\n\"c\" ;'d'", "abc d"),  # characters outside the set are removed
+            ("<>!", "TrainingFailed"),
+            (None, "TrainingFailed"),
+            ("x" * 300, "x" * 200),
+        )
+        for text, stored in cases:
+            with self.subTest(text=text):
+                job = self.start()
+                self.status.return_value = view("failed", text)
+                retrain.poll_once(job.job_id)
+                job.refresh_from_db()
+                self.assertEqual(job.error, stored)
 
     def test_six_hours_times_out_and_cancels_on_the_server(self):
         job = self.start()
@@ -511,12 +525,14 @@ class CommandTest(RetrainBase):
 
     def test_status_prints_counts_and_states(self):
         self.run_cmd()
-        self.status.return_value = view("failed", "secret text")
+        self.status.return_value = view("failed", "training: dataset: rows <8> http://x?sig=1")
         retrain.poll_once(RetrainJob.objects.get().job_id)
         out = self.run_cmd("--status")
         self.assertIn("failed: 1", out)
-        self.assertIn("TrainingFailed", out)
-        self.assertNotIn("secret text", out)
+        self.assertIn("TrainingFailed", out)  # a URL drops the whole text
+        self.assertNotIn("sig=", out)
+        RetrainJob.objects.update(error="worker exited with code -9")
+        self.assertIn("error worker exited with code -9", self.run_cmd("--status"))
 
     def test_status_settles_a_running_job(self):
         self.run_cmd()
