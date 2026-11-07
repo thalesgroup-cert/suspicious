@@ -205,6 +205,14 @@ class MutantTest(RetrainBase):
         self.assertEqual(list(self.store.list(registry.DATASET_BUCKET)), [])
         self.assertFalse(RetrainJob.objects.exists())
 
+    def test_a_store_error_in_the_export_is_refused_and_drops_the_dataset(self):
+        from common.storage.base import StoreError
+        with mock.patch.object(self.store, "presign_get", side_effect=StoreError("unavailable", "down")), \
+                self.assertRaisesRegex(retrain.RetrainRefused, r"could not export the ledger: StoreError"):
+            retrain.start_retrain()
+        self.assertEqual(list(self.store.list(registry.DATASET_BUCKET)), [])  # the put had succeeded
+        self.assertFalse(RetrainJob.objects.exists())
+
     def test_cleanup_ignores_a_tampered_prefix(self):
         self.store.ensure_bucket(registry.BUCKET)
         self.store.put(registry.BUCKET, "v1/j1/manifest.json", BytesIO(b"x"))  # another version's bundle
@@ -549,6 +557,17 @@ class ScheduleTest(RetrainBase):
                                   trigger="schedule", error="Refused",
                                   started_at=timezone.now() - timedelta(days=2))
         tasks.maybe_start_retrain()
+        self.assertEqual(RetrainJob.objects.count(), 1)
+
+    def test_a_store_error_on_a_scheduled_start_backs_off(self):
+        from common.storage.base import StoreError
+        registry.ensure_version_zero()
+        ModelVersion.objects.update(created_at=timezone.now() - timedelta(days=31))
+        with mock.patch.object(self.store, "put", side_effect=StoreError("unavailable", "down")):
+            tasks.maybe_start_retrain()
+        refused = RetrainJob.objects.get()
+        self.assertEqual((refused.state, refused.error, refused.trigger), (J.FAILED, "Refused: StoreError", "schedule"))
+        tasks.maybe_start_retrain()  # backing off: nothing new
         self.assertEqual(RetrainJob.objects.count(), 1)
 
     def test_a_running_job_writes_no_refused_row(self):

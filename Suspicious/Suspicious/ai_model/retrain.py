@@ -54,7 +54,12 @@ def server_error(text) -> str:
 
 
 class RetrainRefused(Exception):
-    """The retrain did not start; the message says why (no URL, no mail text)."""
+    """The retrain did not start; the message says why (no URL, no mail text). cause: the class
+    name of an unexpected error behind it, if any."""
+
+    def __init__(self, message: str, cause: str = ""):
+        super().__init__(message)
+        self.cause = cause
 
 
 class JobRunning(RetrainRefused):
@@ -104,6 +109,10 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         exported = export_ledger(job_id)  # creates the dataset bucket
     except ExportRefused as exc:
         raise RetrainRefused(str(exc)) from None
+    except Exception as exc:  # noqa: BLE001 — the store (or a bug): drop what may have been put
+        _delete_dataset(job_id)
+        name = type(exc).__name__
+        raise RetrainRefused(f"could not export the ledger: {name}", cause=name) from None
     try:
         registry.ensure_bucket()
         store = registry.get_store()
@@ -112,7 +121,8 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         parent = _parent(user)
     except Exception as exc:  # noqa: BLE001 — no job yet: drop the exported dataset, say the class
         _delete_dataset(job_id)
-        raise RetrainRefused(f"could not prepare the training job: {type(exc).__name__}") from None
+        name = type(exc).__name__
+        raise RetrainRefused(f"could not prepare the training job: {name}", cause=name) from None
     params = {
         "version_id": version_id, "seed": SEED, "repeats": REPEATS,
         "baseline": "legacy" if parent.version_id == "v0" else "candidate",
@@ -327,5 +337,5 @@ def maybe_start():
         RetrainJob.objects.create(
             job_id=job_id, target_version=version_id, state=J.FAILED, running_slot=None,
             prefix=registry.bundle_prefix_for(version_id, job_id), trigger=ModelVersion.Trigger.SCHEDULE,
-            started_at=now, finished_at=now, error="Refused")
+            started_at=now, finished_at=now, error=f"Refused: {exc.cause}" if exc.cause else "Refused")
         return None
