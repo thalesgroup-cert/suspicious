@@ -531,7 +531,7 @@ APP_LOGGERS = [
     "api", "case_handler", "cortex_job", "score_process", "connectors",
     "mail_feeder", "email_process", "url_process", "ip_process",
     "hash_process", "file_process", "domain_process", "dashboard",
-    "settings", "profiles", "tasp", "suspicious", "common",
+    "settings", "profiles", "tasp", "suspicious", "common", "ai_model",
 ]
 assert len(APP_LOGGERS) == len(set(APP_LOGGERS)), "duplicate name in APP_LOGGERS"
 
