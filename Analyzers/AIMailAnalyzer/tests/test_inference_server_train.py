@@ -45,10 +45,11 @@ PARAMS = {
     "version_id": "v-test-1", "seed": 0, "repeats": 1, "epochs": 1, "baseline": "candidate",
     "preprocessing_version": "chunkmean-tokens-v1", "parent_version": "v0",
     "ledger_digest": "a" * 64, "campaign_refs_digest": "b" * 64,
-    "encoder_id": "paraphrase-multilingual-mpnet-base-v2", "encoder_hash": "c" * 64,
+    "encoder_id": "paraphrase-multilingual-mpnet-base-v2",
     "trainer_revision": "9f8d6912", "campaign_profile": PROFILE,
 }
 TERMINAL = {"succeeded", "failed", "cancelled"}
+ENCODER_HASH = "c" * 64  # what the fixture's server reports for its encoder
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -180,7 +181,8 @@ def train(make_client, tmp_path, monkeypatch, env):  # noqa: F811
         base.mkdir(exist_ok=True)
         controller = training_job.JobController(
             launcher=launcher or thread_launcher, transport=httpx.MockTransport(storage),
-            tmp_base=str(base), grace_seconds=0.5, poll_seconds=0.02)
+            tmp_base=str(base), grace_seconds=0.5, poll_seconds=0.02,
+            encoder_hash=lambda: ENCODER_HASH)
         client = make_client()
         monkeypatch.setattr(server.trainer, "__dict__", controller.__dict__)
         return client, controller, storage, launches, base
@@ -266,6 +268,56 @@ def test_params_are_strict(train, env, params):
     client, _, _, launches, _ = train()
     assert client.post("/v2/train", json=body(params=params), headers=env).status_code == 422
     assert not launches
+
+
+def test_the_encoder_hash_is_not_accepted_from_the_caller(train, env):
+    client, *_ = train()
+    r = client.post("/v2/train", json=body(params={**PARAMS, "encoder_hash": "d" * 64}), headers=env)
+    assert r.status_code == 422
+
+
+def test_no_encoder_hash_fails_the_job(train, env):
+    client, controller, storage, launches, _ = train()
+    controller.encoder_hash = lambda: None
+    r = client.post("/v2/train", json=body(), headers=env)
+    assert r.status_code == 202 and r.json()["state"] == "failed"
+    assert r.json()["error"] == "encoder not loaded" and launches == [] and storage.requests == []
+
+
+def test_encoder_digest(tmp_path):
+    enc = tmp_path / "enc"
+    (enc / "1_Pooling").mkdir(parents=True)
+    (enc / "model.safetensors").write_bytes(b"weights")
+    (enc / "config.json").write_text("{}")
+    (enc / "1_Pooling" / "config.json").write_text("{\"p\": 1}")
+    first = training_job.encoder_digest(str(enc))
+    assert len(first) == 64 and first == training_job.encoder_digest(str(enc))
+    (enc / "config.json").write_text("{ }")
+    assert training_job.encoder_digest(str(enc)) != first  # content counts
+    (enc / "config.json").write_text("{}")
+    (enc / "config.json").rename(enc / "config2.json")
+    assert training_job.encoder_digest(str(enc)) != first  # names count
+    (enc / "config2.json").rename(enc / "config.json")
+    (tmp_path / "outside").write_bytes(b"x")
+    os.symlink(tmp_path / "outside", enc / "link")
+    assert training_job.encoder_digest(str(enc)) == first  # links are not followed
+    assert training_job.encoder_digest(str(tmp_path / "missing")) is None
+    assert training_job.encoder_digest(str(enc), cap=3) is None  # larger than the cap
+
+
+def test_the_server_hashes_its_encoder_once(tmp_path, monkeypatch):
+    enc = tmp_path / "enc"
+    enc.mkdir()
+    (enc / "model.safetensors").write_bytes(b"w")
+    st = server.ModelStore({})
+    st.vectorizer, st.vectorizer_path = object(), str(enc)
+    calls = []
+    real = training_job.encoder_digest
+    monkeypatch.setattr(training_job, "encoder_digest", lambda p, **k: calls.append(p) or real(p, **k))
+    assert st.encoder_hash() == real(str(enc)) == st.encoder_hash()
+    assert calls == [str(enc)]
+    st.vectorizer = None
+    assert server.ModelStore({}).encoder_hash() is None  # nothing loaded
 
 
 def test_request_body_is_capped(train, env):
@@ -423,6 +475,7 @@ def test_successful_job_trains_writes_and_uploads_the_bundle(train, env, tmp_pat
     assert state["progress"] == 100.0 and state["error"] is None
     report = state["report"]
     assert report["uploaded"] == list(NAMES)
+    assert report["encoder_hash"] == ENCODER_HASH  # computed by the server, not sent by Django
     assert set(report["checks"]) and isinstance(report["eligible"], bool)
     assert {"candidate", "baseline", "tier_cutoffs", "campaign"} <= set(report)
 
@@ -706,7 +759,8 @@ def test_real_worker_trains_a_bundle(make_client, tmp_path, monkeypatch, env):  
     base = tmp_path / "b"
     base.mkdir()
     controller = training_job.JobController(transport=httpx.MockTransport(storage),
-                                            tmp_base=str(base), poll_seconds=0.1)
+                                            tmp_base=str(base), poll_seconds=0.1,
+                                            encoder_hash=lambda: ENCODER_HASH)
     client = make_client()
     monkeypatch.setattr(server.trainer, "__dict__", controller.__dict__)
     client.post("/v2/train", json=body(), headers=env)
@@ -726,7 +780,8 @@ def test_real_worker_killed_becomes_failed(make_client, tmp_path, monkeypatch, e
     base.mkdir()
     controller = training_job.JobController(launcher=killing_launcher,
                                             transport=httpx.MockTransport(storage),
-                                            tmp_base=str(base), poll_seconds=0.05)
+                                            tmp_base=str(base), poll_seconds=0.05,
+                                            encoder_hash=lambda: ENCODER_HASH)
     client = make_client()
     monkeypatch.setattr(server.trainer, "__dict__", controller.__dict__)
     client.post("/v2/train", json=body(), headers=env)

@@ -92,6 +92,9 @@ class ModelStore:
         self.model_dirs = model_dirs
         self.vectorizer: Optional[SentenceTransformer] = None
         self.vectorizer_error: Optional[str] = None
+        self.vectorizer_path: Optional[str] = None
+        self._encoder_hash: Optional[str] = None
+        self._hash_lock = threading.Lock()
         self.slots = {
             variant: {spec.filename: Slot(None, None, None) for spec in MODEL_SPECS}
             for variant in model_dirs
@@ -105,10 +108,23 @@ class ModelStore:
         try:
             self.vectorizer = SentenceTransformer(path, device=str(device))
             self.vectorizer_error = None
+            self.vectorizer_path, self._encoder_hash = path, None
         except Exception as exc:  # noqa: BLE001 - surfaced via /health, not swallowed
             self.vectorizer = None
             self.vectorizer_error = f"{type(exc).__name__}: {exc}"
             logger.error("could not load vectorizer from %s: %s", path, exc)
+
+    def encoder_hash(self) -> Optional[str]:
+        """encoder_digest of the loaded vectorizer's directory, computed at first use and cached
+        (a load resets it). None while no vectorizer is loaded. Lazy rather than at load, so a
+        start or a test client that never trains or reloads does not read ~1 GB of weights."""
+        if self.vectorizer is None or not self.vectorizer_path:
+            return None
+        with self._hash_lock:
+            if self._encoder_hash is None:
+                from . import training_job  # looked up here so tests can count the calls
+                self._encoder_hash = training_job.encoder_digest(self.vectorizer_path)
+            return self._encoder_hash
 
     def refresh(self, force: bool = False) -> dict:
         """(Re)load every model file that is new or changed on disk.
@@ -335,7 +351,7 @@ def _classify(models: dict, mail_body: str) -> dict:
 # right after app = FastAPI(...).
 # The training job controller keeps one job and its state in this process: the server must run as
 # a single uvicorn worker (the Dockerfile CMD), or the one-job lock and the leftover sweep break.
-trainer = JobController()
+trainer = JobController(encoder_hash=store.encoder_hash)
 holder = ModelHolder()  # loaded bundles (POST /v2/reload); empty = the legacy weights in models/
 app.include_router(
     make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS,

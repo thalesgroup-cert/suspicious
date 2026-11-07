@@ -21,13 +21,14 @@ from connectors.providers import ProviderUnavailable
 S = ModelVersion.Status
 J = RetrainJob.State
 SHA = "b" * 64
+ENC = "e" * 64
 GATE = {"checks": {"accuracy": {"passed": True, "value": 0.86, "threshold": 0.8, "detail": ""}},
         "candidate": {"accuracy": 0.86}, "baseline": {"accuracy": 0.84}, "campaign": {},
         "tier_cutoffs": {"high": 0.9, "medium": 0.6}}
 
 
 def succeeded(eligible=True, uploaded=registry.BUNDLE_FILE_NAMES, sha=SHA):
-    report = dict(GATE, eligible=eligible, manifest_sha256=sha, uploaded=list(uploaded))
+    report = dict(GATE, eligible=eligible, manifest_sha256=sha, uploaded=list(uploaded), encoder_hash=ENC)
     return {"job_id": "x", "state": "succeeded", "progress": 100, "report": report, "error": None}
 
 
@@ -97,8 +98,8 @@ class StartTest(RetrainBase):
         params = body["params"]
         self.assertEqual(set(params), {
             "version_id", "seed", "repeats", "baseline", "preprocessing_version", "parent_version",
-            "ledger_digest", "campaign_refs_digest", "encoder_id", "encoder_hash", "trainer_revision",
-            "campaign_profile"})
+            "ledger_digest", "campaign_refs_digest", "encoder_id", "trainer_revision",
+            "campaign_profile"})  # encoder_hash: the server computes it
         self.assertEqual(params["version_id"], job.target_version)
         self.assertEqual((params["seed"], params["repeats"]), (0, 3))
         self.assertEqual((params["baseline"], params["parent_version"]), ("legacy", "v0"))
@@ -285,6 +286,7 @@ class PollTest(RetrainBase):
         self.assertIs(version.manifest["eligible"], True)
         self.assertEqual(version.manifest["gate"]["checks"], GATE["checks"])
         self.assertEqual(version.manifest["ledger_digest"], job.params["ledger_digest"])
+        self.assertEqual(version.manifest["encoder_hash"], ENC)  # from the server's report
         self.assertEqual(version.campaign_profile["distance_threshold"], 0.25)
         self.assertEqual(list(version.events.values_list("action", flat=True)), ["create_candidate"])
         self.assertEqual(len(self.bundle_keys(job)), len(registry.BUNDLE_FILE_NAMES))  # bundle kept

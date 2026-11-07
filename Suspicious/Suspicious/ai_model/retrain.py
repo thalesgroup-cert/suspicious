@@ -32,9 +32,6 @@ BACKOFF = timedelta(days=7)  # after a failed or refused scheduled retrain  # a 
 UPLOAD_EXPIRY = timedelta(hours=4, minutes=15)
 SEED, REPEATS = 0, 3  # fixed: the same ledger digest and seed give the same metrics
 ENCODER_ID = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-# ponytail: the image fetches the encoder from the repo's `main` (inference_server/Dockerfile),
-# so there is no pinned hash to send. Pin a revision there and put it here.
-ENCODER_HASH = "hf-main-unpinned"
 TRAINER_REVISION = "plan-e-candidate-v1"
 GATE_KEYS = ("checks", "candidate", "baseline", "campaign", "tier_cutoffs")
 
@@ -99,7 +96,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         "baseline": "legacy" if parent.version_id == "v0" else "candidate",
         "preprocessing_version": TRAINING_PREPROCESSING, "parent_version": parent.version_id,
         "ledger_digest": exported.ledger_digest, "campaign_refs_digest": exported.campaign_refs_digest,
-        "encoder_id": ENCODER_ID, "encoder_hash": ENCODER_HASH, "trainer_revision": TRAINER_REVISION,
+        "encoder_id": ENCODER_ID, "trainer_revision": TRAINER_REVISION,
         "campaign_profile": dataclasses.asdict(current_profile()),
     }
     try:
@@ -183,7 +180,9 @@ def _manifest(job, report):
     if set(report["uploaded"]) != set(registry.BUNDLE_FILE_NAMES):
         raise IncompleteUpload
     summary = {k: v for k, v in job.params.items() if k != "campaign_profile"}
+    # encoder_hash: the server's digest of its encoder files (it is not sent in the params)
     summary.update(job_id=job.job_id, rows=job.rows, eligible=report["eligible"] is True,
+                   encoder_hash=report.get("encoder_hash"),
                    gate={k: report.get(k) for k in GATE_KEYS})
     return summary, report["manifest_sha256"]
 

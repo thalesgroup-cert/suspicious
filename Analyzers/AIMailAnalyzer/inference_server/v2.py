@@ -85,7 +85,7 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
         req = await _read_json(request, bundles.ReloadRequest)
         try:
             versions = await run_in_threadpool(holder.reload, req, vectorizer=store.vectorizer,
-                                               slots=slots)
+                                               slots=slots, encoder_hash=store.encoder_hash())
         except bundles.ReloadBusy:
             raise HTTPException(409, "a reload is already running") from None
         except bundles.ReloadError as e:

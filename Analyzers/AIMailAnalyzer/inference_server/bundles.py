@@ -137,7 +137,7 @@ class ModelHolder:
             out["shadow"] = shadow.describe()
         return out
 
-    def reload(self, req: ReloadRequest, *, vectorizer, slots) -> dict:
+    def reload(self, req: ReloadRequest, *, vectorizer, slots, encoder_hash=None) -> dict:
         if not self._reload_lock.acquire(blocking=False):
             raise ReloadBusy()
         try:
@@ -160,7 +160,7 @@ class ModelHolder:
                     raise ReloadError("encoder not loaded")
                 width = _encoder_width(vectorizer, slots)
             loaded = {role: None if spec is None else
-                      self._load(role, spec, urls[role], base, vectorizer, width)
+                      self._load(role, spec, urls[role], base, vectorizer, width, encoder_hash)
                       for role, spec in specs.items()}
             with self._lock:
                 self.state = (loaded["active"], loaded["shadow"])
@@ -168,7 +168,7 @@ class ModelHolder:
         finally:
             self._reload_lock.release()
 
-    def _load(self, role, spec, urls, base, vectorizer, width) -> LoadedModel:
+    def _load(self, role, spec, urls, base, vectorizer, width, encoder_hash=None) -> LoadedModel:
         deadline = time.monotonic() + _env_int("AI_RELOAD_MAX_SECONDS", 300, 1)
 
         def check():
@@ -201,6 +201,9 @@ class ModelHolder:
         pv = manifest["preprocessing_version"]
         if pv not in KNOWN_PREPROCESSING:
             raise ReloadError(f"{role}: unknown preprocessing_version")
+        # A bundle that names its encoder must name this one (a missing hash here refuses it too).
+        if manifest["encoder_hash"] and manifest["encoder_hash"] != encoder_hash:
+            raise ReloadError(f"{role}: the bundle was trained with another encoder")
         if bundle.input_dim != width:
             raise ReloadError(f"{role}: input_dim {bundle.input_dim} differs from the encoder "
                               f"width {width}")

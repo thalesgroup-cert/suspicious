@@ -136,8 +136,39 @@ class _Cancelled(Exception):
 Label = Field(pattern=LABEL_PATTERN)
 
 
+MAX_ENCODER_BYTES = 4 << 30  # an encoder directory larger than this gets no hash
+
+
+def encoder_digest(path: str, *, cap: int = MAX_ENCODER_BYTES) -> Optional[str]:
+    """SHA-256 over every regular file under path (symlinks are not followed), in sorted relative
+    POSIX name order: name, NUL, size, NUL, bytes. None when the path is missing or unreadable or
+    the files exceed cap. The training job records it as the manifest's encoder_hash and reload
+    compares it, so a bundle trained with another encoder is refused."""
+    files = []
+    try:
+        for root, dirs, names in os.walk(path):  # followlinks=False: linked dirs are not entered
+            dirs.sort()
+            for name in names:
+                full = os.path.join(root, name)
+                st = os.lstat(full)
+                if stat.S_ISREG(st.st_mode):
+                    files.append((os.path.relpath(full, path).replace(os.sep, "/"), full, st.st_size))
+        if not files or sum(f[2] for f in files) > cap:
+            return None
+        digest = hashlib.sha256()
+        for rel, full, size in sorted(files):
+            digest.update(f"{rel}\0{size}\0".encode())
+            with open(full, "rb", opener=lambda p, f: os.open(p, f | os.O_NOFOLLOW)) as fh:
+                for chunk in iter(lambda: fh.read(1 << 20), b""):
+                    digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
 class TrainParams(BaseModel):
-    """Everything the worker gets besides the dataset. Strings land in the manifest."""
+    """Everything the worker gets besides the dataset. Strings land in the manifest. The server
+    adds encoder_hash itself (encoder_digest of its own encoder); a caller cannot send one."""
     model_config = ConfigDict(extra="forbid", strict=True)
     version_id: str = Field(pattern=JOB_ID_PATTERN)
     seed: int = Field(ge=0, le=2**31 - 1)
@@ -150,7 +181,6 @@ class TrainParams(BaseModel):
     ledger_digest: str = Label
     campaign_refs_digest: str = Label
     encoder_id: str = Label
-    encoder_hash: str = Label
     trainer_revision: str = Label
     campaign_profile: dict  # copied into the bundle as is (spec section 3)
 
@@ -446,8 +476,9 @@ def _env_int(name, default, low):
 
 class JobController:
     def __init__(self, *, launcher=popen_launcher, transport=None, tmp_base=None,
-                 grace_seconds=10.0, poll_seconds=0.5):
+                 grace_seconds=10.0, poll_seconds=0.5, encoder_hash=None):
         self.launcher = launcher
+        self.encoder_hash = encoder_hash or (lambda: None)  # the loaded encoder's digest, or None
         self.transport = transport  # tests inject an httpx.MockTransport
         self.tmp_base = tmp_base  # None: AI_TRAIN_TMPDIR, else the system temp dir, at first use
         self.grace_seconds = grace_seconds
@@ -487,6 +518,10 @@ class JobController:
                 self._swept = True
             job = self.jobs[req.job_id] = Job(req.job_id)
             self._evict()
+            encoder_hash = self.encoder_hash()
+            if not encoder_hash:
+                job.state, job.error = "failed", "encoder not loaded"
+                return 202, job.view()
             try:
                 hosts = allowed_hosts()
                 dataset = check_url(req.dataset_url, hosts, "dataset download")
@@ -495,7 +530,7 @@ class JobController:
             except JobError as e:
                 job.state, job.error = "failed", str(e)
                 return 202, job.view()
-            params = req.params.model_dump()
+            params = {**req.params.model_dump(), "encoder_hash": encoder_hash}
             threading.Thread(target=self._run, args=(job, dataset, uploads, params),
                              daemon=True, name=f"ai-train-{req.job_id}").start()
             return 202, job.view()
@@ -552,7 +587,7 @@ class JobController:
                     self._checkpoint(job, deadline)
                     self._upload(client, uploads[name], blobs[name], name)
             report = {**result["summary"], "manifest_sha256": result["manifest_sha256"],
-                      "uploaded": list(UPLOAD_NAMES)}
+                      "encoder_hash": params["encoder_hash"], "uploaded": list(UPLOAD_NAMES)}
             final = ("succeeded", report, None)
         except _Cancelled:
             final = ("cancelled", None, None)

@@ -103,8 +103,10 @@ def app(tmp_path, monkeypatch, token_env):
     base.mkdir()
     holder = bundles.ModelHolder(transport=httpx.MockTransport(storage), tmp_base=str(base))
     monkeypatch.setattr(server.holder, "__dict__", holder.__dict__)
+    monkeypatch.setattr(server, "VECTORIZER_PATH", str(tmp_path / "no-encoder-files"))
     client = TestClient(server.app)
     client.__enter__()
+    server.store._encoder_hash = "h"  # make_bundle's manifests say "h"
     yield client, server.holder, storage, base
     client.__exit__(None, None, None)
 
@@ -376,6 +378,7 @@ def test_corrupt_bundle_is_refused(loaded, token_env, tmp_path):
     ({"preprocessing": "chunkmean-sentences-v9"}, "preprocessing"),
     ({"dim": 16}, "input_dim"),
     ({"version": "v-other"}, "version"),
+    ({"manifest_extra": {"encoder_hash": "e" * 64}}, "another encoder"),
 ])
 def test_bundle_the_server_cannot_serve_is_refused(loaded, token_env, tmp_path, kw, why):
     client, holder, storage, base = loaded
@@ -385,6 +388,12 @@ def test_bundle_the_server_cannot_serve_is_refused(loaded, token_env, tmp_path, 
     r = reload(client, token_env, active=spec)
     _assert_refused_keeps(client, token_env, r, base, "v-old")
     assert why in r.text
+
+
+def test_a_bundle_without_an_encoder_hash_still_loads(app, token_env, tmp_path):
+    client, holder, storage, base = app
+    spec, _ = make_bundle(tmp_path, storage, version="v-nohash", manifest_extra={"encoder_hash": ""})
+    assert reload(client, token_env, active=spec).status_code == 200
 
 
 def test_missing_encoder_is_refused(loaded, token_env, tmp_path, monkeypatch):
