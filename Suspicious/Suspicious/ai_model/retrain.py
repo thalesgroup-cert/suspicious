@@ -98,7 +98,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
     if job is not None:
         try:
             state = poll_once(job.job_id)  # finishes a stale job first
-        except Exception as exc:  # noqa: BLE001 — the class only; poll_retrain fails it after MAX_AGE
+        except Exception as exc:  # noqa: BLE001: the class only; poll_retrain fails it after MAX_AGE
             raise JobRunning(f"retrain job {job.job_id} could not be checked: {type(exc).__name__}") from None
         if state == J.RUNNING:
             raise JobRunning(f"retrain job {job.job_id} is running")
@@ -109,7 +109,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         exported = export_ledger(job_id)  # creates the dataset bucket
     except ExportRefused as exc:
         raise RetrainRefused(str(exc)) from None
-    except Exception as exc:  # noqa: BLE001 — the store (or a bug): drop what may have been put
+    except Exception as exc:  # noqa: BLE001: the store (or a bug): drop what may have been put
         _delete_dataset(job_id)
         name = type(exc).__name__
         raise RetrainRefused(f"could not export the ledger: {name}", cause=name) from None
@@ -119,7 +119,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         bucket, _, key = prefix.partition("/")
         bundle_urls = {n: store.presign_put(bucket, key + n, UPLOAD_EXPIRY) for n in registry.BUNDLE_FILE_NAMES}
         parent = _parent(user)
-    except Exception as exc:  # noqa: BLE001 — no job yet: drop the exported dataset, say the class
+    except Exception as exc:  # noqa: BLE001: no job yet: drop the exported dataset, say the class
         _delete_dataset(job_id)
         name = type(exc).__name__
         raise RetrainRefused(f"could not prepare the training job: {name}", cause=name) from None
@@ -156,7 +156,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
             return job
         _finish(job, J.FAILED, type(exc).__name__)
         raise RetrainRefused(str(exc)) from None
-    except Exception as exc:  # noqa: BLE001 — a 4xx (ValueError) or a bug: no job on the server
+    except Exception as exc:  # noqa: BLE001: a 4xx (ValueError) or a bug: no job on the server
         _finish(job, J.FAILED, type(exc).__name__)
         raise RetrainRefused(f"the training request failed: {type(exc).__name__}") from None
     return job
@@ -211,7 +211,7 @@ def give_up(job, error: str) -> None:
     """Fail a job whose poll chain keeps raising, past MAX_AGE + STOP_MARGIN (poll_retrain)."""
     try:
         _finish(job, J.FAILED, error)
-    except Exception as exc:  # noqa: BLE001 — the chain stops either way; the class is logged
+    except Exception as exc:  # noqa: BLE001: the chain stops either way; the class is logged
         logger.warning("Retrain %s: could not fail the job: %s", job.job_id, type(exc).__name__)
 
 
@@ -220,7 +220,7 @@ def poll_countdown() -> int:
     a slow POST /v2/train is not answered 404 by a poll that overtook it."""
     try:
         return max(POLL_SECONDS, int(_connector(check_enabled=False)._client().timeout) + 5)
-    except Exception:  # noqa: BLE001 — a misconfigured connector still gets polled
+    except Exception:  # noqa: BLE001: a misconfigured connector still gets polled
         return POLL_SECONDS
 
 
@@ -272,7 +272,7 @@ def _delete_under(bucket, key):
     try:
         if store.bucket_exists(bucket):
             store.delete_many(bucket, [o.name for o in store.list(bucket, key)])
-    except Exception as exc:  # noqa: BLE001 — the job is settled; leftovers are unregistered
+    except Exception as exc:  # noqa: BLE001: the job is settled; leftovers are unregistered
         logger.warning("Retrain cleanup failed: %s", type(exc).__name__)
 
 
