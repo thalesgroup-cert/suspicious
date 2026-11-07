@@ -35,11 +35,17 @@ COPY training/ ./training/
 COPY vectorizers/ ./vectorizers/
 
 # The vectorizer's own weights are excluded from the build context
-# (.dockerignore) — always the same public checkpoint, so fetch it here.
+# (.dockerignore), so fetch them here, from one pinned Hugging Face commit:
+# encoder_hash covers these files, and a bundle trained with another encoder
+# is refused at reload. Changing the pin changes encoder_hash and makes every
+# registered bundle unloadable until retrained (docs/components/analyzers.md).
+# 4328cf26... is the commit whose files the images built since 2026-11 hold
+# (model.safetensors sha256 b5722100..., checked against the Hugging Face API).
+ARG ENCODER_REVISION=4328cf26390c98c5e3c738b4460a05b95f4911f5
 # Without this step SentenceTransformer() fails at startup (only the tokenizer
 # files are in the repo) and every classify call answers 503.
 RUN VEC=/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2 && \
-    BASE=https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2/resolve/main && \
+    BASE=https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2/resolve/${ENCODER_REVISION} && \
     mkdir -p "$VEC/1_Pooling" && \
     curl -fL --retry 3 -o "$VEC/model.safetensors" "$BASE/model.safetensors" && \
     curl -fL --retry 3 -o "$VEC/config.json" "$BASE/config.json" && \

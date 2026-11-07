@@ -573,6 +573,14 @@ name that is not a plain file name, a file above 50 MB or a total above 100 MB, 
 preprocessing version, an `input_dim` other than the encoder's 768, or a manifest naming another
 encoder (the server hashes its own encoder files).
 
+**The encoder is pinned.** `inference_server/Dockerfile` downloads the encoder weights from one
+Hugging Face commit, `ARG ENCODER_REVISION=4328cf26390c98c5e3c738b4460a05b95f4911f5` (the files
+the images built since November 2026 hold; `model.safetensors` SHA-256 `b5722100…`). The encoder
+hash covers every file in the vectorizer directory, so a different pin changes it and every
+registered bundle is then refused at reload until it is retrained. To move the pin: build with
+`--build-arg ENCODER_REVISION=<sha>` (or change the default), retrain, and expect the old bundles
+to stop loading; version 0 (`active: null`) is not affected.
+
 ### Limits
 
 - **Resources.** The job runs in a separate process (`inference_server.training_worker`) with
