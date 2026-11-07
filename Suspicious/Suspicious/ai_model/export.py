@@ -31,6 +31,25 @@ def trainable_rows():
     return LabelRecord.objects.filter(trust=LabelRecord.Trust.FOLDER, status=LabelRecord.Status.ACTIVE)
 
 
+def campaign_ties(case_ids) -> list[tuple[int, int]]:
+    """Row index pairs that the campaign groups must join: the rows of each campaign's member cases
+    (CampaignMember), chained in row order, so members far apart in the embedding space never
+    straddle a fold (spec section 5)."""
+    rows_of = {}
+    for i, case_id in enumerate(case_ids):
+        if case_id is not None:
+            rows_of.setdefault(case_id, []).append(i)
+    members = {}
+    for campaign_id, case_id in CampaignMember.objects.filter(case_id__in=rows_of).values_list(
+            "campaign_id", "case_id"):
+        members.setdefault(campaign_id, []).extend(rows_of[case_id])
+    ties = []
+    for rows in members.values():
+        rows = sorted(set(rows))
+        ties.extend(zip(rows, rows[1:]))
+    return sorted(ties)
+
+
 def export_ledger(job_id: str) -> LedgerExport:
     """ExportRefused (a clear message) when no trainable row is in the training preprocessing, a
     head class has fewer than 8 rows or there are too many rows; RegistryError for a bad job_id.
@@ -60,8 +79,9 @@ def export_ledger(job_id: str) -> LedgerExport:
                   for label, emb, cmp, case_id, _ in values]
     except ValueError:
         raise ExportRefused("a trainable row has an unreadable embedding") from None
+    ties = campaign_ties([v[3] for v in values])
     try:
-        data = training_data.build_dataset(parsed)
+        data = training_data.build_dataset(parsed, ties)
     except ExportRefused as exc:
         if not excluded:
             raise

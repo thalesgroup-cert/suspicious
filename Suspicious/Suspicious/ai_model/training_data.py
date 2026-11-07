@@ -74,8 +74,9 @@ def _matrix(name, vectors):
     return m
 
 
-def build_dataset(rows) -> bytes:
-    """rows: (folder, classifier vector, campaign vector, case id or None). Returns the npz bytes.
+def build_dataset(rows, ties=()) -> bytes:
+    """rows: (folder, classifier vector, campaign vector, case id or None); ties: (i, j) row index
+    pairs of the same campaign (the campaign groups join them). Returns the npz bytes.
     A case id met again keeps NO_CASE on the later rows (the reader wants case ids unique; the
     first row still lets classify leave the case out of its own neighbours)."""
     rows = list(rows)
@@ -94,5 +95,6 @@ def build_dataset(rows) -> bytes:
     buf = io.BytesIO()
     np.savez(buf, embeddings=_matrix("embeddings", [r[1] for r in rows]),
              campaign_embeddings=_matrix("campaign_embeddings", [r[2] for r in rows]),
-             folders=np.array(folders, dtype=str), case_ids=np.array(case_ids, dtype=np.int64))
+             folders=np.array(folders, dtype=str), case_ids=np.array(case_ids, dtype=np.int64),
+             ties=np.array(list(ties), dtype=np.int64).reshape(-1, 2))
     return buf.getvalue()

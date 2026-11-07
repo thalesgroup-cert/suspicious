@@ -2,8 +2,10 @@
 so untrusted bytes. An uncompressed npz with exactly four arrays, one row per ledger mail:
 `embeddings` (float32 (n, d), the classifier input, token chunk-mean), `campaign_embeddings`
 (float32 (n, d2), the first-128 cmp-e1 vector that the groups are built from, Ruling E18),
-`folders` (fixed-width unicode, one of FOLDERS) and `case_ids` (int64, unique, except NO_CASE,
-which marks a row that matched no case and may repeat). No mail text.
+`folders` (fixed-width unicode, one of FOLDERS), `case_ids` (int64, unique, except NO_CASE,
+which marks a row that matched no case and may repeat) and `ties` (int64 (k, 2), row index pairs
+of the same campaign from CampaignMember, k <= MAX_ROWS, possibly empty; the campaign groups join
+them, Ruling E24). No mail text.
 The archive goes through bundle.py's checks (stored members only, layout as np.savez writes it,
 every array header consistent with its member) before np.load(allow_pickle=False) reads it."""
 import io
@@ -26,7 +28,7 @@ FOLDERS = (
     "2_CLASSIC_PHISHING", "2_CLONE_PHISHING", "2_BLACKMAILING_PHISHING", "2_WHALING_PHISHING",
 )
 NO_CASE = -1
-ARRAYS = ("embeddings", "campaign_embeddings", "folders", "case_ids")
+ARRAYS = ("embeddings", "campaign_embeddings", "folders", "case_ids", "ties")
 
 
 class DatasetError(Exception):
@@ -39,6 +41,7 @@ class Dataset:
     campaign_embeddings: np.ndarray
     folders: np.ndarray
     case_ids: np.ndarray
+    ties: np.ndarray
 
 
 def _read(path) -> bytes:
@@ -88,6 +91,9 @@ def read_dataset(path) -> Dataset:
     shape, dtype = shapes["case_ids"]
     if dtype != np.int64 or shape != (n,):
         raise DatasetError("case_ids: must be int64, one per row")
+    shape, dtype = shapes["ties"]
+    if dtype != np.int64 or len(shape) != 2 or shape[1] != 2 or shape[0] > MAX_ROWS:
+        raise DatasetError(f"ties: must be int64 (pairs, 2), at most {MAX_ROWS} pairs")
     try:
         with np.load(io.BytesIO(data), allow_pickle=False) as npz:
             arrays = {k: npz[k] for k in ARRAYS}
@@ -98,6 +104,8 @@ def read_dataset(path) -> Dataset:
             raise DatasetError(f"{k}: non-finite values")
     if not np.isin(arrays["folders"], FOLDERS).all():
         raise DatasetError("folders: unknown folder name")
+    if ((arrays["ties"] < 0) | (arrays["ties"] >= n)).any():
+        raise DatasetError("ties: row index out of range")
     ids = arrays["case_ids"]
     if (ids < NO_CASE).any():
         raise DatasetError(f"case_ids: must be {NO_CASE} (no case) or a case id")

@@ -47,8 +47,9 @@ def test_the_export_file_reads_back_through_the_real_reader(td, tmp_path):
         rows.append((folder, rng.normal(size=768).tolist(), rng.normal(size=768).tolist(), case_id))
     rows[5] = (*rows[5][:3], 5)
     path = tmp_path / "dataset.npz"
-    path.write_bytes(td.build_dataset(rows))
+    path.write_bytes(td.build_dataset(rows, ties=[(0, 63), (4, 5)]))
     d = dataset.read_dataset(path)
+    assert d.ties.tolist() == [[0, 63], [4, 5]]
     assert d.embeddings.shape == d.campaign_embeddings.shape == (64, 768)
     assert np.allclose(d.embeddings[1], np.float32(rows[1][1]))
     assert d.folders.tolist() == [r[0] for r in rows]

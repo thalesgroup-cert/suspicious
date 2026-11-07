@@ -98,7 +98,8 @@ def train(workdir, params, threads, report_progress):
     X, folders = data.embeddings, data.folders
     dup = near_duplicate_groups(data.campaign_embeddings, NEAR_DUPLICATE_THRESHOLD)
     camp = campaign_groups(data.campaign_embeddings,
-                           params["campaign_profile"]["distance_threshold"], [])
+                           params["campaign_profile"]["distance_threshold"],
+                           [tuple(t) for t in data.ties.tolist()])  # CampaignMember links
     repeats, seed, epochs = params["repeats"], params["seed"], params["epochs"]
     total = repeats * N_SPLITS * 2 * 2 + 2  # gate fits (2 groupings x 2 recipes) + the final fit
     done = [0]

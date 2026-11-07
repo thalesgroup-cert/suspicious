@@ -63,7 +63,8 @@ class TrainingDataTest(SimpleTestCase):
         rows[1] = (rows[1][0], rows[1][1], rows[1][2], None)
         rows[2] = (rows[2][0], rows[2][1], rows[2][2], 0)  # a second row of case 0
         with np.load(io.BytesIO(training_data.build_dataset(rows)), allow_pickle=False) as npz:
-            self.assertEqual(sorted(npz.files), ["campaign_embeddings", "case_ids", "embeddings", "folders"])
+            self.assertEqual(sorted(npz.files), ["campaign_embeddings", "case_ids", "embeddings", "folders", "ties"])
+            self.assertEqual((npz["ties"].dtype, npz["ties"].shape), (np.int64, (0, 2)))
             self.assertEqual(npz["embeddings"].dtype, np.float32)
             self.assertEqual(npz["embeddings"].shape, (64, W))
             self.assertEqual(npz["campaign_embeddings"].shape, (64, W))
@@ -187,6 +188,23 @@ class ExportTest(CaseMixin, TestCase):
         self.assertEqual(result.campaign_refs_digest, training_data.digest([campaign.ref]))
         expected = hashlib.sha256(json.dumps(sorted([campaign.ref])).encode()).hexdigest()
         self.assertEqual(result.campaign_refs_digest, expected)
+
+    def test_campaign_members_are_tied(self):
+        n = full_ledger()
+        a, b, c = (self.make_case(message_id=f"<m{i}@x>") for i in range(3))
+        campaign, other = Campaign.objects.create(), Campaign.objects.create()
+        for case in (a, b, c):
+            CampaignMember.objects.create(campaign=campaign, case=case)
+        lone = self.make_case(message_id="<lone@x>")
+        CampaignMember.objects.create(campaign=other, case=lone)
+        rows = [make_row(n + 1, case=a), make_row(n + 2, case=b), make_row(n + 3, case=c),
+                make_row(n + 4, case=lone)]
+        result = export.export_ledger("job-ties")
+        order = list(export.trainable_rows().order_by("pk").values_list("pk", flat=True))
+        idx = [order.index(r.pk) for r in rows]
+        with self.load(result) as npz:
+            ties = {tuple(t) for t in npz["ties"].tolist()}
+        self.assertEqual(ties, {(idx[0], idx[1]), (idx[1], idx[2])})  # a chain; a lone member has none
 
     def test_leaves_out_rows_in_another_preprocessing_and_counts_them(self):
         n = full_ledger()

@@ -62,6 +62,7 @@ def make_dataset(n_per=10, dim=16, **override) -> bytes:
         "campaign_embeddings": rng.normal(size=(len(X), 64)).astype(np.float32),
         "folders": np.repeat(np.array(FOLDERS), n_per),
         "case_ids": np.arange(1, len(X) + 1, dtype=np.int64),
+        "ties": np.zeros((0, 2), dtype=np.int64),
     }
     arrays.update(override)
     arrays = {k: v for k, v in arrays.items() if v is not None}
@@ -1112,6 +1113,38 @@ def test_read_dataset_round_trip(tmp_path):
     assert list(d.folders[:10]) == [FOLDERS[0]] * 10 and d.case_ids[0] == 1
 
 
+def test_read_dataset_reads_the_campaign_ties(tmp_path):
+    d = dataset_mod.read_dataset(_write(tmp_path, make_dataset(ties=np.array([[0, 79], [3, 4]], np.int64))))
+    assert d.ties.tolist() == [[0, 79], [3, 4]]
+
+
+def test_tied_rows_far_apart_share_a_campaign_group_and_a_fold(tmp_path, monkeypatch):
+    """Rows 0 and 79 are in one campaign (CampaignMember) but far apart in the campaign space."""
+    from training import gate
+    camp = np.eye(80, dtype=np.float32)  # orthogonal rows: no pair is within the distance
+    data = make_dataset(campaign_embeddings=camp, ties=np.array([[0, 79]], np.int64))
+    workdir = tmp_path / "job"
+    workdir.mkdir()
+    (workdir / training_worker.DATASET).write_bytes(data)
+    seen = {}
+
+    def capture(X, folders, dup, groups_campaign, **kw):
+        seen.update(X=X, folders=folders, dup=dup, camp=np.asarray(groups_campaign))
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(training_worker, "run_gate", capture)
+    with pytest.raises(RuntimeError, match="stop"):
+        training_worker.train(str(workdir), dict(PARAMS, epochs=1), 1, lambda p: None)
+    camp_groups = seen["camp"]
+    assert camp_groups[0] == camp_groups[79]
+    assert len(set(camp_groups[1:79].tolist()) & {camp_groups[0]}) == 0  # nothing else joined them
+    merged = gate._merge_groups(seen["dup"], camp_groups)
+    for seed in range(3):
+        folds, _ = gate._folds(seen["X"], seen["folders"], merged, seed)
+        for train_idx, test_idx in folds:
+            assert (0 in test_idx) == (79 in test_idx) and (0 in train_idx) == (79 in train_idx)
+
+
 def test_read_dataset_allows_repeated_minus_one_for_rows_without_a_case(tmp_path):
     ids = np.arange(80, dtype=np.int64)
     ids[::2] = -1  # no case: the ledger row matched none
@@ -1133,6 +1166,12 @@ def test_read_dataset_allows_repeated_minus_one_for_rows_without_a_case(tmp_path
     ({"folders": np.array(["9_EVIL"] * 80)}, "folders"),
     ({"folders": np.zeros(80, dtype=np.int64)}, "folders"),
     ({"folders": np.array(["x" * 300] * 80)}, "folders"),
+    ({"ties": None}, "arrays"),
+    ({"ties": np.zeros((1, 2), dtype=np.int32)}, "ties"),
+    ({"ties": np.zeros((2, 3), dtype=np.int64)}, "ties"),
+    ({"ties": np.array([[0, 80]], dtype=np.int64)}, "ties"),
+    ({"ties": np.array([[-1, 3]], dtype=np.int64)}, "ties"),
+    ({"ties": np.zeros((8001, 2), dtype=np.int64)}, "ties"),
 ])
 def test_read_dataset_refuses_bad_arrays(tmp_path, override, why):
     with pytest.raises(dataset_mod.DatasetError, match=why):

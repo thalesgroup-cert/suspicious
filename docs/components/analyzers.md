@@ -471,7 +471,9 @@ changes the active model: shadow runs and promotion come in a later release (Pla
   vote over the training embeddings. Each of the two components is smoothed and calibrated by its
   own temperature; the main probabilities are their mean.
 - **Groups.** Near-duplicates (cosine 0.95 or more on the campaign embedding) and campaign members
-  never straddle a train/test fold or a calibration half.
+  never straddle a train/test fold or a calibration half. Campaign members are rows within the
+  campaign distance of each other, plus the rows of cases linked to the same campaign
+  (`CampaignMember`), which the export sends as a `ties` array however far apart they embed.
 
 ### The gate
 
