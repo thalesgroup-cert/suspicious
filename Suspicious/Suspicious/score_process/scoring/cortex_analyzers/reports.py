@@ -62,8 +62,17 @@ class CortexAnalyzerReports:
             # the trust-weighted categorical engine; the mail band is raised to
             # the worst embedded band and the analyzers' rationale folded in.
             # (Flag OFF → _apply_derived_escalation, the Phase B behaviour.)
+            # Same branch as _apply_embedded_escalation, unrolled so the shadow's
+            # would-be verdict below reuses the evidence instead of re-reading it.
+            evidence, embedded_on = None, False
             if mail:
-                verdict = CortexAnalyzerReports._apply_embedded_escalation(case, mail, verdict)
+                from settings.config import get_config
+                embedded_on = get_config("scoring.mail_embedded_categorical") is not False
+                if embedded_on:
+                    evidence = CortexAnalyzerReports._embedded_evidence(case, mail)
+                    verdict = CortexAnalyzerReports._escalate(verdict, evidence)
+                else:
+                    verdict = CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
 
             # An explanation failure must NEVER break finalisation.
             _explanation = None
@@ -81,6 +90,17 @@ class CortexAnalyzerReports:
                     "verdict explanation failed for case %s", getattr(case, "id", "?"))
 
             apply_verdict(case, verdict, explanation=_explanation)
+
+            # The verdict a shadow model's answer would have given (Plan F, Ruling F5).
+            # Stored on its ShadowResult only; a failure never touches the live verdict.
+            if embedded_on:
+                try:
+                    from ai_model.shadow import record_would_be
+                    record_would_be(case, signals, deny_listed, deny_reason, evidence, verdict)
+                except Exception as exc:
+                    update_cases_logger.warning(
+                        "get_report: shadow would-be verdict skipped for case %s (%s)",
+                        case.id, type(exc).__name__)
 
             update_cases_logger.info(
                 "get_report: case %s → %s (score=%s conf=%s, %d/%d malicious).",
