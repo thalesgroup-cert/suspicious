@@ -127,7 +127,16 @@ class WouldBeTest(TestCase):
 
     @mock.patch("settings.config.get_config", side_effect=_flag_off)
     def test_kill_switch_off_leaves_the_would_be_fields_empty(self, _cfg):
-        row = self.row(self.run_report(self.mail_case(shadow="DANGEROUS")))
+        derived = CortexAnalyzerReports._apply_derived_escalation
+        with mock.patch.object(CortexAnalyzerReports, "_apply_derived_escalation",
+                               side_effect=derived) as spy:
+            plain = self.run_report(self.mail_case())
+            case = self.run_report(self.mail_case(shadow="DANGEROUS"))
+        self.assertEqual(spy.call_count, 2)
+        self.assertEqual((case.results, case.final_score, case.final_confidence, case.verdict_rationale),
+                         (plain.results, plain.final_score, plain.final_confidence, plain.verdict_rationale))
+        self.assertEqual(case.results, Result.SAFE)
+        row = self.row(case)
         self.assertEqual((row.live_result, row.would_be_result, row.would_be_score, row.would_be_rule, row.flip),
                          ("", "", None, "", "none"))
 

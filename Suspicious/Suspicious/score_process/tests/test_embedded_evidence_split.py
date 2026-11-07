@@ -20,7 +20,7 @@ class EmbeddedEvidenceSplitTests(TestCase):
     _verdict = base.MailEmbeddedEscalationTests._verdict
 
     def _run(self, band):
-        return CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, self._verdict(band))
+        return CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, self._verdict(band))[0]
 
     def _levels(self):
         url = URL.objects.get(pk=self.url.pk)
@@ -30,7 +30,9 @@ class EmbeddedEvidenceSplitTests(TestCase):
 
     def test_no_embedded_reports(self):
         v_in = self._verdict(Result.SAFE)
-        self.assertIs(CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, v_in), v_in)
+        v, evidence, categorical = CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, v_in)
+        self.assertIs(v, v_in)
+        self.assertEqual((evidence, categorical), (None, True))
         self.assertEqual(self._levels(), UNTOUCHED)
 
     def test_dangerous_child_raises_safe(self):
@@ -68,11 +70,15 @@ class EmbeddedEvidenceSplitTests(TestCase):
         url_save.assert_not_called()
         ma_save.assert_not_called()
         self.assertEqual(first, second)
-        self.assertEqual(first, self._run(Result.SAFE))
+        v, again, categorical = CortexAnalyzerReports._apply_embedded_escalation(
+            self.case, self.mail, self._verdict(Result.SAFE))
+        self.assertEqual((first, again, categorical), (v, evidence, True))
 
     @patch("settings.config.get_config", side_effect=base._flag_off)
     def test_kill_switch_off_uses_derived_escalation(self, _cfg):
         self._rep(self.gti, "malicious", 95, 9)
         v_in = self._verdict(Result.SAFE)
-        self.assertIs(CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, v_in), v_in)
+        v, evidence, categorical = CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, v_in)
+        self.assertIs(v, v_in)
+        self.assertEqual((evidence, categorical), (None, False))
         self.assertEqual(self._levels(), UNTOUCHED)

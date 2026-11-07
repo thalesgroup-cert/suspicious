@@ -62,17 +62,10 @@ class CortexAnalyzerReports:
             # the trust-weighted categorical engine; the mail band is raised to
             # the worst embedded band and the analyzers' rationale folded in.
             # (Flag OFF → _apply_derived_escalation, the Phase B behaviour.)
-            # Same branch as _apply_embedded_escalation, unrolled so the shadow's
-            # would-be verdict below reuses the evidence instead of re-reading it.
-            evidence, embedded_on = None, False
+            evidence, categorical = None, False
             if mail:
-                from settings.config import get_config
-                embedded_on = get_config("scoring.mail_embedded_categorical") is not False
-                if embedded_on:
-                    evidence = CortexAnalyzerReports._embedded_evidence(case, mail)
-                    verdict = CortexAnalyzerReports._escalate(verdict, evidence)
-                else:
-                    verdict = CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
+                verdict, evidence, categorical = CortexAnalyzerReports._apply_embedded_escalation(
+                    case, mail, verdict)
 
             # An explanation failure must NEVER break finalisation.
             _explanation = None
@@ -93,10 +86,12 @@ class CortexAnalyzerReports:
 
             # The verdict a shadow model's answer would have given (Plan F, Ruling F5).
             # Stored on its ShadowResult only; a failure never touches the live verdict.
-            if embedded_on:
+            if categorical:
                 try:
+                    from django.db import transaction
                     from ai_model.shadow import record_would_be
-                    record_would_be(case, signals, deny_listed, deny_reason, evidence, verdict)
+                    with transaction.atomic():   # a DB error here must not poison an outer transaction
+                        record_would_be(case, signals, deny_listed, deny_reason, evidence, verdict)
                 except Exception as exc:
                     update_cases_logger.warning(
                         "get_report: shadow would-be verdict skipped for case %s (%s)",
@@ -120,17 +115,19 @@ class CortexAnalyzerReports:
         worst embedded band and fold the analyzers' rationale in. Writes
         per-observable ioc_* (global) and per-MailArtifact artifact_*
         (case-scoped) levels. Composition of `_embedded_evidence` (impure) and
-        `_escalate` (pure).
+        `_escalate` (pure). Returns (verdict, evidence, categorical): the evidence
+        is kept so the shadow's would-be verdict reuses it instead of re-reading.
 
         Flag `scoring.mail_embedded_categorical` default-ON — only an explicit
         stored `False` routes back to the Phase B `_apply_derived_escalation`
-        (get_config returns None, not the default, for an unset warm-cache key).
+        (get_config returns None, not the default, for an unset warm-cache key);
+        that path returns (verdict, None, False).
         """
         from settings.config import get_config
         if get_config("scoring.mail_embedded_categorical") is False:
-            return CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
-        return CortexAnalyzerReports._escalate(
-            verdict, CortexAnalyzerReports._embedded_evidence(case, mail))
+            return CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict), None, False
+        evidence = CortexAnalyzerReports._embedded_evidence(case, mail)
+        return CortexAnalyzerReports._escalate(verdict, evidence), evidence, True
 
     @staticmethod
     def _embedded_evidence(case, mail):

@@ -72,7 +72,7 @@ class MailEmbeddedEscalationTests(TestCase):
         self._rep(self.gti, "malicious", 95, 9)
         self._rep(self.urlscan, "suspicious", 60, 6)
         v = CortexAnalyzerReports._apply_embedded_escalation(
-            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))
+            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))[0]
         self.assertEqual(v.result, Result.DANGEROUS)
         # base n_scored=1 + the 2 deduped GTI/urlscan reports on the one URL.
         self.assertEqual(v.n_scored, 3)
@@ -87,20 +87,20 @@ class MailEmbeddedEscalationTests(TestCase):
         self._rep(self.gti, "safe", 95, 0)
         self._rep(self.urlscan, "suspicious", 60, 6)
         v = CortexAnalyzerReports._apply_embedded_escalation(
-            self.case, self.mail, self._verdict(Result.SAFE))
+            self.case, self.mail, self._verdict(Result.SAFE))[0]
         self.assertEqual(v.result, Result.SAFE)
 
     def test_no_embedded_reports_returns_verdict_untouched(self):
         v_in = self._verdict(Result.SAFE)
         self.assertIs(
-            CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, v_in),
+            CortexAnalyzerReports._apply_embedded_escalation(self.case, self.mail, v_in)[0],
             v_in)
 
     def test_sticky_mail_artifact_keeps_its_level(self):
         MailArtifact.objects.filter(artifactIsUrl__url=self.url).update(artifact_level="SAFE-ALLOW_LISTED")
         self._rep(self.gti, "malicious", 95, 9)
         CortexAnalyzerReports._apply_embedded_escalation(
-            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))
+            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))[0]
         ma = MailArtifact.objects.get(artifactIsUrl__url=self.url)
         self.assertEqual(ma.artifact_level, "SAFE-ALLOW_LISTED")
 
@@ -114,7 +114,7 @@ class MailEmbeddedEscalationTests(TestCase):
             user=get_user_model().objects.create_user("camp_u", password="x"))
         self._rep(self.gti, "malicious", 95, 9)
         CortexAnalyzerReports._apply_embedded_escalation(
-            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))
+            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))[0]
         self.url.refresh_from_db()
         self.ma.refresh_from_db()
         self.assertEqual(self.url.ioc_level, "malicious")
@@ -126,7 +126,7 @@ class MailEmbeddedEscalationTests(TestCase):
             ioc_level="critical", ioc_score=3.0, ioc_confidence=11.0)
         self._rep(self.gti, "malicious", 95, 9)
         CortexAnalyzerReports._apply_embedded_escalation(
-            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))
+            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))[0]
         self.url.refresh_from_db()
         self.assertEqual(self.url.ioc_level, "critical")
         self.assertEqual(self.url.ioc_score, 3.0)
@@ -137,7 +137,7 @@ class MailEmbeddedEscalationTests(TestCase):
         embedded Tier-1 malicious verdict must still raise the band."""
         self._rep(self.gti, "malicious", 95, 9)
         v = CortexAnalyzerReports._apply_embedded_escalation(
-            self.case, self.mail, self._verdict(Result.FAILURE))
+            self.case, self.mail, self._verdict(Result.FAILURE))[0]
         self.assertEqual(v.result, Result.DANGEROUS)
         # rebased FAILURE→Dangerous must also carry the Dangerous score (9), so
         # case.score matches case.results (real FAILURE verdicts start at NEUTRAL 5).
@@ -149,7 +149,7 @@ class MailEmbeddedEscalationTests(TestCase):
         the FAILURE verdict is not rebased."""
         self._rep(self.gti, "safe", 95, 0)
         v = CortexAnalyzerReports._apply_embedded_escalation(
-            self.case, self.mail, self._verdict(Result.FAILURE))
+            self.case, self.mail, self._verdict(Result.FAILURE))[0]
         self.assertEqual(v.result, Result.FAILURE)
 
     @patch("settings.config.get_config", side_effect=_flag_off)
@@ -157,6 +157,6 @@ class MailEmbeddedEscalationTests(TestCase):
         with patch.object(CortexAnalyzerReports, "_apply_derived_escalation",
                           return_value="FALLBACK") as fb:
             out = CortexAnalyzerReports._apply_embedded_escalation(
-                self.case, self.mail, self._verdict(Result.SAFE))
+                self.case, self.mail, self._verdict(Result.SAFE))[0]
         fb.assert_called_once()
         self.assertEqual(out, "FALLBACK")
