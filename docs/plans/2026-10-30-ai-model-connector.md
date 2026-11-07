@@ -102,7 +102,7 @@ Deliverable: a sync about every 24 hours fills the append-only ledger from the r
 
 ## Plan E: Retrain, gate and registry
 
-**Status: detailed** in `docs/plans/2026-11-01-ai-model-connector-e-retrain.md` (9 tasks, with a go/no-go checkpoint after Task 5). The outline below is the earlier sketch; the detailed plan's Calls table supersedes it.
+**Status: done**, merged locally into design/ai-model-connector, not pushed. Detailed plan: `docs/plans/2026-11-01-ai-model-connector-e-retrain.md` (9 tasks, with a go/no-go checkpoint after Task 5). The outline below is the earlier sketch; the detailed plan's Calls table supersedes it.
 
 Deliverable: `manage.py ai_model_retrain` (and a start/poll task) turns the ledger into a gated candidate stored as a bundle.
 
