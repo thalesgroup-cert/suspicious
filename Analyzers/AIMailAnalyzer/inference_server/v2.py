@@ -1,6 +1,8 @@
 """Token-protected /v2 API of the inference server."""
+import asyncio
 import json
 import logging
+import os
 import time
 from typing import Annotated, Literal
 
@@ -24,6 +26,15 @@ MAX_CLASSIFY_BODY = 32 * 2**20
 ACTIVE_VERSION = bundles.LEGACY_VERSION
 # >= 0: -1 marks the case-less rows of a bundle's knn index, so it would exclude all of them
 CaseId = Annotated[int, Field(strict=True, ge=0, le=2**63 - 1)]
+# A shadow that takes longer is dropped from the answer (its thread still runs to the end).
+SHADOW_TIMEOUT = float(os.environ.get("AI_SHADOW_TIMEOUT", "8"))
+ALLOWED_VERSIONS = (["active"], ["active", "shadow"], ["shadow"])
+
+
+class TokenizerUnavailable(ValueError):
+    pass
+
+
 NO_TOKENIZER = "token chunking is not available with this encoder"
 
 
@@ -127,61 +138,110 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
     @router.post("/models/ai_mail/classify", dependencies=[Depends(require_token)])
     async def classify_mail(request: Request):
         req = await _read_json(request, ClassifyRequest, MAX_CLASSIFY_BODY, mail_text=True)
-        return await run_in_threadpool(_classify, req)
-
-    def _classify(req: ClassifyRequest):
-        # Only the active version exists until the registry lands.
-        if req.versions != ["active"]:
-            raise HTTPException(400, "Unsupported versions, expected ['active']")
-        active, _ = holder.state  # read once: a concurrent reload does not change this request
-        if active is None:
-            detail = store.unavailable("personal")
-        elif store.vectorizer is None:
-            detail = f"Vectorizer unavailable: {store.vectorizer_error or 'still loading, try again shortly'}"
+        if req.versions not in ALLOWED_VERSIONS:
+            raise HTTPException(400, "Unsupported versions, expected ['active'], "
+                                     "['active', 'shadow'] or ['shadow']")
+        state = holder.state  # read once: a concurrent reload does not change this request
+        started = time.perf_counter()
+        if "shadow" in req.versions and state[1] is None and "active" not in req.versions:
+            raise HTTPException(409, "no shadow version is loaded")
+        if "active" in req.versions:
+            out = await run_in_threadpool(_classify_active, req, state[0], started)
         else:
-            detail = None
+            out = await run_in_threadpool(_classify_shadow_only, req, state[1], started)
+        if "active" in req.versions and "shadow" in req.versions:
+            # The shadow starts after the active answer exists; on timeout its thread runs on
+            # (and keeps its slot until done), the request does not wait for it.
+            out["results"]["shadow"] = await _shadow_answer(req, state[1])
+            out["latency_ms"] = round((time.perf_counter() - started) * 1000)
+        return out
+
+    async def _shadow_answer(req, shadow):
+        if shadow is None:
+            return {"error": "NoShadow"}
+
+        def work():
+            try:
+                return _result(shadow, _run(shadow, _body(req), req))
+            except Exception as e:  # noqa: BLE001 - the class only: a message may hold mail data
+                logger.error("shadow classify failed: %s", type(e).__name__)
+                return {"error": type(e).__name__}
+
+        try:
+            return await asyncio.wait_for(
+                asyncio.get_running_loop().run_in_executor(None, work), SHADOW_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.error("shadow classify failed: Timeout")
+            return {"error": "Timeout"}
+
+    def _body(req):
+        # A JSON "\ud800" escape gives a lone surrogate, which the tokenizer cannot encode: make it "?".
+        return req.mail_body[:max_chars].encode("utf-8", "replace").decode("utf-8")
+
+    def _run(model, body, req):
+        """The legacy-shaped result of one version (None = version 0); raises on any failure."""
+        if model is None or model.preprocessing_version == bundles.PREPROCESSING_LEGACY:
+            # version 0, or a legacy-first128 bundle: the legacy classify core, unchanged
+            models = store.models("personal") if model is None else model.legacy_models()
+            with slots:
+                return classify(models, body)
+        if (model.preprocessing_version == PREPROCESSING_VERSION_TOKENS
+                and not _can_chunk_by_tokens(store.vectorizer)):
+            raise TokenizerUnavailable(NO_TOKENIZER)
+        # one slot for the whole request: at most 8 chunk passes plus the campaign pass
+        return bundles.classify_bundle(model, store.vectorizer, body, slots,
+                                       exclude_case_ids=req.exclude_case_ids)
+
+    def _result(model, legacy):
+        return {
+            "version": model.version_id if model else ACTIVE_VERSION["id"],
+            "class": legacy["classification"],
+            "score": float(legacy["malscore"]),
+            "confidence": float(legacy["confidence"]),
+            "probabilities": legacy["classification_breakdown"],
+            "sub_class": legacy["sub_classification"],
+            "sub_class_confidence": float(legacy["sub_classification_confidence"]),
+            "sub_probabilities": legacy["sub_classification_breakdown"],
+            "contributing_phrases": legacy["contributing_phrases"],
+            "tier": legacy.get("tier"),  # None: version 0 and legacy-first128, not calibrated
+            "similar_cases": [],
+        }
+
+    def _vectorizer_detail():
+        if store.vectorizer is None:
+            return f"Vectorizer unavailable: {store.vectorizer_error or 'still loading, try again shortly'}"
+
+    def _answer(req, name, model, started):
+        detail = _vectorizer_detail() if model is not None else None
         if detail:
             raise HTTPException(503, detail)
-
-        started = time.perf_counter()
-        # A JSON "\ud800" escape gives a lone surrogate, which the tokenizer cannot encode: make it "?".
-        body = req.mail_body[:max_chars].encode("utf-8", "replace").decode("utf-8")
-        if active is None or active.preprocessing_version == bundles.PREPROCESSING_LEGACY:
-            # version 0, or a legacy-first128 bundle: the legacy classify core, unchanged
-            models = store.models("personal") if active is None else active.legacy_models()
-            with slots:
-                legacy = classify(models, body)
-        else:
-            if (active.preprocessing_version == PREPROCESSING_VERSION_TOKENS
-                    and not _can_chunk_by_tokens(store.vectorizer)):
-                raise HTTPException(422, NO_TOKENIZER)
-            # one slot for the whole request: at most 8 chunk passes plus the campaign pass
-            try:
-                legacy = bundles.classify_bundle(active, store.vectorizer, body, slots,
-                                                 exclude_case_ids=req.exclude_case_ids)
-            except NoNeighbours as e:  # every neighbour excluded
-                raise HTTPException(422, str(e)) from None
-            except Exception as e:  # noqa: BLE001 - the class only: a message may hold mail data
-                logger.error("bundle classify failed: %s", type(e).__name__)
-                raise HTTPException(500, "classification failed") from None
+        try:
+            legacy = _run(model, _body(req), req)
+        except TokenizerUnavailable as e:
+            raise HTTPException(422, str(e)) from None
+        except NoNeighbours as e:  # every neighbour excluded
+            raise HTTPException(422, str(e)) from None
+        except HTTPException:
+            raise
+        except Exception as e:  # noqa: BLE001 - the class only: a message may hold mail data
+            logger.error("bundle classify failed: %s", type(e).__name__)
+            raise HTTPException(500, "classification failed") from None
         return {
-            "results": {"active": {
-                "version": active.version_id if active else ACTIVE_VERSION["id"],
-                "class": legacy["classification"],
-                "score": float(legacy["malscore"]),
-                "confidence": float(legacy["confidence"]),
-                "probabilities": legacy["classification_breakdown"],
-                "sub_class": legacy["sub_classification"],
-                "sub_class_confidence": float(legacy["sub_classification_confidence"]),
-                "sub_probabilities": legacy["sub_classification_breakdown"],
-                "contributing_phrases": legacy["contributing_phrases"],
-                "tier": legacy.get("tier"),  # None: version 0 and legacy-first128, not calibrated
-                "similar_cases": [],
-            }},
+            "results": {name: _result(model, legacy)},
             "campaign_embedding": legacy["email_embedding"],
             "campaign_embedding_version": ACTIVE_VERSION["campaign_embedding_version"],
             "latency_ms": round((time.perf_counter() - started) * 1000),
         }
+
+    def _classify_active(req, active, started):
+        if active is None:
+            detail = store.unavailable("personal")
+            if detail:
+                raise HTTPException(503, detail)
+        return _answer(req, "active", active, started)
+
+    def _classify_shadow_only(req, shadow, started):
+        return _answer(req, "shadow", shadow, started)
 
     @router.post("/embed", dependencies=[Depends(require_token)])
     async def embed_route(request: Request):
