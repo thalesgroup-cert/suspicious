@@ -123,9 +123,11 @@ no Cortex job.
 |---|---|---|
 | `GET /v2/health/live` | no | `{"live": true}` while the process is up. |
 | `GET /v2/health/ready` | no | The same body as `/health`: `200` when the vectorizer and the `personal` models are loaded, otherwise `503`. |
-| `GET /v2/models/ai_mail` | yes | Model metadata: the versions the server holds. Today one, `active` (id `v0`), the legacy classifier. |
+| `GET /v2/models/ai_mail` | yes | Model metadata: the versions the server holds, with their `preprocessing` and `manifest_sha256`. Without a loaded bundle, `active` is `v0`, the legacy classifier. |
 | `POST /v2/embed` | yes | Body `{"texts": [...], "profile": "classifier"}` or `"campaign"`, at most 32 texts. Returns `{"vectors": [...], "preprocessing_version": "legacy-first128", "embedding_version": "cmp-e1"}`. In version 0 both profiles give the same vectors. `503` while the vectorizer is not loaded. The label sync uses it. |
-| `POST /v2/models/ai_mail/classify` | yes | Body `{"mail_body": "...", "versions": ["active"]}`. Returns the verdict under `results.active` (class, score, confidence, class and sub-class probabilities, contributing phrases) plus the campaign embedding, its version and the latency. `400` for any other `versions`, `503` when models or vectorizer are not loaded. |
+| `POST /v2/models/ai_mail/classify` | yes | Body `{"mail_body": "...", "versions": ["active"]}`, optional `exclude_case_ids` (at most 1000, used by bundles only: those cases are left out of the neighbour vote). Returns the verdict under `results.active` (class, score, confidence, class and sub-class probabilities, contributing phrases, `tier`) plus the campaign embedding, its version and the latency. `tier` is `null` for version 0 and `legacy-first128` bundles. `400` for any other `versions`, `503` when models or vectorizer are not loaded. |
+| `POST /v2/train`, `GET /v2/train/{job_id}`, `POST /v2/train/{job_id}/cancel` | yes | One training job at a time; see [Retraining](#retraining). |
+| `POST /v2/reload` | yes | Body `{"active": {...} \| null, "shadow": {...} \| null}`. Loads a bundle; `active: null` goes back to the legacy weights. See [Model registry](#model-registry). |
 
 ### The token
 
@@ -449,6 +451,171 @@ folders. It prints counts only. A rerun adds nothing for what is already recorde
   example `unavailable` or `access_denied`) or, for any other error such as a configuration problem,
   the exception class name. It is not turned into an `Inconclusive` success.
 
+## Retraining
+
+`python manage.py ai_model_retrain` trains a new model version from the
+[label ledger](#label-ledger) on the `ai_inference` server and registers it as a `candidate`. It never
+changes the active model: shadow runs and promotion come in a later release (Plan F).
+
+### What is trained
+
+- **Input.** The active `imap_folder` rows of the ledger (at most 8000), each with its classifier
+  embedding in `chunkmean-tokens-v1` (the mean of up to 8 encoder passes over token-sized chunks of
+  the body) and its first-128-token campaign embedding (`cmp-e1`). The export refuses while a
+  trainable row is still embedded in another form: run `python manage.py ai_model_reembed_ledger`
+  first.
+- **Recipe.** The five `ResNetMLP` heads of version 0 (`safe_suspicious`, `spam_dangerous`, `safe`,
+  `unwanted`, `dangerous`), trained with class weights and no oversampling (30 epochs), plus a 5-NN
+  vote over the training embeddings. Each of the two components is smoothed and calibrated by its
+  own temperature; the main probabilities are their mean.
+- **Groups.** Near-duplicates (cosine 0.95 or more on the campaign embedding) and campaign members
+  never straddle a train/test fold or a calibration half.
+
+### The gate
+
+Three repeats (seeds 0, 1, 2) of 5 grouped folds give held-out predictions for the candidate and for
+the baseline, which is the active version's recipe retrained on the same folds (version 0's recipe
+with SMOTE and random oversampling when `v0` is active). The six checks:
+
+| # | Check | Passes when |
+|---|---|---|
+| 1 | `dangerous_called_safe` | the share of Dangerous mails called Safe is at most the baseline's plus 0.01 |
+| 2 | `macro_f1` | macro-F1 is at least the baseline's minus 0.02 |
+| 3 | `calibration_error` | the binned calibration error (15 bins) is below 0.12 |
+| 4 | `head_samples` | every head has at least 8 mails in every class; when it fails, the job fails and nothing is trained |
+| 5 | `high_tier_precision` | the High tier is at least 0.90 precise, measured cross-half: the cutoff is chosen on one calibration half and scored on the other; it also fails below 5% of rows or when no cutoff reaches 0.95 |
+| 6 | `campaign_dangerous_called_safe` | on folds split on campaign groups, check 1 holds |
+
+The version's manifest records `eligible` (all six passed) and every check's value, threshold and
+detail. A candidate that failed a check is still registered, with `eligible: false`.
+
+The stored tier cutoffs: Medium at 0.60, High at `max(0.85, t)`, where `t` is the smallest
+probability whose held-out rows at or above it are 0.95 precise. When no probability reaches 0.95,
+High is 1.01 (unreachable).
+
+### Tiers and scores of a retrained version
+
+For a retrained version (`chunkmean-tokens-v1` or `chunkmean-words90-v1`), classify returns the
+calibrated probabilities. The class is the most probable one when its probability is at least 0.5,
+else `INCONCLUSIVE`. `score` and `confidence` use version 0's mapping (Safe 0 to 5, Unwanted 5 to
+6.5, Dangerous 6.5 to 10, linear in the probability). `tier` is `high` at or above the High cutoff,
+`medium` at or above the Medium cutoff, else `low`, from the top probability. `contributing_phrases`
+is empty: the server does not compute them for these versions. Version 0, and a bundle in
+`legacy-first128`, answer as before with `tier` `null`, shown as "Confidence not calibrated". Fitting
+a temperature for version 0 is not done yet.
+
+Calibrated confidences are lower than version 0's. `tools/confidence_shift.py --dataset <npz>`
+prints the `confidence_ai` distribution of both on held-out predictions. On the 505-mail dataset
+(3 seeds pooled, 1515 rows):
+
+| | p10 | p25 | median | p75 | p90 | Inconclusive |
+|---|---|---|---|---|---|---|
+| version 0's recipe, uncalibrated | 90 | 99 | 100 | 100 | 100 | 1 (0.1%) |
+| retrain recipe, calibrated | 58 | 75 | 87 | 90 | 92 | 69 (4.6%) |
+
+The scoring engine compares `confidence_ai` with the base confidence and applies `CONF_FLOOR`, so a
+promoted version can change which signal decides a verdict. Replay recent cases before promoting.
+
+### Running it
+
+```bash
+docker compose --env-file .env exec suspicious python manage.py ai_model_retrain --wait
+docker compose --env-file .env exec suspicious python manage.py ai_model_retrain --status
+docker compose --env-file .env exec suspicious python manage.py ai_model_retrain --cancel
+```
+
+| Option | Effect |
+|---|---|
+| (none) | Export the ledger, start a job and return. A Celery task polls the job at least 30 s apart. |
+| `--wait [--timeout S]` | Start, then poll until the job ends or `S` seconds pass (default 6 h); the job keeps running after a timeout. |
+| `--status` | Counts and the latest jobs, with each failed job's reason (filtered). |
+| `--cancel` | Cancel the running job. |
+
+The connector must be enabled. A job still running after 6 hours is cancelled and failed. A failed
+or cancelled job registers nothing and its uploaded files are deleted.
+
+**Schedule.** Connector fields `retrain_enabled` (default false) and `retrain_interval_days`
+(default 30). The daily beat entry `ai-model-retrain-check` starts a retrain when both allow it and
+the newest version is older than the interval. A failed or refused scheduled retrain pauses the
+check for 7 days.
+
+### Storage and the hosts allow-list
+
+Django exports the dataset to the `ai-datasets` bucket and gives the server presigned URLs: a GET
+for the dataset (15 minutes) and one PUT per bundle file under
+`ai-models/<version_id>/<job_id>/` (4 h 15 min, because the upload happens when training ends). The
+server holds no storage credentials. It fetches and uploads only to hosts listed in
+`AI_BUNDLE_HOSTS` (comma-separated `host:port`, compared as strings; compose sets `rustfs:9000`;
+empty refuses every URL), over http or https, without following redirects, with a 200 MB download
+cap. URLs are never logged: the server keeps `httpx` and `httpcore` at WARNING and redacts query
+strings.
+
+### Bundle layout
+
+| File | Content |
+|---|---|
+| `heads/<head>.npz` | five heads, one float32 array per state-dict key (no pickle, never read with `torch.load`) |
+| `calibration.json` | `temperature` (`{"hierarchy", "knn"}`, each between 0.2 and 30), `tier_cutoffs` (`high`, `medium`), `held_out_groups` |
+| `knn_index.npz` | `embeddings`, `label_ids`, `case_ids` of the training rows |
+| `campaign_profile.json` | the campaign settings the version was trained with |
+| `manifest.json` | version id, recipe, preprocessing version, encoder id and hash, ledger and campaign digests, gate report, parent version, trainer revision, SHA-256 of every other file |
+
+The SHA-256 of `manifest.json` is stored in the registry (`ModelVersion.manifest_sha256`) and checked
+before the manifest is parsed. A bundle is refused on any hash mismatch, a missing or extra file, a
+name that is not a plain file name, a file above 50 MB or a total above 100 MB, an unknown
+preprocessing version, an `input_dim` other than the encoder's 768, or a manifest naming another
+encoder (the server hashes its own encoder files).
+
+### Limits
+
+- **Resources.** The job runs in a separate process (`inference_server.training_worker`) with
+  `AI_TRAIN_THREADS` torch threads (default 2), so classify keeps answering. It is stopped after
+  `AI_TRAIN_MAX_SECONDS` (default 4 hours). The `ai_inference` memory limit is
+  `AI_INFERENCE_MEM_LIMIT` (default 8g); memory during training has not been measured: record
+  `docker stats ai_inference` during the first run.
+- **Same UID.** The worker runs as the same user as the server. It receives no token and no storage
+  key and only reads validated params and the dataset through a pickle-free reader, but it is not a
+  boundary against code running inside it.
+- **Latency.** A retrained version embeds up to 8 chunks plus the campaign pass per mail: 844 ms
+  median and 1187 ms maximum on 10 bodies of 40 to 1500 words, against 3094 ms median for version
+  0's classify with its contributing-phrases pass (measured on a 28-CPU dev host).
+- **Text form (Ruling E3).** Live classify reads the parsed `.txt` body; the ledger embeds the plain
+  part or reduced HTML of the message. `python manage.py ai_model_text_gap` measures the gap on
+  cases that have both. It has not been run against a review mailbox yet, so the decision is
+  pending.
+
+### Operational remarks
+
+- Check 4 needs 8 mails per head class. The 505-mail dataset has 10 in `1_NEWSLETTER`, so a ledger
+  short of newsletters fails every candidate at check 4.
+- Check 5 is measured cross-half, while the stored High cutoff is chosen on all held-out
+  predictions. The stored High tier can therefore be empty (cutoff 1.01) or below 0.95 precision
+  while check 5 passes.
+- The 505 mails form 145 independent groups (near-duplicate and campaign groups merged).
+  `tools/learning_curve.py` found the gate metrics flat within noise between 109 and 145 groups,
+  and the 8-per-class floor not met below about 60% of the groups. Nothing above 145 groups was
+  measured. Mails from new campaigns and rare classes help more than more mails of known campaigns.
+
+## Model registry
+
+`ai_model.models.ModelVersion` lists the model versions; `ModelEvent` records every status change
+with the user and a note. Both are read-only in the Django admin. Status changes go through
+`ai_model/registry.py` only.
+
+| Status | Meaning |
+|---|---|
+| `candidate` | a finished retrain, not serving |
+| `shadow` | reserved for shadow runs (Plan F) |
+| `active` | the version that classifies; exactly one (a unique column plus locking reads) |
+| `previous` | the version active before the current one; one only |
+| `discarded` | set aside; an older `previous` becomes `discarded` when a new version goes active |
+| `failed` | the job or its registration failed |
+
+Version 0 (`v0`) is a row without a bundle, created by the first retrain when no version is active: the server runs the legacy
+weights from `models/` when told `active: null`, so rolling back to version 0 needs no file.
+`registry.reload_payload(version)` builds the `/v2/reload` body (presigned GETs, 15 minutes). Plan E
+has no command that activates a version or reloads the server.
+
 ## Source
 
 | Module | Role |
@@ -458,6 +625,9 @@ folders. It prints counts only. A rerun adds nothing for what is already recorde
 | `mail_analysis.py` | Classification maths, taxonomy, explainability (needs numpy/torch) |
 | `mail_archive.py` | Safe mail-archive extraction (stdlib only), re-exported by `mail_analysis.py` |
 | `ResNetMLP.py` | The neural network definition |
+| `inference_server/training_job.py`, `training_worker.py`, `bundles.py` | `/v2/train` job controller, its worker process, `/v2/reload` and bundle classify |
+| `training/` | Recipe, groups, gate, bundle format and the dataset reader |
+| `tools/dataset_to_npz.py`, `learning_curve.py`, `confidence_shift.py` | Offline evaluation tools; not imported by the server |
 
 The connector lives in the backend: `Suspicious/Suspicious/connectors/contrib/ai_model/`
 (`connector.py`, `client.py`, `campaigns.py`, `mailtext.py`, `imap_sync.py`), the ledger in

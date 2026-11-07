@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inference server gave it (filtered). Compose:
   `ai_inference` joins the storage network and gets `AI_BUNDLE_HOSTS`, `AI_TRAIN_THREADS` and a
   memory limit (`AI_INFERENCE_MEM_LIMIT`, 8g); see `deployment/.env.example`.
+- A model registry: `ai_model.models.ModelVersion` (statuses `candidate`, `shadow`, `active`,
+  `previous`, `discarded`, `failed`; one `active`, one `previous`) and `ModelEvent`, read-only in
+  the admin. Version 0 is a row without a bundle that runs the legacy weights. Retrained versions
+  are stored as verified bundles in the `ai-models` bucket; their manifest SHA-256 is pinned in the
+  registry.
+- The inference server's `POST /v2/reload` loads a bundle (`active: null` goes back to the legacy
+  weights) and refuses one with a hash mismatch, an unknown preprocessing version or another
+  encoder. Classify with a retrained version returns calibrated probabilities and a `tier` (High,
+  Medium, Low) from the bundle's cutoffs; version 0 keeps its answer and has no tier. Calibrated
+  confidences are lower: on the 505-mail dataset the median `confidence_ai` goes from 100 to 87 and
+  Inconclusive from 0.1% to 4.6% (`tools/confidence_shift.py`). See "Retraining" in
+  `docs/components/analyzers.md`.
 - `POST /v2/embed` takes an optional `preprocessing` (`legacy-first128` by default,
   `chunkmean-tokens-v1`, `chunkmean-words90-v1`); the `campaign` profile always uses the first 128
   tokens. The label sync now embeds folder rows in `chunkmean-tokens-v1`, the form retraining uses
