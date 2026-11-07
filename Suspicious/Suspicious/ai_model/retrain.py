@@ -5,7 +5,8 @@ Nothing here activates or reloads a version (Plan F promotes).
 
 A RetrainJob row is written before the server is called; a failed, cancelled, timed-out or
 half-uploaded job registers nothing and its bundle prefix and dataset are deleted. Presigned URLs
-go into the request body only: never logged, stored or printed. Errors are stored as class names."""
+go into the request body only: never logged, stored or printed. Errors are stored as class names,
+or, for a job the server failed, as the server's own short reason filtered by server_error."""
 import dataclasses
 import logging
 import re
@@ -25,8 +26,10 @@ logger = logging.getLogger("ai_model.retrain")
 J = RetrainJob.State
 
 POLL_SECONDS = 30
-MAX_AGE = timedelta(hours=6)
-BACKOFF = timedelta(days=7)  # after a failed or refused scheduled retrain  # a job still running after this is cancelled and failed
+MAX_AGE = timedelta(hours=6)  # a job still running after this is cancelled and failed
+# A poll chain that keeps raising stops this long after MAX_AGE and fails the job itself.
+STOP_MARGIN = timedelta(minutes=30)
+BACKOFF = timedelta(days=7)  # after a failed or refused scheduled retrain
 # The PUT URLs are used when training ends, so they must outlive the server's wall limit
 # (AI_TRAIN_MAX_SECONDS, 4 h by default). One key per job and the manifest hash pinned in the
 # registry bound what a leaked URL can do: overwrite an unregistered key, which reload refuses.
@@ -87,8 +90,13 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
     the export refuses (its message passes through) or the server refuses the request."""
     connector = _connector()
     job = running_job()
-    if job is not None and poll_once(job.job_id) == J.RUNNING:  # finishes a stale job first
-        raise JobRunning(f"retrain job {job.job_id} is running")
+    if job is not None:
+        try:
+            state = poll_once(job.job_id)  # finishes a stale job first
+        except Exception as exc:  # noqa: BLE001 — the class only; poll_retrain fails it after MAX_AGE
+            raise JobRunning(f"retrain job {job.job_id} could not be checked: {type(exc).__name__}") from None
+        if state == J.RUNNING:
+            raise JobRunning(f"retrain job {job.job_id} is running")
     now = timezone.now()
     job_id, version_id = _new_ids(now)
     prefix = registry.bundle_prefix_for(version_id, job_id)
@@ -179,6 +187,14 @@ def poll_once(job_id: str) -> str:
             logger.info("Retrain %s: cancel on timeout failed: %s", job_id, type(exc).__name__)
         return _finish(job, J.FAILED, "TimedOut").state
     return J.RUNNING
+
+
+def give_up(job, error: str) -> None:
+    """Fail a job whose poll chain keeps raising, past MAX_AGE + STOP_MARGIN (poll_retrain)."""
+    try:
+        _finish(job, J.FAILED, error)
+    except Exception as exc:  # noqa: BLE001 — the chain stops either way; the class is logged
+        logger.warning("Retrain %s: could not fail the job: %s", job.job_id, type(exc).__name__)
 
 
 def poll_countdown() -> int:

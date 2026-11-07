@@ -390,6 +390,44 @@ class PollTest(RetrainBase):
             tasks.poll_retrain(job.job_id)
         tasks.poll_retrain.apply_async.assert_called_once_with((job.job_id,), countdown=30)
 
+    def test_the_chain_stops_after_max_age_when_the_poll_keeps_failing(self):
+        job = self.start()
+        RetrainJob.objects.filter(pk=job.pk).update(
+            started_at=timezone.now() - retrain.MAX_AGE - retrain.STOP_MARGIN - timedelta(seconds=1))
+        tasks.poll_retrain.apply_async.reset_mock()
+        with mock.patch.object(retrain, "poll_once", side_effect=RuntimeError("boom http://x?sig")), \
+                self.assertRaises(RuntimeError):
+            tasks.poll_retrain(job.job_id)
+        tasks.poll_retrain.apply_async.assert_not_called()
+        job.refresh_from_db()
+        self.assertEqual((job.state, job.error, job.running_slot), (J.FAILED, "RuntimeError", None))
+        self.assertEqual(self.bundle_keys(job), [])
+
+    def test_a_failing_poll_within_max_age_still_requeues(self):
+        job = self.start()
+        tasks.poll_retrain.apply_async.reset_mock()
+        with mock.patch.object(retrain, "poll_once", side_effect=RuntimeError("boom")), \
+                self.assertRaises(RuntimeError):
+            tasks.poll_retrain(job.job_id)
+        tasks.poll_retrain.apply_async.assert_called_once_with((job.job_id,), countdown=30)
+
+    def test_the_chain_requeues_when_the_database_is_away(self):
+        from django.db import DatabaseError
+        job = self.start()
+        tasks.poll_retrain.apply_async.reset_mock()
+        with mock.patch.object(retrain, "poll_once", return_value=J.RUNNING), \
+                mock.patch.object(RetrainJob.objects, "filter", side_effect=DatabaseError("gone")):
+            tasks.poll_retrain(job.job_id)
+        tasks.poll_retrain.apply_async.assert_called_once_with((job.job_id,), countdown=30)
+
+    def test_start_refuses_with_the_class_when_the_running_job_cannot_be_checked(self):
+        job = self.start()
+        with mock.patch.object(retrain, "poll_once", side_effect=RuntimeError("boom http://x")), \
+                self.assertRaisesRegex(retrain.RetrainRefused, r"RuntimeError") as caught:
+            retrain.start_retrain()
+        self.assertNotIn("http", str(caught.exception))
+        self.assertIn(job.job_id, str(caught.exception))
+
     def test_the_chain_ends_with_the_job(self):
         job = self.start()
         tasks.poll_retrain.apply_async.reset_mock()
@@ -482,6 +520,15 @@ class ScheduleTest(RetrainBase):
         retrain.poll_once(RetrainJob.objects.get(state=J.RUNNING).job_id)  # fails too
         tasks.maybe_start_retrain()
         self.assertFalse(RetrainJob.objects.filter(state=J.RUNNING).exists())
+
+    def test_a_failed_scheduled_job_two_days_old_still_backs_off(self):
+        registry.ensure_version_zero()
+        ModelVersion.objects.update(created_at=timezone.now() - timedelta(days=31))
+        RetrainJob.objects.create(job_id="old", target_version="v1", state=J.FAILED, prefix="p",
+                                  trigger="schedule", error="Refused",
+                                  started_at=timezone.now() - timedelta(days=2))
+        tasks.maybe_start_retrain()
+        self.assertEqual(RetrainJob.objects.count(), 1)
 
     def test_a_running_job_writes_no_refused_row(self):
         registry.ensure_version_zero()
