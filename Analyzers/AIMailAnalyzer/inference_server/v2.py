@@ -175,7 +175,7 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
                 "sub_class_confidence": float(legacy["sub_classification_confidence"]),
                 "sub_probabilities": legacy["sub_classification_breakdown"],
                 "contributing_phrases": legacy["contributing_phrases"],
-                "tier": None,
+                "tier": legacy.get("tier"),  # None: version 0 and legacy-first128, not calibrated
                 "similar_cases": [],
             }},
             "campaign_embedding": legacy["email_embedding"],

@@ -10,6 +10,7 @@ import logging
 import os
 import threading
 import time
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -219,10 +220,12 @@ def test_good_token_bundle_becomes_active_and_classify_uses_it(app, token_env, t
     out = classify(client, token_env, body)
     batches = sorted(len(b) for b in TokenVectorizer.batches)
     res = out["results"]["active"]
-    assert res["version"] == "v-1" and res["tier"] is None
     vec = server.store.vectorizer
     p = expected(holder.state[0], vec, body)
     main = p.main[0]
+    top = float(main.max())  # the bundle's cutoffs: high 0.9, medium 0.6
+    assert res["version"] == "v-1"
+    assert res["tier"] == ("high" if top >= 0.9 else "medium" if top >= 0.6 else "low")
     assert res["probabilities"] == {"SAFE": float(main[0]), "UNWANTED": float(main[1]),
                                     "DANGEROUS": float(main[2])}
     sub = np.concatenate([p.sub["safe"][0] * main[0], p.sub["unwanted"][0] * main[1],
@@ -233,6 +236,45 @@ def test_good_token_bundle_becomes_active_and_classify_uses_it(app, token_env, t
     assert out["campaign_embedding"] == str(vec.encode([body]).tolist()[0])
     assert out["campaign_embedding_version"] == "cmp-e1"
     assert batches == [1, 5]  # one batch of 5 chunks plus the campaign pass
+
+
+@pytest.mark.parametrize("main, cls, confidence, score, tier", [
+    # spec section 9: a class only at calibrated probability >= 0.5; the legacy score mapping
+    ([0.05, 0.05, 0.90], "DANGEROUS", 0.90, 9.3, "high"),  # at the High cutoff: High
+    ([0.10, 0.70, 0.20], "UNWANTED", 0.70, 5.6, "medium"),
+    ([0.60, 0.25, 0.15], "SAFE", 0.60, 4.0, "medium"),  # at the Medium cutoff: Medium
+    ([0.50, 0.30, 0.20], "SAFE", 0.50, 5.0, "low"),  # exactly 0.5 decides
+    ([0.45, 0.30, 0.25], "INCONCLUSIVE", 0.55, 5.0, "low"),  # below 0.5: Inconclusive
+])
+def test_bundle_scores_from_the_calibrated_probability(app, token_env, tmp_path, monkeypatch,
+                                                       main, cls, confidence, score, tier):
+    client, holder, storage, _ = app
+    spec, _ = make_bundle(tmp_path, storage)
+    assert reload(client, token_env, active=spec).status_code == 200
+    calls = []
+
+    def fixed(heads, knn, X, *, temperature, exclude_case_ids=None):
+        calls.append(temperature)
+        return SimpleNamespace(main=np.array([main]), sub={
+            "safe": np.array([[0.5, 0.5]]), "unwanted": np.array([[0.5, 0.5]]),
+            "dangerous": np.array([[0.25] * 4])})
+
+    monkeypatch.setattr(bundles, "predict", fixed)
+    res = classify(client, token_env)["results"]["active"]
+    assert calls == [{"hierarchy": 1.7, "knn": 1.3}]  # the bundle's own temperatures
+    assert (res["class"], res["tier"]) == (cls, tier)
+    assert res["confidence"] == pytest.approx(confidence)
+    assert res["score"] == pytest.approx(score)
+
+
+@pytest.mark.parametrize("p, tier", [(0.95, "high"), (0.85, "high"), (0.8499, "medium"),
+                                     (0.6, "medium"), (0.5999, "low"), (0.2, "low")])
+def test_tier_from_the_stored_cutoffs(p, tier):
+    assert bundles.tier_of(p, {"high": 0.85, "medium": 0.6}) == tier
+
+
+def test_unreachable_high_cutoff_never_gives_high():
+    assert bundles.tier_of(1.0, {"high": 1.01, "medium": 0.6}) == "medium"
 
 
 def test_bundle_classify_never_draws_a_progress_bar(app, token_env, tmp_path):
@@ -320,6 +362,7 @@ def test_legacy_first128_bundle_answers_exactly_like_v0(app, token_env, tmp_path
     assert reload(client, token_env, active=spec).status_code == 200
     after = classify(client, token_env, exclude_case_ids=[1])
     assert after["results"]["active"]["version"] == "v0-import"
+    assert after["results"]["active"]["tier"] is None  # not calibrated: no tier (Ruling E20)
     assert _strip(after) == _strip(before)
 
 

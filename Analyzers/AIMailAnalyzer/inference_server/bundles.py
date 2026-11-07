@@ -99,7 +99,7 @@ class LoadedModel:
     manifest_sha256: str
     heads: Heads
     knn: Knn
-    calibration: dict  # temperatures used by predict; tiers and scores are Task 9's
+    calibration: dict  # temperatures used by predict, tier_cutoffs used by tier_of
 
     def describe(self) -> dict:
         # calibrated: temperatures are applied on this path (not for legacy-first128 bundles)
@@ -216,12 +216,20 @@ class ModelHolder:
 
 # --- classify ----------------------------------------------------------------------------------
 
+def tier_of(p: float, cutoffs: dict) -> str:
+    """The confidence tier of a calibrated probability: High at or above cutoffs["high"], Medium
+    at or above cutoffs["medium"], else Low (spec section 9)."""
+    return "high" if p >= cutoffs["high"] else "medium" if p >= cutoffs["medium"] else "low"
+
+
 def classify_bundle(model: LoadedModel, vectorizer, body: str, slots,
                     exclude_case_ids=None) -> dict:
     """A chunk-mean bundle's answer, in the legacy classify core's dict shape. The heads see the
     chunk-mean embedding in the bundle's form; the campaign embedding stays the plain first-128
     pass (cmp-e1). Main probabilities are training.recipe.predict's calibrated blend; sub-type
-    probabilities are weighted by the main probability as the legacy path does. Contributing
+    probabilities are weighted by the main probability as the legacy path does. Class, score and
+    confidence come from the calibrated probabilities through the legacy mapping (a class only
+    at 0.5 or above), and `tier` from the top one and the bundle's tier_cutoffs. Contributing
     phrases are not computed (an occlusion pass would cost up to 40 chunked re-embeddings).
     Raises training.recipe.NoNeighbours when exclude_case_ids leaves no neighbour."""
     by_tokens = model.preprocessing_version == PREPROCESSING_VERSION_TOKENS
@@ -245,4 +253,5 @@ def classify_bundle(model: LoadedModel, vectorizer, body: str, slots,
         "sub_classification_breakdown": mail_analysis.get_sub_classification_breakdown(sub),
         "contributing_phrases": [],
         "email_embedding": str(campaign.tolist()[0]),
+        "tier": tier_of(float(main.max()), model.calibration["tier_cutoffs"]),
     }
