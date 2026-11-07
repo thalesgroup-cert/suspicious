@@ -1,0 +1,114 @@
+from unittest import mock
+
+from django.test import TestCase
+
+from ai_model import registry, serversync, tasks
+from ai_model.models import ModelVersion
+from ai_model.tests.test_registry import cand
+from common.storage.fake import FakeObjectStore
+from connectors.contrib.ai_model.client import ServerBusy
+from connectors.providers import ProviderUnavailable
+
+
+def meta(active="v0", shadow=None):
+    out = {"name": "ai_mail", "versions": {"active": {"id": active}}}
+    if shadow:
+        out["versions"]["shadow"] = {"id": shadow}
+    return out
+
+
+class SyncTest(TestCase):
+    def setUp(self):
+        p = mock.patch.object(registry, "get_store", return_value=FakeObjectStore())
+        p.start()
+        self.addCleanup(p.stop)
+        self.client = mock.Mock()
+
+    def go(self, active="v1", shadow="v2"):
+        a = registry.set_active(cand(active)) if active else registry.ensure_version_zero()
+        if shadow:
+            registry.set_shadow(cand(shadow, manifest={"eligible": True}))
+        return a
+
+    def test_wanted_state_follows_the_registry(self):
+        self.go()
+        state = serversync.wanted_state()
+        self.assertEqual((state["active"]["version_id"], state["shadow"]["version_id"]), ("v1", "v2"))
+
+    def test_version_zero_active_sends_null(self):
+        registry.ensure_version_zero()
+        self.assertEqual(serversync.wanted_state(), {"active": None, "shadow": None})
+
+    def test_server_matches_compares_ids(self):
+        self.go()
+        self.client.metadata.return_value = meta("v1", "v2")
+        self.assertTrue(serversync.server_matches(self.client))
+        for bad in (meta("v1"), meta("v0", "v2"), meta("v1", "v9")):
+            self.client.metadata.return_value = bad
+            self.assertFalse(serversync.server_matches(self.client))
+
+    def test_version_zero_matches_the_legacy_server(self):
+        registry.ensure_version_zero()
+        self.client.metadata.return_value = meta("v0")
+        self.assertTrue(serversync.server_matches(self.client))
+
+    def test_no_reload_when_matching(self):
+        self.go()
+        self.client.metadata.return_value = meta("v1", "v2")
+        self.assertTrue(serversync.sync(self.client))
+        self.client.reload.assert_not_called()
+
+    def test_reload_on_mismatch_and_a_fresh_server_gets_the_state(self):
+        self.go()
+        self.client.metadata.side_effect = [meta("v0"), meta("v1", "v2")]
+        self.assertTrue(serversync.sync(self.client))
+        self.client.reload.assert_called_once()
+        self.assertEqual(self.client.reload.call_args.args[0]["active"]["version_id"], "v1")
+
+    def test_still_differing_after_reload_is_false(self):
+        self.go()
+        self.client.metadata.return_value = meta("v0")
+        self.assertFalse(serversync.sync(self.client))
+
+    def test_refused_reload_raises_without_url_or_body(self):
+        self.go()
+        self.client.metadata.return_value = meta("v0")
+        self.client.reload.side_effect = ValueError("inference server refused the request (HTTP 422)")
+        with self.assertRaises(serversync.ReloadRefused) as ctx:
+            serversync.sync(self.client)
+        self.assertNotIn("fake://", str(ctx.exception))
+        self.assertNotIn("http", str(ctx.exception).lower())
+
+    def test_unavailable_and_busy_return_false_and_log_the_class(self):
+        self.go()
+        self.client.metadata.return_value = meta("v0")
+        for exc in (ProviderUnavailable("x secret"), ServerBusy("y")):
+            self.client.reload.side_effect = exc
+            with self.assertLogs("ai_model.serversync", "WARNING") as logs:
+                self.assertFalse(serversync.sync(self.client))
+            self.assertIn(type(exc).__name__, logs.output[0])
+            self.assertNotIn("secret", logs.output[0])
+
+    def test_task_is_a_noop_when_disabled_or_unconfigured(self):
+        with mock.patch("ai_model.ledger.enabled", return_value=False), \
+                mock.patch.object(serversync, "sync") as sync:
+            tasks.sync_server()
+        sync.assert_not_called()
+        with mock.patch("ai_model.ledger.enabled", return_value=True), \
+                mock.patch("connectors.registry.registry.instantiate") as inst, \
+                mock.patch.object(serversync, "sync") as sync:
+            inst.return_value._client.side_effect = ValueError("token not configured")
+            tasks.sync_server()
+        sync.assert_not_called()
+
+    def test_task_syncs_when_enabled(self):
+        with mock.patch("ai_model.ledger.enabled", return_value=True), \
+                mock.patch("connectors.registry.registry.instantiate") as inst, \
+                mock.patch.object(serversync, "sync") as sync:
+            tasks.sync_server()
+        sync.assert_called_once_with(inst.return_value._client.return_value)
+
+    def test_beat_entry(self):
+        from suspicious.celery import app
+        entry = app.conf.beat_schedule["ai-model-server-sync"]
+        self.assertEqual((entry["task"], entry["schedule"]), ("ai_model.tasks.sync_server", 300.0))

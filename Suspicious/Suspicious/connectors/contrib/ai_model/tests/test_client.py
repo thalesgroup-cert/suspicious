@@ -40,6 +40,16 @@ class ClassifyTest(SimpleTestCase):
         self.assertEqual(client.session.post.call_args.kwargs["json"],
                          {"mail_body": "hello", "versions": ["active"], "exclude_case_ids": [42]})
 
+    def test_sends_the_requested_versions(self):
+        client = client_with(post=mock.Mock(return_value=reply(200, {"results": {}})))
+        client.classify("hello", versions=("active", "shadow"))
+        self.assertEqual(client.session.post.call_args.kwargs["json"]["versions"], ["active", "shadow"])
+
+    def test_metadata_gets_the_model_path(self):
+        client = client_with(get=mock.Mock(return_value=reply(200, {"versions": {}})))
+        self.assertEqual(client.metadata(), {"versions": {}})
+        self.assertEqual(client.session.get.call_args.args[0], f"{URL}/v2/models/ai_mail")
+
     def test_connection_errors_and_timeouts_are_retryable(self):
         for error in (requests.ConnectionError("down"), requests.Timeout("slow")):
             with self.subTest(error=type(error).__name__):

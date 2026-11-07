@@ -125,8 +125,9 @@ class ResultMappingTest(SimpleTestCase):
 
 
 class HealthCheckTest(SimpleTestCase):
-    def check(self, config, ready, mismatch=None):
+    def check(self, config, ready, mismatch=None, synced=True):
         with mock.patch.object(module, "AiInferenceClient") as client_class, \
+                mock.patch.object(module.serversync, "server_matches", return_value=synced), \
                 mock.patch.object(module, "collection_mismatch", return_value=mismatch) as check:
             client_class.return_value.ready.return_value = ready
             status = AiModelConnector(config).health_check()
@@ -161,6 +162,11 @@ class HealthCheckTest(SimpleTestCase):
         self.assertEqual((status.ok, status.detail), (True, "ready, token accepted"))
         self.assertIn("RuntimeError", logs.output[0])
         self.assertNotIn("db down", logs.output[0])
+
+    def test_a_registry_and_server_that_differ_are_named(self):
+        status, _ = self.check(CONFIG, (True, "ready, token accepted"), synced=False)
+        self.assertEqual((status.ok, status.detail),
+                         (True, "ready, token accepted. registry and server differ"))
 
     def test_health_check_ok_and_not_ok(self):
         status, client_class = self.check(CONFIG, (True, "ready, token accepted"))

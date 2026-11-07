@@ -10,6 +10,7 @@ from datetime import timedelta
 
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from common.storage import get_store
 
@@ -136,8 +137,8 @@ def set_active(version, user=None, note=""):
                     other.status, other.active_slot = S.PREVIOUS, None
                     _event(other, "demote", user, "replaced by " + target.version_id)
                 other.save(update_fields=["status", "active_slot"])
-            target.status, target.active_slot = S.ACTIVE, 1
-            target.save(update_fields=["status", "active_slot"])
+            target.status, target.active_slot, target.shadow_slot = S.ACTIVE, 1, None
+            target.save(update_fields=["status", "active_slot", "shadow_slot"])
             _event(target, "set_active", user, note)
 
     _retry(run)
@@ -151,9 +152,32 @@ def discard(version, user=None, note=""):
         locked = _lock(version)
         if locked.status in (S.ACTIVE, S.DISCARDED, S.FAILED):
             raise RegistryError(f"cannot discard a {locked.status} version")
-        locked.status = S.DISCARDED
-        locked.save(update_fields=["status"])
+        locked.status, locked.shadow_slot = S.DISCARDED, None
+        locked.save(update_fields=["status", "shadow_slot"])
         _event(locked, "discard", user, note)
+    version.refresh_from_db()
+    return version
+
+
+def set_shadow(version, user=None, note=""):
+    """A gate-eligible candidate becomes the one shadow. Seeding is queued by a later task."""
+    S = ModelVersion.Status
+
+    def run():
+        with transaction.atomic():
+            locked = _lock(version)
+            if locked.status != S.CANDIDATE:
+                raise RegistryError(f"cannot shadow a {locked.status} version")
+            if locked.manifest.get("eligible") is not True:
+                raise RegistryError("the version did not pass the gate")
+            if ModelVersion.objects.select_for_update().filter(status=S.SHADOW).exists():
+                raise RegistryError("another version is the shadow, discard it first")
+            locked.status, locked.shadow_slot = S.SHADOW, 1
+            locked.shadow_since = timezone.now()
+            locked.save(update_fields=["status", "shadow_slot", "shadow_since"])
+            _event(locked, "set_shadow", user, note)
+
+    _retry(run)
     version.refresh_from_db()
     return version
 
@@ -164,8 +188,8 @@ def fail(version, error, user=None):
         locked = _lock(version)
         if locked.status not in (S.CANDIDATE, S.SHADOW):
             raise RegistryError(f"cannot fail a {locked.status} version")
-        locked.status = S.FAILED
-        locked.save(update_fields=["status"])
+        locked.status, locked.shadow_slot = S.FAILED, None
+        locked.save(update_fields=["status", "shadow_slot"])
         _event(locked, "fail", user, str(error)[:500])
     version.refresh_from_db()
     return version
@@ -206,15 +230,20 @@ def ensure_version_zero(user=None):
         raise
 
 
-def reload_payload(version):
-    """Body for /v2/reload's `active` side. Presigned with the internal address (get_store)."""
-    if not version.bundle_prefix:
-        return {"active": None, "shadow": None}
+def _bundle(version):
+    """The /v2/reload entry of one version. Presigned with the internal address (get_store)."""
+    if version is None or not version.bundle_prefix:
+        return None
     bucket, _, prefix = version.bundle_prefix.partition("/")
     store = get_store()
-    return {"active": {
+    return {
         "version_id": version.version_id,
         "bundle_urls": {n: store.presign_get(bucket, prefix + n, PRESIGN_EXPIRY)
                         for n in BUNDLE_FILE_NAMES},
         "manifest_sha256": version.manifest_sha256,
-    }, "shadow": None}
+    }
+
+
+def reload_payload(active, shadow=None):
+    """Body for /v2/reload. Version 0 (no bundle) is `active: null`; no shadow is `shadow: null`."""
+    return {"active": _bundle(active), "shadow": _bundle(shadow)}

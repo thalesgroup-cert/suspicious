@@ -34,5 +34,9 @@ class ConnectorsConfig(AppConfig):
                 "task": "ai_model.tasks.maybe_start_retrain",
                 "schedule": 86400.0,
             }
+            entries["ai-model-server-sync"] = {
+                "task": "ai_model.tasks.sync_server",
+                "schedule": 300.0,
+            }
         if entries:
             celery_app.conf.beat_schedule.update(entries)

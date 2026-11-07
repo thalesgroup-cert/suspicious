@@ -38,3 +38,20 @@ def maybe_start_retrain() -> None:
     from ai_model import retrain
 
     retrain.maybe_start()
+
+
+@shared_task
+def sync_server() -> None:
+    """Every 300 s (beat entry in connectors.apps): push the registry state to the inference server
+    when they differ. A no-op while the connector is disabled or has no usable token or url."""
+    from connectors.registry import registry
+
+    from ai_model import ledger, serversync
+
+    if not ledger.enabled():
+        return
+    try:
+        client = registry.instantiate("ai_model")._client()
+    except ValueError:
+        return
+    serversync.sync(client)

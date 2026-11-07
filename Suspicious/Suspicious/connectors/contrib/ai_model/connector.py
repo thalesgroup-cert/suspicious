@@ -9,7 +9,7 @@ from time import monotonic  # module-level so tests can patch the clock
 from django.db import transaction
 from django.utils import timezone
 
-from ai_model import ledger
+from ai_model import ledger, serversync
 from ai_model.campaign_profile import COLLECTION_NAME
 from ai_model.models import AiAssessment, LabelSyncState
 from ai_model.taxonomy import FOLDERS, class_of
@@ -163,8 +163,10 @@ class AiModelConnector(Connector):
         )
 
     def health_check(self) -> HealthStatus:
+        client = None
         try:
-            ok, detail = self._client().ready()
+            client = self._client()
+            ok, detail = client.ready()
         except ValueError as exc:
             ok, detail = False, str(exc)
         # Campaign detection is a function of this connector too: say when the cleanup misses it.
@@ -175,6 +177,12 @@ class AiModelConnector(Connector):
             mismatch = None
         if mismatch:
             detail = f"{detail.rstrip('. ')}. {mismatch}" if detail else mismatch
+        if ok:
+            try:
+                if not serversync.server_matches(client):
+                    detail = f"{detail.rstrip('. ')}. registry and server differ"
+            except Exception as exc:  # noqa: BLE001 — a health check must not raise
+                logger.debug("Registry sync check failed: %s", type(exc).__name__)
         return HealthStatus(ok=ok, detail=detail)
 
     def on_case_finalised(self, event) -> None:

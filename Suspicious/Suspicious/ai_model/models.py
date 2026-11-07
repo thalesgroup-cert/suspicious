@@ -151,6 +151,11 @@ class ModelVersion(models.Model):
     # 1 while active, NULL otherwise. MariaDB has no partial unique index, so this unique column is
     # what stops two active versions. Set and cleared only by ai_model.registry.
     active_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    # 1 while shadow, NULL otherwise: one shadow at a time, same trick as active_slot.
+    shadow_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    shadow_since = models.DateTimeField(null=True, blank=True)
+    shadow_min_days = models.PositiveSmallIntegerField(default=7)
+    recheck = models.JSONField(default=dict)  # {job_id, passed, finished_at} of the gate recheck
     bundle_prefix = models.CharField(max_length=255, blank=True)  # "" for version 0 (no bundle)
     manifest = models.JSONField(default=dict)
     manifest_sha256 = models.CharField(max_length=64, blank=True)  # blank for version 0
@@ -171,7 +176,12 @@ class ModelVersion(models.Model):
                 condition=models.Q(status="active", active_slot=1, active_slot__isnull=False)
                 | (~models.Q(status="active") & models.Q(active_slot__isnull=True)),
                 name="ai_model_active_slot_matches_status",
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status="shadow", shadow_slot=1, shadow_slot__isnull=False)
+                | (~models.Q(status="shadow") & models.Q(shadow_slot__isnull=True)),
+                name="ai_model_shadow_slot_matches_status",
+            ),
         ]
 
     def __str__(self):
