@@ -396,6 +396,25 @@ def test_a_bundle_without_an_encoder_hash_still_loads(app, token_env, tmp_path):
     assert reload(client, token_env, active=spec).status_code == 200
 
 
+def test_health_answers_while_the_first_encoder_hash_runs_on_reload(app, token_env, tmp_path,
+                                                                     monkeypatch):
+    from test_inference_server_train import _answers_while_blocked
+    client, holder, storage, base = app
+    spec, _ = make_bundle(tmp_path, storage, version="v-slow")
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_hash():
+        entered.set()
+        release.wait(20)
+        return "h"
+
+    monkeypatch.setattr(server.store, "encoder_hash", slow_hash)
+    answered = _answers_while_blocked(
+        client, lambda: reload(client, token_env, active=spec), entered, release)
+    assert answered, "/health waited for the encoder hash: it ran on the event loop"
+    assert holder.state[0].version_id == "v-slow"
+
+
 def test_missing_encoder_is_refused(loaded, token_env, tmp_path, monkeypatch):
     client, holder, storage, base = loaded
     spec, _ = make_bundle(tmp_path, storage, version="v-new")

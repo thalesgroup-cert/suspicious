@@ -506,7 +506,8 @@ class JobController:
 
     # -- API ---------------------------------------------------------------------------------
 
-    def start(self, req: TrainRequest) -> tuple[int, dict]:
+    def start(self, req: TrainRequest, encoder_hash: Optional[str] = None) -> tuple[int, dict]:
+        """encoder_hash: the caller computes it (self.encoder_hash) outside the event loop."""
         install_log_redaction()
         with self._lock:
             if req.job_id in self.jobs:
@@ -518,7 +519,6 @@ class JobController:
                 self._swept = True
             job = self.jobs[req.job_id] = Job(req.job_id)
             self._evict()
-            encoder_hash = self.encoder_hash()
             if not encoder_hash:
                 job.state, job.error = "failed", "encoder not loaded"
                 return 202, job.view()

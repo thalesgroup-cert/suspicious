@@ -320,6 +320,38 @@ def test_the_server_hashes_its_encoder_once(tmp_path, monkeypatch):
     assert server.ModelStore({}).encoder_hash() is None  # nothing loaded
 
 
+def _answers_while_blocked(client, start_request, entered, release):
+    """start_request runs in a thread and blocks in a slow encoder hash; /health must still answer."""
+    t = threading.Thread(target=start_request)
+    t.start()
+    try:
+        assert entered.wait(10)
+        done = []
+        h = threading.Thread(target=lambda: done.append(client.get("/health").status_code))
+        h.start()
+        h.join(5)
+        return bool(done)
+    finally:
+        release.set()
+        t.join(30)
+
+
+def test_health_answers_while_the_first_encoder_hash_runs(train, env):
+    client, controller, *_ = train()
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_hash():
+        entered.set()
+        release.wait(20)
+        return ENCODER_HASH
+
+    controller.encoder_hash = slow_hash
+    answered = _answers_while_blocked(
+        client, lambda: client.post("/v2/train", json=body(), headers=env), entered, release)
+    assert answered, "/health waited for the encoder hash: it ran on the event loop"
+    assert wait(client, env)["state"] == "succeeded"
+
+
 def test_request_body_is_capped(train, env):
     client, _, _, launches, _ = train()
     big = body(params={**PARAMS, "campaign_profile": {**PROFILE, "pad": "x" * 70_000}})

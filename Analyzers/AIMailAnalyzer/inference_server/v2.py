@@ -77,15 +77,19 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
 
     @router.post("/train", dependencies=[Depends(require_token)])
     async def train(request: Request):
-        status, payload = trainer.start(await _read_json(request, TrainRequest))
+        req = await _read_json(request, TrainRequest)
+        # The first hash reads the encoder files (~1 GB): off the event loop.
+        encoder_hash = await run_in_threadpool(trainer.encoder_hash)
+        status, payload = trainer.start(req, encoder_hash=encoder_hash)
         return JSONResponse(payload, status_code=status)
 
     @router.post("/reload", dependencies=[Depends(require_token)])
     async def reload(request: Request):
         req = await _read_json(request, bundles.ReloadRequest)
         try:
+            encoder_hash = await run_in_threadpool(store.encoder_hash)  # off the event loop
             versions = await run_in_threadpool(holder.reload, req, vectorizer=store.vectorizer,
-                                               slots=slots, encoder_hash=store.encoder_hash())
+                                               slots=slots, encoder_hash=encoder_hash)
         except bundles.ReloadBusy:
             raise HTTPException(409, "a reload is already running") from None
         except bundles.ReloadError as e:
