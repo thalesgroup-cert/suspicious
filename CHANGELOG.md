@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its gate report (`eligible: false` when a gate check failed); the active model is never changed.
   A failed or cancelled job registers nothing and its uploaded files are deleted. New connector
   fields `retrain_enabled` (default false) and `retrain_interval_days` (default 30): a daily check
-  starts a retrain when enabled and the newest version is older than the interval. Compose:
+  starts a retrain when enabled and the newest version is older than the interval; a failed or
+  refused scheduled retrain pauses it for 7 days. `--status` shows a failed job's reason as the
+  inference server gave it (filtered). Compose:
   `ai_inference` joins the storage network and gets `AI_BUNDLE_HOSTS`, `AI_TRAIN_THREADS` and a
   memory limit (`AI_INFERENCE_MEM_LIMIT`, 8g); see `deployment/.env.example`.
 - `POST /v2/embed` takes an optional `preprocessing` (`legacy-first128` by default,
