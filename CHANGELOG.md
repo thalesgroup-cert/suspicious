@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tokens. The label sync now embeds folder rows in `chunkmean-tokens-v1`, the form retraining uses
   (up to 8 encoder passes per mail instead of 1). `python manage.py ai_model_reembed_ledger
   [--limit N] [--dry-run]` re-reads the mails of older rows over IMAP and re-embeds them; the
-  training export refuses while such rows remain.
+  training export leaves out rows still in another form and counts them (`left out N`).
 - A label ledger for the `ai_model` connector (`ai_model.models.LabelRecord`, append-only). A sync
   about every 24 hours (schedule 86400 s, counted from when Celery beat started) reads the analysts'
   review folders over IMAP, read-only (`BODY.PEEK[]`), matches each forwarded mail to a case by

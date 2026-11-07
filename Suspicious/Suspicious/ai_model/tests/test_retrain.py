@@ -138,8 +138,18 @@ class StartTest(RetrainBase):
             RetrainJob.objects.create(job_id="other", target_version="v9", state=J.RUNNING, running_slot=1,
                                       prefix="p", trigger="manual")
 
-    def test_export_refusal_passes_through_and_records_nothing(self):
+    def test_a_stale_row_is_left_out_and_counted(self):
         make_row(999, pv="legacy-first128")
+        job = retrain.start_retrain()
+        self.assertEqual((job.rows, job.excluded_rows), (64, 1))
+        self.upload_some(job, registry.BUNDLE_FILE_NAMES)
+        self.status.return_value = succeeded()
+        retrain.poll_once(job.job_id)
+        job.refresh_from_db()
+        self.assertEqual(job.version.manifest["excluded_rows"], 1)
+
+    def test_export_refusal_passes_through_and_records_nothing(self):
+        LabelRecord.objects.update(preprocessing_version="legacy-first128")
         with self.assertRaisesRegex(retrain.RetrainRefused, "ai_model_reembed_ledger"):
             retrain.start_retrain()
         self.assertFalse(RetrainJob.objects.exists())
@@ -497,12 +507,12 @@ class ScheduleTest(RetrainBase):
     def test_a_refused_scheduled_start_backs_off_for_seven_days(self):
         registry.ensure_version_zero()
         ModelVersion.objects.update(created_at=timezone.now() - timedelta(days=31))
-        stale = make_row(999, pv="legacy-first128")
+        LabelRecord.objects.update(preprocessing_version="legacy-first128")
         tasks.maybe_start_retrain()
         refused = RetrainJob.objects.get()
         self.assertEqual((refused.state, refused.error, refused.running_slot, refused.trigger),
                          (J.FAILED, "Refused", None, "schedule"))
-        LabelRecord.objects.filter(pk=stale.pk).delete()
+        LabelRecord.objects.update(preprocessing_version="chunkmean-tokens-v1")
         tasks.maybe_start_retrain()  # within 7 days: nothing
         self.assertEqual(RetrainJob.objects.count(), 1)
         RetrainJob.objects.update(started_at=timezone.now() - timedelta(days=8))
@@ -565,8 +575,12 @@ class CommandTest(RetrainBase):
         for secret in ("fake://", "expires", CONFIG["token"]):
             self.assertNotIn(secret, out)
 
-    def test_export_refusal_becomes_a_command_error(self):
+    def test_start_prints_the_rows_left_out(self):
         make_row(999, pv="legacy-first128")
+        self.assertIn("rows 64, left out 1", self.run_cmd())
+
+    def test_export_refusal_becomes_a_command_error(self):
+        LabelRecord.objects.update(preprocessing_version="legacy-first128")
         with self.assertRaisesRegex(CommandError, "ai_model_reembed_ledger"):
             self.run_cmd()
 

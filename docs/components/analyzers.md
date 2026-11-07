@@ -461,9 +461,11 @@ changes the active model: shadow runs and promotion come in a later release (Pla
 
 - **Input.** The active `imap_folder` rows of the ledger (at most 8000), each with its classifier
   embedding in `chunkmean-tokens-v1` (the mean of up to 8 encoder passes over token-sized chunks of
-  the body) and its first-128-token campaign embedding (`cmp-e1`). The export refuses while a
-  trainable row is still embedded in another form: run `python manage.py ai_model_reembed_ledger`
-  first.
+  the body) and its first-128-token campaign embedding (`cmp-e1`). Trainable rows still embedded in
+  another form are left out and counted (`left out N` in `ai_model_retrain`, `excluded_rows` in the
+  candidate's manifest summary); run `python manage.py ai_model_reembed_ledger` to bring them in. A
+  row whose mail can no longer be fetched stays out until it is fixed. The export refuses when no
+  row is left or a head class falls under 8 rows.
 - **Recipe.** The five `ResNetMLP` heads of version 0 (`safe_suspicious`, `spam_dangerous`, `safe`,
   `unwanted`, `dangerous`), trained with class weights and no oversampling (30 epochs), plus a 5-NN
   vote over the training embeddings. Each of the two components is smoothed and calibrated by its

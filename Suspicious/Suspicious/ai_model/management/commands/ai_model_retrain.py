@@ -13,7 +13,8 @@ J = RetrainJob.State
 
 
 def describe(job) -> str:
-    line = f"job {job.job_id} version {job.target_version}: {job.state} (rows {job.rows})"
+    left_out = f", left out {job.excluded_rows}" if job.excluded_rows else ""
+    line = f"job {job.job_id} version {job.target_version}: {job.state} (rows {job.rows}{left_out})"
     if job.error:
         line += f" error {job.error}"
     if job.version_id is not None:

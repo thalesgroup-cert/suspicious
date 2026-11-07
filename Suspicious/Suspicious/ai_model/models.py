@@ -208,6 +208,7 @@ class RetrainJob(models.Model):
     prefix = models.CharField(max_length=255)  # the bundle prefix, ai-models/<version_id>/<job_id>/
     params = models.JSONField(default=dict)  # the /v2/train params: ids, digests, campaign profile
     rows = models.PositiveIntegerField(default=0)
+    excluded_rows = models.PositiveIntegerField(default=0)  # trainable rows left out (not re-embedded)
     parent = models.ForeignKey(ModelVersion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     version = models.ForeignKey(ModelVersion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     trigger = models.CharField(max_length=10, choices=ModelVersion.Trigger.choices)

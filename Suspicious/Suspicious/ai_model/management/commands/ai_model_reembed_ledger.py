@@ -84,6 +84,8 @@ class Command(BaseCommand):
                     pass
         self.stdout.write(f"re-embedded: {self.done}")
         self.stdout.write("skipped: " + ", ".join(f"{k} {v}" for k, v in self.skipped.items()))
+        self.stdout.write(f"rows not re-embedded stay out of training until fixed (the export leaves "
+                          f"out rows not in {TRAINING_PREPROCESSING})")
 
     def _write(self, client, pending):
         answer = client.embed([t for _, t in pending], "classifier", preprocessing=TRAINING_PREPROCESSING)

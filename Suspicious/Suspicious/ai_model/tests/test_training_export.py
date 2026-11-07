@@ -188,12 +188,30 @@ class ExportTest(CaseMixin, TestCase):
         expected = hashlib.sha256(json.dumps(sorted([campaign.ref])).encode()).hexdigest()
         self.assertEqual(result.campaign_refs_digest, expected)
 
-    def test_refuses_rows_in_another_preprocessing_naming_the_command(self):
+    def test_leaves_out_rows_in_another_preprocessing_and_counts_them(self):
         n = full_ledger()
-        make_row(n + 1, pv="legacy-first128")
-        with self.assertRaisesRegex(export.ExportRefused, "1 trainable row.*ai_model_reembed_ledger"):
+        make_row(n + 1, pv="legacy-first128")  # a mail that can no longer be fetched
+        result = export.export_ledger("job-3")
+        self.assertEqual((result.rows, result.excluded), (64, 1))
+        with self.load(result) as npz:
+            self.assertEqual(npz["embeddings"].shape, (64, W))
+
+    def test_refuses_when_no_row_is_in_the_training_preprocessing(self):
+        for n in range(1, 4):
+            make_row(n, pv="legacy-first128")
+        with self.assertRaisesRegex(export.ExportRefused,
+                                    r"no trainable row is embedded in chunkmean-tokens-v1 "
+                                    r"\(3 left out: run manage.py ai_model_reembed_ledger\)"):
             export.export_ledger("job-3")
         self.assertEqual(self.store.list_buckets(), [])
+
+    def test_a_head_floor_refusal_says_how_many_rows_were_left_out(self):
+        full_ledger()
+        row = LabelRecord.objects.filter(label="2_WHALING_PHISHING").first()
+        LabelRecord.objects.filter(pk=row.pk).update(preprocessing_version="legacy-first128")
+        with self.assertRaisesRegex(export.ExportRefused,
+                                    r"has 7 rows, needs 8 \(1 row\(s\) not in chunkmean-tokens-v1 left out\)"):
+            export.export_ledger("job-3")
 
     def test_refuses_short_classes_and_too_many_rows(self):
         full_ledger(per_folder=7)
@@ -250,6 +268,7 @@ class ReembedCommandTest(TestCase):
         self.assertIn("gone 1", out)
         self.assertIn("UIDVALIDITY changed 1", out)
         self.assertIn("bad locator 1", out)
+        self.assertIn("rows not re-embedded stay out of training until fixed", out)
         stale = LabelRecord.objects.exclude(preprocessing_version=TP).values_list("message_id", flat=True)
         self.assertEqual(sorted(stale), ["m50", "m51", "m52", "m53"])
         self.assertEqual(json.loads(LabelRecord.objects.get(message_id="m1").embedding), [0.5] * (W - 1) + [1.0])

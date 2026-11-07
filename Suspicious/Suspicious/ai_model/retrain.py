@@ -125,7 +125,7 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         with transaction.atomic():
             job = RetrainJob.objects.create(
                 job_id=job_id, target_version=version_id, state=J.RUNNING, running_slot=1, prefix=prefix,
-                params=params, rows=exported.rows, parent=parent, trigger=trigger, requested_by=user,
+                params=params, rows=exported.rows, excluded_rows=exported.excluded, parent=parent, trigger=trigger, requested_by=user,
                 started_at=now)
     except IntegrityError:  # another start won the running slot
         _delete_dataset(job_id)
@@ -211,7 +211,7 @@ def _manifest(job, report):
         raise IncompleteUpload
     summary = {k: v for k, v in job.params.items() if k != "campaign_profile"}
     # encoder_hash: the server's digest of its encoder files (it is not sent in the params)
-    summary.update(job_id=job.job_id, rows=job.rows, eligible=report["eligible"] is True,
+    summary.update(job_id=job.job_id, rows=job.rows, excluded_rows=job.excluded_rows, eligible=report["eligible"] is True,
                    encoder_hash=report.get("encoder_hash"),
                    gate={k: report.get(k) for k in GATE_KEYS})
     return summary, report["manifest_sha256"]
