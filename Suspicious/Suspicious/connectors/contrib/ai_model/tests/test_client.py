@@ -214,6 +214,13 @@ class TrainTest(SimpleTestCase):
         with self.assertRaises(TrainJobGone):
             client.train_status("j-1")
 
+    def test_train_status_408_and_429_mean_try_later(self):
+        from connectors.contrib.ai_model.client import TryLater
+        for status in (408, 429):
+            client = client_with(get=mock.Mock(return_value=reply(status, {"detail": "slow"})))
+            with self.subTest(status=status), self.assertRaises(TryLater):
+                client.train_status("j-1")
+
     def test_train_status_errors_are_status_only(self):
         client = client_with(get=mock.Mock(return_value=reply(500, text="X-Amz-Signature=abc")))
         with self.assertRaises(ProviderUnavailable) as caught:

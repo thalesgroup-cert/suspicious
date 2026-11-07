@@ -156,7 +156,7 @@ def poll_once(job_id: str) -> str:
     """Ask the server once and settle the job if it ended. Returns the job's state after.
     The server's answer comes first: a job it finished is registered even when polled after
     MAX_AGE; MAX_AGE only ends a job that is still running (or that nobody can ask about)."""
-    from connectors.contrib.ai_model.client import TrainJobGone
+    from connectors.contrib.ai_model.client import TrainJobGone, TryLater
     from connectors.providers import ProviderUnavailable
 
     job = RetrainJob.objects.get(job_id=job_id)
@@ -168,8 +168,11 @@ def poll_once(job_id: str) -> str:
         answer = client.train_status(job_id)
     except TrainJobGone:  # the server restarted or never got the job
         return _finish(job, J.FAILED, "TrainJobGone").state
+    except TryLater:  # 408, 429: ask again later
+        pass
     except ProviderUnavailable as exc:
-        if not exc.retryable:
+        if not exc.retryable:  # the server job may still run: stop it uploading into a deleted prefix
+            _cancel_quietly(client, job_id)
             return _finish(job, J.FAILED, type(exc).__name__).state
     except ValueError:  # a 4xx, or the connector is misconfigured: ask again later
         pass
@@ -181,12 +184,17 @@ def poll_once(job_id: str) -> str:
     if state == "cancelled":
         return _finish(job, J.CANCELLED).state
     if timezone.now() - job.started_at > MAX_AGE:
-        try:
-            client.train_cancel(job_id)
-        except Exception as exc:  # noqa: BLE001 — best effort (client may be None), failed either way
-            logger.info("Retrain %s: cancel on timeout failed: %s", job_id, type(exc).__name__)
+        _cancel_quietly(client, job_id)
         return _finish(job, J.FAILED, "TimedOut").state
     return J.RUNNING
+
+
+def _cancel_quietly(client, job_id) -> None:
+    """Best effort (client may be None): the job is failed either way."""
+    try:
+        client.train_cancel(job_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.info("Retrain %s: cancel failed: %s", job_id, type(exc).__name__)
 
 
 def give_up(job, error: str) -> None:

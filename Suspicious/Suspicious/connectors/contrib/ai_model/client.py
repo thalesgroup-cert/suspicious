@@ -36,6 +36,10 @@ class TrainJobGone(Exception):
     """GET /v2/train/{job_id} answered 404: the server does not know the job (restarted, evicted)."""
 
 
+class TryLater(Exception):
+    """408 or 429 on a training-job call: the server is slow or rate limiting, the job is unknown."""
+
+
 def _detail(response) -> str:
     try:
         detail = response.json().get("detail", "")
@@ -91,8 +95,10 @@ class AiInferenceClient:
         return self._post("/v2/train", body, special={409: ServerBusy})
 
     def train_status(self, job_id: str) -> dict:
-        """GET /v2/train/{job_id}: {"state", "progress", "report", "error"}. TrainJobGone on 404."""
-        return self._request("get", f"/v2/train/{job_id}", None, special={404: TrainJobGone})
+        """GET /v2/train/{job_id}: {"state", "progress", "report", "error"}. TrainJobGone on 404,
+        TryLater on 408 and 429."""
+        return self._request("get", f"/v2/train/{job_id}", None,
+                             special={404: TrainJobGone, 408: TryLater, 429: TryLater})
 
     def train_cancel(self, job_id: str) -> dict:
         return self._post(f"/v2/train/{job_id}/cancel", {}, special={404: TrainJobGone})

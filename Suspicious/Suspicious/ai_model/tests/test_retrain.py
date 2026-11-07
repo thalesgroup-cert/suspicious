@@ -249,13 +249,24 @@ class MutantTest(RetrainBase):
         self.assertEqual((job.state, job.error), (J.FAILED, "TrainJobGone"))
 
     def test_poll_error_mapping(self):
+        from connectors.contrib.ai_model.client import TryLater
         job = retrain.start_retrain()
         self.status.side_effect = ValueError("inference server refused the request (HTTP 400)")
         self.assertEqual(retrain.poll_once(job.job_id), J.RUNNING)
+        self.status.side_effect = TryLater("inference server HTTP 429")
+        self.assertEqual(retrain.poll_once(job.job_id), J.RUNNING)
+        self.cancel.assert_not_called()
         self.status.side_effect = ProviderUnavailable("token rejected", retryable=False)
         self.assertEqual(retrain.poll_once(job.job_id), J.FAILED)
+        self.cancel.assert_called_once_with(job.job_id)  # best effort: the server job must not upload
         job.refresh_from_db()
         self.assertEqual(job.error, "ProviderUnavailable")
+
+    def test_a_failing_cancel_does_not_stop_the_job_failing(self):
+        job = retrain.start_retrain()
+        self.status.side_effect = ProviderUnavailable("token rejected", retryable=False)
+        self.cancel.side_effect = ProviderUnavailable("token rejected", retryable=False)
+        self.assertEqual(retrain.poll_once(job.job_id), J.FAILED)
 
 
 class PollTest(RetrainBase):
