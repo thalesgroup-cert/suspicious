@@ -4,6 +4,7 @@ the Cortex AI analyzer. See docs/specs for the ai_model design."""
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from time import monotonic  # module-level so tests can patch the clock
 
 from django.db import transaction
@@ -11,7 +12,7 @@ from django.utils import timezone
 
 from ai_model import ledger, serversync
 from ai_model.campaign_profile import COLLECTION_NAME
-from ai_model.models import AiAssessment, LabelSyncState
+from ai_model.models import AiAssessment, LabelSyncState, ModelVersion
 from ai_model.taxonomy import FOLDERS, class_of
 from ai_model.training_data import TRAINING_PREPROCESSING
 from case_handler.models import Case
@@ -199,14 +200,20 @@ class AiModelConnector(Connector):
         if body is None:
             return _inconclusive("archive_unreadable")
         client = self._client()
+        has_shadow = ModelVersion.objects.filter(status=ModelVersion.Status.SHADOW).exists()
+        # Always the case itself: smaller than a ledger lookup, and a no-op when it is not in
+        # the bundle's neighbour index.
+        extra = {"versions": ["active", "shadow"]} if has_shadow else {}
         try:
-            # Always the case itself: smaller than a ledger lookup, and a no-op when it is not in
-            # the bundle's neighbour index.
-            payload = client.classify(body, exclude_case_ids=[case_id])
+            payload = client.classify(body, exclude_case_ids=[case_id], **extra)
         except ValueError as exc:  # the server refused this mail: a verdict of "can't tell"
             logger.warning("ai_model: case %s refused by the inference server: %s", case_id, exc)
             return _inconclusive(str(exc))
-        return result_from_server(payload)
+        result = result_from_server(payload)
+        shadow = payload.get("results", {}).get("shadow") if has_shadow else None
+        if isinstance(shadow, dict) and "error" not in shadow:
+            result = replace(result, shadow=shadow)
+        return result
 
     def sync(self, *, unlimited: bool = False) -> None:
         """Nightly label sync: read the review folders (read-only) into the label ledger.

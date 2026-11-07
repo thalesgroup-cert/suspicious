@@ -242,3 +242,37 @@ class RetrainJob(models.Model):
 
     def __str__(self):
         return f"{self.job_id} ({self.state})"
+
+
+class ShadowResult(models.Model):
+    """What the shadow model answered for one case. Never read by the live verdict."""
+
+    class Origin(models.TextChoices):
+        LIVE = "live"
+        SEED = "seed"
+
+    class Flip(models.TextChoices):
+        NONE = "none"
+        CHANGED = "changed"
+        CRITICAL = "critical"
+
+    case = models.ForeignKey("case_handler.Case", on_delete=models.CASCADE, related_name="shadow_results")
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="shadow_results")
+    origin = models.CharField(max_length=4, choices=Origin.choices, default=Origin.LIVE)
+    result = models.CharField(max_length=20, choices=AiAssessment.Result.choices)
+    sub_class = models.CharField(max_length=32, blank=True)
+    score = models.FloatField()
+    confidence = models.FloatField()  # percent, as in Case.confidence_ai
+    probabilities = models.JSONField(default=dict)
+    tier = models.CharField(max_length=8, blank=True)
+    error = models.CharField(max_length=64, blank=True)
+    live_result = models.CharField(max_length=20, blank=True)
+    would_be_result = models.CharField(max_length=20, blank=True)
+    would_be_score = models.FloatField(null=True, blank=True)
+    would_be_confidence = models.FloatField(null=True, blank=True)
+    would_be_rule = models.CharField(max_length=64, blank=True)
+    flip = models.CharField(max_length=8, choices=Flip.choices, default=Flip.NONE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["case", "version"], name="ai_model_shadow_result_case_version")]

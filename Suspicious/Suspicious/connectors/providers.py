@@ -164,4 +164,11 @@ def finish_provider_analysis(job_id: int, result, *, error: str = "", attempt: i
             attempt=attempt, duration_ms=duration_ms,
         )
         transaction.on_commit(lambda: reconcile_case.delay(case.id))
+    if result is not None and result.shadow is not None:
+        from ai_model.shadow import store_shadow_result
+
+        try:
+            store_shadow_result(case, result.shadow)
+        except Exception as exc:  # noqa: BLE001 -- a shadow problem never touches the live case
+            logger.warning("shadow result not stored for case %s: %s", case.id, type(exc).__name__)
     return True

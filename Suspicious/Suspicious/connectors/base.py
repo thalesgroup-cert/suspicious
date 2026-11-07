@@ -145,6 +145,7 @@ class ProviderResult:
     model_version: str
     assessment: dict       # remaining AiAssessment fields; keys are the model's field names
     reason: str = ""       # why, when result is INCONCLUSIVE
+    shadow: dict | None = None  # the shadow model's answer, stored beside the case, never scored
 
 
 @dataclass(frozen=True)
