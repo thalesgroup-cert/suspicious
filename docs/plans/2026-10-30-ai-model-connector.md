@@ -116,6 +116,8 @@ Deliverable: `manage.py ai_model_retrain` (and a start/poll task) turns the ledg
 
 ## Plan F: Shadow, promotion, campaign dry run, counters (outline)
 
+**Status: detailed** in `docs/plans/2026-11-07-ai-model-connector-f-shadow.md` (11 tasks). The outline below is the earlier sketch; the detailed plan's Rulings supersede it (dry run on the live collection, gate recheck job, server sync, no v0 temperature fit).
+
 Deliverable: a passing candidate becomes `shadow`, is compared on live mail, and can be promoted or rolled back.
 
 1. **Dual classify**: server accepts `versions: ["active", "shadow"]`; provider stores `ShadowResult` and never lets a shadow failure touch the case (shorter timeout).
