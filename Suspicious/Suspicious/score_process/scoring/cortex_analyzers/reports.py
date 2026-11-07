@@ -2,6 +2,7 @@
 Analyzer report lifecycle: execution, persistence, and querying.
 """
 import logging
+from typing import NamedTuple
 
 from django.db.models import Max
 
@@ -9,6 +10,13 @@ from cortex_job.models import AnalyzerReport
 from .utils import dump_model
 
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
+
+
+class EmbeddedEvidence(NamedTuple):
+    """What the embedded observables of a mail said, read once per scoring pass."""
+    embedded: tuple   # ObservableVerdict per scored observable
+    note: str | None
+    report_count: int
 
 
 class CortexAnalyzerReports:
@@ -91,26 +99,27 @@ class CortexAnalyzerReports:
         via the trust-weighted categorical engine; raise the mail band to the
         worst embedded band and fold the analyzers' rationale in. Writes
         per-observable ioc_* (global) and per-MailArtifact artifact_*
-        (case-scoped) levels.
+        (case-scoped) levels. Composition of `_embedded_evidence` (impure) and
+        `_escalate` (pure).
 
         Flag `scoring.mail_embedded_categorical` default-ON — only an explicit
         stored `False` routes back to the Phase B `_apply_derived_escalation`
         (get_config returns None, not the default, for an unset warm-cache key).
         """
-        from dataclasses import replace
         from settings.config import get_config
         if get_config("scoring.mail_embedded_categorical") is False:
             return CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
+        return CortexAnalyzerReports._escalate(
+            verdict, CortexAnalyzerReports._embedded_evidence(case, mail))
 
-        from case_handler.models import Result
+    @staticmethod
+    def _embedded_evidence(case, mail):
+        """The impure half: score each embedded observable on its own reports and
+        write its ioc_* / artifact_* levels once. None when nothing was scored."""
         from score_process.scoring.observable_collect import mail_observable_reports
         from score_process.scoring.observable_engine import score_observable
         from score_process.scoring.sources import source_verdict_from_report
-        from score_process.scoring.engine import mail_band_escalation
-        from score_process.scoring.bands import (
-            _BAND_ORDER, _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE,
-            sticky_holds,
-        )
+        from score_process.scoring.bands import _BAND_TO_IOC_LEVEL, _DERIVED_SCORE, sticky_holds
         from cortex_job.cortex_utils.derived_observables import score_derived_observables
 
         # keep DerivedObservable.child_band / escalation_note fresh for the chip
@@ -152,10 +161,21 @@ class CortexAnalyzerReports:
                     "artifact_level", "artifact_score", "artifact_confidence"])
 
         if not embedded:
-            return verdict
+            return None
+        return EmbeddedEvidence(tuple(embedded), "; ".join(rationale_lines[:5]) or None,
+                                embedded_report_count)
 
-        note = "; ".join(rationale_lines[:5]) or None
-        worst = max(embedded, key=lambda v: _BAND_ORDER.get(v.band, 0))
+    @staticmethod
+    def _escalate(verdict, evidence):
+        """The pure half: raise `verdict` with `evidence` (None leaves it as is)."""
+        if evidence is None:
+            return verdict
+        from dataclasses import replace
+        from case_handler.models import Result
+        from score_process.scoring.engine import mail_band_escalation
+        from score_process.scoring.bands import _BAND_ORDER, _BAND_RANK, _DERIVED_SCORE
+
+        worst = max(evidence.embedded, key=lambda v: _BAND_ORDER.get(v.band, 0))
         # A body-less mail scores Result.FAILURE (score_case has no scorable
         # signal). Only rebase to Inconclusive when the embedded evidence
         # actually raises the band (Suspicious/Dangerous) — an all-Safe/no-data
@@ -169,8 +189,8 @@ class CortexAnalyzerReports:
         # The embedded analyzer reports WERE scored (on their own observables) —
         # count them in n_scored so apply_verdict's case.analysis_done reflects
         # them, band raised or not. Matches finalise_ioc_group's analyzer count.
-        base = replace(base, n_scored=base.n_scored + embedded_report_count)
-        return mail_band_escalation(base, embedded, note=note)
+        base = replace(base, n_scored=base.n_scored + evidence.report_count)
+        return mail_band_escalation(base, list(evidence.embedded), note=evidence.note)
 
     @staticmethod
     def _apply_derived_escalation(case, mail, verdict):
