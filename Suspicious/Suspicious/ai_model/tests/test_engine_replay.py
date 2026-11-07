@@ -104,3 +104,26 @@ class EngineReplayTest(TestCase):
         self.assertEqual(data["replayed"], 1)
         data = json.loads(self.run_cmd(client, "--json", "--since-days", "30"))
         self.assertEqual(data["replayed"], 2)
+
+    def test_skip_reasons_are_counted_by_class(self):
+        for _ in range(3):
+            self.case()
+        data = json.loads(self.run_cmd(FakeClient([ValueError("x"), KeyError("y"), answer("SAFE", 1)]), "--json"))
+        self.assertEqual(data["skipped_reasons"], {"ValueError": 1, "KeyError": 1})
+        self.assertFalse(data["aborted"])
+
+    def test_five_consecutive_failures_abort_the_run(self):
+        for _ in range(8):
+            self.case()
+        client = FakeClient([ValueError("x")] * 8)
+        data = json.loads(self.run_cmd(client, "--json"))
+        self.assertEqual((len(client.calls), data["aborted"], data["aborted_reason"], data["skipped"]),
+                         (5, True, "ValueError", 5))
+
+    def test_text_output(self):
+        self.case("Safe", 2)
+        text = self.run_cmd(FakeClient([answer("DANGEROUS", 9)]))
+        for line in ("embedded-evidence step is omitted", "replayed: 1", "changed: 1", "critical: 1",
+                     "inconclusive rate before: 0.0", "inconclusive rate after: 0.0",
+                     "median confidence before:", "median confidence after:", "Safe->Dangerous: 1"):
+            self.assertIn(line, text)

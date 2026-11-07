@@ -22,7 +22,20 @@ from score_process.management.commands.backtest_scoring import _signals_for
 from score_process.scoring.collect import collect_votes
 from score_process.scoring.engine import AiSignal, score_case
 
-EPILOG = ("Operator step: with a real candidate loaded as shadow, run this on the last 30 days "
+APPROX = ("Figures are approximate: the embedded-evidence step is omitted from both passes, "
+          "so only the AI signal differs between them.")
+MAX_CONSECUTIVE_FAILURES = 5   # an outage must not cost one 20 s timeout per case in the window
+
+
+class NoMailText(Exception):
+    pass
+
+
+class ShadowRefused(Exception):
+    pass
+
+
+EPILOG = (APPROX + "\n\nOperator step: with a real candidate loaded as shadow, run this on the last 30 days "
           "(--since-days 30 --limit 500) and record the figures. The first promotion waits for it.")
 
 
@@ -67,7 +80,8 @@ class Command(BaseCommand):
         cases = (Case.objects.exclude(results="").filter(
             fileOrMail__mail__isnull=False, creation_date__gte=since).order_by("-id")
             .select_related("fileOrMail__mail"))
-        matrix, before, after, skipped = Counter(), [], [], 0
+        matrix, before, after, reasons = Counter(), [], [], Counter()
+        failures, aborted = 0, None
         changed = critical = 0
         for case in cases.iterator():
             if len(before) >= opts["limit"]:
@@ -76,17 +90,26 @@ class Command(BaseCommand):
                 archive = mail_archive_for(case)
                 body = read_archive_body(archive) if archive is not None else None
                 if body is None:
-                    raise ValueError
-                shadow = client.classify(body, exclude_case_ids=[case.id], versions=["shadow"])
-                shadow = shadow["results"]["shadow"]
-                if "error" in shadow:
-                    raise ValueError
+                    raise NoMailText
+                try:
+                    shadow = client.classify(body, exclude_case_ids=[case.id], versions=["shadow"])
+                    shadow = shadow["results"]["shadow"]
+                    if "error" in shadow:
+                        raise ShadowRefused
+                except Exception as exc:
+                    failures += 1
+                    if failures >= MAX_CONSECUTIVE_FAILURES:
+                        aborted = type(exc).__name__
+                    raise
+                failures = 0
                 s_missing = shadow["class"] == AiAssessment.Result.INCONCLUSIVE
                 s_conf = min(round(float(shadow["confidence"]) * 100), 100)
                 s_ai = None if s_missing or not s_conf else AiSignal(score=round(float(shadow["score"])),
                                                                      confidence=s_conf)
-            except Exception:   # a refused, failed or unreadable case: counted, never described
-                skipped += 1
+            except Exception as exc:   # a refused, failed or unreadable case: counted, never described
+                reasons[type(exc).__name__] += 1
+                if aborted:
+                    break
                 continue
             missing = case.results_ai == Result.INCONCLUSIVE
             ai = None
@@ -100,7 +123,8 @@ class Command(BaseCommand):
             changed += flip != "none"
             critical += flip == "critical"
         report = {
-            "version": opts["version_id"], "replayed": len(before), "skipped": skipped,
+            "version": opts["version_id"], "replayed": len(before), "skipped": sum(reasons.values()), "skipped_reasons": dict(reasons),
+            "aborted": aborted is not None, "aborted_reason": aborted,
             "changed": changed, "critical": critical, "matrix": dict(sorted(matrix.items())),
             "inconclusive_rate_before": _rate(before), "inconclusive_rate_after": _rate(after),
             "median_confidence_before": _median(before), "median_confidence_after": _median(after),
@@ -108,9 +132,13 @@ class Command(BaseCommand):
         if opts["json"]:
             self.stdout.write(json.dumps(report))
             return
+        self.stdout.write(APPROX)
         for key in ("replayed", "skipped", "changed", "critical", "inconclusive_rate_before",
                     "inconclusive_rate_after", "median_confidence_before", "median_confidence_after"):
-            self.stdout.write(f"{key.replace('_', ' ')}: {report[key]}".replace(" ", " ", 1))
+            self.stdout.write(f"{key.replace('_', ' ')}: {report[key]}")
+        self.stdout.write(f"skipped reasons: {report['skipped_reasons']}")
+        if aborted:
+            self.stdout.write(f"aborted after {MAX_CONSECUTIVE_FAILURES} consecutive failures: {aborted}")
         self.stdout.write("transition matrix (live -> shadow: count):")
         for k, n in report["matrix"].items():
             self.stdout.write(f"  {k}: {n}")
