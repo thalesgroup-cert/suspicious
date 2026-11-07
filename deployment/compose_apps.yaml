@@ -305,7 +305,8 @@ services:
       # pipeline can promote new ones in place; the server hot-reloads them.
       - "${CUSTOM_ANALYZERS_PATH}/AIMailAnalyzer/models:/worker/AIMailAnalyzer/models:ro"
     # Server (encoder resident, about 0.8 GB idle) + one training worker (torch, the group
-    # matrix of up to about 1.6 GB at 8000 rows, the gate's fits): about 4.5 GB at peak.
+    # matrix of up to about 1.6 GB at 8000 rows, the gate's fits): estimated about 4.5 GB at
+    # peak, not measured (plan Ruling E22).
     # An OOM kill fails the job ("worker exited with code -9"). One uvicorn worker only (the
     # image's CMD): the job controller's state lives in that process.
     mem_limit: ${AI_INFERENCE_MEM_LIMIT:-8g}

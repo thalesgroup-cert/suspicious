@@ -201,7 +201,8 @@ class ModelHolder:
         pv = manifest["preprocessing_version"]
         if pv not in KNOWN_PREPROCESSING:
             raise ReloadError(f"{role}: unknown preprocessing_version")
-        # A bundle that names its encoder must name this one (a missing hash here refuses it too).
+        # A manifest that names an encoder must name this one; a server without a hash refuses
+        # it. A manifest with an empty encoder_hash is not checked.
         if manifest["encoder_hash"] and manifest["encoder_hash"] != encoder_hash:
             raise ReloadError(f"{role}: the bundle was trained with another encoder")
         if bundle.input_dim != width:
