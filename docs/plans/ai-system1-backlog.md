@@ -35,12 +35,41 @@ model (an AI-generated French report, not in the repository).
 
 ## A home-made "Jev" for this platform
 
-- **Model.** A local multilingual NLI cross-encoder; the candidate is an mDeBERTa-v3-base XNLI
-  checkpoint, to be chosen by measurement.
-  - The structured state is the premise and each question is a hypothesis.
-  - Noul is the entailment probability.
-  - Choice asks one hypothesis per option, with a softmax across the options.
-  - Score is a Choice over ordered levels, plus the confidence formula above.
+- **Interface.** Copy Jev's request shape so the backend could change later: `state` (a list
+  of text parts) and `questions` keyed by name, each with a `type` (`choice`, `noul`, `score`)
+  and its options or levels. The answers come back nested under the question names, each with
+  its probabilities and a confidence. It would be served as one more `/v2` route on
+  `ai_inference`.
+- **Model.** Chosen by the spike, from three candidates. All of them answer in one forward
+  pass with no text generation.
+  1. A multilingual NLI cross-encoder (an mDeBERTa-v3-base XNLI checkpoint).
+     - The state is the premise and each question is a hypothesis.
+     - Noul is the entailment probability.
+     - Choice asks one hypothesis per option, with a softmax across the options.
+     - Score is a Choice over ordered levels.
+     - About 280M parameters, so it fits the CPU host.
+  2. A small multilingual instruct model read through its option logits. This is the "build
+     your own Jev" recipe, with Qwen2.5-1.5B-Instruct as the example.
+     - The prompt lists the options as letters, and the model reads only the next-token
+       logits of those letters.
+     - Letter order biases the answer: permute the order and average, which costs extra
+       passes.
+     - At 1.5B parameters, CPU latency per question is the open point.
+  3. A small trained head (the "Drex" pattern, a DistilBERT or MiniLM head).
+     - This needs our labels, which makes it close to what model 1 already is.
+     - Only worth doing per question once the ledger holds enough labelled examples.
+- **Excluded.**
+  - Hosted Jev (`typesafe/jev-1.14` through OpenRouter): cloud only.
+  - ModernBERT-based "Laya": English-centric, and our mail is French and English.
+  - RSI-Jev v6 (4B, Qwen3.5-4B base, Apache-2.0 weights): sized for a GPU (H200 figures),
+    and every benchmark it reports is self-reported.
+- **What the open replicas show.**
+  - Their latency figures are on GPUs (T4, A10G, H200), with no stated method, so the spike
+    measures our own.
+  - Calibration does not come for free. Laya reports an ECE of 0.081, the same order as
+    model 1's 0.079. RSI-Jev reports that every RL reward it tried made raw calibration
+    worse, and that a post-hoc confidence head recovered it.
+  - Post-hoc calibration per question therefore stays in the plan.
 - **Determinism.** The weights are fixed and nothing is sampled, so the same input and version
   always give the same answer.
 - **Calibration.** Each question gets its own temperature, fitted on ledger labels with the
@@ -127,8 +156,11 @@ trigger in the code before designing.
 
 1. Plans E, F and G merged.
 2. H2 rules-only. It is the smallest piece and is useful without any model.
-3. Spike: measure the NLI model on CPU (latency, French and English) and its zero-shot answers
-   to the H1 questions on the 505 mails.
+3. Spike: measure candidates 1 and 2 on the CPU host.
+   - Latency per question at our chunk sizes.
+   - French and English behaviour.
+   - Zero-shot answers to the H1 questions on the 505 mails, with ECE before and after
+     temperature scaling.
 4. H2 questions in shadow.
 5. H1 offline overlap study, then H1 in shadow through Plan F.
 
@@ -139,9 +171,12 @@ trigger in the code before designing.
 
 ## Sources
 
-- TypeSafe Jev, community summaries:
-  - https://openrouter.ai/docs/guides/community/jev.md
+- TypeSafe Jev:
+  - https://openrouter.ai/docs/guides/community/jev (primitives, request shape)
   - https://nexos.ai/blog/what-is-jev/
+- Build-your-own recipe and open replicas, with figures not independently measured:
+  - https://jevlab.dev/build-your-own-jev
+  - https://www.orcarouter.ai/id/blog/jev-open-source (RSI-Jev)
 - OpenJev, described as a chat-model wrapper:
   - https://aisuccesslabjuliangoldie.com/blog/jev-vs-openjev/
   - https://pub.towardsai.net/jev-and-rlcd-architecture-open-source-models-and-practical-agent-use-cases-bd8ab990fc44
