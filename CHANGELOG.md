@@ -30,7 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   encoder. Classify with a retrained version returns calibrated probabilities and a `tier` (High,
   Medium, Low) from the bundle's cutoffs; version 0 keeps its answer and has no tier. Calibrated
   confidences are lower: on the 505-mail dataset the median `confidence_ai` goes from 100 to 87 and
-  Inconclusive from 0.1% to 4.6% (`tools/confidence_shift.py`). See "Retraining" in
+  Inconclusive from 0.1% to 4.6% (`tools/confidence_shift.py`). The "before" figures come from
+  retraining version 0's recipe and scoring held-out folds, not from the shipped version 0 weights,
+  which have seen these mails, so live version 0 confidences differ. See "Retraining" in
   `docs/components/analyzers.md`.
 - `POST /v2/embed` takes an optional `preprocessing` (`legacy-first128` by default,
   `chunkmean-tokens-v1`, `chunkmean-words90-v1`); the `campaign` profile always uses the first 128

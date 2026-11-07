@@ -510,8 +510,11 @@ prints the `confidence_ai` distribution of both on held-out predictions. On the 
 
 | | p10 | p25 | median | p75 | p90 | Inconclusive |
 |---|---|---|---|---|---|---|
-| version 0's recipe, uncalibrated | 90 | 99 | 100 | 100 | 100 | 1 (0.1%) |
+| version 0's recipe, retrained per fold, uncalibrated | 90 | 99 | 100 | 100 | 100 | 1 (0.1%) |
 | retrain recipe, calibrated | 58 | 75 | 87 | 90 | 92 | 69 (4.6%) |
+
+The first row comes from retraining version 0's recipe and scoring the held-out folds, not from
+the shipped version 0 weights, which have seen these 505 mails; live version 0 confidences differ.
 
 The scoring engine compares `confidence_ai` with the base confidence and applies `CONF_FLOOR`, so a
 promoted version can change which signal decides a verdict. Replay recent cases before promoting.

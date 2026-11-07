@@ -1,16 +1,20 @@
-"""Engine sensitivity (spec Risks): the confidence_ai distribution before and after calibration.
+"""Print the confidence_ai distribution before and after calibration (spec Risks).
 
-    python tools/confidence_shift.py --dataset <npz> [--form tokens|words90] [--seeds 0,1,2]
+usage: python tools/confidence_shift.py --dataset <npz> [--form tokens|words90] [--seeds 0,1,2]
 
 The dataset is the .npz of tools/dataset_to_npz.py. Both sides are held-out predictions on the
-same grouped folds (near-duplicate groups on the first-128 `embeddings`, as the gate does).
-Before: version 0's recipe (`legacy_recipe`) on the first-128 embeddings, uncalibrated, as live
-version 0 answers today (the hierarchy probabilities, unsmoothed). After: the retrain recipe
-(`candidate_recipe`) on the chunk-mean embeddings, calibrated per component on the other
-calibration half and blended (Task 9). Each
-row goes through mail_analysis.getMainClassificationInfo and the connector's rounding, so the
-numbers are the case's confidence_ai and class. Only counts and quantiles are printed; no mail
-text. Nothing in training/ or inference_server/ imports this file.
+same grouped folds: near-duplicate groups on the first-128 `embeddings`, as the gate uses.
+
+Before: version 0's recipe (`legacy_recipe`) retrained on the first-128 embeddings, uncalibrated
+(the hierarchy probabilities with the smoothing undone). It is not the shipped version 0 weights,
+which have seen the dataset's mails.
+After: the retrain recipe (`candidate_recipe`) on the chunk-mean embeddings, each component
+calibrated on the other calibration half, then blended.
+
+Each row goes through mail_analysis.getMainClassificationInfo and the connector's rounding. For
+each side the tool prints the confidence_ai quantiles, its counts per band of 10 and the class
+counts with the Inconclusive share. It prints counts and quantiles only, no mail text, and asserts
+no value. Nothing in training/ or inference_server/ imports this file.
 """
 import argparse
 import sys
@@ -51,7 +55,8 @@ def _print(name, probs):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(description=__doc__, usage=argparse.SUPPRESS,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dataset", required=True)
     ap.add_argument("--form", choices=("tokens", "words90"), default="tokens")
     ap.add_argument("--seeds", default="0,1,2")
