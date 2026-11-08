@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Box, Tab, Tabs, Typography } from "@mui/material";
 
+import { CandidateTab } from "./CandidateTab";
 import { OverviewTab } from "./OverviewTab";
 
 // Tasks 7 to 11 fill the tabs.
@@ -21,6 +22,7 @@ export function AiModelPanel() {
       </Tabs>
       <Box role="tabpanel" id={`${id}-panel-${tab}`} aria-labelledby={`${id}-tab-${tab}`} sx={{ pt: 2 }}>
         {tab === "Overview" && <OverviewTab onSeeCandidate={() => setTab("Candidate")} />}
+        {tab === "Candidate" && <CandidateTab />}
       </Box>
     </Box>
   );

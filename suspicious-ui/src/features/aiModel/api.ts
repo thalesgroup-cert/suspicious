@@ -56,13 +56,19 @@ export type VersionRow = VersionSummary & {
   age_warning: boolean;
 };
 
-/** Gate payload is whitelisted server side (Ruling G5); its inner shape is read by the Candidate tab. */
+/** Gate payload, whitelisted server side (Ruling G5); every part may be absent or null. */
+export type GateCheck = { passed?: boolean; value?: number | string | null; threshold?: number | string | null; detail?: string };
 export type Gate = {
-  checks: unknown;
-  candidate: unknown;
-  baseline: unknown;
-  campaign: unknown;
-  tier_cutoffs: unknown;
+  checks: Record<string, GateCheck> | null;
+  candidate: Record<string, number | string | null> | null;
+  baseline: Record<string, number | string | null> | null;
+  campaign: {
+    dangerous_called_safe?: number | null;
+    baseline_dangerous_called_safe?: number | null;
+    groups?: number | null;
+    fallback?: boolean;
+  } | null;
+  tier_cutoffs: { high?: number | null; medium?: number | null } | null;
 };
 
 export type CandidateRow = {
