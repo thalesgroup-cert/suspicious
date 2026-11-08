@@ -60,7 +60,7 @@ function status(m: Mock) {
     schedule: { enabled: true, interval_days: 30, next_run: "2026-12-01T00:00:00Z", backoff_until: null },
     counts: { candidate: m.candidate ? 1 : 0, shadow: m.shadow ? 1 : 0, active: 1, previous: m.previous ? 1 : 0, discarded: 0, failed: 0 },
     jobs: m.jobState === "succeeded" ? [job] : [],
-    ledger: { by_source: { folder: { Dangerous: 40, Safe: 60 } }, flagged: 2, trainable: 100 },
+    ledger: { by_source: { imap_folder: { Dangerous: 40, Safe: 60 } }, flagged: 2, trainable: 100 },
   };
 }
 

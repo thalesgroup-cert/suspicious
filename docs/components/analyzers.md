@@ -770,7 +770,8 @@ Retrain, promote, rollback, discard, resolve and the breaker reset each ask for 
 `409` is shown in words from its `codes`; the card shows only what the server confirmed.
 
 **Schedule rule.** `schedule.next_run` is not stored. It is the newest version's `created_at` plus
-`retrain_interval_days` (default 30), or now when there is no version. It is `null` when the
+`retrain_interval_days` (default 30), or now when there is no version. The newest version counts candidate, shadow, active and previous
+versions only; discarded and failed ones are ignored. It is `null` when the
 connector is disabled, `retrain_enabled` is not true, or a job runs. After a failed scheduled job
 (including a refused one) started within the last 7 days, the date is pushed to the end of that
 7-day backoff, reported as `backoff_until`. The beat check runs once a day, so the card says
@@ -787,9 +788,9 @@ A reset does not hide a server that is down: the breaker opens again after five 
 (`BREAKER_FAIL_MAX`). Each reset adds a `ModelEvent`.
 
 **Label mix warning.** `GET /api/ai-model/ledger/` compares the Dangerous, Safe and Unwanted shares
-of the active folder rows now with the shares 30 days ago. `jump` names the class that moved most
-when it moved by more than 15 percentage points and each window holds at least 50 rows; otherwise
-`jump` is `null`.
+of the active `imap_folder` rows now with the shares among the active `imap_folder` rows observed
+more than 30 days ago. `jump` is `{class, from, to}` for the class that moved most, when it moved
+by more than 15 percentage points and each window holds at least 50 rows; otherwise it is `null`.
 
 **Review queue.** `disagreements`: mail cases finalised in the last 30 days whose latest AI class
 is on the other side of the Safe/Dangerous axis from the case verdict and where the AI did not set
@@ -804,7 +805,7 @@ group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<
 
 | Route | Role | What it does |
 |---|---|---|
-| `GET /api/ai-model/status/` | Admin, CISO | active, previous and shadow summaries, whether a job is running, and the card header: `health`, `breaker`, `schedule`, `counts` (versions by status), `jobs` (the last five) and `ledger` |
+| `GET /api/ai-model/status/` | Admin, CISO | active, previous and shadow summaries, whether a job is running, and the card header: `health` (`{ok, detail, checked_at}`, `detail` capped at 200 characters), `breaker`, `schedule`, `counts` (versions by status), `jobs` (the last five) and `ledger` |
 | `GET /api/ai-model/versions/` | Admin, CISO | versions with counters, purity and the age warning (`limit`, `offset`) |
 | `GET /api/ai-model/shadow/` | Admin, CISO | the shadow with agreement, flips (`flips_`), dry-run effects (`effects_`), the alert delta (`candidate_only_`, `active_only_`) and the unmet `conditions` |
 | `GET /api/ai-model/reviews/` | Admin, CISO | the review log, optional `?version_id=` |
@@ -815,11 +816,11 @@ group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<
 | `POST /api/ai-model/promote/` | Admin | promote the shadow (or `version_id`); `409` with `codes` when refused |
 | `POST /api/ai-model/rollback/` | Admin | the `previous` version becomes active; `409 no_previous` without one |
 | `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version, free the shadow slot and sync the server (best effort) |
-| `GET /api/ai-model/candidates/` | Admin, CISO | candidates and the shadow, newest first (`limit`, `offset`): `{version_id, status, created_at, trigger, rows, excluded_rows, eligible, gate}`. `gate` is a whitelisted copy of the manifest (`checks`, `candidate`, `baseline`, `campaign`, `tier_cutoffs`; numbers, booleans and strings up to 300 characters); the manifest, bundle prefix and URLs never leave the registry |
+| `GET /api/ai-model/candidates/` | Admin, CISO | candidates and the shadow, newest first (`limit`, `offset`): `{version_id, status, created_at, trigger, rows, excluded_rows, eligible, gate}`. `gate` is a whitelisted copy of the manifest (`checks`, `candidate`, `baseline`, `campaign`, `tier_cutoffs`; numbers, booleans and strings up to 300 characters, nested at most 4 levels, lists cut at 50 items; any string or key containing `http` is dropped); the manifest, bundle prefix and URLs never leave the registry |
 | `GET /api/ai-model/jobs/` | Admin, CISO | the retrain job history, newest first (`limit`, `offset`): `{job_id, state, trigger, rows, excluded_rows, started_at, finished_at, error}`, `error` capped at 200 characters |
 | `GET /api/ai-model/ledger/` | Admin, CISO | `ledger_summary()` (`by_source`, `flagged`, `trainable`) plus `mix`, the label mix and its jump warning (see below) |
 | `GET /api/ai-model/flags/` | Admin, CISO | flagged labels, newest first (`limit`, `offset`): `{id, case_id, label_class, source, flag_reason, observed_at}`; no message id, subject or sender |
-| `GET /api/ai-model/queue/` | Admin, CISO | `disagreements` and `campaign_conflicts`, each `{count, results}`, paged with `disagreements_limit`/`disagreements_offset` and `conflicts_limit`/`conflicts_offset` |
+| `GET /api/ai-model/queue/` | Admin, CISO | `disagreements` and `campaign_conflicts`, each `{count, results}` (rows: `{case_id, verdict, ai_class, date}` and `{campaign_ref, classes, date}`), paged with `disagreements_limit`/`disagreements_offset` and `conflicts_limit`/`conflicts_offset` |
 | `POST /api/ai-model/retrain/` | Admin | `{note}`: start a manual retrain; `202 {job_id}`; `409` with a fixed message when a job runs or the retrain is refused |
 | `POST /api/ai-model/flags/<id>/resolve/` | Admin | `{keep, note}` (note required, at most 2000 characters): `keep: true` makes the label active again, `false` supersedes it; `404` for an unknown label, `409` when it is not flagged; answers the label row |
 | `POST /api/ai-model/breaker/reset/` | Admin | `{note}`: move the breaker's reset epoch; `202 {epoch}`; `503` when the shared cache is unavailable |

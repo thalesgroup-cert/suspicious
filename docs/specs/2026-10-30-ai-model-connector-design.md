@@ -512,8 +512,8 @@ campaign-held-out result; the shadow comparison, the review list and the campaig
 the alert delta; the version history with rollback and, per version, the campaign counters and
 purity; the label ledger summary and the list of flagged labels. A queue lists mails where the AI and
 the other evidence disagree, and cases whose campaign members disagree, as candidates for review and
-labelling. The queue covers the last 30 days of finalised mail cases and live campaigns, at most
-200 rows per list (amended by Plan G).
+labelling. The disagreement list covers finalised mail cases of the last 30 days; the campaign conflict
+list has no time window; each list holds at most 200 rows (amended by Plan G).
 
 **Connector gallery.** The standard card (enabled, configuration, health, last sync). It shows a
 read-only line pointing to the AI model card (**Call**).
