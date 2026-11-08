@@ -784,8 +784,9 @@ connector is disabled, `retrain_enabled` is not true, or a job runs. After a fai
 change, last writer wins, with no expiry; `status` reports that value, or `unknown` when the key is
 absent or the cache fails. A reset (`POST /api/ai-model/breaker/reset/`) increments the integer at
 `breaker-epoch:<name>`. Before a call, a process compares the epoch with the one it last applied
-and closes its own breaker when it moved; it reads the cache at most once per 5 seconds per breaker,
-so a reset lands within about 5 seconds. A cache outage never breaks a call (the check fails open).
+and closes its own breaker when it moved, so each process closes its breaker before its next call
+(it reads the epoch at most once per 5 seconds per breaker). The published state changes only when a
+process makes a call: with no traffic, the card can keep showing `open` after a reset. A cache outage never breaks a call (the check fails open).
 A reset does not hide a server that is down: the breaker opens again after five failures
 (`BREAKER_FAIL_MAX`). Each reset adds a `ModelEvent`.
 
