@@ -415,3 +415,32 @@ class RecheckApiTest(RetrainBase, APITestCase):
         again = self.client.post(BASE + "recheck/", {}, format="json")  # a job is running
         self.assertEqual(again.status_code, 409)
         self.assertNotIn(job_id, str(again.json()))
+
+
+class CandidatesEdgeTest(APITestCase):
+    def setUp(self):
+        self.client.force_authenticate(user("adm2", "Admin"))
+
+    def test_counts_coerced_nan_depth_list_cap_and_paging(self):
+        deep = {"a": {"b": {"c": {"d": {"e": 1}}}}}
+        gate = {"checks": {"list": list(range(80)), "deep": deep}}
+        cand("e1", manifest={"rows": {"x": 1}, "excluded_rows": "7", "gate": gate})
+        data = self.client.get(BASE + "candidates/").json()
+        row = data["results"][0]
+        self.assertIsNone(row["rows"])
+        self.assertIsNone(row["excluded_rows"])
+        checks = row["gate"]["checks"]
+        from api.serializers.ai_model import _plain  # a JSON column cannot store NaN, so call it directly
+        self.assertEqual(_plain([float("nan"), float("inf"), 1.5]), [None, None, 1.5])
+        self.assertEqual(checks["list"], list(range(50)))
+        self.assertEqual(checks["deep"], {"a": {"b": {"c": None}}})
+
+    def test_order_and_paging(self):
+        now = timezone.now()
+        for i, vid in enumerate(("p1", "p2", "p3")):
+            v = cand(vid, manifest={})
+            ModelVersion.objects.filter(pk=v.pk).update(created_at=now - timedelta(days=10 - i))
+        ids = lambda q: [x["version_id"] for x in self.client.get(BASE + "candidates/" + q).json()["results"]]
+        self.assertEqual(ids(""), ["p3", "p2", "p1"])
+        self.assertEqual(ids("?limit=1&offset=1"), ["p2"])
+        self.assertEqual(self.client.get(BASE + "candidates/?limit=1").json()["count"], 3)

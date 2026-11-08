@@ -1,3 +1,4 @@
+import math
 from rest_framework import serializers
 
 from ai_model import retrain
@@ -41,7 +42,9 @@ STR_CAP, MAX_DEPTH = 300, 4
 
 def _plain(x, depth=0):
     """Depth-limited copy: numbers, booleans and short strings only (anything with a URL dropped)."""
-    if isinstance(x, (bool, int, float)):
+    if isinstance(x, float):
+        return x if math.isfinite(x) else None
+    if isinstance(x, (bool, int)):
         return x
     if isinstance(x, str):
         return None if "http" in x.lower() else x[:STR_CAP]
@@ -62,8 +65,12 @@ def gate_view(manifest) -> dict | None:
     return {k: _plain(gate.get(k)) for k in retrain.GATE_KEYS}
 
 
+def _count(x):
+    return x if isinstance(x, int) and not isinstance(x, bool) else None
+
+
 def candidate_row(v) -> dict:
     m = v.manifest or {}
     return {"version_id": v.version_id, "status": v.status, "created_at": v.created_at, "trigger": v.trigger,
-            "rows": m.get("rows"), "excluded_rows": m.get("excluded_rows"),
+            "rows": _count(m.get("rows")), "excluded_rows": _count(m.get("excluded_rows")),
             "eligible": m.get("eligible") is True, "gate": gate_view(m)}
