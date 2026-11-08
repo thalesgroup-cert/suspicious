@@ -8,11 +8,8 @@ import dataclasses
 import logging
 from datetime import datetime, timedelta
 
-from django.db import transaction
 from django.db.models import Max, Min, Q
 from django.utils import timezone
-
-from case_handler.models import CampaignMember
 
 from . import registry, serversync
 from .models import ModelVersion, ShadowCampaignEffect, ShadowResult, ShadowReview
@@ -27,7 +24,6 @@ SHADOW_MIN_RESULTS = 500
 DEFAULT_MIN_DAYS = 7  # ModelVersion.shadow_min_days default
 WINDOW_DAYS = 15
 RECHECK_MAX_AGE_DAYS = 7
-MAX_MIN_DAYS = 365
 
 
 class PromotionRefused(Exception):
@@ -89,6 +85,8 @@ def _recheck_code(version, now):
         finished = datetime.fromisoformat(recheck["finished_at"])
     except (TypeError, ValueError):
         return "recheck_missing"
+    if finished.tzinfo is None:  # record_recheck always stores UTC with an offset
+        return "recheck_missing"
     min_met = version.shadow_since + timedelta(days=version.shadow_min_days) if version.shadow_since else None
     if min_met is None or finished < min_met or now - finished > timedelta(days=RECHECK_MAX_AGE_DAYS):
         return "recheck_stale"
@@ -117,7 +115,7 @@ def can_promote(version) -> list:
         unmet.append(code)
     if version.campaign_profile != _active_profile():
         span = ShadowCampaignEffect.objects.filter(version=version).aggregate(a=Min("created_at"), b=Max("created_at"))
-        if span["a"] is None or (span["b"].date() - span["a"].date()).days < WINDOW_DAYS:
+        if span["a"] is None or span["b"] - span["a"] < timedelta(days=WINDOW_DAYS):
             unmet.append("profile_window")
     # ponytail: plain read, not locked against a retrain starting concurrently; a job started
     # after the check trains on the ledger and cannot touch the pointer.
@@ -127,107 +125,59 @@ def can_promote(version) -> list:
 
 
 def _sync_or_revert(revert):
-    """After commit: a 4xx reload reverts the pointer and raises; a transient failure keeps it."""
+    """After commit: a 4xx reload reverts the pointer and re-raises, whatever the revert does; a
+    transient failure keeps the new pointer and the beat heals the server."""
     try:
         if not serversync.sync():
             logger.warning("ai_model server sync after a pointer move failed, the beat retries")
-    except serversync.ReloadRefused:
-        revert()
-        raise
+    except serversync.ReloadRefused as refused:
+        try:
+            revert()
+        except Exception as exc:  # never mask the refusal
+            logger.warning("ai_model pointer revert failed: %s", type(exc).__name__)
+        raise refused
+
+
+def _refuse_unmet(target):
+    unmet = can_promote(target)
+    if unmet:
+        raise PromotionRefused(unmet)
 
 
 def promote(version, user, note=""):
-    before = {}
-
-    def run():
-        with transaction.atomic():
-            rows = list(ModelVersion.objects.select_for_update().order_by("pk").filter(
-                Q(pk=version.pk) | Q(status__in=(S.ACTIVE, S.PREVIOUS))))
-            target = next((r for r in rows if r.pk == version.pk), None)
-            if target is None:
-                raise RegistryError("unknown version")
-            unmet = can_promote(target)
-            if unmet:
-                raise PromotionRefused(unmet)
-            before.clear()
-            before.update({r.status: r.pk for r in rows if r.pk != target.pk})
-            registry.set_active(target, user, note)
-            registry._event(target, "promote", user, note)
-
-    registry._retry(run)
-    _sync_or_revert(lambda: _revert_promote(version.pk, before, user))
+    """Ruling F13: conditions re-checked under the row locks, then set_active and a server sync."""
+    old_active, old_previous = registry.promote_shadow(version, user, note, _refuse_unmet)
+    _sync_or_revert(lambda: registry.revert_promote(version, old_active, old_previous, user, "reload refused"))
     version.refresh_from_db()
     return version
-
-
-def _revert_promote(pk, before, user):
-    """Put back exactly what promote moved: the version to shadow, the old active back, the old
-    previous (discarded by set_active) back to previous. Skipped if something moved meanwhile."""
-    pks = [pk, *before.values()]
-
-    def run():
-        with transaction.atomic():
-            rows = {r.pk: r for r in ModelVersion.objects.select_for_update().order_by("pk").filter(pk__in=pks)}
-            target, old = rows.get(pk), rows.get(before.get(S.ACTIVE))
-            if target is None or target.status != S.ACTIVE or (old and old.status != S.PREVIOUS):
-                logger.warning("ai_model promote not reverted: the registry moved meanwhile")
-                return
-            target.status, target.active_slot, target.shadow_slot = S.SHADOW, None, 1
-            target.save(update_fields=["status", "active_slot", "shadow_slot"])
-            registry._event(target, "promote_reverted", user, "reload refused")
-            if old:
-                old.status, old.active_slot = S.ACTIVE, 1
-                old.save(update_fields=["status", "active_slot"])
-                registry._event(old, "promote_reverted", user, "reload refused")
-            prev = rows.get(before.get(S.PREVIOUS))
-            if prev and prev.status == S.DISCARDED:
-                prev.status = S.PREVIOUS
-                prev.save(update_fields=["status"])
-                registry._event(prev, "promote_reverted", user, "reload refused")
-
-    registry._retry(run)
 
 
 def rollback(user, note=""):
-    """The previous version becomes active again (registry.set_active swaps the two)."""
-    previous = ModelVersion.objects.filter(status=S.PREVIOUS).first()
-    if previous is None:
-        raise RegistryError("no previous version to roll back to")
-    old = ModelVersion.objects.filter(status=S.ACTIVE).first()
-
-    with transaction.atomic():
-        registry.set_active(previous, user, note)  # locks and re-checks the status
-        registry._event(previous, "rollback", user, note)
+    """The previous version becomes active again; PromotionRefused(["no_previous"]) without one."""
+    picked = registry.rollback_to_previous(user, note)
+    if picked is None:
+        raise PromotionRefused(["no_previous"])
+    target, old_active = picked
 
     def revert():
-        if old is None:
-            return
-        with transaction.atomic():
-            registry.set_active(old, user, "reload refused")
-            registry._event(old, "rollback_reverted", user, "reload refused")
+        if old_active is not None:
+            registry.revert_rollback(target, old_active, user, "reload refused")
 
     _sync_or_revert(revert)
-    previous.refresh_from_db()
-    return previous
+    target.refresh_from_db()
+    return target
 
 
 def extend(version, days, user, note=""):
-    """Raise the shadow's minimum period; it never goes down."""
-    with transaction.atomic():
-        locked = registry._lock(version)
-        if locked.status != S.SHADOW:
-            raise RegistryError(f"cannot extend a {locked.status} version")
-        if not isinstance(days, int) or isinstance(days, bool) or not locked.shadow_min_days < days <= MAX_MIN_DAYS:
-            raise RegistryError(f"days must be above {locked.shadow_min_days} and at most {MAX_MIN_DAYS}")
-        locked.shadow_min_days = days
-        locked.save(update_fields=["shadow_min_days"])
-        registry._event(locked, "extend", user, f"{days} days" + (f": {note}" if note else ""))
-    version.refresh_from_db()
-    return version
+    return registry.extend_shadow(version, days, user, note)
 
 
 def review(version, kind, case_id, user, note=""):
-    """Append a review of one current flip or alert-delta item; refuses an item that does not exist."""
+    """Append a review of one current flip or alert-delta item of the shadow; refuses an item that
+    does not exist and a version that is not the shadow."""
+    version.refresh_from_db(fields=["status"])
+    if version.status != S.SHADOW:
+        raise RegistryError(f"cannot review a {version.status} version")
     if (kind, case_id) not in _items(version):
         raise RegistryError("no such review item for this version")
     return ShadowReview.objects.create(version=version, kind=kind, case_id=case_id, user=user, note=note)

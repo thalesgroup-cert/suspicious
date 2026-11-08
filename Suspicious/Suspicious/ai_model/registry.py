@@ -5,6 +5,7 @@ an older `previous` becomes `discarded`. Exactly one `active`: enforced by the u
 `ModelVersion.active_slot` column (MariaDB ignores partial unique indexes) plus locking reads.
 """
 import dataclasses
+import logging
 import re
 from datetime import timedelta
 from datetime import timezone as dt_timezone
@@ -28,6 +29,8 @@ BUNDLE_FILE_NAMES = (
     "heads/unwanted.npz", "heads/dangerous.npz",
     "calibration.json", "knn_index.npz", "campaign_profile.json", "manifest.json",
 )
+logger = logging.getLogger(__name__)
+MAX_SHADOW_MIN_DAYS = 365
 _ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _DEADLOCK = (1213, 1205)  # MySQL/MariaDB deadlock, lock wait timeout
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -143,6 +146,127 @@ def set_active(version, user=None, note=""):
             _event(target, "set_active", user, note)
 
     _retry(run)
+    version.refresh_from_db()
+    return version
+
+
+def promote_shadow(version, user, note, check):
+    """set_active for a promotion (ai_model.promotion). check(locked_target) runs under the row
+    locks and raises to refuse. Returns (old_active, old_previous) as they were, for revert_promote."""
+    S = ModelVersion.Status
+    before = {}
+
+    def run():
+        with transaction.atomic():
+            rows = list(ModelVersion.objects.select_for_update().order_by("pk").filter(
+                Q(pk=version.pk) | Q(status__in=(S.ACTIVE, S.PREVIOUS))))
+            target = next((r for r in rows if r.pk == version.pk), None)
+            if target is None:
+                raise RegistryError("unknown version")
+            check(target)
+            before.clear()
+            before.update({r.status: r for r in rows if r.pk != target.pk})
+            set_active(target, user, note)
+            _event(target, "promote", user, note)
+
+    _retry(run)
+    version.refresh_from_db()
+    return before.get(S.ACTIVE), before.get(S.PREVIOUS)
+
+
+def revert_promote(target, old_active, old_previous, user=None, note=""):
+    """Undo promote_shadow after the server refused the reload: target back to shadow (to
+    candidate if another version became the shadow meanwhile), old_active back to active,
+    old_previous (discarded by set_active) back to previous. All rows are checked first: if any
+    moved meanwhile nothing is written. True when reverted."""
+    S = ModelVersion.Status
+    want = {target.pk: S.ACTIVE}
+    if old_active is not None:
+        want[old_active.pk] = S.PREVIOUS
+    if old_previous is not None:
+        want[old_previous.pk] = S.DISCARDED
+
+    def run():
+        with transaction.atomic():
+            rows = {r.pk: r for r in ModelVersion.objects.select_for_update().order_by("pk").filter(
+                Q(pk__in=want) | Q(status=S.SHADOW))}
+            if any(pk not in rows or rows[pk].status != status for pk, status in want.items()):
+                logger.warning("ai_model promote not reverted: the registry moved meanwhile")
+                return False
+            locked = rows[target.pk]
+            if any(r.status == S.SHADOW for r in rows.values()):
+                logger.warning("ai_model promote reverted to candidate: another version is the shadow")
+                locked.status, locked.active_slot, locked.shadow_slot = S.CANDIDATE, None, None
+            else:
+                locked.status, locked.active_slot, locked.shadow_slot = S.SHADOW, None, 1
+            locked.save(update_fields=["status", "active_slot", "shadow_slot"])
+            _event(locked, "promote_reverted", user, note)
+            for pk, status in ((getattr(old_active, "pk", None), S.ACTIVE),
+                               (getattr(old_previous, "pk", None), S.PREVIOUS)):
+                if pk is None:
+                    continue
+                row = rows[pk]
+                row.status, row.active_slot = status, 1 if status == S.ACTIVE else None
+                row.save(update_fields=["status", "active_slot"])
+                _event(row, "promote_reverted", user, note)
+            return True
+
+    return _retry(run)
+
+
+def rollback_to_previous(user, note=""):
+    """The previous version becomes active again, picked under the row locks. Returns
+    (target, old_active), or None when there is no previous."""
+    S = ModelVersion.Status
+    picked = []
+
+    def run():
+        with transaction.atomic():
+            rows = list(ModelVersion.objects.select_for_update().order_by("pk").filter(
+                status__in=(S.ACTIVE, S.PREVIOUS)))
+            target = next((r for r in rows if r.status == S.PREVIOUS), None)
+            if target is None:
+                return
+            old_active = next((r for r in rows if r.status == S.ACTIVE), None)
+            set_active(target, user, note)  # refreshes target, so old_active is read first
+            _event(target, "rollback", user, note)
+            picked[:] = [target, old_active]
+
+    _retry(run)
+    return tuple(picked) or None
+
+
+def revert_rollback(target, old_active, user=None, note=""):
+    """Undo rollback_to_previous: a swap back, only if both rows are where it left them."""
+    S = ModelVersion.Status
+
+    def run():
+        with transaction.atomic():
+            rows = {r.pk: r for r in ModelVersion.objects.select_for_update().order_by("pk").filter(
+                pk__in=(target.pk, old_active.pk))}
+            if (getattr(rows.get(target.pk), "status", None) != S.ACTIVE
+                    or getattr(rows.get(old_active.pk), "status", None) != S.PREVIOUS):
+                logger.warning("ai_model rollback not reverted: the registry moved meanwhile")
+                return False
+            set_active(old_active, user, note)
+            _event(old_active, "rollback_reverted", user, note)
+            return True
+
+    return _retry(run)
+
+
+def extend_shadow(version, days, user=None, note=""):
+    """Raise the shadow's minimum period (shadow_min_days); it never goes down."""
+    with transaction.atomic():
+        locked = _lock(version)
+        if locked.status != ModelVersion.Status.SHADOW:
+            raise RegistryError(f"cannot extend a {locked.status} version")
+        if (not isinstance(days, int) or isinstance(days, bool)
+                or not locked.shadow_min_days < days <= MAX_SHADOW_MIN_DAYS):
+            raise RegistryError(f"days must be above {locked.shadow_min_days} and at most {MAX_SHADOW_MIN_DAYS}")
+        locked.shadow_min_days = days
+        locked.save(update_fields=["shadow_min_days"])
+        _event(locked, "extend", user, f"{days} days" + (f": {note}" if note else ""))
     version.refresh_from_db()
     return version
 

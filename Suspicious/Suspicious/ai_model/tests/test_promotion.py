@@ -32,9 +32,10 @@ def result(version, case=None, origin="live", flip="none", would_be="Safe"):
         confidence=90, flip=flip, would_be_result=would_be)
 
 
-def effect(version, case=None, kind="none", days_ago=0):
+def effect(version, case=None, kind="none", days_ago=0, base=None):
     row = ShadowCampaignEffect.objects.create(case=case or make_case(), version=version, effect=kind)
-    ShadowCampaignEffect.objects.filter(pk=row.pk).update(created_at=timezone.now() - timedelta(days=days_ago))
+    at = (base or timezone.now()) - timedelta(days=days_ago)
+    ShadowCampaignEffect.objects.filter(pk=row.pk).update(created_at=at)
     return row
 
 
@@ -77,7 +78,7 @@ class ConditionsTest(PromotionBase):
 
     def test_not_shadow(self):
         registry.discard(self.v1)
-        self.assertIn("not_shadow", self.unmet())
+        self.assertEqual(self.unmet(), ["not_shadow"])
 
     def test_too_young_and_extend_raises_the_minimum(self):
         self.age(6)
@@ -139,6 +140,15 @@ class ConditionsTest(PromotionBase):
         self.recheck(days_ago=2)
         self.assertEqual(self.unmet(), [])
 
+    def test_a_naive_or_unparsable_recheck_time_is_missing(self):
+        naive = (timezone.now() - timedelta(days=1)).replace(tzinfo=None).isoformat()
+        ModelVersion.objects.filter(pk=self.v1.pk).update(
+            recheck={"job_id": "r", "passed": True, "finished_at": naive})
+        self.assertEqual(self.unmet(), ["recheck_missing"])
+        ModelVersion.objects.filter(pk=self.v1.pk).update(
+            recheck={"job_id": "r", "passed": True, "finished_at": "yesterday"})
+        self.assertEqual(self.unmet(), ["recheck_missing"])
+
     def test_recheck_before_the_minimum_was_met_does_not_count(self):
         self.age(10)
         promotion.extend(self.v1, 9, self.admin, "")
@@ -151,10 +161,11 @@ class ConditionsTest(PromotionBase):
         ModelVersion.objects.filter(pk=self.v1.pk).update(
             campaign_profile=dict(self.v0.campaign_profile, distance_threshold=0.99))
         self.assertEqual(self.unmet(), ["profile_window"])
-        effect(self.v1, days_ago=14)
-        effect(self.v1, days_ago=0)
+        base = timezone.now()
+        effect(self.v1, days_ago=0, base=base)
+        effect(self.v1, days_ago=14.99, base=base)  # 15 calendar dates, under 15 days
         self.assertEqual(self.unmet(), ["profile_window"])
-        effect(self.v1, days_ago=15)
+        effect(self.v1, days_ago=15, base=base)
         self.assertEqual(self.unmet(), [])
 
     def test_job_running(self):
@@ -189,6 +200,13 @@ class ReviewTest(PromotionBase):
             promotion.review(self.v1, "other", flip.case_id, self.admin, "")
         self.assertEqual(ShadowReview.objects.count(), 2)
 
+    def test_a_review_of_a_version_that_is_not_the_shadow_is_refused(self):
+        flip = result(self.v1, flip="critical", would_be="Dangerous")
+        registry.discard(self.v1)
+        with self.assertRaises(RegistryError):
+            promotion.review(self.v1, "flip", flip.case_id, self.admin, "")
+        self.assertFalse(ShadowReview.objects.exists())
+
     def test_a_review_of_an_item_that_went_away_does_not_count(self):
         flip = result(self.v1, flip="critical", would_be="Dangerous")
         promotion.review(self.v1, "flip", flip.case_id, self.admin, "")
@@ -220,7 +238,7 @@ class ActionsTest(PromotionBase):
         self.assertEqual(ctx.exception.codes, ["job_running"])
 
     def test_promote(self):
-        with mock.patch(SYNC, return_value=True) as sync, self.captureOnCommitCallbacks(execute=True):
+        with mock.patch(SYNC, return_value=True) as sync:
             promotion.promote(self.v1, self.admin, "go")
         sync.assert_called_once_with()
         self.v1.refresh_from_db()
@@ -244,6 +262,46 @@ class ActionsTest(PromotionBase):
         self.assertEqual(old_prev.status, S.PREVIOUS)
         acts = self.actions(self.v1)
         self.assertLess(acts.index("promote"), acts.index("promote_reverted"))
+
+    def test_promote_revert_when_a_new_shadow_appeared_keeps_going_and_reraises(self):
+        v2 = cand("v2", manifest={"eligible": True})
+
+        def refuse():
+            with self.captureOnCommitCallbacks(execute=False):
+                registry.set_shadow(v2)
+            raise ReloadRefused("no")
+
+        with mock.patch(SYNC, side_effect=refuse), self.assertRaises(ReloadRefused):
+            promotion.promote(self.v1, self.admin, "go")
+        for v in (self.v1, self.v0, v2):
+            v.refresh_from_db()
+        self.assertEqual((self.v1.status, self.v1.shadow_slot, self.v1.active_slot), (S.CANDIDATE, None, None))
+        self.assertEqual((self.v0.status, v2.status), (S.ACTIVE, S.SHADOW))
+        self.assertIn("promote_reverted", self.actions(self.v1))
+        self.assertIn("promote_reverted", self.actions(self.v0))
+
+    def test_promote_revert_does_nothing_if_a_row_moved(self):
+        def refuse():
+            registry.set_active(self.v0)  # v0 active again, v1 previous
+            raise ReloadRefused("no")
+
+        with self.assertLogs("ai_model.registry", "WARNING") as logs, mock.patch(SYNC, side_effect=refuse), \
+                self.assertRaises(ReloadRefused):
+            promotion.promote(self.v1, self.admin, "go")
+        self.assertIn("moved meanwhile", logs.output[0])
+        self.v1.refresh_from_db()
+        self.assertEqual(self.v1.status, S.PREVIOUS)
+        self.assertFalse(ModelEvent.objects.filter(action="promote_reverted").exists())
+
+    def test_a_failing_revert_never_masks_the_refusal(self):
+        with mock.patch(SYNC, side_effect=ReloadRefused("no")), \
+                mock.patch("ai_model.registry.revert_promote", side_effect=RegistryError("x")), \
+                self.assertRaises(ReloadRefused):
+            promotion.promote(self.v1, self.admin, "go")
+        with mock.patch(SYNC, side_effect=ReloadRefused("no")), \
+                mock.patch("ai_model.registry.revert_rollback", side_effect=RegistryError("x")), \
+                self.assertRaises(ReloadRefused):
+            promotion.rollback(self.admin, "")
 
     def test_promote_then_transient_sync_failure_keeps_the_new_active(self):
         with mock.patch(SYNC, return_value=False):
@@ -290,9 +348,32 @@ class ActionsTest(PromotionBase):
         self.assertIn("rollback_reverted", self.actions(self.v1))
 
     def test_rollback_needs_a_previous(self):
-        with mock.patch(SYNC) as sync, self.assertRaises(RegistryError):
+        with mock.patch(SYNC) as sync, self.assertRaises(PromotionRefused) as ctx:
             promotion.rollback(self.admin, "")
+        self.assertEqual(ctx.exception.codes, ["no_previous"])
         sync.assert_not_called()
+
+    def test_rollback_never_activates_a_previous_that_was_discarded(self):
+        with mock.patch(SYNC, return_value=True):
+            promotion.promote(self.v1, self.admin, "go")
+        registry.discard(self.v0)  # what a concurrent promote does to the old previous
+        with mock.patch(SYNC) as sync, self.assertRaises(PromotionRefused) as ctx:
+            promotion.rollback(self.admin, "")
+        self.assertEqual(ctx.exception.codes, ["no_previous"])
+        sync.assert_not_called()
+        self.v0.refresh_from_db()
+        self.v1.refresh_from_db()
+        self.assertEqual((self.v0.status, self.v1.status), (S.DISCARDED, S.ACTIVE))
+
+    def test_rollback_picks_its_target_under_the_lock(self):
+        with mock.patch(SYNC, return_value=True):
+            promotion.promote(self.v1, self.admin, "go")
+        real = ModelVersion.objects.select_for_update
+        with mock.patch.object(ModelVersion.objects, "select_for_update", side_effect=real) as sfu, \
+                mock.patch.object(ModelVersion.objects, "filter", side_effect=AssertionError("unlocked")), \
+                mock.patch(SYNC, return_value=True):
+            promotion.rollback(self.admin, "")
+        self.assertGreaterEqual(sfu.call_count, 2)  # the target pick, then set_active
 
     def test_discard_keeps_results_for_audit(self):
         registry.discard(self.v1)
