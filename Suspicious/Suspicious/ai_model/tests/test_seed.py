@@ -1,12 +1,15 @@
 """Ruling F8: seeding the shadow's classes for the mails already in the live collection."""
 from unittest import mock
 
+from celery.exceptions import SoftTimeLimitExceeded
 from django.test import TestCase
 
 from ai_model import registry, tasks
 from ai_model.models import ShadowResult
 from ai_model.tests.test_registry import cand
 from ai_model.tests.test_shadow_result import answer
+from connectors.contrib.ai_model.client import ShadowNotLoaded
+from connectors.providers import ProviderUnavailable
 from connectors.contrib.ai_model.tests.test_campaigns import _case
 
 SECRET = "mail text never logged"
@@ -37,7 +40,7 @@ class SeedShadowTest(TestCase):
         self.cases = [_case() for _ in range(30)]
         ids = [f"case-{c.id}" for c in self.cases] + ["case-999999", "2611-abc"]
         self.coll, self.client = PagedCollection(ids), FakeClient()
-        chroma = mock.MagicMock()
+        self.chroma = chroma = mock.MagicMock()
         chroma.get_or_create_collection.return_value = self.coll
         connector = mock.MagicMock()
         connector._client.return_value = self.client
@@ -101,3 +104,73 @@ class SeedShadowTest(TestCase):
             registry.discard(self.version)
             registry.set_shadow(cand("s2", manifest={"eligible": True}))
         delay.assert_called_once_with("s2")
+
+    def paused_at(self, requeue, offset):
+        requeue.assert_called_once_with(("s1", offset), countdown=tasks.SEED_RETRY_SECONDS)
+
+    def test_a_live_row_written_during_the_classify_is_kept(self):
+        def racing(text, exclude_case_ids=None, versions=("active",)):
+            if not ShadowResult.objects.exists():  # the live path stores the first case meanwhile
+                ShadowResult.objects.create(case=self.cases[0], version=self.version, result="SAFE",
+                                            score=1, confidence=90, would_be_result="Safe")
+            return {"results": {"shadow": answer("s1", "DANGEROUS")}}
+
+        self.client.classify = racing
+        self.seed()
+        live = ShadowResult.objects.get(case=self.cases[0])
+        self.assertEqual((live.origin, live.result, live.would_be_result), ("live", "SAFE", "Safe"))
+        self.assertEqual(ShadowResult.objects.filter(origin="seed").count(), 29)
+
+    def test_a_chroma_error_while_paging_pauses_at_the_same_offset(self):
+        self.coll.get = mock.Mock(side_effect=ConnectionError(SECRET))
+        with self.assertLogs("ai_model.tasks", "WARNING") as logs:
+            requeue = self.seed(25)
+        self.paused_at(requeue, 25)
+        self.assertNotIn(SECRET, "\n".join(logs.output))
+
+    def test_a_collection_that_cannot_be_opened_pauses(self):
+        self.chroma.get_or_create_collection.side_effect = ConnectionError(SECRET)
+        self.paused_at(self.seed(), 0)
+
+    def test_a_retryable_server_failure_pauses_at_the_chunk_start(self):
+        self.client.classify = mock.Mock(side_effect=ProviderUnavailable("HTTP 503"))
+        self.paused_at(self.seed(), 0)
+
+    def test_a_shadow_unloaded_on_the_server_pauses_instead_of_skipping(self):
+        self.client.classify = mock.Mock(side_effect=ShadowNotLoaded("HTTP 409"))
+        requeue = self.seed()
+        self.paused_at(requeue, 0)
+        self.assertEqual(self.client.classify.call_count, 1)
+
+    def test_a_non_retryable_failure_skips_the_mail_not_the_run(self):
+        self.client.classify = mock.Mock(side_effect=ProviderUnavailable("HTTP 401", retryable=False))
+        with self.assertLogs("ai_model.tasks", "WARNING") as logs:
+            requeue = self.seed()
+        requeue.assert_not_called()
+        self.assertEqual(self.client.classify.call_count, 30)
+        self.assertIn("ProviderUnavailable", "\n".join(logs.output))
+
+    def test_the_soft_time_limit_requeues_at_the_current_offset(self):
+        calls = []
+
+        def slow(text, exclude_case_ids=None, versions=("active",)):
+            calls.append(text)
+            if len(calls) == 27:
+                raise SoftTimeLimitExceeded()
+            return {"results": {"shadow": answer("s1", "DANGEROUS")}}
+
+        self.client.classify = slow
+        requeue = self.seed()
+        requeue.assert_called_once_with(("s1", 25))
+
+    def test_a_discard_between_chunks_stops_the_run(self):
+        def discard_then_answer(text, exclude_case_ids=None, versions=("active",)):
+            self.version.refresh_from_db()
+            if self.version.status == "shadow":
+                registry.discard(self.version)
+            return {"results": {"shadow": answer("s1", "DANGEROUS")}}
+
+        self.client.classify = discard_then_answer
+        requeue = self.seed()
+        requeue.assert_not_called()
+        self.assertEqual(self.coll.pages, [(0, 25)])

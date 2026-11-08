@@ -32,6 +32,11 @@ class ServerBusy(Exception):
     """409: another training job or reload is running on the server."""
 
 
+class ShadowNotLoaded(ValueError):
+    """409 on a ["shadow"]-only classify: the server holds no shadow (restarted, not synced yet).
+    A ValueError, so callers that treat a refusal as "this mail only" keep working."""
+
+
 class TrainJobGone(Exception):
     """GET /v2/train/{job_id} answered 404: the server does not know the job (restarted, evicted)."""
 
@@ -79,7 +84,8 @@ class AiInferenceClient:
         payload = {"mail_body": mail_body, "versions": list(versions)}
         if exclude_case_ids:
             payload["exclude_case_ids"] = list(exclude_case_ids)
-        return self._post(_MODEL_PATH + "/classify", payload)
+        special = {409: ShadowNotLoaded} if list(versions) == ["shadow"] else None
+        return self._post(_MODEL_PATH + "/classify", payload, special=special)
 
     def metadata(self) -> dict:
         """GET /v2/models/ai_mail: {"name", "versions": {"active": {"id", ...}, "shadow"?: {...}}}."""

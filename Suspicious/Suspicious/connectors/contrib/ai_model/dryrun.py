@@ -66,9 +66,11 @@ def dry_run_campaign(case, shadow_result, assessment, headers, profile, collecti
     )
     if not docs:
         return _record(case, version, E.NONE)
-    member_ids = list(dict.fromkeys([*_case_ids(docs), case.id]))
-    # The campaign live detection would pick: the one most of the members are in.
-    known = Counter(CampaignMember.objects.filter(case_id__in=member_ids).values_list("campaign_id", flat=True))
+    neighbours = _case_ids(docs)
+    member_ids = list(dict.fromkeys([*neighbours, case.id]))
+    # The campaign live detection would pick: the one most of the members are in. Neighbours only:
+    # the live task may already have placed the case itself.
+    known = Counter(CampaignMember.objects.filter(case_id__in=neighbours).values_list("campaign_id", flat=True))
     if not known:
         return _record(case, version, E.WOULD_CREATE, member_ids)
     return _record(case, version, E.WOULD_JOIN, member_ids, min(known, key=lambda cid: (-known[cid], cid)))

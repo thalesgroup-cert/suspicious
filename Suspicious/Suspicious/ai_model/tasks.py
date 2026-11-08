@@ -1,6 +1,7 @@
 """Celery tasks of the retrain (ai_model.retrain). Short tasks only: training runs in the inference
 server, so no task outlives the broker's visibility timeout."""
 import logging
+from collections import Counter
 from time import monotonic  # module-level so tests can patch the clock
 
 from celery import shared_task
@@ -74,12 +75,20 @@ def sync_server() -> None:
 @shared_task(soft_time_limit=SEED_BUDGET_SECONDS + 600, time_limit=SEED_BUDGET_SECONDS + 660)
 def seed_shadow(version_id: str, offset: int = 0) -> None:
     """Ruling F8: classify the live collection's documents with the shadow and store origin="seed"
-    ShadowResult rows. Pages the collection SEED_CHUNK documents at a time from ``offset`` and
-    queues itself again with the next offset once SEED_BUDGET_SECONDS are spent. A document
-    without a case-<id> id or whose case is gone is skipped, so is a case that already has a row
-    of this version (a rerun classifies nothing twice and never overwrites a live row). A no-op
-    once the version is no longer the shadow. No document text is logged."""
-    from connectors.contrib.ai_model.campaigns import CampaignStoreUnavailable, open_collection
+    ShadowResult rows (insert only: a live row is never touched). Pages the collection SEED_CHUNK
+    documents at a time from ``offset`` and queues itself again with the next offset once
+    SEED_BUDGET_SECONDS are spent or the soft time limit fires. Stops when the version is no
+    longer the shadow (checked before every chunk). A document without a case-<id> id, whose case
+    is gone or which already has a row of this version is skipped, so a rerun classifies nothing
+    twice; so is one the server refuses (4xx, garbage answer, non-retryable failure). The store
+    or the server being away, or the server not holding the shadow (409), pauses the run: it is
+    queued again at the chunk start after SEED_RETRY_SECONDS, and that run syncs the server first.
+    Only exception class names are logged, never document text."""
+    from celery.exceptions import SoftTimeLimitExceeded
+    from connectors.contrib.ai_model.campaigns import (
+        CampaignStoreUnavailable, _store_unavailable, open_collection,
+    )
+    from connectors.contrib.ai_model.client import ShadowNotLoaded
     from connectors.providers import ProviderUnavailable
     from connectors.registry import registry
 
@@ -87,10 +96,13 @@ def seed_shadow(version_id: str, offset: int = 0) -> None:
     from ai_model.campaign_profile import current_profile
     from ai_model.models import ModelVersion
 
-    version = ModelVersion.objects.filter(version_id=version_id, status=ModelVersion.Status.SHADOW).first()
+    def still_shadow():
+        return ModelVersion.objects.filter(version_id=version_id, status=ModelVersion.Status.SHADOW).first()
+
+    version = still_shadow()
     if version is None or not ledger.enabled():
         return
-    started = monotonic()
+    started, skipped = monotonic(), Counter()
     try:
         client = registry.instantiate("ai_model")._client()
         # The server must hold the shadow before ["shadow"] answers (409 otherwise).
@@ -98,42 +110,63 @@ def seed_shadow(version_id: str, offset: int = 0) -> None:
             raise ProviderUnavailable("registry and server differ")
         collection = open_collection(current_profile())
         while monotonic() - started < SEED_BUDGET_SECONDS:
-            page = collection.get(limit=SEED_CHUNK, offset=offset, include=["documents"])
+            if still_shadow() is None:
+                return
+            with _store_unavailable("campaign store unavailable"):
+                page = collection.get(limit=SEED_CHUNK, offset=offset, include=["documents"])
             ids = page.get("ids") or []
             for doc_id, text in zip(ids, page.get("documents") or []):
-                _seed_one(version, doc_id, text, client)
+                failure = _seed_one(version, doc_id, text, client)
+                if failure:
+                    skipped[failure] += 1
             offset += len(ids)
             if len(ids) < SEED_CHUNK:
                 logger.info("Shadow %s seeded up to offset %d.", version_id, offset)
                 return
         seed_shadow.apply_async((version_id, offset))
-    except (ValueError, serversync.ReloadRefused) as exc:  # token/url missing or reload refused
-        logger.warning("Shadow seeding of %s stopped: %s", version_id, type(exc).__name__)
-    except (ProviderUnavailable, CampaignStoreUnavailable) as exc:
+    except SoftTimeLimitExceeded:
+        logger.warning("Shadow seeding of %s hit its time limit at %d, requeued.", version_id, offset)
+        seed_shadow.apply_async((version_id, offset))
+    except (ProviderUnavailable, CampaignStoreUnavailable, ShadowNotLoaded) as exc:
         if isinstance(exc, ProviderUnavailable) and not exc.retryable:
             logger.warning("Shadow seeding of %s stopped: %s", version_id, type(exc).__name__)
             return
         logger.warning("Shadow seeding of %s paused at %d (%s).", version_id, offset, type(exc).__name__)
         seed_shadow.apply_async((version_id, offset), countdown=SEED_RETRY_SECONDS)
+    except (ValueError, serversync.ReloadRefused) as exc:  # token/url missing or reload refused
+        logger.warning("Shadow seeding of %s stopped: %s", version_id, type(exc).__name__)
+    finally:
+        if skipped:
+            logger.warning("Shadow seeding of %s skipped mails: %s", version_id, dict(skipped))
 
 
-def _seed_one(version, doc_id, text, client) -> None:
-    """One document; a refused mail or a malformed answer skips it. ProviderUnavailable propagates
-    (the run pauses)."""
+def _seed_one(version, doc_id, text, client) -> str | None:
+    """One document; the exception class name when the mail was skipped on a failure. A refusal,
+    a malformed answer or a non-retryable failure skips it; a retryable ProviderUnavailable and
+    ShadowNotLoaded propagate (the run pauses)."""
     from case_handler.models import Case
+    from connectors.contrib.ai_model.client import ShadowNotLoaded
+    from connectors.providers import ProviderUnavailable
 
     from ai_model.models import ShadowResult
     from ai_model.shadow import store_shadow_result
 
     prefix, _, raw = str(doc_id).partition("-")
     if prefix != "case" or not raw.isdigit() or not text:
-        return
+        return None
     case = Case.objects.filter(pk=int(raw)).first()
     if case is None or ShadowResult.objects.filter(case=case, version=version).exists():
-        return
+        return None
     try:
         answer = client.classify(text, versions=("shadow",))["results"]["shadow"]
         if "error" not in answer:
             store_shadow_result(case, answer, origin=ShadowResult.Origin.SEED)
+    except ShadowNotLoaded:
+        raise
+    except ProviderUnavailable as exc:
+        if exc.retryable:
+            raise
+        return type(exc).__name__
     except (ValueError, KeyError, TypeError) as exc:  # refused (4xx) or garbage: this mail only
-        logger.warning("Shadow seeding skipped case %s: %s", case.id, type(exc).__name__)
+        return type(exc).__name__
+    return None

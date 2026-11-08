@@ -1,6 +1,8 @@
 """Store the shadow model's answer for a case. Nothing here touches the live verdict."""
 from __future__ import annotations
 
+from django.db import IntegrityError, transaction
+
 from ai_model.models import AiAssessment, ModelVersion, ShadowResult
 from case_handler.models import Result
 from score_process.scoring.engine import AiSignal, score_case
@@ -15,7 +17,7 @@ def store_shadow_result(case, payload: dict, origin=ShadowResult.Origin.LIVE):
     if version is None:
         return None
     sub_class = str(payload["sub_class"])
-    row, _ = ShadowResult.objects.update_or_create(case=case, version=version, defaults={
+    fields = {
         "origin": origin,
         "result": payload["class"],
         "sub_class": sub_class[:ShadowResult._meta.get_field("sub_class").max_length],
@@ -23,7 +25,15 @@ def store_shadow_result(case, payload: dict, origin=ShadowResult.Origin.LIVE):
         "confidence": min(round(float(payload["confidence"]) * 100), 100),
         "probabilities": payload["probabilities"],
         "tier": payload.get("tier") or "",
-    })
+    }
+    if origin == ShadowResult.Origin.SEED:
+        # Insert only: a row already there (a live answer stored meanwhile) is never touched.
+        try:
+            with transaction.atomic():
+                return ShadowResult.objects.create(case=case, version=version, **fields)
+        except IntegrityError:
+            return None
+    row, _ = ShadowResult.objects.update_or_create(case=case, version=version, defaults=fields)
     return row
 
 

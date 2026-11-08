@@ -45,6 +45,17 @@ class ClassifyTest(SimpleTestCase):
         client.classify("hello", versions=("active", "shadow"))
         self.assertEqual(client.session.post.call_args.kwargs["json"]["versions"], ["active", "shadow"])
 
+    def test_a_409_for_the_shadow_alone_is_shadow_not_loaded(self):
+        from connectors.contrib.ai_model.client import ShadowNotLoaded
+
+        client = client_with(post=mock.Mock(return_value=reply(409, {"detail": "no shadow"})))
+        with self.assertRaises(ShadowNotLoaded) as raised:
+            client.classify("hello", versions=("shadow",))
+        self.assertIsInstance(raised.exception, ValueError)  # callers catching ValueError still do
+        with self.assertRaises(ValueError) as raised:
+            client.classify("hello", versions=("active", "shadow"))
+        self.assertNotIsInstance(raised.exception, ShadowNotLoaded)
+
     def test_metadata_gets_the_model_path(self):
         client = client_with(get=mock.Mock(return_value=reply(200, {"versions": {}})))
         self.assertEqual(client.metadata(), {"versions": {}})

@@ -83,6 +83,14 @@ class DryRunTest(TestCase):
         self.assertEqual((row.effect, row.live_campaign), (E.WOULD_JOIN, campaign))
         self.assertEqual(set(row.member_case_ids), {c.id for c in old} | {row.case_id})
 
+    def test_the_case_already_placed_live_does_not_turn_create_into_join(self):
+        old = [self.neighbour() for _ in range(3)]
+        case = _case()
+        CampaignMember.objects.create(campaign=Campaign.objects.create(title="x"), case=case)
+        row = self.dry(case)
+        self.assertEqual((row.effect, row.live_campaign), (E.WOULD_CREATE, None))
+        self.assertEqual(set(row.member_case_ids), {c.id for c in old} | {case.id})
+
     def test_a_case_the_candidate_calls_safe_is_not_checked(self):
         [self.neighbour() for _ in range(3)]
         self.assertEqual(self.dry(result="SAFE").effect, E.NO_CHECK)
@@ -192,6 +200,13 @@ class HookTest(TestCase):
                 mock.patch("connectors.contrib.ai_model.connector.run_shadow_campaign") as shadow:
             self.connector.on_case_finalised(self.event)
         return live, shadow
+
+    def test_a_failing_shadow_lookup_leaves_the_live_hook_as_before(self):
+        with mock.patch("connectors.contrib.ai_model.connector.ModelVersion.objects.filter",
+                        side_effect=RuntimeError("db")), self.assertLogs("connectors.contrib.ai_model", "WARNING"):
+            live, shadow = self.hook()
+        live.delay.assert_called_once_with(self.case.id)
+        shadow.delay.assert_not_called()
 
     def test_queued_only_when_a_shadow_exists(self):
         live, shadow = self.hook()
