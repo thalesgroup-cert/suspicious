@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Box, Button, CircularProgress, IconButton, Stack, Switch, Typography } from "@mui/material";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link as RouterLink } from "react-router";
+import { Box, Button, CircularProgress, IconButton, Link, Stack, Switch, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import CheckCircle from "@mui/icons-material/CheckCircle";
 import CloseOutlined from "@mui/icons-material/CloseOutlined";
@@ -8,6 +9,7 @@ import ErrorOutlined from "@mui/icons-material/ErrorOutlined";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import { useSnackbar } from "notistack";
 
+import { getMe, type Me } from "@/api/auth";
 import { relativeTime } from "@/features/settings/connectorConfig";
 import { cleanDescription } from "@/features/settings/labels";
 import { useAccent } from "@/features/settings/useAccent";
@@ -61,6 +63,11 @@ export function ConnectorTile({
     onError: () => enqueueSnackbar("Failed to update connector.", { variant: "error" }),
   });
 
+  // Only the ai_model tile needs the user's groups (the card is Admin-only); same key as the Settings page.
+  const isAiModel = name === "ai_model";
+  const me = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false, enabled: isAiModel }).data;
+  const isAdmin = me?.groups?.includes("Admin") ?? false;
+
   const description = cleanDescription(connector.description ?? "");
   const since = relativeTime(connector.last_health_at, new Date());
   const border = theme.palette.divider;
@@ -102,6 +109,16 @@ export function ConnectorTile({
           <Typography variant="body2" sx={{ ...CLAMP, color: muted, lineHeight: 1.5, minHeight: "3em" }}>
             {description}
           </Typography>
+          {isAiModel && (
+            <Typography variant="body2" sx={{ color: muted }}>
+              Models, retraining and shadow are managed in the{" "}
+              {isAdmin ? (
+                <Link component={RouterLink} to="/settings/ai_model">AI model card</Link>
+              ) : (
+                "AI model card"
+              )}
+            </Typography>
+          )}
           <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", columnGap: 1, flexWrap: "wrap" }}>
             <StatusLabel size="small" tone={status.tone} label={status.label} />
             {since !== "not checked yet" && (
