@@ -268,6 +268,23 @@ class AiModelApiTest(APITestCase):
         self.assertEqual((effects["count"], len(effects["results"])), (3, 1))
         self.assertTrue(effects["results"][0]["reviewable"])
 
+    def test_bad_paging_params_stay_bounded(self):
+        v = self.shadow()
+        for _ in range(105):
+            self.flip(v)
+            ShadowCampaignEffect.objects.create(case=self.case(), version=v, effect="would_join")
+        for q in ("flips_limit=-1&flips_offset=abc", "candidate_only_limit=99999", "effects_offset=1000000000",
+                  "flips_limit=99999&effects_limit=99999"):
+            r = self.client.get(BASE + "shadow/?" + q)
+            self.assertEqual(r.status_code, 200, q)
+            body = r.json()
+            for rows in (body["flips"], body["campaign_effects"], body["alert_delta"]["candidate_only"],
+                         body["alert_delta"]["active_only"]):
+                self.assertLessEqual(len(rows["results"]), 100, q)
+        body = self.client.get(BASE + "shadow/?candidate_only_limit=99999").json()
+        self.assertEqual(len(body["alert_delta"]["candidate_only"]["results"]), 100)
+        self.assertEqual(body["alert_delta"]["candidate_only"]["count"], 105)
+
 
 class RecheckApiTest(RetrainBase, APITestCase):
     """The real start_recheck runs; only the inference server and the object store are faked."""

@@ -127,6 +127,23 @@ class ConditionsTest(PromotionBase):
         promotion.review(self.v1, "campaign", in_live.pk, self.admin, "")
         self.assertEqual(self.unmet(), [])
 
+    def test_a_snapshot_gives_the_same_codes(self):
+        flips = [result(self.v1, flip="critical", would_be="Dangerous") for _ in range(2)]
+        effect(self.v1, kind="would_join")
+        for state in ("unreviewed", "partly reviewed"):
+            snap = promotion.snapshot(self.v1)
+            codes = promotion.can_promote(self.v1)
+            self.assertEqual(codes, promotion.can_promote(self.v1, snap))
+            self.assertEqual(set(codes), {"unreviewed_flips", "unreviewed_campaigns"}, state)
+            self.assertEqual(promotion.latest_reviews(self.v1), promotion.latest_reviews(self.v1, snap))
+            promotion.review(self.v1, "flip", flips[0].case_id, self.admin, "one")
+            promotion.review(self.v1, "campaign", promotion.alert_delta(self.v1)["candidate_only"][0], self.admin, "c")
+            if state == "unreviewed":
+                flips = flips[1:]  # the second pass: one flip left unreviewed, the campaign reviewed
+                effect(self.v1, kind="would_join")  # and a new unreviewed campaign
+        self.v1.refresh_from_db()
+        self.assertEqual(promotion.can_promote(self.v1), promotion.can_promote(self.v1, promotion.snapshot(self.v1)))
+
     def test_recheck_missing_failed_stale(self):
         ModelVersion.objects.filter(pk=self.v1.pk).update(recheck={})
         self.assertEqual(self.unmet(), ["recheck_missing"])

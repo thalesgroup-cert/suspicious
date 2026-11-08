@@ -115,3 +115,25 @@ class StatsTest(TestCase):
         base = self.v0.created_at
         self.assertFalse(stats.age_warning(self.v0, now=base + timedelta(days=60)))
         self.assertTrue(stats.age_warning(self.v0, now=base + timedelta(days=61)))
+
+    def test_purity_many_keeps_versions_apart_with_overlapping_labels(self):
+        v1 = ModelVersion.objects.create(version_id="s1", status="candidate", trigger="manual")
+        self.labelled(self.v0, "Dangerous", 3)
+        self.labelled(self.v0, "Safe", 7)
+        self.labelled(v1, "Dangerous", 4)
+        shared = CampaignMember.objects.filter(case__ai_assessment__model_version="v0").first().case
+        LabelRecord.objects.create(message_id="m", message_id_hash="h", case=shared, source="analyst_verdict",
+                                   label="Safe", label_class="Safe", trust="verdict")  # relabelled: latest wins
+        many = stats.purity_many([self.v0, v1])
+        self.assertEqual(many["v0"], stats.purity(self.v0))
+        self.assertEqual(many["s1"], stats.purity(v1))
+        self.assertEqual((many["v0"]["labelled"], many["v0"]["warning"]), (10, True))
+        self.assertEqual((many["s1"]["labelled"], many["s1"]["dangerous"], many["s1"]["warning"]), (4, 4, False))
+        self.assertLessEqual(many["v0"]["dangerous"], 3)
+
+    def test_totals_are_zero_for_a_version_without_rows(self):
+        v1 = ModelVersion.objects.create(version_id="s1", status="candidate", trigger="manual")
+        ModelVersionStats.objects.create(version=self.v0, day=timezone.localdate(), scored=5, dangerous=2, created=1)
+        t = stats.totals([self.v0, v1])
+        self.assertEqual(t["s1"], {"scored": 0, "dangerous": 0, "checks": 0, "joined": 0, "alerts": 0, "created": 0})
+        self.assertEqual((t["v0"]["scored"], t["v0"]["dangerous"], t["v0"]["created"]), (5, 2, 1))
