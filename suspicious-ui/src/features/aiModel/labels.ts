@@ -27,7 +27,10 @@ type Conflict = { response?: { status?: number; data?: { detail?: unknown; codes
 
 export function refusalMessage(error: unknown, context: RefusalContext = "action"): string {
   const res = (error as Conflict | null)?.response;
-  if (res?.status !== 409) return "Could not reach the server; nothing was changed.";
+  if (res?.status !== 409) {
+    const detail = res?.data?.detail;
+    return typeof detail === "string" && detail ? detail : "Could not reach the server; nothing was changed.";
+  }
   const codes = Array.isArray(res.data?.codes) ? (res.data.codes as string[]) : [];
   if (codes.length) return codes.map((c) => CODE_TEXT[c] ?? c).join(" ");
   const ctx = CONTEXT_TEXT[context];

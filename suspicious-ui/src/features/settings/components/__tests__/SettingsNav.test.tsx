@@ -29,13 +29,12 @@ describe("SettingsNav unsaved marker", () => {
 
   it("leaves out the sections named in hidden", async () => {
     await page.viewport(1280, 900);
-    const { rerender } = renderWithProviders(
+    renderWithProviders(
       <SettingsNav active="domains_allow" unsaved={unsaved} onNavigate={vi.fn()} hidden={new Set(["ai_model"])} />,
     );
     const nav = screen.getByRole("navigation", { name: "Settings sections" });
     expect(within(nav).queryByRole("link", { name: "AI model" })).toBeNull();
     expect(within(nav).getByRole("link", { name: "Connectors" })).toBeInTheDocument();
-    void rerender;
   });
   it("lists AI model by default", async () => {
     await page.viewport(1280, 900);

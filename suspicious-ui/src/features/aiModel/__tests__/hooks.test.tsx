@@ -80,5 +80,8 @@ describe("labels", () => {
     );
     expect(refusalMessage(conflict({ detail: "x" }), "retrain")).toMatch(/retrain/i);
     expect(refusalMessage(new Error("boom"), "retrain")).toMatch(/could not/i);
+    const e503 = { response: { status: 503, data: { detail: "The shared cache is unavailable; the breaker was not reset." } } };
+    expect(refusalMessage(e503, "breaker")).toBe("The shared cache is unavailable; the breaker was not reset.");
+    expect(refusalMessage({ response: { status: 500, data: {} } }, "breaker")).toMatch(/could not reach/i);
   });
 });

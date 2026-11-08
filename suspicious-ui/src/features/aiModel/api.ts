@@ -52,7 +52,7 @@ export type AiModelStatus = {
 
 export type VersionRow = VersionSummary & {
   stats: Record<string, number>;
-  purity: unknown;
+  purity: { labelled: number; dangerous: number; purity: number | null; warning: boolean };
   age_warning: boolean;
 };
 
@@ -77,7 +77,7 @@ export type CandidateRow = {
 };
 
 export type Agreement = { agree: number; total: number };
-export type SubList<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+export type SubList<T> = { count: number; results: T[] };
 
 export type ShadowDetail = VersionSummary & {
   live_results: number;
