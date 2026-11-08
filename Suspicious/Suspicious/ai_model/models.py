@@ -300,6 +300,36 @@ class ShadowCampaignEffect(models.Model):
                                                name="ai_model_shadow_campaign_case_version")]
 
 
+class ShadowReview(models.Model):
+    """An admin's review of one flip or alert-delta item of a shadow version (ai_model.promotion).
+    Append-only: a second review adds a row, the latest counts.
+    ponytail: a guard on save()/delete() only; QuerySet.update()/delete() and the version's
+    cascade bypass it. A DB trigger is the upgrade if reviews get other writers."""
+
+    class Kind(models.TextChoices):
+        FLIP = "flip"
+        CAMPAIGN = "campaign"
+
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="reviews")
+    kind = models.CharField(max_length=8, choices=Kind.choices)
+    case_id = models.PositiveIntegerField()  # not a FK: the review outlives the case for audit
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                             on_delete=models.SET_NULL, related_name="+")
+    note = models.TextField(blank=True)
+    at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["version", "kind", "case_id"], name="ai_model_review_item")]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("ShadowReview is append-only")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("ShadowReview is append-only")
+
+
 class ModelVersionStats(models.Model):
     """Daily counters of one model version, attributed through the case's assessment (Ruling F10).
     Recomputed by ai_model.stats; never written by the live path."""
