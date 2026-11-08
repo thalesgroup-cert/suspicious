@@ -5,7 +5,8 @@ import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
 import { useAiModelCandidates, useAiModelStatus, useDiscard, useShadowStart } from "../hooks";
 import { refusalMessage } from "../labels";
-import { failedNames, GateTable } from "./GateTable";
+import { failedNames } from "./gateFormat";
+import { GateTable } from "./GateTable";
 
 export function CandidateTab() {
   const list = useAiModelCandidates();
