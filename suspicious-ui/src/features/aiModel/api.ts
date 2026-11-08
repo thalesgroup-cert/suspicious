@@ -51,7 +51,7 @@ export type AiModelStatus = {
 };
 
 export type VersionRow = VersionSummary & {
-  stats: Record<string, number>;
+  stats: { scored: number; dangerous: number; checks: number; created: number; joined: number; alerts: number };
   purity: { labelled: number; dangerous: number; purity: number | null; warning: boolean };
   age_warning: boolean;
 };
