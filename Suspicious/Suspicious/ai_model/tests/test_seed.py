@@ -27,10 +27,11 @@ class PagedCollection:
 
 class FakeClient:
     def __init__(self):
-        self.calls = []
+        self.calls, self.excluded = [], []
 
     def classify(self, text, exclude_case_ids=None, versions=("active",)):
         self.calls.append((text, tuple(versions)))
+        self.excluded.append(exclude_case_ids)
         return {"results": {"shadow": answer("s1", "DANGEROUS")}}
 
 
@@ -67,6 +68,10 @@ class SeedShadowTest(TestCase):
         self.assertEqual(set(rows.values_list("case_id", flat=True)), {c.id for c in self.cases})
         self.assertEqual(set(rows.values_list("origin", "result", "would_be_result")),
                          {("seed", "DANGEROUS", "")})
+
+    def test_each_case_is_left_out_of_its_own_neighbour_vote(self):
+        self.seed()
+        self.assertEqual(self.client.excluded, [[c.id] for c in self.cases])
 
     def test_a_spent_budget_requeues_with_the_new_offset(self):
         with mock.patch.object(tasks, "monotonic", side_effect=[0, 0, tasks.SEED_BUDGET_SECONDS]):

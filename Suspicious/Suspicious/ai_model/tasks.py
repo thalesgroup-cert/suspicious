@@ -158,7 +158,7 @@ def _seed_one(version, doc_id, text, client) -> str | None:
     if case is None or ShadowResult.objects.filter(case=case, version=version).exists():
         return None
     try:
-        answer = client.classify(text, versions=("shadow",))["results"]["shadow"]
+        answer = client.classify(text, exclude_case_ids=[case.id], versions=("shadow",))["results"]["shadow"]
         if "error" not in answer:
             store_shadow_result(case, answer, origin=ShadowResult.Origin.SEED)
     except ShadowNotLoaded:
