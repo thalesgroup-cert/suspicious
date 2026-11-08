@@ -110,7 +110,9 @@ def can_promote(version, snap=None) -> list:
         unmet.append("not_shadow")
     if not version.shadow_since or now < version.shadow_since + timedelta(days=version.shadow_min_days):
         unmet.append("too_young")
-    if ShadowResult.objects.filter(version=version, origin=ShadowResult.Origin.LIVE).count() < SHADOW_MIN_RESULTS:
+    # the population of the flips and the agreement: live rows with a would-be verdict
+    compared = ShadowResult.objects.filter(version=version, origin=ShadowResult.Origin.LIVE).exclude(would_be_result="")
+    if compared.count() < SHADOW_MIN_RESULTS:
         unmet.append("too_few_results")
     snap = snap or snapshot(version)
     reviewed = set(latest_reviews(version, snap))

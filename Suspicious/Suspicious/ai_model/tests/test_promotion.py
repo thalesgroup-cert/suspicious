@@ -100,6 +100,11 @@ class ConditionsTest(PromotionBase):
         result(self.v1, origin="seed")
         self.assertEqual(self.unmet(), ["too_few_results"])
 
+    def test_live_results_without_a_would_be_verdict_do_not_count(self):
+        ShadowResult.objects.filter(version=self.v1).update(would_be_result="")
+        result(self.v1, would_be="Dangerous")
+        self.assertEqual(self.unmet(), ["too_few_results"])
+
     def test_only_critical_flips_need_a_review(self):
         result(self.v1, flip="changed")
         result(self.v1, flip="critical", would_be="")  # no would-be: not a flip
