@@ -2,7 +2,7 @@
 server, so no task outlives the broker's visibility timeout."""
 import logging
 from collections import Counter
-from time import monotonic  # module-level so tests can patch the clock
+from time import monotonic, sleep  # module-level so tests can patch the clock
 
 from celery import shared_task
 
@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 SEED_CHUNK = 25
 SEED_BUDGET_SECONDS = 20 * 60  # Ruling F8; checked between chunks
 SEED_RETRY_SECONDS = 300
+# Pause after each seeding classify: the server's one shadow slot is then free for the live dual
+# calls, which wait up to 1 s for it.
+SEED_PAUSE_SECONDS = 1
 
 
 @shared_task
@@ -158,7 +161,10 @@ def _seed_one(version, doc_id, text, client) -> str | None:
     if case is None or ShadowResult.objects.filter(case=case, version=version).exists():
         return None
     try:
-        answer = client.classify(text, exclude_case_ids=[case.id], versions=("shadow",))["results"]["shadow"]
+        try:
+            answer = client.classify(text, exclude_case_ids=[case.id], versions=("shadow",))["results"]["shadow"]
+        finally:
+            sleep(SEED_PAUSE_SECONDS)
         if "error" not in answer:
             store_shadow_result(case, answer, origin=ShadowResult.Origin.SEED)
     except ShadowNotLoaded:

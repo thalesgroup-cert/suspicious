@@ -50,6 +50,7 @@ class SeedShadowTest(TestCase):
             mock.patch("connectors.registry.registry.instantiate", return_value=connector),
             mock.patch("ai_model.serversync.sync", return_value=True),
             mock.patch("connectors.contrib.ai_model.campaigns.get_chroma_client", return_value=chroma),
+            mock.patch.object(tasks, "SEED_PAUSE_SECONDS", 0),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -72,6 +73,12 @@ class SeedShadowTest(TestCase):
     def test_each_case_is_left_out_of_its_own_neighbour_vote(self):
         self.seed()
         self.assertEqual(self.client.excluded, [[c.id] for c in self.cases])
+
+    def test_pauses_after_each_classify_so_live_shadows_get_the_slot(self):
+        with mock.patch.object(tasks, "SEED_PAUSE_SECONDS", 1), mock.patch.object(tasks, "sleep") as sleep:
+            self.seed()
+        self.assertEqual(sleep.call_args_list, [mock.call(1)] * len(self.client.calls))
+        self.assertEqual(len(self.client.calls), 30)
 
     def test_a_spent_budget_requeues_with_the_new_offset(self):
         with mock.patch.object(tasks, "monotonic", side_effect=[0, 0, tasks.SEED_BUDGET_SECONDS]):
