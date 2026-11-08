@@ -186,4 +186,8 @@ urlpatterns = [
     path("ai-model/recheck/", ai.RecheckView.as_view(), name="ai-model-recheck"),
     path("ai-model/retrain/", ai.RetrainView.as_view(), name="ai-model-retrain"),
     path("ai-model/jobs/", ai.JobsView.as_view(), name="ai-model-jobs"),
+    path("ai-model/ledger/", ai.LedgerView.as_view(), name="ai-model-ledger"),
+    path("ai-model/flags/", ai.FlagsView.as_view(), name="ai-model-flags"),
+    path("ai-model/flags/<int:pk>/resolve/", ai.ResolveFlagView.as_view(), name="ai-model-flag-resolve"),
+    path("ai-model/queue/", ai.QueueView.as_view(), name="ai-model-queue"),
 ]

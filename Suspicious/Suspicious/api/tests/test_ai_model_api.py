@@ -479,3 +479,72 @@ class CandidatesEdgeTest(APITestCase):
         self.assertEqual(ids(""), ["p3", "p2", "p1"])
         self.assertEqual(ids("?limit=1&offset=1"), ["p2"])
         self.assertEqual(self.client.get(BASE + "candidates/?limit=1").json()["count"], 3)
+
+
+class LedgerFlagsQueueApiTest(APITestCase):
+    def setUp(self):
+        self.admin = user("adm3", "Admin")
+        self.ciso = user("ciso3", "CISO")
+        self.client.force_authenticate(self.admin)
+        self.v = cand("lv", manifest={})
+
+    def flagged(self, **kw):
+        from ai_model.models import LabelRecord
+        fields = dict(message_id="SECRET-ID@x", message_id_hash="h", source="imap_folder", label="1_SAFE",
+                      label_class="Safe", trust="folder", status="flagged", flag_reason="folder_verdict_mismatch",
+                      snapshot={"sender_domain": "SECRET.example"})
+        fields.update(kw)
+        return LabelRecord.objects.create(**fields)
+
+    def test_reads_and_writes_permissions(self):
+        row = self.flagged()
+        for path in ("ledger/", "flags/", "queue/"):
+            self.client.force_authenticate(self.ciso)
+            self.assertEqual(self.client.get(BASE + path).status_code, 200, path)
+            self.client.force_authenticate(user("plain" + path[:3]))
+            self.assertEqual(self.client.get(BASE + path).status_code, 403, path)
+        self.client.force_authenticate(self.ciso)
+        self.assertEqual(self.client.post(BASE + f"flags/{row.pk}/resolve/", {"keep": True, "note": "n"},
+                                          format="json").status_code, 403)
+
+    def test_ledger_has_summary_and_mix(self):
+        data = self.client.get(BASE + "ledger/").json()
+        self.assertEqual(set(data), {"by_source", "flagged", "trainable", "mix"})
+        self.assertIsNone(data["mix"]["jump"])
+
+    def test_flags_list_has_no_mail_identity(self):
+        row = self.flagged()
+        self.flagged(status="active")
+        data = self.client.get(BASE + "flags/").json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(set(data["results"][0]),
+                         {"id", "case_id", "label_class", "source", "flag_reason", "observed_at"})
+        self.assertEqual(data["results"][0]["id"], row.pk)
+        self.assertNotIn("SECRET", str(data))
+
+    def test_resolve_keep_and_drop_log_an_event_and_a_second_is_409(self):
+        for keep, status_ in ((True, "active"), (False, "superseded")):
+            row = self.flagged(message_id_hash=f"h{keep}")
+            r = self.client.post(BASE + f"flags/{row.pk}/resolve/", {"keep": keep, "note": "checked"}, format="json")
+            self.assertEqual(r.status_code, 200)
+            row.refresh_from_db()
+            self.assertEqual((row.status, row.resolved_by, row.resolution_note), (status_, self.admin, "checked"))
+            ev = self.v.events.filter(action="flag_resolved").latest("pk")
+            self.assertEqual(ev.user, self.admin)
+            self.assertIn(str(row.pk), ev.note)
+            self.assertIn(str(keep).lower(), ev.note)
+            again = self.client.post(BASE + f"flags/{row.pk}/resolve/", {"keep": keep, "note": "x"}, format="json")
+            self.assertEqual(again.status_code, 409)
+        self.assertEqual(self.v.events.filter(action="flag_resolved").count(), 2)
+
+    def test_resolve_needs_a_note_and_a_known_row(self):
+        row = self.flagged()
+        for body in ({"keep": True}, {"keep": True, "note": " "}, {"note": "n"}):
+            self.assertEqual(self.client.post(BASE + f"flags/{row.pk}/resolve/", body, format="json").status_code, 400)
+        self.assertEqual(self.client.post(BASE + "flags/999999/resolve/", {"keep": True, "note": "n"},
+                                          format="json").status_code, 404)
+
+    def test_queue_shape(self):
+        data = self.client.get(BASE + "queue/").json()
+        self.assertEqual(data, {"disagreements": {"count": 0, "results": []},
+                                "campaign_conflicts": {"count": 0, "results": []}})

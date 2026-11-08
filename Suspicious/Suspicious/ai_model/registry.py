@@ -342,6 +342,15 @@ def retrain_requested(version, user, note):
     _event(version, "retrain_requested", user, note)
 
 
+def flag_resolved(user, note):
+    """A flagged label was resolved (api flag view). Labels belong to no version, so the event goes
+    on the active one (else the newest, else version 0)."""
+    versions = ModelVersion.objects
+    version = (versions.filter(status=ModelVersion.Status.ACTIVE).first()
+               or versions.order_by("-pk").first() or ensure_version_zero(user))
+    _event(version, "flag_resolved", user, note)
+
+
 def review_recorded(version, user, note):
     """A shadow review was appended (promotion.review, inside its transaction)."""
     _event(version, "review", user, note)

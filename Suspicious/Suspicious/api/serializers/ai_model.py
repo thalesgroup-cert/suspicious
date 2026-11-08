@@ -20,6 +20,11 @@ class ReviewSerializer(ActionSerializer):
     note = serializers.CharField(max_length=2000)  # non-empty, trimmed
 
 
+class ResolveSerializer(serializers.Serializer):
+    keep = serializers.BooleanField()
+    note = serializers.CharField(max_length=2000)  # non-empty, trimmed
+
+
 def version_summary(v) -> dict:
     """Whitelist: no manifest, bundle prefix or URL ever leaves the registry."""
     recheck = v.recheck or {}
@@ -74,3 +79,9 @@ def candidate_row(v) -> dict:
     return {"version_id": v.version_id, "status": v.status, "created_at": v.created_at, "trigger": v.trigger,
             "rows": _count(m.get("rows")), "excluded_rows": _count(m.get("excluded_rows")),
             "eligible": m.get("eligible") is True, "gate": gate_view(m)}
+
+
+def flag_row(r) -> dict:
+    """No message id, subject or sender: the case id is the handle."""
+    return {"id": r.pk, "case_id": r.case_id, "label_class": r.label_class, "source": r.source,
+            "flag_reason": r.flag_reason, "observed_at": r.observed_at}

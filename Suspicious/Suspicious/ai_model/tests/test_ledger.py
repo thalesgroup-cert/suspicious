@@ -398,3 +398,8 @@ class LabelMixTest(TestCase):
         self.rows("Safe", 10, 40)
         self.rows("Dangerous", 10, 1)
         self.assertIsNone(ledger.label_mix()["jump"])
+
+    def test_empty_ledger(self):
+        mix = ledger.label_mix()
+        self.assertEqual((mix["now"], mix["before"], mix["jump"]), ({}, {}, None))
+        self.assertEqual(mix["rows"], {"now": 0, "before": 0})

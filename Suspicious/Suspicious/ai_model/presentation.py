@@ -80,6 +80,10 @@ def _members_disagree(labels: dict, ai_result: str) -> bool:
     return (ai == "DANGEROUS" and "Safe" in labels) or (ai == "SAFE" and "Dangerous" in labels)
 
 
+def members_disagree(labels: dict, ai_result: str = "") -> bool:
+    return _members_disagree(labels, ai_result)
+
+
 def _campaign(case, assessment=None, elevated: bool = False):
     membership = getattr(case, "campaign_membership", None)
     if membership is None:

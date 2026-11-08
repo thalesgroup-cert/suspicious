@@ -308,7 +308,7 @@ def label_mix(now=None) -> dict:
     def mix(qs):
         counts = dict(qs.values_list("label_class").annotate(n=Count("id")))
         total = sum(counts.values())
-        return {c: (counts.get(c, 0) / total if total else 0.0) for c in MIX_CLASSES}, total
+        return ({c: counts.get(c, 0) / total for c in MIX_CLASSES} if total else {}), total
 
     now_mix, now_n = mix(rows)
     before_mix, before_n = mix(rows.filter(observed_at__lt=cutoff))

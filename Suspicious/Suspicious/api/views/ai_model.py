@@ -9,13 +9,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ai_model import promotion, registry, retrain, schedule, stats
-from ai_model.ledger import ledger_summary
-from ai_model.models import ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
+from ai_model import promotion, queue, registry, retrain, schedule, stats
+from ai_model.ledger import label_mix, ledger_summary, resolve_flag
+from ai_model.models import LabelRecord, ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
 from ai_model.serversync import ReloadRefused
 from api.permissions.ai_model import IsAdmin, IsAdminOrCISO
-from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ReviewSerializer, candidate_row, job_row,
-                                      version_summary)
+from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ResolveSerializer, ReviewSerializer,
+                                      candidate_row, flag_row, job_row, version_summary)
 from connectors.delivery import get_state
 
 S = ModelVersion.Status
@@ -259,3 +259,44 @@ class JobsView(ListAPIView, Read):
 
     def list(self, request, *args, **kwargs):
         return self.get_paginated_response([job_row(j) for j in self.paginate_queryset(self.get_queryset())])
+
+
+class LedgerView(Read):
+    def get(self, request):
+        return Response({**ledger_summary(), "mix": label_mix()})
+
+
+class FlagsView(ListAPIView, Read):
+    pagination_class = Page
+
+    def get_queryset(self):
+        return LabelRecord.objects.filter(status=LabelRecord.Status.FLAGGED).order_by("-observed_at", "-pk")
+
+    def list(self, request, *args, **kwargs):
+        return self.get_paginated_response([flag_row(r) for r in self.paginate_queryset(self.get_queryset())])
+
+
+class ResolveFlagView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        ser = ResolveSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        keep, note = ser.validated_data["keep"], ser.validated_data["note"]
+        record = LabelRecord.objects.filter(pk=pk).first()
+        if record is None:
+            return Response({"detail": "Unknown label."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            resolve_flag(record, request.user, note, keep=keep)
+        except ValueError:
+            return _refused("The label is not flagged.")
+        registry.flag_resolved(request.user, f"label {record.pk}: keep={str(keep).lower()}: {note}"[:2000])
+        return Response(flag_row(record))
+
+
+class QueueView(Read):
+    def get(self, request):
+        return Response({
+            "disagreements": _paged(queue.disagreements(), request, "disagreements", lambda r: r),
+            "campaign_conflicts": _paged(queue.campaign_conflicts(), request, "conflicts", lambda r: r),
+        })
