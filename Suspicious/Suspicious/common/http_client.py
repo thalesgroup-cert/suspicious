@@ -7,12 +7,17 @@ Shared HTTP client utilities:
   - BREAKERS: per-integration pybreaker.CircuitBreaker registry
   - get_breaker(): look up / create a breaker by integration name
   - RETRY: tenacity retry decorator
+  - breaker_state() / request_reset(): a breaker's state as the processes publish it to the
+    shared Django cache, and a reset every process applies before its next call
 """
 from __future__ import annotations
 
 import logging
+import time
+from datetime import UTC, datetime
 
 import requests
+from django.core.cache import cache
 from requests.adapters import HTTPAdapter
 
 DEFAULT_CONNECT_TIMEOUT: int = 5
@@ -74,11 +79,89 @@ class _LogStateChange(pybreaker.CircuitBreakerListener):
                    cb.name, getattr(old_state, "name", None), new_state.name)
 
 
+# pybreaker state lives in each process (gunicorn worker, celery worker). Each process publishes
+# its state changes to the shared cache (last writer wins) and reads a reset epoch before a call.
+# Neither key has a TTL: the state carries its own "since", and the epoch must outlive any one
+# process. A flushed cache means "unknown" and an epoch restarting from 1 (missed only by a
+# process that last applied epoch 1).
+STATE_KEY = "breaker:{}"
+EPOCH_KEY = "breaker-epoch:{}"
+EPOCH_CHECK_SECONDS = 5  # ponytail: at most one cache read per breaker per 5 s, so a reset lands within that
+_UNKNOWN = {"state": "unknown", "since": None}
+_STATES = (pybreaker.STATE_CLOSED, pybreaker.STATE_OPEN, pybreaker.STATE_HALF_OPEN)
+_publish_failing = False  # log a failing publish once per outage, not per state change
+
+
+class _PublishState(pybreaker.CircuitBreakerListener):
+    """Write {state, since} to the shared cache. Never raises: a cache outage must not break a call."""
+
+    def state_change(self, cb, old_state, new_state):
+        global _publish_failing
+        try:
+            cache.set(STATE_KEY.format(cb.name),
+                      {"state": new_state.name, "since": datetime.now(UTC).isoformat()}, timeout=None)
+            _publish_failing = False
+        except Exception:  # noqa: BLE001 — any cache error
+            if not _publish_failing:
+                _publish_failing = True
+                logger.warning("circuit breaker %s: could not publish its state to the cache", cb.name)
+
+
+class _EpochBreaker(pybreaker.CircuitBreaker):
+    """A breaker that closes itself, once, when an admin moved the reset epoch. ``calling()``
+    goes through ``call()`` so both paths check. The check fails open: no cache, no change."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._epoch = None  # the last epoch this process applied (None: never seen one)
+        self._epoch_checked = float("-inf")
+
+    def _sync_epoch(self):
+        now = time.monotonic()
+        with self._lock:  # the breaker's own RLock: one lock order, and close() re-enters it
+            if now - self._epoch_checked < EPOCH_CHECK_SECONDS:
+                return
+            self._epoch_checked = now
+            try:
+                epoch = cache.get(EPOCH_KEY.format(self.name))
+            except Exception:  # noqa: BLE001 — cache down: the breaker behaves as before
+                return
+            if epoch is None or epoch == self._epoch:
+                return
+            # A process seeing its first epoch with a closed breaker has nothing to undo.
+            if self._epoch is not None or self.current_state != pybreaker.STATE_CLOSED:
+                self.close()
+            self._epoch = epoch
+
+    def call(self, func, *args, **kwargs):
+        self._sync_epoch()
+        return super().call(func, *args, **kwargs)
+
+
 def _new_breaker(name: str) -> pybreaker.CircuitBreaker:
-    return pybreaker.CircuitBreaker(
+    return _EpochBreaker(
         fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT,
-        name=name, listeners=[_LogStateChange()],
+        name=name, listeners=[_LogStateChange(), _PublishState()],
     )
+
+
+def breaker_state(name: str) -> dict:
+    """{state, since} as last published by any process; unknown when absent or the cache fails."""
+    try:
+        value = cache.get(STATE_KEY.format(name))
+    except Exception:  # noqa: BLE001
+        return dict(_UNKNOWN)
+    if not isinstance(value, dict) or value.get("state") not in _STATES:
+        return dict(_UNKNOWN)
+    return {"state": value["state"], "since": value.get("since")}
+
+
+def request_reset(name: str) -> int:
+    """Move the reset epoch for *name* and return it. Cache errors propagate (the caller answers 503)."""
+    key = EPOCH_KEY.format(name)
+    if cache.add(key, 1, timeout=None):
+        return 1
+    return cache.incr(key)
 
 
 BREAKERS: dict[str, pybreaker.CircuitBreaker] = {

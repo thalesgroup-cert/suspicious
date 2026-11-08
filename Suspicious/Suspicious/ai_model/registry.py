@@ -342,13 +342,22 @@ def retrain_requested(version, user, note):
     _event(version, "retrain_requested", user, note)
 
 
-def flag_resolved(user, note):
-    """A flagged label was resolved (api flag view). Labels belong to no version, so the event goes
-    on the active one (else the newest, else version 0)."""
+def _unversioned_event(action, user, note):
+    """An event that belongs to no version goes on the active one (else the newest, else version 0)."""
     versions = ModelVersion.objects
     version = (versions.filter(status=ModelVersion.Status.ACTIVE).first()
                or versions.order_by("-pk").first() or ensure_version_zero(user))
-    _event(version, "flag_resolved", user, note)
+    _event(version, action, user, note)
+
+
+def flag_resolved(user, note):
+    """A flagged label was resolved (api flag view)."""
+    _unversioned_event("flag_resolved", user, note)
+
+
+def record_breaker_reset(user, note):
+    """An admin reset the ai_model circuit breaker (api breaker view)."""
+    _unversioned_event("breaker_reset", user, note)
 
 
 def review_recorded(version, user, note):

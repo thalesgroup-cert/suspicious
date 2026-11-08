@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from rest_framework.test import APITestCase
 
-from ai_model.models import ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
+from ai_model.models import ModelEvent, ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
 from ai_model.registry import set_shadow
 from ai_model.retrain import RetrainRefused
 from ai_model.serversync import ReloadRefused
@@ -598,3 +598,51 @@ class LedgerFlagsQueueApiTest(APITestCase):
         with mock.patch("ai_model.queue.CAP", 2):
             capped = self.client.get(BASE + "queue/").json()
         self.assertEqual((capped["disagreements"]["count"], capped["campaign_conflicts"]["count"]), (2, 2))
+
+
+class BreakerApiTest(APITestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.admin = user("adm5", "Admin")
+        self.client.force_authenticate(self.admin)
+
+    def test_status_shows_the_published_state(self):
+        from django.core.cache import cache
+        cache.set("breaker:ai_model", {"state": "open", "since": "2026-11-08T10:00:00+00:00"})
+        body = self.client.get(BASE + "status/").json()
+        self.assertEqual(body["breaker"], {"state": "open", "since": "2026-11-08T10:00:00+00:00"})
+
+    def test_reset_is_admin_only(self):
+        for u in (user("ciso5", "CISO"), user("cert5", "CERT"), user("plain5"),
+                  U.objects.create_superuser("root5", "r@e.c", "x")):
+            self.client.force_authenticate(u)
+            self.assertEqual(self.client.post(BASE + "breaker/reset/", {}, format="json").status_code, 403)
+        self.client.force_authenticate(None)
+        self.assertIn(self.client.post(BASE + "breaker/reset/", {}, format="json").status_code, (401, 403))
+        self.assertFalse(ModelVersion.objects.exists())
+
+    def test_reset_moves_the_epoch_and_audits_on_v0(self):
+        from django.core.cache import cache
+        r = self.client.post(BASE + "breaker/reset/", {"note": "server back"}, format="json")
+        self.assertEqual(r.status_code, 202)
+        self.assertEqual(r.json(), {"epoch": 1})
+        self.assertEqual(cache.get("breaker-epoch:ai_model"), 1)
+        ev = ModelVersion.objects.get(version_id="v0").events.get(action="breaker_reset")
+        self.assertEqual((ev.user, ev.note), (self.admin, "server back"))
+
+    def test_reset_audits_on_the_active_version(self):
+        v = cand("act5")
+        from ai_model.registry import set_active
+        set_active(v)
+        cand("newer5")
+        self.assertEqual(self.client.post(BASE + "breaker/reset/", {}, format="json").status_code, 202)
+        self.assertEqual(v.events.filter(action="breaker_reset").count(), 1)
+        self.assertFalse(ModelVersion.objects.filter(version_id="v0").exists())
+
+    def test_reset_answers_503_when_the_cache_is_down(self):
+        with mock.patch("common.http_client.cache.add", side_effect=ConnectionError("redis secret detail")):
+            r = self.client.post(BASE + "breaker/reset/", {"note": "n"}, format="json")
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json(), {"detail": "The shared cache is unavailable; the breaker was not reset."})
+        self.assertFalse(ModelEvent.objects.filter(action="breaker_reset").exists())

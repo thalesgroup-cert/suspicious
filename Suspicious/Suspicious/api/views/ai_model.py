@@ -14,6 +14,7 @@ from ai_model import promotion, queue, registry, retrain, schedule, stats
 from ai_model.ledger import label_mix, ledger_summary, resolve_flag
 from ai_model.models import LabelRecord, ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
 from ai_model.serversync import ReloadRefused
+from common.http_client import breaker_state, request_reset
 from api.permissions.ai_model import IsAdmin, IsAdminOrCISO
 from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ResolveSerializer, ReviewSerializer,
                                       candidate_row, flag_row, job_row, version_summary)
@@ -99,7 +100,7 @@ class StatusView(Read):
             "job_running": job is not None, "job_id": job.job_id if job else None,
             "health": {"ok": state.last_health_ok, "detail": state.last_health_detail[:200],
                        "checked_at": state.last_health_at},
-            "breaker": {"state": "unknown", "since": None},  # Task 5 publishes the real state
+            "breaker": breaker_state("ai_model"),
             "schedule": {"enabled": cfg.get("retrain_enabled") is True,
                          "interval_days": retrain.interval_days(cfg),
                          "next_run": schedule.next_run(now, cfg=cfg, running=job, backoff=backoff),
@@ -302,3 +303,29 @@ class QueueView(Read):
             "disagreements": _paged(queue.disagreements(), request, "disagreements", lambda r: r),
             "campaign_conflicts": _paged(queue.campaign_conflicts(), request, "conflicts", lambda r: r),
         })
+
+
+class _CacheDown(Exception):
+    pass
+
+
+class BreakerResetView(APIView):
+    """Move the ai_model breaker's reset epoch; each worker closes its own breaker before its next
+    call. A server that is really down re-opens it after five failures."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        ser = ActionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():  # no epoch move without its event, no event without the move
+                registry.record_breaker_reset(request.user, ser.validated_data["note"])
+                try:
+                    epoch = request_reset("ai_model")
+                except Exception as exc:  # noqa: BLE001 — any cache error; never echo it
+                    raise _CacheDown from exc
+        except _CacheDown:
+            return Response({"detail": "The shared cache is unavailable; the breaker was not reset."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"epoch": epoch}, status=status.HTTP_202_ACCEPTED)

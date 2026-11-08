@@ -190,4 +190,5 @@ urlpatterns = [
     path("ai-model/flags/", ai.FlagsView.as_view(), name="ai-model-flags"),
     path("ai-model/flags/<int:pk>/resolve/", ai.ResolveFlagView.as_view(), name="ai-model-flag-resolve"),
     path("ai-model/queue/", ai.QueueView.as_view(), name="ai-model-queue"),
+    path("ai-model/breaker/reset/", ai.BreakerResetView.as_view(), name="ai-model-breaker-reset"),
 ]
