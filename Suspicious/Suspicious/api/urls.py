@@ -1,6 +1,7 @@
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from api.views import ai_model as ai
 from api.views.auth import LoginView, LogoutView, MeView
 from api.views.campaigns import (
     CampaignClassificationCountsView,
@@ -172,4 +173,14 @@ urlpatterns = [
     path("connectors/<str:name>/config/", ConnectorConfigView.as_view(), name="connector-config"),
     path("connectors/<str:name>/test/", ConnectorTestView.as_view(), name="connector-test"),
     path("connectors/<str:name>/deliveries/", ConnectorDeliveriesView.as_view(), name="connector-deliveries"),
+    path("ai-model/status/", ai.StatusView.as_view(), name="ai-model-status"),
+    path("ai-model/versions/", ai.VersionsView.as_view(), name="ai-model-versions"),
+    path("ai-model/shadow/", ai.ShadowView.as_view(), name="ai-model-shadow"),
+    path("ai-model/shadow/start/", ai.ShadowStartView.as_view(), name="ai-model-shadow-start"),
+    path("ai-model/promote/", ai.PromoteView.as_view(), name="ai-model-promote"),
+    path("ai-model/rollback/", ai.RollbackView.as_view(), name="ai-model-rollback"),
+    path("ai-model/discard/", ai.DiscardView.as_view(), name="ai-model-discard"),
+    path("ai-model/extend/", ai.ExtendView.as_view(), name="ai-model-extend"),
+    path("ai-model/reviews/", ai.ReviewsView.as_view(), name="ai-model-reviews"),
+    path("ai-model/recheck/", ai.RecheckView.as_view(), name="ai-model-recheck"),
 ]
