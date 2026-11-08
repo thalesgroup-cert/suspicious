@@ -645,8 +645,10 @@ runs on its own: no shadow starts and no version is promoted without an admin.
   the one classify call. The server answers the active part first, then scores the shadow under its
   own deadline, `AI_SHADOW_TIMEOUT` seconds (default 8, set in `deployment/.env`; the connector's own
   timeout is 20 s). The response waits for it up to that deadline. `results.shadow` is the answer or
-  `{"error": "<ClassName>"}`: `NoShadow`, `Timeout`, `Busy` (another shadow pass holds the shadow's
-  slot), `Skipped` (the active pass took more than 10 s) or the exception class. A shadow error is
+  `{"error": "<ClassName>"}`: `NoShadow`, `Timeout`, `Busy` (another shadow pass, often the
+  seeding, held the shadow's slot for more than 1 s), `Skipped` (the active pass took longer than
+  18 s minus `AI_SHADOW_TIMEOUT`, so 10 s by default, which keeps the whole call under the
+  connector's 20 s) or the exception class. A shadow error is
   never an HTTP error when `active` was asked. The shadow runs under its own single slot, outside the
   live classify slots, so a slow shadow never makes a live pass wait; on a timeout the worker thread
   keeps running to its end and holds that shadow slot meanwhile. `["shadow"]` alone is used by the
@@ -669,7 +671,9 @@ runs on its own: no shadow starts and no version is promoted without an admin.
   existing row, live or seed, is never touched. They feed the campaign dry run but do not count
   toward the 500 mails. If the server or the vector store is away, or the server does not hold the
   shadow yet, the task pauses and retries after 5 minutes. Each document is classified with its own
-  case left out of the neighbour vote. A run holds one Celery worker for up to about 31 minutes (20
+  case left out of the neighbour vote, and the task pauses 1 s after each classify so that live
+  dual calls can take the shadow slot. Live shadow answers can still be `Busy` while seeding runs,
+  so most live results, the ones that count toward the 500, accumulate after it. A run holds one Celery worker for up to about 31 minutes (20
   minutes of work, a 30-minute soft and a 31-minute hard time limit), so keep the worker's
   concurrency at 4 or more.
 - **Campaign dry run.** On `case_finalised` the connector also queues a dry run for the shadow. It
@@ -694,7 +698,8 @@ It runs after every pointer move, after a shadow start and a discard, and from t
 `ai-model-server-sync` every 300 s, so a restarted server is brought back to the registry state
 within five minutes. `/v2/reload` is all-or-nothing, so a reload refused (4xx) while a shadow is
 wanted is retried once without the shadow: the active pointer never depends on the shadow bundle.
-When that retry succeeds, the shadow gets a `shadow_refused` event (one per run of refusals) and the
+When that retry succeeds, the shadow gets a `shadow_refused` event, unless its latest event is already one (so a refusal
+right after a recovery may go unrecorded), and the
 server runs without it until the bundle loads or an admin discards it. After a shadow start the
 shadow must load: if the server refuses it, the version goes back to `candidate` (`shadow_since`
 cleared, a `shadow_refused` event) and the request fails. A discard syncs best effort: a failure is
@@ -818,13 +823,13 @@ reports. Record the dates and figures in the promotion note. This has not been r
 |---|---|
 | `shadow/start/` answers `409` | the version is not a `candidate`, did not pass the gate, or another version is the shadow (discard it first); or the server refused the bundle, the version is back to `candidate` with a `shadow_refused` event: check the `ai_inference` logs |
 | A `shadow_refused` event on the running shadow | the server refused the shadow bundle on a reload and runs without it; the beat keeps trying. Check the `ai_inference` logs, or discard the shadow |
-| No live results accumulate | the connector is off, the server does not hold the shadow (health says "registry and server differ"; check `GET /v2/models/ai_mail`), or the shadow keeps timing out, is `Busy` or `Skipped` (`results.shadow.error` is logged by class; raise `AI_SHADOW_TIMEOUT`, check the server's load) |
+| No live results accumulate | the connector is off, the server does not hold the shadow (health says "registry and server differ"; check `GET /v2/models/ai_mail`), or the shadow keeps timing out, is `Busy` or `Skipped` (`results.shadow.error` is logged by class). `Busy` is expected while seeding runs: live results accumulate after it. For timeouts, check the server's load or raise `AI_SHADOW_TIMEOUT`; raising it shortens the window in which a slow active pass still gets a shadow (18 s minus the timeout), and above about 15 s slow mails get no shadow (`Skipped`) |
 | `409` on promote with `too_few_results` | seed rows do not count; wait for live mail or extend |
 | `409` on promote with `recheck_stale` | the recheck is older than 7 days or finished before the minimum period was met: run a new one |
 | `409` on promote with `job_running` | a training or recheck job is running; wait for it |
 | "The inference server refused the change; it was reverted" | the reload got a 4xx (bundle hash, encoder change, token); the pointer is back where it was. Check the `ai_inference` logs |
 | Promoted, but the server still answers the old version | a transient reload failure; the registry is right and the beat entry retries every 5 minutes |
-| Seeding stopped | the log line names the class; a paused run requeues itself after 5 minutes, a refused reload or missing token stops it (`ValueError`, `ReloadRefused`) |
+| Seeding stopped or keeps pausing | the log line names the class; a paused run requeues itself after 5 minutes. A missing token or url stops it (`ValueError`). When the server refuses the shadow bundle (a `shadow_refused` event), the sync returns without the shadow and seeding pauses every 5 minutes (`ProviderUnavailable`) until the bundle loads or the shadow is discarded |
 | Engine replay prints few cases | the skipped reasons name the exception classes (`NoMailText`, `ShadowRefused`, ...) |
 | Counters look low | they are rebuilt daily for the last three days; `campaign_checks` is a proxy |
 
