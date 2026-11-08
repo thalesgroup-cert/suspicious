@@ -279,7 +279,8 @@ class CampaignReplayTest(_Replay):
 
     def test_a_member_with_a_non_numeric_score_or_confidence_is_skipped_as_unusable(self):
         campaign = Campaign.objects.create(title="Verify payroll")
-        members = [_mail_case(angle, campaign) for angle in (0, 0.05, 0.1)]
+        for angle in (0, 0.05, 0.1):
+            _mail_case(angle, campaign)
         bad_score = _mail_case(0.12, campaign, malscore="n/a")
         bad_confidence = _mail_case(0.14, campaign, confidence="high")
         last = _mail_case(0.15, campaign)

@@ -1,4 +1,3 @@
-import io
 from unittest import mock
 
 from django.test import SimpleTestCase
