@@ -314,6 +314,11 @@ def recheck_started(version, user, job_id):
     _event(version, "start_recheck", user, job_id)
 
 
+def review_recorded(version, user, note):
+    """A shadow review was appended (promotion.review, inside its transaction)."""
+    _event(version, "review", user, note)
+
+
 def record_recheck(version, job_id, passed, finished_at):
     """Store a finished recheck as {job_id, passed, finished_at (ISO, UTC)}. Only the shadow
     version takes one: a version discarded or promoted meanwhile is left as it is."""

@@ -7,11 +7,12 @@ from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from ai_model.models import ModelVersion, ShadowCampaignEffect, ShadowResult, ShadowReview
+from ai_model.models import ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
 from ai_model.registry import set_shadow
 from ai_model.retrain import RetrainRefused
 from ai_model.serversync import ReloadRefused
 from ai_model.tests.test_registry import cand
+from ai_model.tests.test_retrain import RetrainBase
 from case_handler.models import Case
 
 U = get_user_model()
@@ -60,7 +61,7 @@ class AiModelApiTest(APITestCase):
                 self.client.force_authenticate(u)
                 self.assertEqual(self.client.get(BASE + path).status_code, code, (path, u))
             self.client.force_authenticate(None)
-            self.assertIn(self.client.get(BASE + path).status_code, (401, 403))
+            self.assertEqual(self.client.get(BASE + path).status_code, 401)
 
     def test_writes_admin_only(self):
         for path in ("shadow/start/", "promote/", "rollback/", "discard/", "extend/", "reviews/", "recheck/"):
@@ -68,7 +69,13 @@ class AiModelApiTest(APITestCase):
                 self.client.force_authenticate(u)
                 self.assertEqual(self.client.post(BASE + path, {}, format="json").status_code, 403, path)
             self.client.force_authenticate(None)
-            self.assertIn(self.client.post(BASE + path, {}, format="json").status_code, (401, 403))
+            self.assertEqual(self.client.post(BASE + path, {}, format="json").status_code, 401)
+
+    def test_superuser_without_the_admin_group_is_refused(self):
+        root = U.objects.create_superuser(username="root", password="x", email="r@e.c")  # F14: group Admin only
+        self.client.force_authenticate(root)
+        self.assertEqual(self.client.get(BASE + "status/").status_code, 403)
+        self.assertEqual(self.client.post(BASE + "promote/", {}, format="json").status_code, 403)
 
     # reads
     def test_versions_counters_purity_warnings_and_no_secrets(self):
@@ -119,7 +126,7 @@ class AiModelApiTest(APITestCase):
         [flip] = body["flips"]["results"]
         self.assertEqual((flip["case_id"], flip["flip"], flip["reviewed"]), (f.case_id, "critical", False))
         self.assertEqual(body["campaign_effects"]["count"], 1)
-        self.assertEqual(body["alert_delta"]["candidate_only"], [c.id])
+        self.assertEqual(body["alert_delta"]["candidate_only"], {"count": 1, "results": [c.id]})
         self.assertIn("unreviewed_flips", body["conditions"])
         self.assertIn("too_young", body["conditions"])
         self.assertNotIn("MAILTEXT-SECRET", str(body))
@@ -151,9 +158,7 @@ class AiModelApiTest(APITestCase):
 
     def test_promote_ok_writes_event(self):
         v = self.shadow()
-        with mock.patch(SYNC, return_value=True), mock.patch("api.views.ai_model.promotion.can_promote",
-                                                              return_value=[]), \
-                mock.patch("ai_model.promotion.can_promote", return_value=[]):
+        with mock.patch(SYNC, return_value=True), mock.patch("ai_model.promotion.can_promote", return_value=[]):
             r = self.client.post(BASE + "promote/", {"note": "ship"}, format="json")
         self.assertEqual(r.status_code, 200)
         v.refresh_from_db()
@@ -199,9 +204,10 @@ class AiModelApiTest(APITestCase):
         v.refresh_from_db()
         self.assertEqual(v.shadow_min_days, 14)
         self.assertIn("extend", self.events(v))
-        for bad in (14, 400, "x", None, True):
-            self.assertIn(self.client.post(BASE + "extend/", {"days": bad}, format="json").status_code, (400, 409))
-        self.assertEqual(self.client.post(BASE + "extend/", {"days": 400}, format="json").status_code, 400)
+        for bad, code in ((14, 409), (3, 409), (400, 400), ("x", 400), (None, 400), (True, 400)):
+            self.assertEqual(self.client.post(BASE + "extend/", {"days": bad}, format="json").status_code, code, bad)
+        v.refresh_from_db()
+        self.assertEqual(v.shadow_min_days, 14)
 
     def test_reviews(self):
         v = self.shadow()
@@ -210,6 +216,8 @@ class AiModelApiTest(APITestCase):
         r = self.client.post(BASE + "reviews/", ok, format="json")
         self.assertEqual(r.status_code, 201)
         self.assertEqual(ShadowReview.objects.get().case_id, f.case_id)
+        self.assertEqual(list(v.events.filter(action="review").values_list("user__username", "note")),
+                         [("adm", f"flip {f.case_id}")])
         listed = self.client.get(BASE + "reviews/").json()
         self.assertEqual(listed["count"], 1)
         self.assertEqual(listed["results"][0]["user"], "adm")
@@ -223,14 +231,62 @@ class AiModelApiTest(APITestCase):
         self.assertEqual(r.status_code, 409)
         self.assertEqual(ShadowReview.objects.count(), 1)
 
-    def test_recheck(self):
-        v = self.shadow()
-        with mock.patch("api.views.ai_model.retrain.start_recheck", return_value=mock.Mock(job_id="j1")) as m:
-            r = self.client.post(BASE + "recheck/", {}, format="json")
-        self.assertEqual(r.status_code, 202)
-        self.assertEqual(r.json(), {"job_id": "j1"})
-        self.assertEqual(m.call_args[0][0].pk, v.pk)
+    def test_recheck_refusal_is_a_fixed_409(self):
+        self.shadow()
         with mock.patch("api.views.ai_model.retrain.start_recheck", side_effect=RetrainRefused("http://x/leak")):
             r = self.client.post(BASE + "recheck/", {}, format="json")
         self.assertEqual(r.status_code, 409)
         self.assertNotIn("leak", str(r.json()))
+
+    def test_flips_page_and_review_state(self):
+        v = self.shadow()
+        crit = [self.flip(v) for _ in range(3)]
+        changed = self.flip(v, "changed")
+        promotion_review = {"kind": "flip", "case_id": crit[0].case_id, "note": "ok"}
+        self.assertEqual(self.client.post(BASE + "reviews/", promotion_review, format="json").status_code, 201)
+        body = self.client.get(BASE + "shadow/?flips_limit=2&flips_offset=1").json()["flips"]
+        self.assertEqual((body["count"], len(body["results"])), (4, 2))
+        rows = {r["case_id"]: r for r in self.client.get(BASE + "shadow/").json()["flips"]["results"]}
+        self.assertEqual((rows[crit[0].case_id]["reviewable"], rows[crit[0].case_id]["reviewed"]), (True, True))
+        self.assertEqual((rows[crit[1].case_id]["reviewable"], rows[crit[1].case_id]["reviewed"]), (True, False))
+        self.assertFalse(rows[changed.case_id]["reviewable"])
+        self.assertNotIn("reviewed", rows[changed.case_id])
+        r = self.client.post(BASE + "reviews/", {"kind": "flip", "case_id": changed.case_id, "note": "n"},
+                             format="json")
+        self.assertEqual(r.status_code, 409)
+
+    def test_alert_delta_counts_and_pages(self):
+        v = self.shadow()
+        ids = sorted(self.case().id for _ in range(3))
+        for i in ids:
+            ShadowCampaignEffect.objects.create(case_id=i, version=v, effect="would_join")
+        d = self.client.get(BASE + "shadow/?candidate_only_limit=2&candidate_only_offset=2").json()["alert_delta"]
+        self.assertEqual(d["candidate_only"]["count"], 3)
+        self.assertEqual(d["candidate_only"]["results"], ids[2:])
+        self.assertEqual(d["active_only"], {"count": 0, "results": []})
+        effects = self.client.get(BASE + "shadow/?effects_limit=1&effects_offset=2").json()["campaign_effects"]
+        self.assertEqual((effects["count"], len(effects["results"])), (3, 1))
+        self.assertTrue(effects["results"][0]["reviewable"])
+
+
+class RecheckApiTest(RetrainBase, APITestCase):
+    """The real start_recheck runs; only the inference server and the object store are faked."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = user("adm", "Admin")
+        self.client.force_authenticate(self.admin)
+        v = cand("v1", manifest={"eligible": True, "seed": 7})
+        with mock.patch("ai_model.registry._queue_seeding"):
+            self.shadow = set_shadow(v, self.admin)
+
+    def test_recheck_starts_a_job_and_writes_its_event(self):
+        r = self.client.post(BASE + "recheck/", {"version_id": "v1"}, format="json")
+        self.assertEqual(r.status_code, 202)
+        job_id = r.json()["job_id"]
+        self.assertTrue(RetrainJob.objects.filter(job_id=job_id, state="running").exists())
+        self.assertEqual(list(self.shadow.events.filter(action="start_recheck").values_list("user", "note")),
+                         [(self.admin.pk, job_id)])
+        again = self.client.post(BASE + "recheck/", {}, format="json")  # a job is running
+        self.assertEqual(again.status_code, 409)
+        self.assertNotIn(job_id, str(again.json()))

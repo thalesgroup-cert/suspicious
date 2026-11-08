@@ -1,6 +1,5 @@
 """AI model card endpoints (Plan F, Task 10). Thin: the services decide, the views map their
 refusals to fixed messages (never exception text)."""
-from django.db.models import Sum
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import LimitOffsetPagination
@@ -24,13 +23,12 @@ class Page(LimitOffsetPagination):
     max_limit = MAX_LIMIT
 
 
-def _limited(qs, request, row):
-    """{count, results} bounded by ?limit= (default 50, at most 100)."""
-    try:
-        n = max(1, min(int(request.query_params.get("limit", 50)), MAX_LIMIT))
-    except ValueError:
-        n = 50
-    return {"count": qs.count(), "results": [row(r) for r in qs[:n]]}
+def _paged(qs, request, prefix, row):
+    """{count, results} with its own ?<prefix>_limit and ?<prefix>_offset (limit default 50, at most 100)."""
+    page = Page()
+    page.limit_query_param, page.offset_query_param = f"{prefix}_limit", f"{prefix}_offset"
+    rows = page.paginate_queryset(qs, request)
+    return {"count": page.count, "results": [row(r) for r in rows]}
 
 
 def _refused(detail, **extra):
@@ -41,7 +39,9 @@ class Read(APIView):
     permission_classes = [IsAuthenticated, IsAdminOrCISO]
 
 
-class Write(APIView):
+class WriteMixin:
+    """POST handler shared by the Admin-only writes: validate, resolve the version, call act()."""
+
     permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = ActionSerializer
     needs_version = False  # True: version_id is required, no default to the shadow
@@ -72,6 +72,10 @@ class Write(APIView):
             return _refused("The change was refused in the current state.")
 
 
+class Write(WriteMixin, APIView):
+    pass
+
+
 class StatusView(Read):
     def get(self, request):
         pick = lambda s: (lambda v: version_summary(v) if v else None)(ModelVersion.objects.filter(status=s).first())
@@ -88,13 +92,10 @@ class VersionsView(ListAPIView, Read):
 
     def list(self, request, *args, **kwargs):
         page = self.paginate_queryset(self.get_queryset())
-        rows = []
-        for v in page:
-            total = v.stats.aggregate(scored=Sum("scored"), dangerous=Sum("dangerous"), checks=Sum("campaign_checks"),
-                                      created=Sum("created"), joined=Sum("joined"), alerts=Sum("alerts"))
-            rows.append({**version_summary(v), "stats": {k: n or 0 for k, n in total.items()},
-                         "purity": stats.purity(v), "age_warning": stats.age_warning(v)})
-        return self.get_paginated_response(rows)
+        totals, purity = stats.totals(page), stats.purity_many(page)
+        return self.get_paginated_response([
+            {**version_summary(v), "stats": totals[v.version_id], "purity": purity[v.version_id],
+             "age_warning": stats.age_warning(v)} for v in page])
 
 
 class ShadowView(Read):
@@ -102,32 +103,44 @@ class ShadowView(Read):
         v = ModelVersion.objects.filter(status=S.SHADOW).first()
         if v is None:
             return Response({"shadow": None})
-        live = ShadowResult.objects.filter(version=v, origin="live").exclude(would_be_result="")
-        reviews = promotion.latest_reviews(v)
-        cls = [(r.result, r.case.ai_assessment.result) for r in live.select_related("case__ai_assessment")
-               if hasattr(r.case, "ai_assessment")]
-        verdict = list(live.values_list("live_result", "would_be_result"))
-        agree = lambda pairs: {"agree": sum(a.lower() == b.lower() for a, b in pairs), "total": len(pairs)}
-        flips = ShadowResult.objects.filter(version=v, origin="live").exclude(flip="none").exclude(would_be_result="") \
-            .order_by("-created_at", "-pk")
+        snap = promotion.snapshot(v)  # read once, shared by the reviews, the lists and the conditions
+        reviews = promotion.latest_reviews(v, snap)
+        critical = {r.case_id for r in snap["critical"]}
+        delta = snap["delta"]
+        in_delta = set(delta["candidate_only"]) | set(delta["active_only"])
+        agreement = stats.agreement(v)
+        flips = ShadowResult.objects.filter(version=v, origin="live").exclude(flip="none") \
+            .exclude(would_be_result="").order_by("-created_at", "-pk")
         effects = ShadowCampaignEffect.objects.filter(version=v).order_by("-created_at", "-pk")
-        delta = promotion.alert_delta(v)
+
+        def flip_row(r):
+            reviewable = r.case_id in critical  # only critical flips are reviewed (Ruling F6)
+            row = {"case_id": r.case_id, "flip": r.flip, "live_result": r.live_result,
+                   "would_be_result": r.would_be_result, "reviewable": reviewable}
+            if reviewable:
+                row["reviewed"] = ("flip", r.case_id) in reviews
+            return row
+
+        def effect_row(e):
+            reviewable = e.case_id in in_delta
+            row = {"case_id": e.case_id, "effect": e.effect, "live_campaign_id": e.live_campaign_id,
+                   "reviewable": reviewable}
+            if reviewable:
+                row["reviewed"] = ("campaign", e.case_id) in reviews
+            return row
+
         return Response({
             **version_summary(v),
-            "live_results": live.count(),
-            "agreement": {"class": agree(cls), "verdict": agree(verdict)},
-            "flips": _limited(flips, request, lambda r: {
-                "case_id": r.case_id, "flip": r.flip, "live_result": r.live_result,
-                "would_be_result": r.would_be_result, "reviewed": ("flip", r.case_id) in reviews}),
-            "campaign_effects": _limited(effects, request, lambda e: {
-                "case_id": e.case_id, "effect": e.effect, "live_campaign_id": e.live_campaign_id,
-                "reviewed": ("campaign", e.case_id) in reviews}),
-            "alert_delta": delta,
-            "conditions": promotion.can_promote(v),
+            "live_results": agreement["verdict"]["total"],
+            "agreement": agreement,
+            "flips": _paged(flips, request, "flips", flip_row),
+            "campaign_effects": _paged(effects, request, "effects", effect_row),
+            "alert_delta": {k: _paged(delta[k], request, k, lambda c: c) for k in ("candidate_only", "active_only")},
+            "conditions": promotion.can_promote(v, snap),
         })
 
 
-class ReviewsView(ListAPIView):
+class ReviewsView(WriteMixin, ListAPIView):
     pagination_class = Page
 
     def get_permissions(self):
@@ -146,9 +159,6 @@ class ReviewsView(ListAPIView):
         return self.get_paginated_response(rows)
 
     serializer_class = ReviewSerializer
-    needs_version = False
-    needs_target = True
-    post = Write.post
 
     def act(self, request, version, data):
         promotion.review(version, data["kind"], data["case_id"], request.user, data["note"])

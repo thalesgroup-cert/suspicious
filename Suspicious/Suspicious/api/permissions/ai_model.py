@@ -1,6 +1,7 @@
 from rest_framework.permissions import BasePermission
 
 
+# A superuser without the Admin group is refused on purpose: Ruling F14 follows IsAdminOrCERT, group only.
 class _InGroups(BasePermission):
     groups: tuple = ()
 

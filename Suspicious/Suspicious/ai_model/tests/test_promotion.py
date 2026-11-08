@@ -181,6 +181,12 @@ class DefaultsTest(TestCase):
 
 
 class ReviewTest(PromotionBase):
+    def test_a_review_writes_its_model_event(self):
+        flip = result(self.v1, flip="critical", would_be="Dangerous")
+        promotion.review(self.v1, "flip", flip.case_id, self.admin, "checked")
+        self.assertEqual(list(self.v1.events.filter(action="review").values_list("user", "note")),
+                         [(self.admin.pk, f"flip {flip.case_id}")])
+
     def test_review_is_append_only_and_refuses_a_missing_item(self):
         flip = result(self.v1, flip="critical", would_be="Dangerous")
         first = promotion.review(self.v1, "flip", flip.case_id, self.admin, "one")

@@ -8,6 +8,7 @@ import dataclasses
 import logging
 from datetime import datetime, timedelta
 
+from django.db import transaction
 from django.db.models import Max, Min, Q
 from django.utils import timezone
 
@@ -50,15 +51,22 @@ def alert_delta(version):
     }
 
 
-def _items(version):
-    delta = alert_delta(version)
-    return ({("flip", r.case_id) for r in critical_flips(version)}
+def snapshot(version):
+    """The review items read once: {"critical": [ShadowResult], "delta": alert_delta}. Callers that
+    need several of can_promote, latest_reviews and the lists pass one snapshot around."""
+    return {"critical": critical_flips(version), "delta": alert_delta(version)}
+
+
+def _items(version, snap=None):
+    snap = snap or snapshot(version)
+    delta = snap["delta"]
+    return ({("flip", r.case_id) for r in snap["critical"]}
             | {("campaign", c) for c in delta["candidate_only"] + delta["active_only"]})
 
 
-def latest_reviews(version):
+def latest_reviews(version, snap=None):
     """{(kind, case_id): ShadowReview}, the latest review per item, current items only."""
-    items = _items(version)
+    items = _items(version, snap)
     latest = {}
     for r in ShadowReview.objects.filter(version=version).order_by("at", "pk"):
         if (r.kind, r.case_id) in items:
@@ -93,7 +101,7 @@ def _recheck_code(version, now):
     return None
 
 
-def can_promote(version) -> list:
+def can_promote(version, snap=None) -> list:
     """Unmet conditions by stable code; empty when the version may be promoted. Reads the fields
     of the object given (promote passes the locked row)."""
     now = timezone.now()
@@ -104,10 +112,11 @@ def can_promote(version) -> list:
         unmet.append("too_young")
     if ShadowResult.objects.filter(version=version, origin=ShadowResult.Origin.LIVE).count() < SHADOW_MIN_RESULTS:
         unmet.append("too_few_results")
-    reviewed = set(latest_reviews(version))
-    if any(("flip", r.case_id) not in reviewed for r in critical_flips(version)):
+    snap = snap or snapshot(version)
+    reviewed = set(latest_reviews(version, snap))
+    if any(("flip", r.case_id) not in reviewed for r in snap["critical"]):
         unmet.append("unreviewed_flips")
-    delta = alert_delta(version)
+    delta = snap["delta"]
     if any(("campaign", c) not in reviewed for c in delta["candidate_only"] + delta["active_only"]):
         unmet.append("unreviewed_campaigns")
     code = _recheck_code(version, now)
@@ -180,4 +189,7 @@ def review(version, kind, case_id, user, note=""):
         raise RegistryError(f"cannot review a {version.status} version")
     if (kind, case_id) not in _items(version):
         raise RegistryError("no such review item for this version")
-    return ShadowReview.objects.create(version=version, kind=kind, case_id=case_id, user=user, note=note)
+    with transaction.atomic():
+        row = ShadowReview.objects.create(version=version, kind=kind, case_id=case_id, user=user, note=note)
+        registry.review_recorded(version, user, f"{kind} {case_id}")
+    return row

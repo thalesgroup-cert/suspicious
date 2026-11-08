@@ -3,7 +3,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Min
+from django.db.models import F, Min
 from django.utils import timezone
 
 from .models import AiAssessment, LabelRecord, ModelVersion, ModelVersionStats
@@ -66,24 +66,66 @@ def recompute(days=3, now=None):
         )
 
 
-def purity(version, now=None):
-    """Dangerous share among the version's campaign members of the last 30 days that carry an
-    active label. {"labelled", "dangerous", "purity" (None when nothing is labelled), "warning"}."""
+def purity_many(versions, now=None):
+    """{version_id: purity dict} for several versions in two queries. Purity: Dangerous share among
+    the version's campaign members of the last 30 days that carry an active label (latest wins).
+    {"labelled", "dangerous", "purity" (None when nothing is labelled), "warning"}."""
     from case_handler.models import CampaignMember
 
     since = (now or timezone.now()) - timedelta(days=PURITY_DAYS)
-    cases = CampaignMember.objects.filter(
-        joined_at__gte=since, case__ai_assessment__model_version=version.version_id
-    ).values_list("case_id", flat=True)
+    ids = [v.version_id for v in versions]
+    owner = dict(CampaignMember.objects.filter(joined_at__gte=since, case__ai_assessment__model_version__in=ids)
+                 .values_list("case_id", "case__ai_assessment__model_version"))
     labels = {}
     for case_id, klass in LabelRecord.objects.filter(
-        case_id__in=list(cases), status=LabelRecord.Status.ACTIVE
+        case_id__in=list(owner), status=LabelRecord.Status.ACTIVE
     ).order_by("observed_at", "id").values_list("case_id", "label_class"):
         labels[case_id] = klass  # latest active label wins
-    n, bad = len(labels), sum(k == LabelRecord.LabelClass.DANGEROUS for k in labels.values())
-    p = bad / n if n else None
-    return {"labelled": n, "dangerous": bad, "purity": p,
-            "warning": n >= MIN_LABELLED and p < MIN_PURITY}
+    out = {}
+    for vid in ids:
+        mine = [k for c, k in labels.items() if owner[c] == vid]
+        n, bad = len(mine), sum(k == LabelRecord.LabelClass.DANGEROUS for k in mine)
+        p = bad / n if n else None
+        out[vid] = {"labelled": n, "dangerous": bad, "purity": p, "warning": n >= MIN_LABELLED and p < MIN_PURITY}
+    return out
+
+
+def purity(version, now=None):
+    return purity_many([version], now)[version.version_id]
+
+
+def totals(versions):
+    """{version_id: summed counters} over all stored days, one grouped query."""
+    from django.db.models import Sum
+
+    rows = ModelVersionStats.objects.filter(version__in=versions).values("version__version_id").annotate(
+        scored=Sum("scored"), dangerous=Sum("dangerous"), checks=Sum("campaign_checks"),
+        created_=Sum("created"), joined=Sum("joined"), alerts=Sum("alerts"))
+    by = {r["version__version_id"]: r for r in rows}
+    keys = ("scored", "dangerous", "checks", "joined", "alerts")
+    return {v.version_id: {**{k: by.get(v.version_id, {}).get(k) or 0 for k in keys},
+                           "created": by.get(v.version_id, {}).get("created_") or 0} for v in versions}
+
+
+def agreement(version):
+    """Live shadow results with a would-be verdict: how often the shadow agrees with the live side.
+    class: shadow class vs the case's live AI class; verdict: live case result vs would-be result.
+    Grouped counts, nothing loaded row by row."""
+    from django.db.models import Count
+
+    from .models import ShadowResult
+
+    live = ShadowResult.objects.filter(version=version, origin=ShadowResult.Origin.LIVE).exclude(would_be_result="")
+
+    def tally(pairs):
+        return {"agree": sum(r["n"] for r in pairs if (r["a"] or "").lower() == (r["b"] or "").lower()),
+                "total": sum(r["n"] for r in pairs)}
+
+    return {
+        "class": tally(live.filter(case__ai_assessment__isnull=False)
+                       .values(a=F("result"), b=F("case__ai_assessment__result")).annotate(n=Count("pk"))),
+        "verdict": tally(live.values(a=F("live_result"), b=F("would_be_result")).annotate(n=Count("pk"))),
+    }
 
 
 def age_warning(version, now=None):
