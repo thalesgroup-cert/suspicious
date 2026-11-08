@@ -476,7 +476,8 @@ class ConcurrentPromoteTest(TransactionTestCase):
         v1 = cand("v1", manifest={"eligible": True}, campaign_profile=v0.campaign_profile)
         with mock.patch("ai_model.registry._queue_seeding"):
             registry.set_shadow(v1)
-        finished = (timezone.now() - timedelta(days=1)).isoformat()
+        # the recheck must have finished after the minimum period was met (day 7), so day 8 minus 12 h
+        finished = (timezone.now() - timedelta(hours=12)).isoformat()
         ModelVersion.objects.filter(pk=v1.pk).update(
             shadow_since=timezone.now() - timedelta(days=8),
             recheck={"job_id": "r", "passed": True, "finished_at": finished})
@@ -493,6 +494,7 @@ class ConcurrentPromoteTest(TransactionTestCase):
                 connection.close()
 
         with mock.patch.object(promotion, "SHADOW_MIN_RESULTS", 1), mock.patch(SYNC, return_value=True):
+            self.assertEqual(promotion.can_promote(ModelVersion.objects.get(pk=v1.pk)), [])
             threads = [threading.Thread(target=run) for _ in range(2)]
             for t in threads:
                 t.start()
