@@ -4,15 +4,16 @@ import { Alert, Box, Button, LinearProgress, Stack, TextField, Typography } from
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
 import type { ReviewKind } from "../api";
-import { useAiModelShadow, useDiscard, useExtend, usePromote, useRecheck } from "../hooks";
+import { MAX_SHADOW_DAYS, SHADOW_MIN_RESULTS } from "../constants";
+import { useAiModelShadow, useAiModelStatus, useDiscard, useExtend, usePromote, useRecheck } from "../hooks";
 import { refusalMessage } from "../labels";
 import { AgreementTable } from "./AgreementTable";
 import { CampaignEffects, type Offsets } from "./CampaignEffects";
-import { FlipsList, PAGE } from "./FlipsList";
+import { FlipsList } from "./FlipsList";
+import { PAGE } from "./Pager";
 import { PromotionConditions } from "./PromotionConditions";
 import { ReviewDialog } from "./ReviewDialog";
 
-export const SHADOW_MIN_RESULTS = 500;
 const DAY = 86_400_000;
 
 export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
@@ -21,12 +22,14 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
   const [review, setReview] = React.useState<{ kind: ReviewKind; caseId: number } | null>(null);
   const [now] = React.useState(() => Date.now());
   const [days, setDays] = React.useState("");
+  const jobRunning = useAiModelStatus().data?.job_running ?? false;
+  const [err, setErr] = React.useState<unknown>(null);
   const q = useAiModelShadow({
     flips_limit: PAGE, flips_offset: off.flips,
     effects_limit: PAGE, effects_offset: off.effects,
     candidate_only_limit: PAGE, candidate_only_offset: off.candidate_only,
     active_only_limit: PAGE, active_only_offset: off.active_only,
-  });
+  }, jobRunning);
   const promote = usePromote();
   const extend = useExtend();
   const recheck = useRecheck();
@@ -48,8 +51,10 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
   const age = d.shadow_since ? Math.max(0, Math.floor((now - new Date(d.shadow_since).getTime()) / DAY)) : 0;
   const pct = Math.min(100, Math.round((d.live_results / SHADOW_MIN_RESULTS) * 100));
   const n = Number(days);
-  const daysOk = /^\d+$/.test(days) && n > d.shadow_min_days && n <= 365;
-  const err = [promote, extend, recheck, discard].find((m) => m.isError);
+  const daysOk = /^\d+$/.test(days) && n > d.shadow_min_days && n <= MAX_SHADOW_DAYS;
+  // The latest outcome of any action wins, so an old refusal does not outlive a later success.
+  const run = <V,>(m: { mutate(v: V, o: { onSuccess(): void; onError(e: unknown): void }): void }, v: V, then?: () => void) =>
+    m.mutate(v, { onSuccess: () => { setErr(null); then?.(); }, onError: setErr });
   const page = (k: keyof typeof off, o: number) => setOff((p) => ({ ...p, [k]: o }));
   const close = () => setDialog(null);
 
@@ -92,13 +97,13 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
           value={days}
           onChange={(e) => setDays(e.target.value)}
           error={days !== "" && !daysOk}
-          helperText={days !== "" && !daysOk ? `Enter a whole number above ${d.shadow_min_days}` : `Now ${d.shadow_min_days} days`}
+          helperText={days !== "" && !daysOk ? `Enter a whole number above ${d.shadow_min_days}, at most ${MAX_SHADOW_DAYS}` : `Now ${d.shadow_min_days} days, above ${d.shadow_min_days}, at most ${MAX_SHADOW_DAYS}`}
           slotProps={{ htmlInput: { inputMode: "numeric" } }}
         />
-        <Button disabled={!daysOk || busy} onClick={() => extend.mutate({ days: n }, { onSuccess: () => setDays("") })}>
+        <Button disabled={!daysOk || busy} onClick={() => run(extend, { days: n }, () => setDays(""))}>
           Extend
         </Button>
-        <Button disabled={busy} onClick={() => recheck.mutate({})}>
+        <Button disabled={busy} onClick={() => run(recheck, {})}>
           Recheck
         </Button>
         <Button color="error" disabled={busy} onClick={() => setDialog("discard")}>
@@ -114,7 +119,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
           </Typography>
         )}
         {recheck.isSuccess && <Typography variant="body2">Recheck started.</Typography>}
-        {err && <Typography variant="body2">{refusalMessage(err.error)}</Typography>}
+        {err != null && <Typography variant="body2">{refusalMessage(err)}</Typography>}
       </Box>
 
       <ReviewDialog kind={review?.kind ?? "flip"} caseId={review?.caseId ?? null} onClose={() => setReview(null)} />
@@ -126,7 +131,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         onCancel={close}
         onConfirm={() => {
           close();
-          promote.mutate({});
+          run(promote, {});
         }}
       />
       <ConfirmDialog
@@ -138,7 +143,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         onCancel={close}
         onConfirm={() => {
           close();
-          discard.mutate({});
+          run(discard, {});
         }}
       />
     </Stack>

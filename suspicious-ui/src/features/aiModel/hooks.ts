@@ -22,8 +22,8 @@ const list = <T>(key: (p?: api.PageParams) => readonly unknown[], fn: (p?: api.P
 export const useAiModelVersions = list(aiModelKeys.versions, api.getVersions);
 export const useAiModelCandidates = list(aiModelKeys.candidates, api.getCandidates);
 /** Keeps the old page on screen while another page of a sub-list loads or after a review. */
-export const useAiModelShadow = (params?: api.PageParams) =>
-  useQuery({ queryKey: aiModelKeys.shadow(params), queryFn: () => api.getShadow(params), retry: false, placeholderData: keepPreviousData });
+export const useAiModelShadow = (params?: api.PageParams, poll = false) =>
+  useQuery({ queryKey: aiModelKeys.shadow(params), queryFn: () => api.getShadow(params), retry: false, placeholderData: keepPreviousData, refetchInterval: poll ? 10_000 : false });
 export const useAiModelReviews = list(aiModelKeys.reviews, api.getReviews);
 export const useAiModelFlags = list(aiModelKeys.flags, api.getFlags);
 export const useAiModelQueue = list(aiModelKeys.queue, api.getQueue);

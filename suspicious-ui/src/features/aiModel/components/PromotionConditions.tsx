@@ -2,8 +2,7 @@ import { List, ListItem, ListItemText } from "@mui/material";
 
 import { CODE_TEXT } from "../labels";
 
-/** Every condition the server can report, so a met one shows as done. */
-// recheck_* are three faces of one requirement; show it once.
+/** Every condition the server can report, so a met one shows as done; recheck_* are three faces of one requirement and show once. */
 const ROWS = ["too_young", "too_few_results", "unreviewed_flips", "unreviewed_campaigns", "recheck", "profile_window", "job_running"];
 const DONE: Record<string, string> = {
   too_young: "The shadow period has run its minimum days.",

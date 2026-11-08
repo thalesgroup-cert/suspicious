@@ -1,7 +1,7 @@
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
 
 import type { ShadowDetail } from "../api";
-import { Pager } from "./FlipsList";
+import { Pager } from "./Pager";
 
 export type Offsets = { effects: number; candidate_only: number; active_only: number };
 type Props = { data: ShadowDetail; offsets: Offsets; onPage(k: keyof Offsets, o: number): void; onReview(caseId: number): void };
@@ -68,6 +68,7 @@ export function CampaignEffects({ data, offsets, onPage, onReview }: Props) {
                       <TableRow key={id}>
                         <TableCell component="th" scope="row">{id}</TableCell>
                         <TableCell>
+                          {/* The backend sends bare case ids with no reviewed flag, so this button stays after a review. */}
                           <Button size="small" aria-label={`Review alert case ${id}`} onClick={() => onReview(id)}>
                             Review
                           </Button>
