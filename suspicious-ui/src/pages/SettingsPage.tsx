@@ -9,12 +9,13 @@ import { getMe, type Me } from "@/api/auth";
 import { SoftCard } from "@/features/settings/components/cards";
 import { SettingsNav } from "@/features/settings/components/SettingsNav";
 import { StatusStrip } from "@/features/settings/components/StatusStrip";
-import { SECTIONS, SectionContent, parseSection } from "@/features/settings/components/sections";
+import { getEnabledConnectors } from "@/features/settings/components/connectors";
+import { SECTIONS, SectionContent, isSectionVisible, parseSection } from "@/features/settings/components/sections";
 import { UnsavedProvider, useUnsavedKeys } from "@/features/settings/unsaved";
 import { useAccent } from "@/features/settings/useAccent";
 
 // Query roots the header Refresh covers: lists and scoring live under "settings", the feeder health chip under "feeder".
-const REFRESH_ROOTS = new Set(["settings", "connectors", "connector-config", "connector-deliveries", "feeder"]);
+const REFRESH_ROOTS = new Set(["settings", "connectors", "connector-config", "connector-deliveries", "feeder", "ai-model"]);
 
 function SettingsBody() {
   const qc = useQueryClient();
@@ -28,6 +29,10 @@ function SettingsBody() {
   const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
   const groups = me?.groups ?? [];
+  // Same key the gallery toggle invalidates, so enabling ai_model shows the section without a reload.
+  const enabledQuery = useQuery({ queryKey: ["enabledConnectors"], queryFn: getEnabledConnectors, staleTime: 60_000 });
+  const enabled = enabledQuery.data ?? [];
+  const hidden = new Set(SECTIONS.filter((s) => !isSectionVisible(s, groups, enabled)).map((s) => s.key));
   const isAllowed = groups.includes("Admin") || groups.includes("CERT");
 
   if (meQuery.isLoading) {
@@ -46,7 +51,16 @@ function SettingsBody() {
     );
   }
 
-  const active = parseSection(section);
+  const parsed = parseSection(section);
+  // A direct URL to a gated section waits for the connector list instead of bouncing on an empty one.
+  if (parsed && hidden.has(parsed) && enabledQuery.isPending) {
+    return (
+      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  const active = parsed && !hidden.has(parsed) ? parsed : null;
   // Bare /settings redirects too, so the first nav item is a real URL and clicking it is not a navigation.
   if (active === null) {
     return <Navigate to={`/settings/${SECTIONS[0].key}`} replace />;
@@ -90,6 +104,7 @@ function SettingsBody() {
             <SettingsNav
               active={activeMeta.key}
               unsaved={unsaved}
+              hidden={hidden}
               onNavigate={(key) => navigate(`/settings/${key}`)}
             />
           </Grid>

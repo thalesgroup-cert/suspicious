@@ -10,12 +10,17 @@ import { visuallyHidden } from "@/features/settings/components/a11y";
 export type SettingsNavProps = {
   active: SectionKey;
   unsaved: ReadonlySet<SectionKey>;
+  /** Sections the user may not see right now (role or disabled connector). */
+  hidden?: ReadonlySet<SectionKey>;
   onNavigate(key: SectionKey): void;
 };
 
 const href = (key: SectionKey) => `/settings/${key}`;
 
-export function SettingsNav({ active, unsaved, onNavigate }: SettingsNavProps) {
+export function SettingsNav({ active, unsaved, hidden, onNavigate }: SettingsNavProps) {
+  const groups = GROUPS.map((g) => ({ ...g, sections: g.sections.filter((s) => !hidden?.has(s.key)) })).filter(
+    (g) => g.sections.length,
+  );
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
   const labelId = React.useId();
@@ -32,7 +37,7 @@ export function SettingsNav({ active, unsaved, onNavigate }: SettingsNavProps) {
         onChange={(e) => onNavigate(e.target.value as SectionKey)}
         slotProps={{ select: { native: true } }}
       >
-        {GROUPS.map((g) => (
+        {groups.map((g) => (
           <optgroup key={g.key} label={g.label}>
             {g.sections.map((s) => (
               <option key={s.key} value={s.key}>
@@ -49,7 +54,7 @@ export function SettingsNav({ active, unsaved, onNavigate }: SettingsNavProps) {
   return (
     <SoftCard sx={{ position: "sticky", top: 16 }}>
       <Box component="nav" aria-label="Settings sections" sx={{ p: 1.5 }}>
-        {GROUPS.map((g, i) => (
+        {groups.map((g, i) => (
           <Box key={g.key} sx={{ mt: i === 0 ? 0 : 1.5 }}>
             <Typography
               id={`${labelId}-${g.key}`}

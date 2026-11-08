@@ -37,7 +37,10 @@ vi.mock("@/features/settings/components/connectors", () => ({
   putConnectorConfig: vi.fn(),
   testConnector: vi.fn(),
   listDeliveries: vi.fn().mockResolvedValue([]),
+  getEnabledConnectors: vi.fn().mockResolvedValue([]),
 }));
+
+vi.mock("@/features/aiModel/api", () => ({}));
 
 
 import { getMe } from "@/api/auth";
@@ -47,6 +50,7 @@ import {
   getFeederHealth,
   listAnalyzers,
 } from "@/features/settings/api";
+import { getEnabledConnectors } from "@/features/settings/components/connectors";
 import SettingsPage from "../SettingsPage";
 void getFeederStatus;
 
@@ -188,5 +192,54 @@ describe("SettingsPage - Test Suite", () => {
       await screen.findByRole("heading", { level: 2, name: "Email feeder" });
       expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
     });
+  });
+});
+
+describe("SettingsPage - AI model section visibility", () => {
+  beforeEach(async () => {
+    await page.viewport(1280, 900);
+    vi.mocked(getMe).mockResolvedValue(fixtureMeSuperuser);
+    vi.mocked(listItems).mockResolvedValue(fixtureSettingsList as never);
+    vi.mocked(getFeederStatus).mockResolvedValue(fixtureFeederStatus);
+    vi.mocked(getFeederHealth).mockResolvedValue({ online: true, last_successful_poll: null, emails_processed_total: 0, errors_total: 0, stale_seconds: 0, stale: false, checked_at: 0, error: null });
+    vi.mocked(listAnalyzers).mockResolvedValue(fixtureAnalyzers);
+    vi.mocked(getEnabledConnectors).mockResolvedValue(["ai_model"]);
+  });
+
+  const navLink = () =>
+    within(screen.getByRole("navigation", { name: "Settings sections" })).queryByRole("link", { name: "AI model" });
+
+  it("lists the section for an Admin while the connector is enabled, and opens it", async () => {
+    const { router } = open("/settings/ai_model");
+    expect(await screen.findByRole("heading", { name: "AI model", level: 2 })).toBeInTheDocument();
+    expect(navLink()).not.toBeNull();
+    expect(router!.state.location.pathname).toBe("/settings/ai_model");
+  });
+
+  it("hides it from a CERT-only user and redirects its URL", async () => {
+    vi.mocked(getMe).mockResolvedValue({ ...fixtureMeSuperuser, groups: ["CERT"] });
+    const { router } = open("/settings/ai_model");
+    await waitFor(() => expect(router!.state.location.pathname).toBe("/settings/domains_allow"));
+    await screen.findByRole("navigation", { name: "Settings sections" });
+    expect(navLink()).toBeNull();
+  });
+
+  it("hides it while the connector is disabled and redirects its URL", async () => {
+    vi.mocked(getEnabledConnectors).mockResolvedValue([]);
+    const { router } = open("/settings/ai_model");
+    await waitFor(() => expect(router!.state.location.pathname).toBe("/settings/domains_allow"));
+    await screen.findByRole("navigation", { name: "Settings sections" });
+    expect(navLink()).toBeNull();
+  });
+
+  it("appears without a reload once the enabledConnectors query is invalidated", async () => {
+    vi.mocked(getEnabledConnectors).mockResolvedValue([]);
+    const queryClient = createTestQueryClient();
+    open("/settings/connectors", queryClient);
+    await screen.findByRole("navigation", { name: "Settings sections" });
+    expect(navLink()).toBeNull();
+    vi.mocked(getEnabledConnectors).mockResolvedValue(["ai_model"]);
+    await queryClient.invalidateQueries({ queryKey: ["enabledConnectors"] });
+    await waitFor(() => expect(navLink()).not.toBeNull());
   });
 });
