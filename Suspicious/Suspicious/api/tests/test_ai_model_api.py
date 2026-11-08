@@ -62,7 +62,7 @@ class AiModelApiTest(APITestCase):
             self.assertEqual(self.client.get(BASE + path).status_code, 401)
 
     def test_writes_admin_only(self):
-        for path in ("shadow/start/", "promote/", "rollback/", "discard/", "extend/", "reviews/", "recheck/"):
+        for path in ("shadow/start/", "promote/", "rollback/", "discard/", "extend/", "reviews/", "recheck/", "retrain/"):
             for u in (self.ciso, self.cert, self.reporter):
                 self.client.force_authenticate(u)
                 self.assertEqual(self.client.post(BASE + path, {}, format="json").status_code, 403, path)
@@ -346,6 +346,29 @@ class AiModelApiTest(APITestCase):
         self.assertEqual(r.status_code, 409)
         self.assertNotIn("leak", str(r.json()))
 
+    def test_jobs_page_newest_first_for_admin_and_ciso(self):
+        now = timezone.now()
+        for i in range(3):
+            RetrainJob.objects.create(job_id=f"j{i}", target_version=f"t{i}", state="failed", error="e" * 300,
+                                      rows=i, started_at=now - timedelta(days=3 - i))
+        for u in (self.admin, self.ciso):
+            self.client.force_authenticate(u)
+            body = self.client.get(BASE + "jobs/?limit=2").json()
+            self.assertEqual(body["count"], 3)
+            self.assertEqual([j["job_id"] for j in body["results"]], ["j2", "j1"])
+            self.assertEqual(len(body["results"][0]["error"]), 200)
+            self.assertEqual(set(body["results"][0]), {"job_id", "state", "trigger", "rows", "excluded_rows",
+                                                       "started_at", "finished_at", "error"})
+        for u in (self.cert, self.reporter):
+            self.client.force_authenticate(u)
+            self.assertEqual(self.client.get(BASE + "jobs/").status_code, 403)
+
+    def test_retrain_refusal_is_a_fixed_409(self):
+        with mock.patch("api.views.ai_model.retrain.start_retrain", side_effect=RetrainRefused("http://x/leak")):
+            r = self.client.post(BASE + "retrain/", {}, format="json")
+        self.assertEqual(r.status_code, 409)
+        self.assertNotIn("leak", str(r.json()))
+
     def test_flips_page_and_review_state(self):
         v = self.shadow()
         crit = [self.flip(v) for _ in range(3)]
@@ -415,6 +438,18 @@ class RecheckApiTest(RetrainBase, APITestCase):
         again = self.client.post(BASE + "recheck/", {}, format="json")  # a job is running
         self.assertEqual(again.status_code, 409)
         self.assertNotIn(job_id, str(again.json()))
+
+
+    def test_retrain_starts_a_job_and_writes_its_event(self):
+        r = self.client.post(BASE + "retrain/", {"note": "monthly"}, format="json")
+        self.assertEqual(r.status_code, 202)
+        job = RetrainJob.objects.get(job_id=r.json()["job_id"])
+        ev = job.parent.events.get(action="retrain_requested")
+        self.assertEqual((ev.user, ev.note), (self.admin, "monthly"))
+        again = self.client.post(BASE + "retrain/", {}, format="json")  # a job is running
+        self.assertEqual(again.status_code, 409)
+        self.assertEqual(RetrainJob.objects.count(), 1)
+        self.assertNotIn(job.job_id, str(again.json()))
 
 
 class CandidatesEdgeTest(APITestCase):

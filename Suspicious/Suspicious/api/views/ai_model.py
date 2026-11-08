@@ -240,3 +240,22 @@ class RecheckView(Write):
     def act(self, request, version, data):
         job = retrain.start_recheck(version, request.user)
         return Response({"job_id": job.job_id}, status=status.HTTP_202_ACCEPTED)
+
+
+class RetrainView(Write):
+    needs_target = False
+
+    def act(self, request, version, data):
+        job = retrain.start_retrain(request.user, trigger=ModelVersion.Trigger.MANUAL)
+        registry.retrain_requested(job.parent, request.user, data["note"])
+        return Response({"job_id": job.job_id}, status=status.HTTP_202_ACCEPTED)
+
+
+class JobsView(ListAPIView, Read):
+    pagination_class = Page
+
+    def get_queryset(self):
+        return RetrainJob.objects.order_by("-started_at", "-pk")
+
+    def list(self, request, *args, **kwargs):
+        return self.get_paginated_response([job_row(j) for j in self.paginate_queryset(self.get_queryset())])

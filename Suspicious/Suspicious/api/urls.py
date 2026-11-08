@@ -184,4 +184,6 @@ urlpatterns = [
     path("ai-model/extend/", ai.ExtendView.as_view(), name="ai-model-extend"),
     path("ai-model/reviews/", ai.ReviewsView.as_view(), name="ai-model-reviews"),
     path("ai-model/recheck/", ai.RecheckView.as_view(), name="ai-model-recheck"),
+    path("ai-model/retrain/", ai.RetrainView.as_view(), name="ai-model-retrain"),
+    path("ai-model/jobs/", ai.JobsView.as_view(), name="ai-model-jobs"),
 ]

@@ -337,6 +337,11 @@ def recheck_started(version, user, job_id):
     _event(version, "start_recheck", user, job_id)
 
 
+def retrain_requested(version, user, note):
+    """A manual retrain was started (api retrain view); version is the job's parent."""
+    _event(version, "retrain_requested", user, note)
+
+
 def review_recorded(version, user, note):
     """A shadow review was appended (promotion.review, inside its transaction)."""
     _event(version, "review", user, note)
