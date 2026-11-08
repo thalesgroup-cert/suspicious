@@ -175,6 +175,7 @@ urlpatterns = [
     path("connectors/<str:name>/deliveries/", ConnectorDeliveriesView.as_view(), name="connector-deliveries"),
     path("ai-model/status/", ai.StatusView.as_view(), name="ai-model-status"),
     path("ai-model/versions/", ai.VersionsView.as_view(), name="ai-model-versions"),
+    path("ai-model/candidates/", ai.CandidatesView.as_view(), name="ai-model-candidates"),
     path("ai-model/shadow/", ai.ShadowView.as_view(), name="ai-model-shadow"),
     path("ai-model/shadow/start/", ai.ShadowStartView.as_view(), name="ai-model-shadow-start"),
     path("ai-model/promote/", ai.PromoteView.as_view(), name="ai-model-promote"),

@@ -14,7 +14,7 @@ from ai_model.ledger import ledger_summary
 from ai_model.models import ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
 from ai_model.serversync import ReloadRefused
 from api.permissions.ai_model import IsAdmin, IsAdminOrCISO
-from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ReviewSerializer, job_row,
+from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ReviewSerializer, candidate_row, job_row,
                                       version_summary)
 from connectors.delivery import get_state
 
@@ -121,6 +121,16 @@ class VersionsView(ListAPIView, Read):
         return self.get_paginated_response([
             {**version_summary(v), "stats": totals[v.version_id], "purity": purity[v.version_id],
              "age_warning": stats.age_warning(v)} for v in page])
+
+
+class CandidatesView(ListAPIView, Read):
+    pagination_class = Page
+
+    def get_queryset(self):
+        return ModelVersion.objects.filter(status__in=[S.CANDIDATE, S.SHADOW]).order_by("-created_at", "-pk")
+
+    def list(self, request, *args, **kwargs):
+        return self.get_paginated_response([candidate_row(v) for v in self.paginate_queryset(self.get_queryset())])
 
 
 class ShadowView(Read):

@@ -147,6 +147,44 @@ class AiModelApiTest(APITestCase):
         from api.serializers.ai_model import job_row
         self.assertEqual(len(job_row(RetrainJob(job_id="j", error="E" * 300))["error"]), 200)
 
+    def test_candidates(self):
+        gate = {"checks": {"calibration_error": {"passed": False, "value": 0.2, "detail": "D" * 400},
+                           "high_tier_precision": {"passed": False, "value": 0.5}, "ok": True},
+                "candidate": {"auc": 0.9}, "baseline": {"auc": 0.8}, "campaign": {"n": 3},
+                "tier_cutoffs": {"high": 0.9}, "secret_key": "LEAK", "url": "http://x/y"}
+        manifest = {"eligible": False, "rows": 10, "excluded_rows": 2, "gate": gate,
+                    "link": "http://leak", "seed": 7}
+        c1 = cand("c1", manifest=manifest)
+        c2 = cand("c2", manifest={"eligible": True, "rows": 5, "excluded_rows": 0,
+                                  "gate": {"checks": {"n": "see http://leak.example/p"}}})
+        sh = self.shadow("sh")
+        old = cand("old", manifest={})
+        ModelVersion.objects.filter(pk=old.pk).update(status=S.DISCARDED)
+        r = self.client.get(BASE + "candidates/")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        ids = [x["version_id"] for x in data["results"]]
+        self.assertEqual(set(ids), {"c1", "c2", "sh"})
+        self.assertEqual(ids, [v.version_id for v in ModelVersion.objects.filter(
+            version_id__in=ids).order_by("-created_at", "-pk")])
+        text = r.content.decode()
+        for bad in ("LEAK", "secret_key", "bundle_prefix", "http", "seed", c1.bundle_prefix):
+            self.assertNotIn(bad, text)
+        row = next(x for x in data["results"] if x["version_id"] == "c1")
+        self.assertIs(row["eligible"], False)
+        self.assertEqual((row["rows"], row["excluded_rows"]), (10, 2))
+        self.assertEqual(set(row["gate"]), {"checks", "candidate", "baseline", "campaign", "tier_cutoffs"})
+        self.assertEqual(row["gate"]["checks"]["calibration_error"]["value"], 0.2)
+        self.assertIn("high_tier_precision", row["gate"]["checks"])
+        self.assertEqual(len(row["gate"]["checks"]["calibration_error"]["detail"]), 300)
+        self.assertIsNone(next(x for x in data["results"] if x["version_id"] == "sh")["gate"])
+        self.assertIs(next(x for x in data["results"] if x["version_id"] == "c2")["eligible"], True)
+        for u, code in ((self.ciso, 200), (self.cert, 403), (self.reporter, 403)):
+            self.client.force_authenticate(u)
+            self.assertEqual(self.client.get(BASE + "candidates/").status_code, code)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(BASE + "candidates/").status_code, 401)
+
     def test_shadow_comparison(self):
         v = self.shadow()
         f = self.flip(v)
