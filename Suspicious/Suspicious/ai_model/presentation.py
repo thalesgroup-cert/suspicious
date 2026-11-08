@@ -10,7 +10,7 @@ from ai_model.models import LabelRecord
 from api.permissions.submissions import has_elevated_view, submission_queryset
 from case_handler.models import Case
 
-_AXIS = {"SAFE", "DANGEROUS"}  # the only classes that can disagree
+AXIS = {"SAFE", "DANGEROUS"}  # the only classes that can disagree
 _TIERS = {"high", "medium", "low"}
 _AI_RULE = "ai-classifier-decisive"
 _SIMILAR_KEYS = ("case_id", "similarity", "label", "provenance")
@@ -122,7 +122,7 @@ def cross_check(case, assessment) -> dict:
     # Without an explanation (or a band in it) the case's current verdict stands in, so an
     # analyst override is still compared.
     band = str(explanation.get("band") or case.results or "").upper()
-    disagrees = not ai_decided and ai in _AXIS and band in _AXIS and ai != band
+    disagrees = not ai_decided and ai in AXIS and band in AXIS and ai != band
     return {"facts": facts, "disagrees": disagrees}
 
 

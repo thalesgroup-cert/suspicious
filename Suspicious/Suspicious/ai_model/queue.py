@@ -4,16 +4,19 @@ from datetime import timedelta
 from django.utils import timezone
 
 from ai_model.models import AiAssessment, LabelRecord
-from ai_model.presentation import cross_check, members_disagree
+from ai_model.presentation import AXIS, cross_check, members_disagree
 
-AXIS = ("SAFE", "DANGEROUS")
+CAP = 200
 
 
-def disagreements(since_days=30, cap=200) -> list[dict]:
+def disagreements(since_days=30, cap=None) -> list[dict]:
     """Finalised mail cases whose AI class is on the other side of the Safe/Dangerous axis from the
     verdict and where the AI did not set the band (presentation.cross_check), newest first."""
+    cap = cap or CAP
+    # ponytail: Python scan of the 30-day Safe/Dangerous window, fine at current scale; upgrade
+    # path: push the cross-check into SQL.
     since = timezone.now() - timedelta(days=since_days)
-    rows = (AiAssessment.objects.filter(case__finalized_at__gte=since, result__in=AXIS,
+    rows = (AiAssessment.objects.filter(case__finalized_at__gte=since, result__in=sorted(AXIS),
                                         case__fileOrMail__mail__isnull=False)
             .select_related("case").order_by("-case__finalized_at", "-pk"))
     out = []
@@ -26,8 +29,9 @@ def disagreements(since_days=30, cap=200) -> list[dict]:
     return out
 
 
-def campaign_conflicts(cap=200) -> list[dict]:
+def campaign_conflicts(cap=None) -> list[dict]:
     """Campaigns whose active folder-labelled members include both Dangerous and Safe, newest first."""
+    cap = cap or CAP
     pairs = (LabelRecord.objects.filter(
         source=LabelRecord.Source.IMAP_FOLDER, trust=LabelRecord.Trust.FOLDER, status=LabelRecord.Status.ACTIVE,
         label_class__in=("Dangerous", "Safe"), case__campaign_membership__isnull=False)
@@ -36,6 +40,6 @@ def campaign_conflicts(cap=200) -> list[dict]:
     seen: dict[str, dict] = {}
     for ref, updated, label_class in pairs:
         seen.setdefault(ref, {"updated": updated, "labels": {}})["labels"][label_class] = 1
-    rows = sorted((r, v) for r, v in seen.items() if members_disagree(v["labels"]))
-    rows.sort(key=lambda rv: rv[1]["updated"], reverse=True)
+    rows = sorted(((r, v) for r, v in seen.items() if members_disagree(v["labels"])),
+                  key=lambda rv: rv[1]["updated"], reverse=True)
     return [{"campaign_ref": r, "classes": ["Dangerous", "Safe"], "date": v["updated"]} for r, v in rows[:cap]]

@@ -403,3 +403,21 @@ class LabelMixTest(TestCase):
         mix = ledger.label_mix()
         self.assertEqual((mix["now"], mix["before"], mix["jump"]), ({}, {}, None))
         self.assertEqual(mix["rows"], {"now": 0, "before": 0})
+
+    def test_jump_names_the_largest_change(self):
+        self.rows("Safe", 50, 40)
+        self.rows("Dangerous", 40, 40)
+        self.rows("Unwanted", 10, 40)
+        self.rows("Unwanted", 100, 1)  # Safe -25, Dangerous -20, Unwanted +45 points
+        self.assertEqual(ledger.label_mix()["jump"]["class"], "Unwanted")
+
+    def test_window_boundary_is_strict(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        now = timezone.now()
+        for age, key in ((timedelta(days=30), "edge"), (timedelta(days=30, seconds=1), "past")):
+            for i in range(3):
+                LabelRecord.objects.create(
+                    message_id_hash=f"{key}{i}", source=LabelRecord.Source.IMAP_FOLDER, label="Safe",
+                    label_class="Safe", trust=LabelRecord.Trust.FOLDER, observed_at=now - age)
+        self.assertEqual(ledger.label_mix(now=now)["rows"], {"now": 6, "before": 3})

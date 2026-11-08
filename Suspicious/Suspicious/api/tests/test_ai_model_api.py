@@ -548,3 +548,53 @@ class LedgerFlagsQueueApiTest(APITestCase):
         data = self.client.get(BASE + "queue/").json()
         self.assertEqual(data, {"disagreements": {"count": 0, "results": []},
                                 "campaign_conflicts": {"count": 0, "results": []}})
+
+    def test_resolve_is_atomic_with_its_event(self):
+        row = self.flagged()
+        with mock.patch("ai_model.registry.flag_resolved", side_effect=RuntimeError("boom")):
+            self.client.raise_request_exception = False
+            r = self.client.post(BASE + f"flags/{row.pk}/resolve/", {"keep": True, "note": "n"}, format="json")
+        self.assertEqual(r.status_code, 500)
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.resolved_by), ("flagged", None))
+
+    def test_resolve_without_an_active_version_falls_back_to_v0(self):
+        self.v.delete()
+        row = self.flagged()
+        self.assertEqual(self.client.post(BASE + f"flags/{row.pk}/resolve/", {"keep": True, "note": "n"},
+                                          format="json").status_code, 200)
+        self.assertEqual(ModelVersion.objects.get(version_id="v0").events.filter(action="flag_resolved").count(), 1)
+
+    def test_queue_rows_paging_and_cap(self):
+        from datetime import timedelta
+        from ai_model.models import AiAssessment, LabelRecord
+        from case_handler.models import Campaign, CampaignMember
+        from connectors.contrib.ai_model import imap_sync  # noqa: F401
+        for i in range(3):
+            c = Case.objects.create(reporter=user(f"q{i}"), description="MAILTEXT-SECRET", results="Safe",
+                                    verdict_explanation={"decisive_rule": "deny-listed", "band": "Safe"},
+                                    finalized_at=timezone.now() - timedelta(days=i))
+            from case_handler.models import CaseHasFileOrMail
+            from mail_feeder.models import Mail, MailHeader
+            h = MailHeader.objects.create(header_value="{}", fuzzy_hash=f"h{i}")
+            m = Mail.objects.create(subject="SUBJ-SECRET", reportedBy="r", date=timezone.now(), to="t",
+                                    mail_id=f"m{i}", mail_header=h)
+            c.fileOrMail = CaseHasFileOrMail.objects.create(case=c, mail=m)
+            c.save(update_fields=["fileOrMail"])
+            AiAssessment.objects.create(case=c, model_version="v0", result="DANGEROUS", score=1, confidence=1)
+            camp = Campaign.objects.create()
+            for j, lab in enumerate(("Dangerous", "Safe")):
+                member = Case.objects.create(reporter=self.admin, description="")
+                CampaignMember.objects.create(campaign=camp, case=member)
+                LabelRecord.objects.create(message_id_hash=f"c{i}{j}", case=member, source="imap_folder",
+                                           label=lab, label_class=lab, trust="folder")
+        data = self.client.get(BASE + "queue/").json()
+        self.assertEqual((data["disagreements"]["count"], data["campaign_conflicts"]["count"]), (3, 3))
+        self.assertNotIn("SECRET", str(data))
+        paged = self.client.get(BASE + "queue/?disagreements_limit=1&disagreements_offset=1"
+                                "&conflicts_limit=2&conflicts_offset=2").json()
+        self.assertEqual((len(paged["disagreements"]["results"]), paged["disagreements"]["count"]), (1, 3))
+        self.assertEqual((len(paged["campaign_conflicts"]["results"]), paged["campaign_conflicts"]["count"]), (1, 3))
+        with mock.patch("ai_model.queue.CAP", 2):
+            capped = self.client.get(BASE + "queue/").json()
+        self.assertEqual((capped["disagreements"]["count"], capped["campaign_conflicts"]["count"]), (2, 2))

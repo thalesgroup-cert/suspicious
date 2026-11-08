@@ -1,5 +1,6 @@
 """AI model card endpoints (Plan F, Task 10). Thin: the services decide, the views map their
 refusals to fixed messages (never exception text)."""
+from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
 from rest_framework import status
@@ -287,10 +288,11 @@ class ResolveFlagView(APIView):
         if record is None:
             return Response({"detail": "Unknown label."}, status=status.HTTP_404_NOT_FOUND)
         try:
-            resolve_flag(record, request.user, note, keep=keep)
+            with transaction.atomic():  # a failed event write must not close the label unaudited
+                resolve_flag(record, request.user, note, keep=keep)
+                registry.flag_resolved(request.user, f"label {record.pk}: keep={str(keep).lower()}: {note}"[:2000])
         except ValueError:
             return _refused("The label is not flagged.")
-        registry.flag_resolved(request.user, f"label {record.pk}: keep={str(keep).lower()}: {note}"[:2000])
         return Response(flag_row(record))
 
 

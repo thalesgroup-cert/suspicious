@@ -300,7 +300,7 @@ MIX_WINDOW_DAYS, MIX_MIN_ROWS, MIX_JUMP = 30, 50, 0.15  # ruling G8
 
 def label_mix(now=None) -> dict:
     """Share of each class among the active folder rows now and among those observed more than
-    MIX_WINDOW_DAYS ago. `jump` names the first class whose share moved by more than MIX_JUMP, when
+    MIX_WINDOW_DAYS ago. `jump` names the class whose share moved most, when that is more than MIX_JUMP, when
     both windows hold at least MIX_MIN_ROWS rows; else None."""
     cutoff = (now or dj_timezone.now()) - timedelta(days=MIX_WINDOW_DAYS)
     rows = LabelRecord.objects.filter(source=LabelRecord.Source.IMAP_FOLDER, status=ACTIVE).order_by()
@@ -314,8 +314,7 @@ def label_mix(now=None) -> dict:
     before_mix, before_n = mix(rows.filter(observed_at__lt=cutoff))
     jump = None
     if now_n >= MIX_MIN_ROWS and before_n >= MIX_MIN_ROWS:
-        for c in MIX_CLASSES:
-            if abs(now_mix[c] - before_mix[c]) > MIX_JUMP:
-                jump = {"class": c, "from": before_mix[c], "to": now_mix[c]}
-                break
+        c = max(MIX_CLASSES, key=lambda c: abs(now_mix[c] - before_mix[c]))
+        if abs(now_mix[c] - before_mix[c]) > MIX_JUMP:
+            jump = {"class": c, "from": before_mix[c], "to": now_mix[c]}
     return {"now": now_mix, "before": before_mix, "rows": {"now": now_n, "before": before_n}, "jump": jump}
