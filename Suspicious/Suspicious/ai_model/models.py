@@ -298,3 +298,20 @@ class ShadowCampaignEffect(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["case", "version"],
                                                name="ai_model_shadow_campaign_case_version")]
+
+
+class ModelVersionStats(models.Model):
+    """Daily counters of one model version, attributed through the case's assessment (Ruling F10).
+    Recomputed by ai_model.stats; never written by the live path."""
+
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="stats")
+    day = models.DateField()
+    scored = models.PositiveIntegerField(default=0)
+    dangerous = models.PositiveIntegerField(default=0)
+    campaign_checks = models.PositiveIntegerField(default=0)
+    created = models.PositiveIntegerField(default=0)
+    joined = models.PositiveIntegerField(default=0)
+    alerts = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["version", "day"], name="ai_model_stats_version_day")]

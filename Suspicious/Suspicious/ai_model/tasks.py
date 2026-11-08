@@ -170,3 +170,12 @@ def _seed_one(version, doc_id, text, client) -> str | None:
     except (ValueError, KeyError, TypeError) as exc:  # refused (4xx) or garbage: this mail only
         return type(exc).__name__
     return None
+
+
+@shared_task
+def materialise_model_stats() -> None:
+    """Daily (beat entry in connectors.apps): recompute the per-version counters of the last 3 days."""
+    from ai_model import registry, stats
+
+    registry.ensure_version_zero()  # v0 assessments count under the v0 row
+    stats.recompute()
