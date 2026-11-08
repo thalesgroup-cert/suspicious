@@ -8,7 +8,7 @@ from django.db import connection
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
-from ai_model import promotion, registry
+from ai_model import promotion, registry, serversync
 from ai_model.models import (ModelEvent, ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult,
                              ShadowReview)
 from ai_model.promotion import PromotionRefused
@@ -403,6 +403,65 @@ class ActionsTest(PromotionBase):
         self.v1.refresh_from_db()
         self.assertEqual((self.v1.status, self.v1.shadow_slot), (S.DISCARDED, None))
         self.assertEqual(ShadowResult.objects.filter(version=self.v1).count(), 2)
+
+
+class ShadowSyncTest(TestCase):
+    """start_shadow and discard push the new state to the server after commit (Ruling F2)."""
+
+    def setUp(self):
+        self.admin = get_user_model().objects.create(username="admin")
+        registry.ensure_version_zero()
+        self.v1 = cand("v1", manifest={"eligible": True})
+
+    def start(self, **sync):
+        with mock.patch(SYNC, **sync) as call, self.captureOnCommitCallbacks(execute=True), \
+                mock.patch("ai_model.registry._queue_seeding"):
+            try:
+                return promotion.start_shadow(self.v1, self.admin, "go")
+            finally:
+                self.calls = call.call_args_list
+
+    def test_start_shadow_syncs_and_requires_the_shadow_to_load(self):
+        self.start(return_value=True)
+        self.assertEqual([c.kwargs for c in self.calls], [{"shadow_must_load": True}])
+        self.v1.refresh_from_db()
+        self.assertEqual(self.v1.status, S.SHADOW)
+
+    def test_start_shadow_transient_failure_keeps_the_shadow(self):
+        self.start(return_value=False)
+        self.v1.refresh_from_db()
+        self.assertEqual(self.v1.status, S.SHADOW)
+
+    def test_start_shadow_refused_goes_back_to_candidate(self):
+        for exc in (serversync.ShadowRefused("x"), ReloadRefused("x")):
+            with self.assertRaises(ReloadRefused):
+                self.start(side_effect=exc)
+            self.v1.refresh_from_db()
+            self.assertEqual((self.v1.status, self.v1.shadow_slot, self.v1.shadow_since),
+                             (S.CANDIDATE, None, None))
+            ev = self.v1.events.order_by("pk").last()
+            self.assertEqual((ev.action, ev.user), ("shadow_refused", self.admin))
+        # back to candidate, so it can be started again
+        self.start(return_value=True)
+        self.v1.refresh_from_db()
+        self.assertEqual(self.v1.status, S.SHADOW)
+
+    def test_discard_syncs_best_effort(self):
+        with self.captureOnCommitCallbacks(execute=False):
+            registry.set_shadow(self.v1)
+        for i, kw in enumerate(({"return_value": False}, {"side_effect": ReloadRefused("x")})):
+            v = cand(f"d{i}")
+            with mock.patch(SYNC, **kw) as sync, self.assertLogs("ai_model.promotion", "WARNING"):
+                promotion.discard(v, self.admin, "bye")
+            sync.assert_called_once_with()
+            v.refresh_from_db()
+            self.assertEqual(v.status, S.DISCARDED)
+        with mock.patch(SYNC, return_value=True) as sync:
+            promotion.discard(self.v1, self.admin, "bye")
+        sync.assert_called_once_with()
+        self.v1.refresh_from_db()
+        self.assertEqual((self.v1.status, self.v1.shadow_slot), (S.DISCARDED, None))
+        self.assertEqual(self.v1.events.last().user, self.admin)
 
 
 @skipIf(connection.vendor == "sqlite", "needs row locks and real connections (MariaDB)")

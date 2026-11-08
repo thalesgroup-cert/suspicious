@@ -174,7 +174,7 @@ class ShadowStartView(Write):
     needs_version = True
 
     def act(self, request, version, data):
-        return _done(registry.set_shadow(version, request.user, data["note"]))
+        return _done(promotion.start_shadow(version, request.user, data["note"]))
 
 
 class PromoteView(Write):
@@ -191,7 +191,7 @@ class RollbackView(Write):
 
 class DiscardView(Write):
     def act(self, request, version, data):
-        return _done(registry.discard(version, request.user, data["note"]))
+        return _done(promotion.discard(version, request.user, data["note"]))
 
 
 class ExtendView(Write):

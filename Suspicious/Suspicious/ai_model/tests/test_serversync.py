@@ -79,6 +79,59 @@ class SyncTest(TestCase):
         self.assertNotIn("fake://", str(ctx.exception))
         self.assertNotIn("http", str(ctx.exception).lower())
 
+    def test_a_refused_shadow_is_retried_without_it_and_leaves_one_event(self):
+        self.go()
+        shadow = ModelVersion.objects.get(version_id="v2")
+        self.client.metadata.return_value = meta("v0")
+        for _ in range(2):  # the beat's next run: same refusal, no second event
+            self.client.reload.reset_mock()
+            self.client.reload.side_effect = [ValueError("inference server refused the request (HTTP 422)"), {}]
+            with self.assertLogs("ai_model.serversync", "WARNING") as logs:
+                self.assertFalse(serversync.sync(self.client))  # the server still lacks the shadow
+            bodies = [c.args[0] for c in self.client.reload.call_args_list]
+            self.assertEqual([b["shadow"] is None for b in bodies], [False, True])
+            self.assertEqual(bodies[1]["active"]["version_id"], "v1")
+            self.assertNotIn("422", "".join(logs.output))
+        self.assertEqual(list(shadow.events.filter(action="shadow_refused").values_list("user", flat=True)), [None])
+        shadow.refresh_from_db()
+        self.assertEqual(shadow.status, ModelVersion.Status.SHADOW)
+
+    def test_shadow_must_load_raises_shadow_refused_after_the_retry(self):
+        self.go()
+        self.client.metadata.return_value = meta("v0")
+        self.client.reload.side_effect = [ValueError("HTTP 422"), {}]
+        with self.assertRaises(serversync.ShadowRefused):
+            serversync.sync(self.client, shadow_must_load=True)
+        self.assertEqual(self.client.reload.call_count, 2)
+
+    def test_refused_with_and_without_the_shadow_is_reload_refused(self):
+        self.go()
+        self.client.metadata.return_value = meta("v0")
+        self.client.reload.side_effect = ValueError("HTTP 422")
+        with self.assertRaises(serversync.ReloadRefused) as ctx:
+            serversync.sync(self.client)
+        self.assertNotIsInstance(ctx.exception, serversync.ShadowRefused)
+        self.assertEqual(self.client.reload.call_count, 2)
+        self.assertFalse(ModelVersion.objects.filter(events__action="shadow_refused").exists())
+
+    def test_without_a_shadow_a_refusal_is_not_retried(self):
+        self.go(shadow=None)
+        self.client.metadata.return_value = meta("v0")
+        self.client.reload.side_effect = ValueError("HTTP 422")
+        with self.assertRaises(serversync.ReloadRefused):
+            serversync.sync(self.client)
+        self.assertEqual(self.client.reload.call_count, 1)
+
+    def test_an_unconfigured_connector_is_a_transient_failure(self):
+        self.go()
+        for exc in (ValueError("token secret"), KeyError("ai_model")):
+            with mock.patch("connectors.registry.registry.instantiate") as inst, \
+                    self.assertLogs("ai_model.serversync", "WARNING") as logs:
+                inst.return_value._client.side_effect = exc
+                self.assertFalse(serversync.sync())
+            self.assertIn(type(exc).__name__, logs.output[0])
+            self.assertNotIn("secret", logs.output[0])
+
     def test_a_4xx_on_the_metadata_get_is_not_a_refused_reload(self):
         self.go()
         self.client.metadata.side_effect = ValueError("inference server refused the request (HTTP 422)")

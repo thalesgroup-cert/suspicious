@@ -177,6 +177,34 @@ def rollback(user, note=""):
     return target
 
 
+def start_shadow(version, user, note=""):
+    """registry.set_shadow, then a server sync that must load the shadow. A refusal (4xx) puts
+    the version back to candidate and raises ReloadRefused; a transient failure keeps the shadow
+    and the beat heals the server."""
+    registry.set_shadow(version, user, note)
+    try:
+        if not serversync.sync(shadow_must_load=True):
+            logger.warning("ai_model server sync after a shadow start failed, the beat retries")
+    except serversync.ReloadRefused as refused:
+        try:
+            registry.unshadow(version, user)
+        except Exception as exc:  # never mask the refusal
+            logger.warning("ai_model shadow revert failed: %s", type(exc).__name__)
+        raise refused
+    return version
+
+
+def discard(version, user, note=""):
+    """registry.discard, then a best-effort server sync (a discarded shadow leaves the server)."""
+    registry.discard(version, user, note)
+    try:
+        if not serversync.sync():
+            logger.warning("ai_model server sync after a discard failed, the beat retries")
+    except serversync.ReloadRefused as exc:
+        logger.warning("ai_model server sync after a discard refused: %s", type(exc).__name__)
+    return version
+
+
 def extend(version, days, user, note=""):
     return registry.extend_shadow(version, days, user, note)
 

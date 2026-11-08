@@ -309,6 +309,29 @@ def set_shadow(version, user=None, note=""):
     return version
 
 
+def shadow_refused(version):
+    """serversync: the server refused the shadow's bundle and runs without it. One event per run
+    of refusals (the beat retries every 300 s); the version stays the shadow."""
+    last = version.events.order_by("-pk").values_list("action", flat=True).first()
+    if last != "shadow_refused":
+        _event(version, "shadow_refused", None, "the inference server refused the bundle")
+
+
+def unshadow(version, user=None):
+    """The server refused a shadow just started: back to candidate, its shadow period cleared, so
+    an admin may start it again. A version that is no longer the shadow is left as it is."""
+    S = ModelVersion.Status
+    with transaction.atomic():
+        locked = _lock(version)
+        if locked.status != S.SHADOW:
+            return False
+        locked.status, locked.shadow_slot, locked.shadow_since = S.CANDIDATE, None, None
+        locked.save(update_fields=["status", "shadow_slot", "shadow_since"])
+        _event(locked, "shadow_refused", user, "back to candidate")
+    version.refresh_from_db()
+    return True
+
+
 def recheck_started(version, user, job_id):
     """Ruling F11: a gate recheck of this version was posted (retrain.start_recheck)."""
     _event(version, "start_recheck", user, job_id)

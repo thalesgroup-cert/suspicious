@@ -173,6 +173,35 @@ class AiModelApiTest(APITestCase):
         self.assertEqual(r.status_code, 409)
         self.assertNotIn("presigned", str(r.json()))
 
+    def test_promote_with_a_cleared_token_is_a_transient_sync_failure(self):
+        v = self.shadow()
+        with mock.patch("ai_model.promotion.can_promote", return_value=[]), \
+                mock.patch("connectors.registry.registry.instantiate") as inst:
+            inst.return_value._client.side_effect = ValueError("token not configured")
+            r = self.client.post(BASE + "promote/", {}, format="json")
+        self.assertEqual(r.status_code, 200)
+        v.refresh_from_db()
+        self.assertEqual(v.status, S.ACTIVE)
+
+    def test_shadow_start_refused_by_the_server_is_409_and_back_to_candidate(self):
+        v = cand("v2", manifest={"eligible": True})
+        with mock.patch("ai_model.registry._queue_seeding"), \
+                mock.patch(SYNC, side_effect=ReloadRefused("http://presigned/leak")) as sync:
+            r = self.client.post(BASE + "shadow/start/", {"version_id": "v2"}, format="json")
+        sync.assert_called_once_with(shadow_must_load=True)
+        self.assertEqual(r.status_code, 409)
+        self.assertNotIn("presigned", str(r.json()))
+        v.refresh_from_db()
+        self.assertEqual(v.status, S.CANDIDATE)
+        self.assertIn("shadow_refused", self.events(v))
+
+    def test_discard_syncs_the_server(self):
+        self.shadow()
+        with mock.patch(SYNC, return_value=True) as sync:
+            r = self.client.post(BASE + "discard/", {"version_id": "v2"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        sync.assert_called_once_with()
+
     def test_promote_without_shadow_409(self):
         self.assertEqual(self.client.post(BASE + "promote/", {}, format="json").status_code, 409)
 
