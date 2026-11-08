@@ -79,7 +79,7 @@ export function CandidateTab() {
         onCancel={close}
         onConfirm={() => {
           close();
-          discard.mutate({ version_id: c.version_id });
+          discard.mutate({ version_id: c.version_id, expected_status: "candidate" });
         }}
       />
     </Stack>

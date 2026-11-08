@@ -71,6 +71,7 @@ describe("VersionsTab", () => {
     expect(d).toHaveTextContent("v0 (the original model)");
     await userEvent.click(within(d).getByRole("button", { name: "Roll back" }));
     expect(api.postRollback).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(api.postRollback).mock.calls[0][0]).toEqual({ version_id: "v0" });
   });
 
   it("shows the 409 text and only the latest outcome", async () => {

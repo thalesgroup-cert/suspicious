@@ -130,6 +130,6 @@ describe("CandidateTab", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Discard" }));
     expect(api.postDiscard).not.toHaveBeenCalled();
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Discard" }));
-    await waitFor(() => expect(vi.mocked(api.postDiscard).mock.calls[0][0]).toEqual({ version_id: "v4" }));
+    await waitFor(() => expect(vi.mocked(api.postDiscard).mock.calls[0][0]).toEqual({ version_id: "v4", expected_status: "candidate" }));
   });
 });

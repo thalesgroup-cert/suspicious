@@ -2,12 +2,16 @@ import math
 from rest_framework import serializers
 
 from ai_model import retrain
-from ai_model.models import ShadowReview
+from ai_model.models import ModelVersion, ShadowReview
 
 
 class ActionSerializer(serializers.Serializer):
     version_id = serializers.CharField(max_length=64, required=False)
     note = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
+
+
+class DiscardSerializer(ActionSerializer):
+    expected_status = serializers.ChoiceField(choices=ModelVersion.Status.values, required=False)
 
 
 class ExtendSerializer(ActionSerializer):

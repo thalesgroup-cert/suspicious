@@ -6,7 +6,7 @@ import { useReview } from "../hooks";
 
 export const NOTE_MAX = 2000;
 
-export function ReviewDialog({ kind, caseId, onClose }: { kind: ReviewKind; caseId: number | null; onClose(): void }) {
+export function ReviewDialog({ versionId, kind, caseId, onClose }: { versionId: string; kind: ReviewKind; caseId: number | null; onClose(): void }) {
   const id = React.useId();
   const [note, setNote] = React.useState("");
   const review = useReview();
@@ -42,7 +42,7 @@ export function ReviewDialog({ kind, caseId, onClose }: { kind: ReviewKind; case
         <Button
           variant="contained"
           disabled={!valid || review.isPending}
-          onClick={() => review.mutate({ kind, case_id: Number(caseId), note: note.trim() }, { onSuccess: done })}
+          onClick={() => review.mutate({ version_id: versionId, kind, case_id: Number(caseId), note: note.trim() }, { onSuccess: done })}
         >
           Save review
         </Button>

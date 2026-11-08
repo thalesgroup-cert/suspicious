@@ -96,7 +96,7 @@ export function VersionsTab() {
         onConfirm={() => {
           const target = confirm?.version_id ?? "";
           setConfirm(null);
-          rollback.mutate({}, {
+          rollback.mutate({ version_id: target }, {
             onSuccess: () => setOutcome(`Rolled back to ${versionName(target)}.`),
             onError: (e) => setOutcome(refusalMessage(e)),
           });

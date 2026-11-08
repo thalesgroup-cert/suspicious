@@ -77,7 +77,7 @@ describe("ShadowTab", () => {
       detail({ flips: { count: 1, results: [{ case_id: 11, flip: "critical", live_result: "Safe", would_be_result: "Dangerous", reviewable: true, reviewed: true }] } }),
     );
     await userEvent.click(save);
-    expect(vi.mocked(api.postReview).mock.calls[0][0]).toEqual({ kind: "flip", case_id: 11, note: "checked" });
+    expect(vi.mocked(api.postReview).mock.calls[0][0]).toEqual({ version_id: "v5", kind: "flip", case_id: 11, note: "checked" });
     expect(await screen.findByText("Reviewed")).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe("ShadowTab", () => {
     const dlg = await screen.findByRole("dialog");
     expect(within(dlg).getByText(/v5 becomes the active/)).toBeInTheDocument();
     await userEvent.click(within(dlg).getByRole("button", { name: "Promote" }));
-    await waitFor(() => expect(api.postPromote).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(api.postPromote).mock.calls[0][0]).toEqual({ version_id: "v5" }));
     await waitFor(() => expect(within(screen.getAllByRole("status")[0]).getByText(/out of date/)).toBeInTheDocument());
     await waitFor(() => expect(vi.mocked(api.getShadow).mock.calls.length).toBeGreaterThan(1));
   });
@@ -121,7 +121,7 @@ describe("ShadowTab", () => {
     await userEvent.clear(input);
     await userEvent.type(input, "14");
     await userEvent.click(btn);
-    expect(vi.mocked(api.postExtend).mock.calls[0][0]).toEqual({ days: 14 });
+    expect(vi.mocked(api.postExtend).mock.calls[0][0]).toEqual({ version_id: "v5", days: 14 });
   });
 
   it("rechecks, shows its result, and discards after confirmation", async () => {
@@ -131,10 +131,10 @@ describe("ShadowTab", () => {
     renderTab();
     expect(await screen.findByText(/Last recheck: Failed/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Recheck" }));
-    expect(vi.mocked(api.postRecheck).mock.calls[0][0]).toEqual({});
+    expect(vi.mocked(api.postRecheck).mock.calls[0][0]).toEqual({ version_id: "v5" });
     await userEvent.click(screen.getByRole("button", { name: "Discard" }));
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Discard" }));
-    await waitFor(() => expect(vi.mocked(api.postDiscard).mock.calls[0][0]).toEqual({}));
+    await waitFor(() => expect(vi.mocked(api.postDiscard).mock.calls[0][0]).toEqual({ version_id: "v5", expected_status: "shadow" }));
   });
 
   it("disables the other actions while one is in flight", async () => {
@@ -174,7 +174,7 @@ describe("ShadowTab", () => {
     await userEvent.click(screen.getByRole("button", { name: "Review campaign case 211" }));
     await userEvent.type(screen.getByLabelText(/Review note/), "ok");
     await userEvent.click(screen.getByRole("button", { name: "Save review" }));
-    await waitFor(() => expect(vi.mocked(api.postReview).mock.calls[0][0]).toEqual({ kind: "campaign", case_id: 211, note: "ok" }));
+    await waitFor(() => expect(vi.mocked(api.postReview).mock.calls[0][0]).toEqual({ version_id: "v5", kind: "campaign", case_id: 211, note: "ok" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await screen.findByRole("button", { name: "Review campaign case 211" })).toBeInTheDocument();
     expect(last()).toMatchObject({ effects_offset: 10, flips_offset: 10 });

@@ -126,6 +126,7 @@ const get = async <T>(path: string, params?: PageParams): Promise<T> => (await a
 const post = async <T>(path: string, body: object = {}): Promise<T> => (await api.post(`${base}${path}`, body)).data;
 
 export type Note = { note?: string };
+/** version_id: the version the screen shows, so a stale screen is refused (409 state_changed). */
 export type VersionAction = Note & { version_id?: string };
 
 export const getStatus = () => get<AiModelStatus>("status/");
@@ -140,8 +141,8 @@ export const getQueue = (p?: PageParams) => get<QueueResponse>("queue/", p);
 
 export const postShadowStart = (b: VersionAction & { version_id: string }) => post<VersionSummary>("shadow/start/", b);
 export const postPromote = (b: VersionAction) => post<VersionSummary>("promote/", b);
-export const postRollback = (b: Note) => post<VersionSummary>("rollback/", b);
-export const postDiscard = (b: VersionAction) => post<VersionSummary>("discard/", b);
+export const postRollback = (b: VersionAction) => post<VersionSummary>("rollback/", b);
+export const postDiscard = (b: VersionAction & { expected_status?: VersionStatus }) => post<VersionSummary>("discard/", b);
 export const postExtend = (b: VersionAction & { days: number }) => post<VersionSummary>("extend/", b);
 export const postRecheck = (b: VersionAction) => post<{ job_id: string }>("recheck/", b);
 export const postReview = (b: VersionAction & { kind: ReviewKind; case_id: number; note: string }) =>

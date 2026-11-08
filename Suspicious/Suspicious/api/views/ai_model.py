@@ -18,8 +18,8 @@ from ai_model.models import LabelRecord, ModelVersion, RetrainJob, ShadowCampaig
 from ai_model.serversync import ReloadRefused
 from common.http_client import breaker_state, request_reset
 from api.permissions.ai_model import IsAdmin, IsAdminOrCISO
-from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ResolveSerializer, ReviewSerializer,
-                                      candidate_row, flag_row, job_row, version_summary)
+from api.serializers.ai_model import (ActionSerializer, DiscardSerializer, ExtendSerializer, ResolveSerializer,
+                                      ReviewSerializer, candidate_row, flag_row, job_row, version_summary)
 from connectors.delivery import get_state
 
 logger = logging.getLogger(__name__)
@@ -226,12 +226,15 @@ class RollbackView(Write):
     needs_target = False
 
     def act(self, request, version, data):
-        return _done(promotion.rollback(request.user, data["note"]))
+        # version_id, when sent, is the rollback target the client saw (a stale screen is refused)
+        return _done(promotion.rollback(request.user, data["note"], data.get("version_id")))
 
 
 class DiscardView(Write):
+    serializer_class = DiscardSerializer
+
     def act(self, request, version, data):
-        return _done(promotion.discard(version, request.user, data["note"]))
+        return _done(promotion.discard(version, request.user, data["note"], data.get("expected_status")))
 
 
 class ExtendView(Write):

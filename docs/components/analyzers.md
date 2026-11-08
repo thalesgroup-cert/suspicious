@@ -767,7 +767,9 @@ Five tabs:
 - **Ledger:** label mix with its jump warning, flagged labels with resolve, and the review queue.
 
 Retrain, promote, rollback, discard, resolve and the breaker reset each ask for confirmation. A
-`409` is shown in words from its `codes`; the card shows only what the server confirmed.
+`409` is shown in words from its `codes`; the card shows only what the server confirmed. Every
+version action sends the `version_id` it shows (and discard its expected status), so an action
+from a stale screen is refused instead of acting on whatever the server holds now.
 
 **Schedule rule.** `schedule.next_run` is not stored. It is the newest version's `created_at` plus
 `retrain_interval_days` (default 30), or now when there is no version. The newest version counts candidate, shadow, active and previous
@@ -814,8 +816,8 @@ group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<
 | `POST /api/ai-model/recheck/` | Admin | start a gate recheck of the shadow; `202 {job_id}` |
 | `POST /api/ai-model/extend/` | Admin | `{days}`: a new total for `shadow_min_days`, above the current one, at most 365 |
 | `POST /api/ai-model/promote/` | Admin | promote the shadow (or `version_id`); `409` with `codes` when refused |
-| `POST /api/ai-model/rollback/` | Admin | the `previous` version becomes active; `409 no_previous` without one |
-| `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version, free the shadow slot and sync the server (best effort) |
+| `POST /api/ai-model/rollback/` | Admin | the `previous` version becomes active; `409 no_previous` without one. With `version_id` (the target the screen shows), `409 state_changed` and no change when the `previous` is another version |
+| `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version, free the shadow slot and sync the server (best effort). With `expected_status`, `409 state_changed` and no change when the version is no longer in that status |
 | `GET /api/ai-model/candidates/` | Admin, CISO | candidates and the shadow, newest first (`limit`, `offset`): `{version_id, status, created_at, trigger, rows, excluded_rows, eligible, gate}`. `gate` is a whitelisted copy of the manifest (`checks`, `candidate`, `baseline`, `campaign`, `tier_cutoffs`; numbers, booleans and strings up to 300 characters, nested at most 4 levels, lists cut at 50 items; any string or key containing `http` is dropped); the manifest, bundle prefix and URLs never leave the registry |
 | `GET /api/ai-model/jobs/` | Admin, CISO | the retrain job history, newest first (`limit`, `offset`): `{job_id, state, trigger, rows, excluded_rows, started_at, finished_at, error}`, `error` capped at 200 characters |
 | `GET /api/ai-model/ledger/` | Admin, CISO | `ledger_summary()` (`by_source`, `flagged`, `trainable`) plus `mix`, the label mix and its jump warning (see below) |

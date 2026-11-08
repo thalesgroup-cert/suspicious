@@ -298,6 +298,40 @@ class AiModelApiTest(APITestCase):
         self.assertEqual(a.status, S.ACTIVE)
         self.assertIn("rollback", self.events(a) + self.events(b))
 
+    def test_rollback_to_a_stale_target_is_refused(self):
+        from ai_model import registry
+        a, b, c = cand("a"), cand("b"), cand("c")
+        for v in (a, b, c):
+            registry.set_active(v, self.admin)  # a discarded, b previous, c active
+        before = dict(ModelVersion.objects.values_list("version_id", "status"))
+        events = ModelEvent.objects.count()
+        with mock.patch(SYNC, return_value=True) as sync:
+            for stale in ("a", "c"):
+                r = self.client.post(BASE + "rollback/", {"version_id": stale}, format="json")
+                self.assertEqual((r.status_code, r.json().get("codes")), (409, ["state_changed"]), stale)
+        sync.assert_not_called()
+        self.assertEqual(dict(ModelVersion.objects.values_list("version_id", "status")), before)
+        self.assertEqual(ModelEvent.objects.count(), events)
+        with mock.patch(SYNC, return_value=True):
+            r = self.client.post(BASE + "rollback/", {"version_id": "b"}, format="json")
+        self.assertEqual((r.status_code, r.json()["version_id"]), (200, "b"))
+        b.refresh_from_db()
+        self.assertEqual(b.status, S.ACTIVE)
+
+    def test_discard_of_a_former_shadow_is_refused(self):
+        v = self.shadow()
+        ModelVersion.objects.filter(pk=v.pk).update(status=S.PREVIOUS, shadow_slot=None)  # promoted, then rolled back
+        r = self.client.post(BASE + "discard/", {"version_id": "v2", "expected_status": "shadow"}, format="json")
+        self.assertEqual((r.status_code, r.json().get("codes")), (409, ["state_changed"]))
+        v.refresh_from_db()
+        self.assertEqual(v.status, S.PREVIOUS)
+        self.assertNotIn("discard", self.events(v))
+        ModelVersion.objects.filter(pk=v.pk).update(status=S.ACTIVE, active_slot=1)  # promoted
+        r = self.client.post(BASE + "discard/", {"version_id": "v2", "expected_status": "shadow"}, format="json")
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(self.client.post(BASE + "discard/", {"version_id": "v2", "expected_status": "x"},
+                                          format="json").status_code, 400)
+
     def test_discard(self):
         v = self.shadow()
         r = self.client.post(BASE + "discard/", {"version_id": "v2"}, format="json")

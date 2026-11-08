@@ -45,6 +45,10 @@ class RegistryError(Exception):
     pass
 
 
+class StateChanged(RegistryError):
+    """The version is no longer in the state the caller saw (a stale screen)."""
+
+
 def _check_id(value, what):
     if not isinstance(value, str) or not _ID.fullmatch(value):
         raise RegistryError(f"{what} must match [A-Za-z0-9_-]{{1,64}}")
@@ -214,9 +218,10 @@ def revert_promote(target, old_active, old_previous, user=None, note=""):
     return _retry(run)
 
 
-def rollback_to_previous(user, note=""):
+def rollback_to_previous(user, note="", expected_id=None):
     """The previous version becomes active again, picked under the row locks. Returns
-    (target, old_active), or None when there is no previous."""
+    (target, old_active), or None when there is no previous. With expected_id, a previous with
+    another id raises StateChanged."""
     S = ModelVersion.Status
     picked = []
 
@@ -227,6 +232,8 @@ def rollback_to_previous(user, note=""):
             target = next((r for r in rows if r.status == S.PREVIOUS), None)
             if target is None:
                 return
+            if expected_id is not None and target.version_id != expected_id:
+                raise StateChanged("the previous version changed")
             old_active = next((r for r in rows if r.status == S.ACTIVE), None)
             set_active(target, user, note)  # refreshes target, so old_active is read first
             _event(target, "rollback", user, note)
@@ -271,10 +278,13 @@ def extend_shadow(version, days, user=None, note=""):
     return version
 
 
-def discard(version, user=None, note=""):
+def discard(version, user=None, note="", expected_status=None):
+    """With expected_status, a version in another status raises StateChanged."""
     S = ModelVersion.Status
     with transaction.atomic():
         locked = _lock(version)
+        if expected_status is not None and locked.status != expected_status:
+            raise StateChanged(f"the version is {locked.status} now")
         if locked.status in (S.ACTIVE, S.DISCARDED, S.FAILED):
             raise RegistryError(f"cannot discard a {locked.status} version")
         locked.status, locked.shadow_slot = S.DISCARDED, None

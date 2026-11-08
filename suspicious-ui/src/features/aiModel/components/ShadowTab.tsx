@@ -100,10 +100,10 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
           helperText={days !== "" && !daysOk ? `Enter a whole number above ${d.shadow_min_days}, at most ${MAX_SHADOW_DAYS}` : `Now ${d.shadow_min_days} days, above ${d.shadow_min_days}, at most ${MAX_SHADOW_DAYS}`}
           slotProps={{ htmlInput: { inputMode: "numeric" } }}
         />
-        <Button disabled={!daysOk || busy} onClick={() => run(extend, { days: n }, () => setDays(""))}>
+        <Button disabled={!daysOk || busy} onClick={() => run(extend, { version_id: d.version_id, days: n }, () => setDays(""))}>
           Extend
         </Button>
-        <Button disabled={busy} onClick={() => run(recheck, {})}>
+        <Button disabled={busy} onClick={() => run(recheck, { version_id: d.version_id })}>
           Recheck
         </Button>
         <Button color="error" disabled={busy} onClick={() => setDialog("discard")}>
@@ -122,7 +122,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         {err != null && <Typography variant="body2">{refusalMessage(err)}</Typography>}
       </Box>
 
-      <ReviewDialog kind={review?.kind ?? "flip"} caseId={review?.caseId ?? null} onClose={() => setReview(null)} />
+      <ReviewDialog versionId={d.version_id} kind={review?.kind ?? "flip"} caseId={review?.caseId ?? null} onClose={() => setReview(null)} />
       <ConfirmDialog
         open={dialog === "promote"}
         title="Promote this version?"
@@ -131,7 +131,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         onCancel={close}
         onConfirm={() => {
           close();
-          run(promote, {});
+          run(promote, { version_id: d.version_id });
         }}
       />
       <ConfirmDialog
@@ -143,7 +143,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         onCancel={close}
         onConfirm={() => {
           close();
-          run(discard, {});
+          run(discard, { version_id: d.version_id, expected_status: "shadow" });
         }}
       />
     </Stack>
