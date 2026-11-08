@@ -17,10 +17,15 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
   const reset = useResetBreaker();
   const jobs = useAiModelJobs(s?.job_running ?? false);
   const [confirm, setConfirm] = React.useState(false);
-  // The breaker state seen when a reset succeeded; the note hides once the published state moves.
-  const [resetAt, setResetAt] = React.useState<string | null>(null);
+  // "waiting": reset succeeded, status still shows the old open state; "seen": status shows it cleared.
+  const [resetNote, setResetNote] = React.useState<null | "waiting" | "seen">(null);
   if (isError) return <Alert severity="error">Could not load the AI model status.</Alert>;
   if (!s) return <Typography>Loading</Typography>;
+
+  const tripped = s.breaker.state === "open" || s.breaker.state === "half-open";
+  // Adjusting state during render: keep the note once the breaker clears, drop it if it trips again.
+  if (resetNote === "waiting" && !tripped) setResetNote("seen");
+  else if (resetNote === "seen" && tripped) setResetNote(null);
 
   const health = s.health.ok === null ? "never checked" : s.health.ok ? "ok" : "failing";
   const sources = Object.keys(s.ledger.by_source);
@@ -44,7 +49,7 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
           </Button>
         )}
         <Box role="status">
-          {resetAt !== null && resetAt === s.breaker.state && <Typography variant="body2">The breaker was reset.</Typography>}
+          {resetNote !== null && <Typography variant="body2">The breaker was reset.</Typography>}
           {reset.isError && <Typography variant="body2">{refusalMessage(reset.error, "breaker")}</Typography>}
         </Box>
         <ConfirmDialog
@@ -55,8 +60,8 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
           onCancel={() => setConfirm(false)}
           onConfirm={() => {
             setConfirm(false);
-            setResetAt(null);
-            reset.mutate(undefined, { onSuccess: () => setResetAt(s.breaker.state) });
+            setResetNote(null);
+            reset.mutate(undefined, { onSuccess: () => setResetNote("waiting") });
           }}
         />
       </Box>

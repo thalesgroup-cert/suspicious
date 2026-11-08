@@ -85,6 +85,31 @@ describe("OverviewTab", () => {
     expect(await screen.findByText(/breaker was reset/i)).toBeInTheDocument();
     expect(screen.getByText(/breaker was reset/i).closest("[role=status]")).not.toBeNull();
   });
+  it("keeps the reset note once the breaker closes and drops it if it trips again", async () => {
+    vi.mocked(api.postResetBreaker).mockResolvedValue({ epoch: 2 });
+    const closed = status();
+    const open = status({ breaker: { state: "open", since: null } });
+    vi.mocked(api.getStatus).mockResolvedValue(open);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(api.getJobs).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+    render(
+      <QueryClientProvider client={qc}>
+        <SnackbarProvider>
+          <OverviewTab onSeeCandidate={vi.fn()} />
+        </SnackbarProvider>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.click(await screen.findByRole("button", { name: /reset breaker/i }));
+    vi.mocked(api.getStatus).mockResolvedValue(closed);
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^reset$/i }));
+    await screen.findByText(/Circuit breaker: closed/);
+    expect(screen.getByText(/breaker was reset/i)).toBeInTheDocument();
+    vi.mocked(api.getStatus).mockResolvedValue(open);
+    await qc.invalidateQueries();
+    await screen.findByText(/Circuit breaker: open/);
+    expect(screen.queryByText(/breaker was reset/i)).toBeNull();
+  });
   it("offers a reset for half-open", async () => {
     renderTab(status({ breaker: { state: "half-open", since: null } }));
     expect(await screen.findByRole("button", { name: /reset breaker/i })).toBeInTheDocument();
