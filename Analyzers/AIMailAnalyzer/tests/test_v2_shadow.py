@@ -105,6 +105,7 @@ def _wait_free(lock):
 def test_slow_shadow_times_out_holds_only_the_shadow_slot(both, monkeypatch):
     client, _, h = both
     monkeypatch.setattr(v2, "SHADOW_TIMEOUT", 0.05)
+    monkeypatch.setattr(v2, "LIVE_SHADOW_WAIT", 0.01)
 
     def slow(gate):
         with gate:
@@ -125,9 +126,23 @@ def test_slow_shadow_times_out_holds_only_the_shadow_slot(both, monkeypatch):
     assert _wait_free(server._shadow_slot)
 
 
+def test_dual_call_waits_briefly_for_the_shadow_slot(both):
+    client, _, h = both
+    server._shadow_slot.acquire()
+    threading.Timer(0.3, server._shadow_slot.release).start()
+    out = classify(client, h, versions=["active", "shadow"])
+    assert out["results"]["shadow"]["version"] == "v-s"
+
+
+@pytest.mark.parametrize("timeout, skip", [(8, 10.0), (12, 6.0), (18, 0.0), (30, 0.0)])
+def test_skip_point_keeps_active_plus_shadow_under_18_s(monkeypatch, timeout, skip):
+    monkeypatch.setattr(v2, "SHADOW_TIMEOUT", timeout)
+    assert v2.shadow_skip_after() == skip
+
+
 def test_shadow_skipped_after_a_slow_active_pass(both, monkeypatch):
     client, _, h = both
-    monkeypatch.setattr(v2, "SHADOW_SKIP_AFTER", 0)
+    monkeypatch.setattr(v2, "SHADOW_TIMEOUT", 18)  # skip point 0: any active pass is too slow
     r = post(client, h, versions=["active", "shadow"])
     assert r.status_code == 200
     assert r.json()["results"]["shadow"] == {"error": "Skipped"}

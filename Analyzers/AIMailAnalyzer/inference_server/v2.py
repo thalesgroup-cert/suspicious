@@ -30,8 +30,16 @@ CaseId = Annotated[int, Field(strict=True, ge=0, le=2**63 - 1)]
 # A shadow that takes longer is dropped from the answer (its thread still runs to the end).
 SHADOW_TIMEOUT = float(os.environ.get("AI_SHADOW_TIMEOUT", "8"))
 ALLOWED_VERSIONS = (["active"], ["active", "shadow"], ["shadow"])
-# An active pass slower than this leaves no time for the shadow under the connector's timeout.
-SHADOW_SKIP_AFTER = 10.0
+# Active time plus the shadow's deadline stays under this, below the connector's 20 s timeout.
+DUAL_BUDGET = 18.0
+# How long a dual call waits for the shadow slot (held by seeding or another shadow) before Busy.
+LIVE_SHADOW_WAIT = 1.0
+
+
+def shadow_skip_after() -> float:
+    """Seconds of active pass after which the shadow is skipped (10 s with the default 8 s
+    timeout; a timeout of 18 s or more skips the shadow always)."""
+    return max(0.0, DUAL_BUDGET - SHADOW_TIMEOUT)
 # A ["shadow"]-only call (seeding, replay) waits this long for the shadow slot; below the
 # connector's 20 s timeout.
 SHADOW_ONLY_WAIT = 15.0
@@ -43,7 +51,7 @@ class Busy(Exception):
 
 class _ShadowGate:
     """The shadow's own slot, in place of the live slots: a shadow pass never queues ahead of a
-    live one. wait 0 tries once (the dual call), else waits up to `wait` seconds."""
+    live one. wait 0 tries once, else waits up to `wait` seconds."""
 
     def __init__(self, lock, wait):
         self._lock, self._wait = lock, wait
@@ -182,7 +190,7 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder,
         if "active" in req.versions and "shadow" in req.versions:
             # The shadow starts after the active answer exists; on timeout its thread runs on
             # (and keeps the shadow slot until done), the request does not wait for it.
-            if time.perf_counter() - started > SHADOW_SKIP_AFTER:
+            if time.perf_counter() - started > shadow_skip_after():
                 out["results"]["shadow"] = {"error": "Skipped"}
             else:
                 out["results"]["shadow"] = await _shadow_answer(req, state[1])
@@ -195,7 +203,7 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder,
 
         def work():
             try:
-                return _result(shadow, _run(shadow, _body(req), req, _ShadowGate(shadow_slot, 0)))
+                return _result(shadow, _run(shadow, _body(req), req, _ShadowGate(shadow_slot, LIVE_SHADOW_WAIT)))
             except Exception as e:  # noqa: BLE001 - the class only: a message may hold mail data
                 logger.error("shadow classify failed: %s", type(e).__name__)
                 return {"error": type(e).__name__}
