@@ -127,7 +127,9 @@ Deliverable: a passing candidate becomes `shadow`, is compared on live mail, and
 5. **Promote, rollback, discard, extend**: conditions from the spec enforced server-side; atomic pointer moves; `ModelEvent` audit; reload call; concurrency with a running job refused.
 6. **Review API**: review a flip or a campaign difference with a note; list of open items.
 
-## Plan G: Settings "AI model" card (outline)
+## Plan G: Settings "AI model" card
+
+Status: detailed in `docs/plans/2026-11-08-ai-model-connector-g-admin-card.md` (12 tasks: five backend reads and writes, then the card). Outline below kept for reference.
 
 Deliverable: the admin card, hidden when the module is disabled.
 
