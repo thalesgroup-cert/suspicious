@@ -95,13 +95,14 @@ class StatusView(Read):
         state = get_state("ai_model")
         cfg, now = schedule.config(), timezone.now()
         backoff = schedule.backoff_until(now)
+        detail = state.last_health_detail or ""  # CISO reads it too: no URL, host or exception text with one
         counts = {s: 0 for s in S.values}
         counts.update(ModelVersion.objects.order_by().values("status").annotate(n=Count("id"))
                       .values_list("status", "n"))
         return Response({
             "active": pick(S.ACTIVE), "previous": pick(S.PREVIOUS), "shadow": pick(S.SHADOW),
             "job_running": job is not None, "job_id": job.job_id if job else None,
-            "health": {"ok": state.last_health_ok, "detail": state.last_health_detail[:200],
+            "health": {"ok": state.last_health_ok, "detail": None if "http" in detail.lower() else detail[:200],
                        "checked_at": state.last_health_at},
             "breaker": breaker_state("ai_model"),
             "schedule": {"enabled": cfg.get("retrain_enabled") is True,

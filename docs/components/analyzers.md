@@ -807,7 +807,7 @@ group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<
 
 | Route | Role | What it does |
 |---|---|---|
-| `GET /api/ai-model/status/` | Admin, CISO | active, previous and shadow summaries, whether a job is running, and the card header: `health` (`{ok, detail, checked_at}`, `detail` capped at 200 characters), `breaker`, `schedule`, `counts` (versions by status), `jobs` (the last five) and `ledger` |
+| `GET /api/ai-model/status/` | Admin, CISO | active, previous and shadow summaries, whether a job is running, and the card header: `health` (`{ok, detail, checked_at}`, `detail` capped at 200 characters and `null` when it contains `http`), `breaker`, `schedule`, `counts` (versions by status), `jobs` (the last five) and `ledger` |
 | `GET /api/ai-model/versions/` | Admin, CISO | versions with counters, purity and the age warning (`limit`, `offset`) |
 | `GET /api/ai-model/shadow/` | Admin, CISO | the shadow with agreement, flips (`flips_`), dry-run effects (`effects_`), the alert delta (`candidate_only_`, `active_only_`) and the unmet `conditions` |
 | `GET /api/ai-model/reviews/` | Admin, CISO | the review log, optional `?version_id=` |

@@ -147,6 +147,14 @@ class AiModelApiTest(APITestCase):
         from api.serializers.ai_model import job_row
         self.assertEqual(len(job_row(RetrainJob(job_id="j", error="E" * 300))["error"]), 200)
 
+    def test_status_health_detail_drops_urls_and_caps(self):
+        from connectors.delivery import get_state
+        st = get_state("ai_model")
+        for detail, shown in (("ConnectError to HTTP://ai_inference:8090/v2", None), ("x" * 300, "x" * 200)):
+            st.last_health_detail = detail
+            st.save()
+            self.assertEqual(self.client.get(BASE + "status/").json()["health"]["detail"], shown)
+
     def test_job_row_kind(self):
         from api.serializers.ai_model import job_row
         self.assertEqual(job_row(RetrainJob(job_id="j", params={"recheck": True}))["kind"], "recheck")

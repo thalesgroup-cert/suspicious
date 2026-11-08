@@ -44,7 +44,8 @@ export type AiModelStatus = {
   shadow: VersionSummary | null;
   job_running: boolean;
   job_id: string | null;
-  health: { ok: boolean | null; detail: string; checked_at: string | null };
+  /** detail is null when it held a URL. */
+  health: { ok: boolean | null; detail: string | null; checked_at: string | null };
   breaker: { state: "closed" | "open" | "half-open" | "unknown"; since: string | null };
   schedule: { enabled: boolean; interval_days: number; next_run: string | null; backoff_until: string | null };
   counts: Record<VersionStatus, number>;
