@@ -116,7 +116,7 @@ Deliverable: `manage.py ai_model_retrain` (and a start/poll task) turns the ledg
 
 ## Plan F: Shadow, promotion, campaign dry run, counters (outline)
 
-**Status: done**, built on feature/ai-model-shadow, awaiting merge, not pushed. Detailed plan: `docs/plans/2026-11-07-ai-model-connector-f-shadow.md` (11 tasks). The outline below is the earlier sketch; the detailed plan's Rulings supersede it (dry run on the live collection, gate recheck job, server sync, no v0 temperature fit).
+**Status: done**, merged locally into design/ai-model-connector (f936cc3c), not pushed; dev-stack acceptance run recorded in `docs/plans/2026-11-08-ai-model-f-acceptance-run.md`. Detailed plan: `docs/plans/2026-11-07-ai-model-connector-f-shadow.md` (11 tasks). The outline below is the earlier sketch; the detailed plan's Rulings supersede it (dry run on the live collection, gate recheck job, server sync, no v0 temperature fit).
 
 Deliverable: a passing candidate becomes `shadow`, is compared on live mail, and can be promoted or rolled back.
 
