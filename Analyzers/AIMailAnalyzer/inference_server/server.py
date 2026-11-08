@@ -262,6 +262,7 @@ class FairSemaphore:
 
 store = ModelStore(MODEL_DIRS)
 _inference_slots = FairSemaphore(MAX_CONCURRENCY)
+_shadow_slot = threading.Lock()  # one shadow pass at a time, outside _inference_slots (v2)
 
 
 @asynccontextmanager
@@ -355,6 +356,6 @@ trainer = JobController(encoder_hash=store.encoder_hash)
 holder = ModelHolder()  # loaded bundles (POST /v2/reload); empty = the legacy weights in models/
 app.include_router(
     make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS,
-                   trainer=trainer, holder=holder)
+                   trainer=trainer, holder=holder, shadow_slot=_shadow_slot)
 )
 

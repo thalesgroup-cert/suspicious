@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import threading
 import time
 from typing import Annotated, Literal
 
@@ -29,6 +30,32 @@ CaseId = Annotated[int, Field(strict=True, ge=0, le=2**63 - 1)]
 # A shadow that takes longer is dropped from the answer (its thread still runs to the end).
 SHADOW_TIMEOUT = float(os.environ.get("AI_SHADOW_TIMEOUT", "8"))
 ALLOWED_VERSIONS = (["active"], ["active", "shadow"], ["shadow"])
+# An active pass slower than this leaves no time for the shadow under the connector's timeout.
+SHADOW_SKIP_AFTER = 10.0
+# A ["shadow"]-only call (seeding, replay) waits this long for the shadow slot; below the
+# connector's 20 s timeout.
+SHADOW_ONLY_WAIT = 15.0
+
+
+class Busy(Exception):
+    """The shadow slot is taken by another shadow pass."""
+
+
+class _ShadowGate:
+    """The shadow's own slot, in place of the live slots: a shadow pass never queues ahead of a
+    live one. wait 0 tries once (the dual call), else waits up to `wait` seconds."""
+
+    def __init__(self, lock, wait):
+        self._lock, self._wait = lock, wait
+
+    def __enter__(self):
+        got = self._lock.acquire(timeout=self._wait) if self._wait else self._lock.acquire(blocking=False)
+        if not got:
+            raise Busy()
+        return self
+
+    def __exit__(self, *exc):
+        self._lock.release()
 
 
 class TokenizerUnavailable(ValueError):
@@ -79,11 +106,14 @@ class EmbedRequest(BaseModel):
     preprocessing: Literal[bundles.KNOWN_PREPROCESSING] = bundles.PREPROCESSING_LEGACY
 
 
-def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> APIRouter:
+def make_v2_router(*, store, classify, slots, max_chars, trainer, holder,
+                   shadow_slot=None) -> APIRouter:
     """classify is server._classify(models, mail_body), which returns the legacy
     result dict; slots is the server's concurrency semaphore; trainer is the
     training_job.JobController (training runs in its own process, outside slots);
+    shadow_slot is the shadow's one-pass lock (a new one when None);
     holder is the bundles.ModelHolder (the loaded bundles, None = legacy weights)."""
+    shadow_slot = threading.Lock() if shadow_slot is None else shadow_slot
     router = APIRouter(prefix="/v2")
 
     @router.post("/train", dependencies=[Depends(require_token)])
@@ -151,8 +181,11 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
             out = await run_in_threadpool(_classify_shadow_only, req, state[1], started)
         if "active" in req.versions and "shadow" in req.versions:
             # The shadow starts after the active answer exists; on timeout its thread runs on
-            # (and keeps its slot until done), the request does not wait for it.
-            out["results"]["shadow"] = await _shadow_answer(req, state[1])
+            # (and keeps the shadow slot until done), the request does not wait for it.
+            if time.perf_counter() - started > SHADOW_SKIP_AFTER:
+                out["results"]["shadow"] = {"error": "Skipped"}
+            else:
+                out["results"]["shadow"] = await _shadow_answer(req, state[1])
             out["latency_ms"] = round((time.perf_counter() - started) * 1000)
         return out
 
@@ -162,7 +195,7 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
 
         def work():
             try:
-                return _result(shadow, _run(shadow, _body(req), req))
+                return _result(shadow, _run(shadow, _body(req), req, _ShadowGate(shadow_slot, 0)))
             except Exception as e:  # noqa: BLE001 - the class only: a message may hold mail data
                 logger.error("shadow classify failed: %s", type(e).__name__)
                 return {"error": type(e).__name__}
@@ -178,18 +211,20 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
         # A JSON "\ud800" escape gives a lone surrogate, which the tokenizer cannot encode: make it "?".
         return req.mail_body[:max_chars].encode("utf-8", "replace").decode("utf-8")
 
-    def _run(model, body, req):
-        """The legacy-shaped result of one version (None = version 0); raises on any failure."""
+    def _run(model, body, req, gate=None):
+        """The legacy-shaped result of one version (None = version 0); raises on any failure.
+        gate: the slot the pass runs under (the live slots when None)."""
+        gate = slots if gate is None else gate
         if model is None or model.preprocessing_version == bundles.PREPROCESSING_LEGACY:
             # version 0, or a legacy-first128 bundle: the legacy classify core, unchanged
             models = store.models("personal") if model is None else model.legacy_models()
-            with slots:
+            with gate:
                 return classify(models, body)
         if (model.preprocessing_version == PREPROCESSING_VERSION_TOKENS
                 and not _can_chunk_by_tokens(store.vectorizer)):
             raise TokenizerUnavailable(NO_TOKENIZER)
         # one slot for the whole request: at most 8 chunk passes plus the campaign pass
-        return bundles.classify_bundle(model, store.vectorizer, body, slots,
+        return bundles.classify_bundle(model, store.vectorizer, body, gate,
                                        exclude_case_ids=req.exclude_case_ids)
 
     def _result(model, legacy):
@@ -211,12 +246,14 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
         if store.vectorizer is None:
             return f"Vectorizer unavailable: {store.vectorizer_error or 'still loading, try again shortly'}"
 
-    def _answer(req, name, model, started):
+    def _answer(req, name, model, started, gate=None):
         detail = _vectorizer_detail() if model is not None else None
         if detail:
             raise HTTPException(503, detail)
         try:
-            legacy = _run(model, _body(req), req)
+            legacy = _run(model, _body(req), req, gate)
+        except Busy:
+            raise HTTPException(503, "Shadow busy, try again") from None
         except TokenizerUnavailable as e:
             raise HTTPException(422, str(e)) from None
         except NoNeighbours as e:  # every neighbour excluded
@@ -241,7 +278,7 @@ def make_v2_router(*, store, classify, slots, max_chars, trainer, holder) -> API
         return _answer(req, "active", active, started)
 
     def _classify_shadow_only(req, shadow, started):
-        return _answer(req, "shadow", shadow, started)
+        return _answer(req, "shadow", shadow, started, _ShadowGate(shadow_slot, SHADOW_ONLY_WAIT))
 
     @router.post("/embed", dependencies=[Depends(require_token)])
     async def embed_route(request: Request):
