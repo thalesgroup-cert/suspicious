@@ -8,15 +8,18 @@ import { useAiModelStatus, useAiModelVersions, useRollback } from "../hooks";
 import { refusalMessage } from "../labels";
 import { PAGE, Pager } from "./Pager";
 
-// Mirrors stats.AGE_WARNING_DAYS and MIN_LABELLED / MIN_PURITY wording in ai_model/stats.py.
+// Mirror stats.AGE_WARNING_DAYS and stats.MIN_PURITY in ai_model/stats.py.
+const MIN_PURITY_PCT = 80;
 const AGE_WARNING_DAYS = 60;
+// Floor to one decimal so a value just under the threshold never reads as the threshold.
+const pct = (p: number) => `${Math.floor(p * 1000) / 10}%`;
 const day = (iso: string) => new Date(iso).toLocaleDateString();
 const versionName = (id: string) => (id === "v0" ? "v0 (the original model)" : id);
 
 function warnings(v: VersionRow): string[] {
   const out: string[] = [];
-  if (v.purity.warning) out.push(`Low purity: only ${Math.round((v.purity.purity ?? 0) * 100)}% of ${v.purity.labelled} labelled members are Dangerous.`);
-  if (v.age_warning) out.push(`Trained on data older than ${AGE_WARNING_DAYS} days.`);
+  if (v.purity.warning) out.push(`Low purity: ${pct(v.purity.purity ?? 0)} of ${v.purity.labelled} labelled members are Dangerous, below the ${MIN_PURITY_PCT}% threshold.`);
+  if (v.age_warning) out.push(`Created more than ${AGE_WARNING_DAYS} days ago.`);
   return out;
 }
 
@@ -61,7 +64,7 @@ export function VersionsTab() {
                   <TableCell>{v.stats.joined}</TableCell>
                   <TableCell>{v.stats.alerts}</TableCell>
                   <TableCell>
-                    {v.purity.purity === null ? "no labelled members" : `${Math.round(v.purity.purity * 100)}% of ${v.purity.labelled} labelled`}
+                    {v.purity.purity === null ? "no labelled members" : `${pct(v.purity.purity)} of ${v.purity.labelled} labelled`}
                   </TableCell>
                   <TableCell>
                     {warnings(v).map((w) => (

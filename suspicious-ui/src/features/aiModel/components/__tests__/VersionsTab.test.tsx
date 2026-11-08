@@ -49,8 +49,14 @@ describe("VersionsTab", () => {
     expect(r.getByText("95% of 40 labelled")).toBeInTheDocument();
     const bad = within(screen.getByRole("rowheader", { name: "v2" }).closest("tr")!);
     expect(bad.getByText(/Low purity/)).toBeInTheDocument();
-    expect(bad.getByText(/older than 60 days/)).toBeInTheDocument();
+    expect(bad.getByText(/Created more than 60 days ago/)).toBeInTheDocument();
     expect(within(screen.getByRole("rowheader", { name: "v3" }).closest("tr")!).queryByText(/Low purity|older than/)).toBeNull();
+  });
+
+  it("shows a purity just under the threshold without rounding up", async () => {
+    vi.mocked(api.getVersions).mockResolvedValue(page([row("v2", "discarded", { purity: { labelled: 200, dangerous: 159, purity: 0.795, warning: true } })]));
+    renderTab();
+    expect(await screen.findByText(/79\.5% of 200 labelled members.*80% threshold/)).toBeInTheDocument();
   });
 
   it("offers Rollback only on the previous row and names both versions", async () => {
@@ -82,13 +88,20 @@ describe("VersionsTab", () => {
   });
 
   it("keeps the open dialog while paging", async () => {
-    vi.mocked(api.getVersions).mockImplementation(async (p) =>
-      (p?.offset ?? 0) === 0 ? page([row("v3", "active"), row("v2", "previous")], 25) : page([row("v1", "discarded")], 25));
+    let release: () => void = () => {};
+    vi.mocked(api.getVersions).mockImplementation(async (p) => {
+      if ((p?.offset ?? 0) === 0) return page([row("v3", "active"), row("v2", "previous")], 25);
+      await new Promise<void>((r) => { release = r; });
+      return page([row("v1", "discarded")], 25);
+    });
     renderTab();
     await userEvent.click(await screen.findByRole("button", { name: /Rollback to v2/ }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     // MUI marks the page behind a modal aria-hidden; the pager is still clickable.
     await userEvent.click(screen.getByRole("button", { name: /Next page of versions/, hidden: true }));
+    // Page 2 is still loading: the dialog and the old rows stay.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    release();
     expect(await screen.findByRole("rowheader", { name: "v1", hidden: true })).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });

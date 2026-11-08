@@ -19,7 +19,9 @@ export const useAiModelStatus = () =>
 const list = <T>(key: (p?: api.PageParams) => readonly unknown[], fn: (p?: api.PageParams) => Promise<T>) =>
   (params?: api.PageParams) => useQuery({ queryKey: key(params), queryFn: () => fn(params), retry: false });
 
-export const useAiModelVersions = list(aiModelKeys.versions, api.getVersions);
+/** Keeps the old page on screen while another page loads, so an open dialog stays mounted. */
+export const useAiModelVersions = (params?: api.PageParams) =>
+  useQuery({ queryKey: aiModelKeys.versions(params), queryFn: () => api.getVersions(params), retry: false, placeholderData: keepPreviousData });
 export const useAiModelCandidates = list(aiModelKeys.candidates, api.getCandidates);
 /** Keeps the old page on screen while another page of a sub-list loads or after a review. */
 export const useAiModelShadow = (params?: api.PageParams, poll = false) =>
