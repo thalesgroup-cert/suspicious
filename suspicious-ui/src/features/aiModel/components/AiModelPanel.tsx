@@ -3,6 +3,7 @@ import { Box, Tab, Tabs, Typography } from "@mui/material";
 
 import { CandidateTab } from "./CandidateTab";
 import { OverviewTab } from "./OverviewTab";
+import { ShadowTab } from "./ShadowTab";
 
 // Tasks 7 to 11 fill the tabs.
 const TABS = ["Overview", "Candidate", "Shadow", "Versions", "Ledger"] as const;
@@ -23,6 +24,7 @@ export function AiModelPanel() {
       <Box role="tabpanel" id={`${id}-panel-${tab}`} aria-labelledby={`${id}-tab-${tab}`} sx={{ pt: 2 }}>
         {tab === "Overview" && <OverviewTab onSeeCandidate={() => setTab("Candidate")} />}
         {tab === "Candidate" && <CandidateTab />}
+        {tab === "Shadow" && <ShadowTab onSeeCandidate={() => setTab("Candidate")} />}
       </Box>
     </Box>
   );
