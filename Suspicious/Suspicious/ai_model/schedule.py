@@ -1,22 +1,19 @@
 """When the daily check will next start a scheduled retrain (Plan G, ruling G4). Computed from the
-same rules as retrain.maybe_start, never stored."""
+same rules as retrain.maybe_start (they share retrain.interval_days and retrain.newest_version),
+never stored."""
 from datetime import timedelta
 
 from django.utils import timezone
 
-from ai_model import retrain
+from ai_model import ledger, retrain
 from ai_model.models import ModelVersion, RetrainJob
+
+
+_UNSET = object()
 
 
 def config() -> dict:
     return retrain._connector(check_enabled=False).config
-
-
-def interval_days(cfg=None) -> int:
-    try:
-        return max(int((cfg if cfg is not None else config()).get("retrain_interval_days", 30)), 0)
-    except (TypeError, ValueError):
-        return 30
 
 
 def backoff_until(now=None):
@@ -28,15 +25,16 @@ def backoff_until(now=None):
     return last.started_at + retrain.BACKOFF if last else None
 
 
-def next_run(now=None):
-    """None when scheduling is off or a job runs; else the newest version's age limit, pushed to the
-    end of the backoff. The beat check runs once a day, so the date is approximate."""
+def next_run(now=None, *, cfg=None, running=_UNSET, backoff=_UNSET):
+    """None when the connector is disabled, scheduling is off or a job runs; else the newest version's
+    age limit, pushed to the end of the backoff. The beat check runs once a day, so the date is
+    approximate. cfg, running (a job or None) and backoff may be passed to save repeat reads."""
     now = now or timezone.now()
-    cfg = config()
-    if cfg.get("retrain_enabled") is not True or retrain.running_job() is not None:
+    cfg = config() if cfg is None else cfg
+    running = retrain.running_job() if running is _UNSET else running
+    if not ledger.enabled() or cfg.get("retrain_enabled") is not True or running:
         return None
-    S = ModelVersion.Status
-    newest = (ModelVersion.objects.filter(status__in=(S.CANDIDATE, S.SHADOW, S.ACTIVE, S.PREVIOUS))
-              .order_by("-created_at").first())
-    due = newest.created_at + timedelta(days=interval_days(cfg)) if newest else now
-    return max(due, backoff_until(now) or due)
+    newest = retrain.newest_version()
+    due = newest.created_at + timedelta(days=retrain.interval_days(cfg)) if newest else now
+    backoff = backoff_until(now) if backoff is _UNSET else backoff
+    return max(due, backoff or due)

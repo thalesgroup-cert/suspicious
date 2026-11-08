@@ -1,5 +1,6 @@
 """Plan G, Task 1: schedule.next_run and backoff_until."""
 from datetime import timedelta
+from unittest import mock
 
 from django.utils import timezone
 
@@ -32,10 +33,19 @@ class ScheduleTest(RetrainBase):
         self.assertEqual(schedule.next_run(), v.created_at + timedelta(days=10))
         self.assertIsNone(schedule.backoff_until())
 
-    def test_none_when_disabled(self):
+    def test_no_versions_is_due_now(self):
+        now = timezone.now()
+        self.assertEqual(schedule.next_run(now), now)
+
+    def test_none_when_scheduling_off(self):
         self.version()
-        self.config = {**self.config, "retrain_enabled": False}
-        self.assertIsNone(schedule.next_run())
+        with mock.patch.object(self, "config", {**self.config, "retrain_enabled": False}):
+            self.assertIsNone(schedule.next_run())
+
+    def test_none_when_connector_disabled(self):
+        self.version()
+        with mock.patch("ai_model.ledger.enabled", return_value=False):
+            self.assertIsNone(schedule.next_run())
 
     def test_none_while_a_job_runs(self):
         self.version()

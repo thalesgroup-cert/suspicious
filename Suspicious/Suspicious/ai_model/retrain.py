@@ -363,6 +363,20 @@ def cancel_retrain():
     return job
 
 
+def interval_days(config) -> int:
+    try:
+        return max(int(config.get("retrain_interval_days", 30)), 0)
+    except (TypeError, ValueError):
+        return 30
+
+
+def newest_version():
+    """The newest candidate, shadow, active or previous version: the age the schedule counts from."""
+    S = ModelVersion.Status
+    return (ModelVersion.objects.filter(status__in=(S.CANDIDATE, S.SHADOW, S.ACTIVE, S.PREVIOUS))
+            .order_by("-created_at").first())
+
+
 def maybe_start():
     """The daily check: start a retrain when `retrain_enabled` is true, no job runs and the newest
     candidate, shadow, active or previous version is older than `retrain_interval_days`.
@@ -373,13 +387,8 @@ def maybe_start():
     config = _connector().config
     if config.get("retrain_enabled") is not True:
         return None
-    try:
-        days = max(int(config.get("retrain_interval_days", 30)), 0)
-    except (TypeError, ValueError):
-        days = 30
-    S = ModelVersion.Status
-    newest = (ModelVersion.objects.filter(status__in=(S.CANDIDATE, S.SHADOW, S.ACTIVE, S.PREVIOUS))
-              .order_by("-created_at").first())
+    days = interval_days(config)
+    newest = newest_version()
     if newest and newest.created_at > timezone.now() - timedelta(days=days):
         return None
     now = timezone.now()

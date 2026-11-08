@@ -7,7 +7,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass
-from datetime import timezone
+from datetime import timedelta, timezone
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -302,7 +302,6 @@ def label_mix(now=None) -> dict:
     """Share of each class among the active folder rows now and among those observed more than
     MIX_WINDOW_DAYS ago. `jump` names the first class whose share moved by more than MIX_JUMP, when
     both windows hold at least MIX_MIN_ROWS rows; else None."""
-    from datetime import timedelta
     cutoff = (now or dj_timezone.now()) - timedelta(days=MIX_WINDOW_DAYS)
     rows = LabelRecord.objects.filter(source=LabelRecord.Source.IMAP_FOLDER, status=ACTIVE).order_by()
 

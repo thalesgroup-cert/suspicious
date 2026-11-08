@@ -1,6 +1,7 @@
 """AI model card endpoints (Plan F, Task 10). Thin: the services decide, the views map their
 refusals to fixed messages (never exception text)."""
 from django.db.models import Count
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import LimitOffsetPagination
@@ -87,6 +88,8 @@ class StatusView(Read):
 
         job = retrain.running_job()
         state = get_state("ai_model")
+        cfg, now = schedule.config(), timezone.now()
+        backoff = schedule.backoff_until(now)
         counts = {s: 0 for s in S.values}
         counts.update(ModelVersion.objects.order_by().values("status").annotate(n=Count("id"))
                       .values_list("status", "n"))
@@ -96,9 +99,10 @@ class StatusView(Read):
             "health": {"ok": state.last_health_ok, "detail": state.last_health_detail[:200],
                        "checked_at": state.last_health_at},
             "breaker": {"state": "unknown", "since": None},  # Task 5 publishes the real state
-            "schedule": {"enabled": schedule.config().get("retrain_enabled") is True,
-                         "interval_days": schedule.interval_days(), "next_run": schedule.next_run(),
-                         "backoff_until": schedule.backoff_until()},
+            "schedule": {"enabled": cfg.get("retrain_enabled") is True,
+                         "interval_days": retrain.interval_days(cfg),
+                         "next_run": schedule.next_run(now, cfg=cfg, running=job, backoff=backoff),
+                         "backoff_until": backoff},
             "counts": counts,
             "jobs": [job_row(j) for j in RetrainJob.objects.order_by("-started_at", "-pk")[:5]],
             "ledger": ledger_summary(),

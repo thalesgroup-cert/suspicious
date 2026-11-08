@@ -109,26 +109,43 @@ class AiModelApiTest(APITestCase):
         st = get_state("ai_model")
         st.last_health_ok, st.last_health_detail, st.last_health_at = False, "down", timezone.now()
         st.save()
-        self.shadow()
+        v = self.shadow()
+        v.manifest = {"eligible": True, "url": "https://presigned.example/x"}
+        v.bundle_prefix = "ai-models/secret-prefix/"
+        v.save()
+        cand("c1")
+        cand("c2")
+        ModelVersion.objects.filter(version_id="c2").update(status=S.DISCARDED)
         for i in range(7):
             RetrainJob.objects.create(job_id=f"j{i}", target_version="t", state="failed", prefix="p/",
-                                      trigger="manual", error="E" * 300,
+                                      trigger="manual", error="E" * 200,
                                       started_at=timezone.now() - timedelta(hours=10 - i))
-        body = self.client.get(BASE + "status/").json()
+        cfg = {"retrain_enabled": True, "retrain_interval_days": 10}
+        with mock.patch("ai_model.schedule.config", return_value=cfg), \
+                mock.patch("ai_model.ledger.enabled", return_value=True):
+            body = self.client.get(BASE + "status/").json()
         self.assertEqual(body["health"]["ok"], False)
         self.assertEqual(body["health"]["detail"], "down")
         self.assertIsNotNone(body["health"]["checked_at"])
         self.assertEqual(body["breaker"], {"state": "unknown", "since": None})
-        self.assertEqual(set(body["schedule"]), {"enabled", "interval_days", "next_run", "backoff_until"})
-        self.assertEqual(body["counts"], {"candidate": 0, "shadow": 1, "active": 0, "previous": 0,
-                                          "discarded": 0, "failed": 0})
+        newest = max(ModelVersion.objects.exclude(status=S.DISCARDED).values_list("created_at", flat=True))
+        self.assertEqual(body["schedule"], {
+            "enabled": True, "interval_days": 10, "backoff_until": None,
+            "next_run": (newest + timedelta(days=10)).isoformat().replace("+00:00", "Z")})
+        self.assertEqual(body["counts"], {"candidate": 1, "shadow": 1, "active": 0, "previous": 0,
+                                          "discarded": 1, "failed": 0})
         self.assertEqual([j["job_id"] for j in body["jobs"]], ["j6", "j5", "j4", "j3", "j2"])
-        self.assertEqual(len(body["jobs"][0]["error"]), 200)
         self.assertEqual(set(body["jobs"][0]), {"job_id", "state", "trigger", "rows", "excluded_rows",
                                                 "started_at", "finished_at", "error"})
         from ai_model.ledger import ledger_summary
         self.assertEqual(body["ledger"], ledger_summary())
-        self.assertNotIn("MAILTEXT", str(body))
+        text = str(body)
+        for secret in ("http", "secret-prefix", "presigned", "manifest"):
+            self.assertNotIn(secret, text)
+
+    def test_job_row_caps_error(self):
+        from api.serializers.ai_model import job_row
+        self.assertEqual(len(job_row(RetrainJob(job_id="j", error="E" * 300))["error"]), 200)
 
     def test_shadow_comparison(self):
         v = self.shadow()
