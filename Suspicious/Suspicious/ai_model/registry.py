@@ -7,6 +7,7 @@ an older `previous` becomes `discarded`. Exactly one `active`: enforced by the u
 import dataclasses
 import re
 from datetime import timedelta
+from datetime import timezone as dt_timezone
 
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Q
@@ -180,6 +181,26 @@ def set_shadow(version, user=None, note=""):
             transaction.on_commit(lambda: _queue_seeding(locked.version_id))
 
     _retry(run)
+    version.refresh_from_db()
+    return version
+
+
+def recheck_started(version, user, job_id):
+    """Ruling F11: a gate recheck of this version was posted (retrain.start_recheck)."""
+    _event(version, "start_recheck", user, job_id)
+
+
+def record_recheck(version, job_id, passed, finished_at):
+    """Store a finished recheck as {job_id, passed, finished_at (ISO, UTC)}. Only the shadow
+    version takes one: a version discarded or promoted meanwhile is left as it is."""
+    with transaction.atomic():
+        locked = _lock(version)
+        if locked.status != ModelVersion.Status.SHADOW:
+            raise RegistryError(f"cannot record a recheck on a {locked.status} version")
+        locked.recheck = {"job_id": job_id, "passed": bool(passed),
+                          "finished_at": finished_at.astimezone(dt_timezone.utc).isoformat()}
+        locked.save(update_fields=["recheck"])
+        _event(locked, "recheck", None, f"{job_id} {'passed' if passed else 'failed'}")
     version.refresh_from_db()
     return version
 

@@ -1,7 +1,9 @@
 """Retrain orchestration (Plan E, Task 8b): export the ledger, hand the inference server presigned
 URLs through POST /v2/train, poll GET /v2/train/{job_id} with short Celery tasks
 (ai_model.tasks.poll_retrain) and register a succeeded job as a `candidate` through the registry.
-Nothing here activates or reloads a version (Plan F promotes).
+Nothing here activates or reloads a version (Plan F promotes). A gate recheck of the shadow
+(start_recheck, Ruling F11) uses the same chain and running slot but has no bundle and never
+creates a candidate: its result goes on ModelVersion.recheck through the registry.
 
 A RetrainJob row is written before the server is called; a failed, cancelled, timed-out or
 half-uploaded job registers nothing and its bundle prefix and dataset are deleted. Presigned URLs
@@ -93,6 +95,35 @@ def _new_ids(now):
 def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
     """Start one training job. RetrainRefused when the connector is disabled, a job is running,
     the export refuses (its message passes through) or the server refuses the request."""
+    return _start(user, trigger)
+
+
+def start_recheck(version, user=None) -> RetrainJob:
+    """Ruling F11: re-run the gate of the shadow version on the current ledger with its recipe and
+    seed (params.recheck: no final fit, no bundle). Refused like start_retrain, and for a version
+    that is not the shadow. The poll stores {job_id, passed, finished_at} on ModelVersion.recheck;
+    a failed or cancelled recheck changes nothing on the version."""
+    version.refresh_from_db()
+    if version.status != ModelVersion.Status.SHADOW:
+        raise RetrainRefused(f"only the shadow version can be rechecked, not a {version.status} one")
+    return _start(user, ModelVersion.Trigger.MANUAL, recheck_of=version)
+
+
+def _recheck_params(version, exported):
+    """The shadow's own recipe inputs from its manifest; the ledger digests are the current ones."""
+    m = version.manifest
+    return {
+        "version_id": version.version_id, "seed": m.get("seed", SEED), "repeats": m.get("repeats", REPEATS),
+        "baseline": m.get("baseline", "candidate"),
+        "preprocessing_version": m.get("preprocessing_version", TRAINING_PREPROCESSING),
+        "parent_version": m.get("parent_version"),
+        "ledger_digest": exported.ledger_digest, "campaign_refs_digest": exported.campaign_refs_digest,
+        "encoder_id": m.get("encoder_id", ENCODER_ID), "trainer_revision": m.get("trainer_revision", TRAINER_REVISION),
+        "campaign_profile": version.campaign_profile, "recheck": True,
+    }
+
+
+def _start(user, trigger, recheck_of=None) -> RetrainJob:
     connector = _connector()
     job = running_job()
     if job is not None:
@@ -104,7 +135,6 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
             raise JobRunning(f"retrain job {job.job_id} is running")
     now = timezone.now()
     job_id, version_id = _new_ids(now)
-    prefix = registry.bundle_prefix_for(version_id, job_id)
     try:
         exported = export_ledger(job_id)  # creates the dataset bucket
     except ExportRefused as exc:
@@ -113,30 +143,37 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
         _delete_dataset(job_id)
         name = type(exc).__name__
         raise RetrainRefused(f"could not export the ledger: {name}", cause=name) from None
-    try:
-        registry.ensure_bucket()
-        store = registry.get_store()
-        bucket, _, key = prefix.partition("/")
-        bundle_urls = {n: store.presign_put(bucket, key + n, UPLOAD_EXPIRY) for n in registry.BUNDLE_FILE_NAMES}
-        parent = _parent(user)
-    except Exception as exc:  # noqa: BLE001: no job yet: drop the exported dataset, say the class
-        _delete_dataset(job_id)
-        name = type(exc).__name__
-        raise RetrainRefused(f"could not prepare the training job: {name}", cause=name) from None
-    params = {
-        "version_id": version_id, "seed": SEED, "repeats": REPEATS,
-        "baseline": "legacy" if parent.version_id == "v0" else "candidate",
-        "preprocessing_version": TRAINING_PREPROCESSING, "parent_version": parent.version_id,
-        "ledger_digest": exported.ledger_digest, "campaign_refs_digest": exported.campaign_refs_digest,
-        "encoder_id": ENCODER_ID, "trainer_revision": TRAINER_REVISION,
-        "campaign_profile": dataclasses.asdict(current_profile()),
-    }
+    if recheck_of is not None:  # no bundle: no prefix, no PUT URL
+        version_id, prefix, bundle_urls, parent = recheck_of.version_id, "", None, recheck_of
+        params = _recheck_params(recheck_of, exported)
+    else:
+        prefix = registry.bundle_prefix_for(version_id, job_id)
+        try:
+            registry.ensure_bucket()
+            store = registry.get_store()
+            bucket, _, key = prefix.partition("/")
+            bundle_urls = {n: store.presign_put(bucket, key + n, UPLOAD_EXPIRY) for n in registry.BUNDLE_FILE_NAMES}
+            parent = _parent(user)
+        except Exception as exc:  # noqa: BLE001: no job yet: drop the exported dataset, say the class
+            _delete_dataset(job_id)
+            name = type(exc).__name__
+            raise RetrainRefused(f"could not prepare the training job: {name}", cause=name) from None
+        params = {
+            "version_id": version_id, "seed": SEED, "repeats": REPEATS,
+            "baseline": "legacy" if parent.version_id == "v0" else "candidate",
+            "preprocessing_version": TRAINING_PREPROCESSING, "parent_version": parent.version_id,
+            "ledger_digest": exported.ledger_digest, "campaign_refs_digest": exported.campaign_refs_digest,
+            "encoder_id": ENCODER_ID, "trainer_revision": TRAINER_REVISION,
+            "campaign_profile": dataclasses.asdict(current_profile()),
+        }
     try:
         with transaction.atomic():
             job = RetrainJob.objects.create(
                 job_id=job_id, target_version=version_id, state=J.RUNNING, running_slot=1, prefix=prefix,
                 params=params, rows=exported.rows, excluded_rows=exported.excluded, parent=parent, trigger=trigger, requested_by=user,
                 started_at=now)
+            if recheck_of is not None:
+                registry.recheck_started(recheck_of, user, job_id)
     except IntegrityError:  # another start won the running slot
         _delete_dataset(job_id)
         raise JobRunning("another retrain job is running") from None
@@ -145,7 +182,9 @@ def start_retrain(user=None, trigger=ModelVersion.Trigger.MANUAL) -> RetrainJob:
     poll_retrain.apply_async((job_id,), countdown=poll_countdown())
     from connectors.contrib.ai_model.client import ServerBusy
     from connectors.providers import ProviderUnavailable
-    body = {"job_id": job_id, "dataset_url": exported.url, "bundle_urls": bundle_urls, "params": params}
+    body = {"job_id": job_id, "dataset_url": exported.url, "params": params}
+    if bundle_urls is not None:
+        body["bundle_urls"] = bundle_urls
     try:
         connector._client().train(body)
     except ServerBusy:
@@ -235,14 +274,34 @@ def _manifest(job, report):
     return summary, report["manifest_sha256"]
 
 
+def is_recheck(job) -> bool:
+    return job.params.get("recheck") is True
+
+
+def _store_recheck(job, report, finished_at):
+    """A succeeded recheck: the server's answer for this version goes on ModelVersion.recheck."""
+    if report["version_id"] != job.target_version:
+        raise registry.RegistryError("the recheck report names another version")
+    version = ModelVersion.objects.get(version_id=job.target_version)
+    registry.record_recheck(version, job.job_id, report["eligible"] is True, finished_at)
+
+
 def _finish(job, state, error="", report=None):
     """Settle a running job once (a locking read: a redelivered poll or --wait does nothing more).
-    A succeeded job becomes a candidate; anything that stops that fails the job instead."""
+    A succeeded job becomes a candidate, a succeeded recheck its version's recheck result;
+    anything that stops that fails the job instead."""
     with transaction.atomic():
         locked = RetrainJob.objects.select_for_update().get(pk=job.pk)
         if locked.state != J.RUNNING:
             return locked
-        if state == J.SUCCEEDED:
+        now = timezone.now()
+        if state == J.SUCCEEDED and is_recheck(locked):
+            try:
+                with transaction.atomic():
+                    _store_recheck(locked, report, now)
+            except (registry.RegistryError, ModelVersion.DoesNotExist, KeyError, TypeError) as exc:
+                state, error = J.FAILED, type(exc).__name__
+        elif state == J.SUCCEEDED:
             try:
                 manifest, sha = _manifest(locked, report)
                 with transaction.atomic():
@@ -253,9 +312,9 @@ def _finish(job, state, error="", report=None):
                     IntegrityError) as exc:
                 state, error = J.FAILED, type(exc).__name__
         locked.state, locked.error, locked.running_slot = state, error[:ERROR_MAX], None
-        locked.finished_at = timezone.now()
+        locked.finished_at = now
         locked.save(update_fields=["state", "error", "running_slot", "finished_at", "version"])
-    if state != J.SUCCEEDED:
+    if state != J.SUCCEEDED and not is_recheck(locked):  # a recheck has no bundle
         _delete_bundle(locked)
     _delete_dataset(locked.job_id)
     logger.info("Retrain %s: %s %s", locked.job_id, state, error)

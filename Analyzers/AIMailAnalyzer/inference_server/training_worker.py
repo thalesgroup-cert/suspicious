@@ -9,6 +9,8 @@ no storage key, no proxy). It has no network use: the controller downloads the d
 directory and uploads what this process leaves in out/bundle.
 Outputs, all under <workdir>/out: `progress` (one number, percent of this process's work),
 `result.json` (the manifest pin and the gate summary, or {"error": reason}) and `bundle/`.
+A recheck (params["recheck"], Ruling F11) stops after the gate: result.json holds the summary only
+and no bundle is written.
 An unexpected exception ends the process with a non-zero exit code, which the controller reports
 as the code alone; stdout and stderr go to files in the job directory.
 
@@ -101,7 +103,9 @@ def train(workdir, params, threads, report_progress):
                            params["campaign_profile"]["distance_threshold"],
                            [tuple(t) for t in data.ties.tolist()])  # CampaignMember links
     repeats, seed, epochs = params["repeats"], params["seed"], params["epochs"]
-    total = repeats * N_SPLITS * 2 * 2 + 2  # gate fits (2 groupings x 2 recipes) + the final fit
+    recheck = params.get("recheck") is True
+    # gate fits (2 groupings x 2 recipes) + the final fit (none for a recheck)
+    total = repeats * N_SPLITS * 2 * 2 + (0 if recheck else 2)
     done = [0]
 
     def counted(fn):
@@ -116,10 +120,15 @@ def train(workdir, params, threads, report_progress):
     baseline = counted(partial(RECIPES[params["baseline"]], epochs=epochs, threads=threads))
     report = run_gate(X, folders, dup, camp, baseline_recipe=baseline, recipe=recipe,
                       repeats=repeats, seed0=seed)
-    if not report.checks["head_samples"]["passed"]:
-        raise Rejected("gate: " + report.checks["head_samples"]["detail"])
     gate = _plain(asdict(report))
     gate["eligible"] = report.eligible
+    summary = {k: gate[k] for k in ("eligible", "checks", "candidate", "baseline", "campaign",
+                                    "tier_cutoffs")}
+    if recheck:  # Ruling F11: the gate's answer only, a failed head floor included (eligible false)
+        report_progress(100.0)
+        return {"summary": summary}
+    if not report.checks["head_samples"]["passed"]:
+        raise Rejected("gate: " + report.checks["head_samples"]["detail"])
 
     heads = fit_heads(X, folders, seed=seed, epochs=epochs, threads=threads)
     # the gate fitted one temperature per component on each held-out half; the median is stored
@@ -144,8 +153,6 @@ def train(workdir, params, threads, report_progress):
                        knn=Knn.build(X, folders, data.case_ids),
                        campaign_profile=params["campaign_profile"], manifest=manifest)
     report_progress(100.0)
-    summary = {k: gate[k] for k in ("eligible", "checks", "candidate", "baseline", "campaign",
-                                    "tier_cutoffs")}
     summary["temperature"] = temperature
     summary["temperature_at_bound"] = {c: temperature_at_bound(t) for c, t in temperature.items()}
     return {"manifest_sha256": sha, "summary": summary}
