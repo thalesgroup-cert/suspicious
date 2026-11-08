@@ -1,5 +1,7 @@
 """AI model card endpoints (Plan F, Task 10). Thin: the services decide, the views map their
 refusals to fixed messages (never exception text)."""
+import logging
+
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
@@ -20,6 +22,7 @@ from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, Resolv
                                       candidate_row, flag_row, job_row, version_summary)
 from connectors.delivery import get_state
 
+logger = logging.getLogger(__name__)
 S = ModelVersion.Status
 MAX_LIMIT = 100
 
@@ -325,7 +328,8 @@ class BreakerResetView(APIView):
                     epoch = request_reset("ai_model")
                 except Exception as exc:  # noqa: BLE001 — any cache error; never echo it
                     raise _CacheDown from exc
-        except _CacheDown:
+        except _CacheDown as down:
+            logger.warning("breaker reset refused: %s", type(down.__cause__).__name__)
             return Response({"detail": "The shared cache is unavailable; the breaker was not reset."},
                             status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response({"epoch": epoch}, status=status.HTTP_202_ACCEPTED)

@@ -626,9 +626,11 @@ class BreakerApiTest(APITestCase):
         from django.core.cache import cache
         r = self.client.post(BASE + "breaker/reset/", {"note": "server back"}, format="json")
         self.assertEqual(r.status_code, 202)
-        self.assertEqual(r.json(), {"epoch": 1})
-        self.assertEqual(cache.get("breaker-epoch:ai_model"), 1)
-        ev = ModelVersion.objects.get(version_id="v0").events.get(action="breaker_reset")
+        epoch = r.json()["epoch"]
+        self.assertEqual(cache.get("breaker-epoch:ai_model"), epoch)
+        again = self.client.post(BASE + "breaker/reset/", {}, format="json").json()["epoch"]
+        self.assertGreater(again, epoch)
+        ev = ModelVersion.objects.get(version_id="v0").events.filter(action="breaker_reset").earliest("pk")
         self.assertEqual((ev.user, ev.note), (self.admin, "server back"))
 
     def test_reset_audits_on_the_active_version(self):
@@ -641,8 +643,10 @@ class BreakerApiTest(APITestCase):
         self.assertFalse(ModelVersion.objects.filter(version_id="v0").exists())
 
     def test_reset_answers_503_when_the_cache_is_down(self):
-        with mock.patch("common.http_client.cache.add", side_effect=ConnectionError("redis secret detail")):
+        with mock.patch("common.http_client.cache.add", side_effect=ConnectionError("redis secret detail")), \
+                self.assertLogs("api.views.ai_model", "WARNING") as logs:
             r = self.client.post(BASE + "breaker/reset/", {"note": "n"}, format="json")
+        self.assertEqual(logs.output, ["WARNING:api.views.ai_model:breaker reset refused: ConnectionError"])
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json(), {"detail": "The shared cache is unavailable; the breaker was not reset."})
         self.assertFalse(ModelEvent.objects.filter(action="breaker_reset").exists())

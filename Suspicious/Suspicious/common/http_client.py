@@ -82,8 +82,7 @@ class _LogStateChange(pybreaker.CircuitBreakerListener):
 # pybreaker state lives in each process (gunicorn worker, celery worker). Each process publishes
 # its state changes to the shared cache (last writer wins) and reads a reset epoch before a call.
 # Neither key has a TTL: the state carries its own "since", and the epoch must outlive any one
-# process. A flushed cache means "unknown" and an epoch restarting from 1 (missed only by a
-# process that last applied epoch 1).
+# process. A flushed cache means "unknown" and an epoch re-seeded from the clock (always new).
 STATE_KEY = "breaker:{}"
 EPOCH_KEY = "breaker-epoch:{}"
 EPOCH_CHECK_SECONDS = 5  # ponytail: at most one cache read per breaker per 5 s, so a reset lands within that
@@ -157,10 +156,10 @@ def breaker_state(name: str) -> dict:
 
 
 def request_reset(name: str) -> int:
-    """Move the reset epoch for *name* and return it. Cache errors propagate (the caller answers 503)."""
+    """Move the reset epoch for *name* and return it. Cache errors propagate (the caller answers 503).
+    A missing key is seeded from the clock, so a flushed cache never repeats an epoch a process holds."""
     key = EPOCH_KEY.format(name)
-    if cache.add(key, 1, timeout=None):
-        return 1
+    cache.add(key, time.time_ns(), timeout=None)
     return cache.incr(key)
 
 

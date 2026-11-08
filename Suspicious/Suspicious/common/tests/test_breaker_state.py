@@ -54,10 +54,21 @@ class BreakerStateTest(SimpleTestCase):
         self.assertEqual(hc.breaker_state("tb"), {"state": "unknown", "since": None})
 
     def test_request_reset_increments_the_epoch(self):
-        self.assertEqual(hc.request_reset("tb"), 1)
-        self.assertEqual(hc.request_reset("tb"), 2)
-        self.assertEqual(cache.get("breaker-epoch:tb"), 2)
-        self.assertIsNone(cache.get("breaker-epoch:other"))
+        first = hc.request_reset("tb")
+        second = hc.request_reset("tb")
+        self.assertGreater(second, first)
+        self.assertEqual(cache.get("breaker-epoch:tb"), second)
+
+    def test_a_flushed_cache_never_repeats_an_old_epoch(self):
+        old = hc.request_reset("tb")
+        cache.clear()
+        self.assertGreater(hc.request_reset("tb"), old)  # seeded from the clock, not from 1
+
+    def test_reset_of_one_breaker_leaves_another_alone(self):
+        other = hc.request_reset("tb2")
+        hc.request_reset("tb")
+        hc.request_reset("tb")
+        self.assertEqual(cache.get("breaker-epoch:tb2"), other)
 
     def test_open_breaker_closes_before_the_next_call_after_a_reset(self):
         self.b.call(lambda: None)
