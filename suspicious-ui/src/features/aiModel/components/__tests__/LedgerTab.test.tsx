@@ -133,6 +133,34 @@ describe("LedgerTab", () => {
     expect(api.getFlags).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 10 }));
   });
 
+  it("steps back a page when resolving empties the last page", async () => {
+    let total = 11;
+    vi.mocked(api.getFlags).mockImplementation(async (p) => {
+      const o = Number(p?.offset ?? 0);
+      return pg(Array.from({ length: Math.max(0, Math.min(10, total - o)) }, (_, i) => flag(o + i + 1)), total);
+    });
+    vi.mocked(api.postResolveFlag).mockImplementation(async () => { total = 10; return flag(11); });
+    renderTab();
+    await userEvent.click(await screen.findByRole("button", { name: "Next page of flagged labels" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Keep label for case 111" }));
+    await userEvent.type(within(await screen.findByRole("dialog")).getByLabelText(/note/i), "ok");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Keep label" }));
+    expect(await screen.findByRole("rowheader", { name: "101" })).toBeInTheDocument();
+    expect(api.getFlags).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }));
+  });
+
+  it("steps back a queue page that came back empty", async () => {
+    vi.mocked(api.getQueue).mockImplementation(async (p) =>
+      Number(p?.disagreements_offset ?? 0) === 0
+        ? queue({ disagreements: { count: 25, results: queue().disagreements.results } })
+        : queue({ disagreements: { count: 5, results: [] } }));
+    renderTab();
+    await userEvent.click(await screen.findByRole("button", { name: "Next page of AI disagreements" }));
+    await waitFor(() => expect(api.getQueue).toHaveBeenCalledWith(expect.objectContaining({ disagreements_offset: 10 })));
+    await waitFor(() => expect(api.getQueue).toHaveBeenLastCalledWith(expect.objectContaining({ disagreements_offset: 0 })));
+    expect(await screen.findByRole("link", { name: "7" })).toBeInTheDocument();
+  });
+
   it("shows empty states", async () => {
     vi.mocked(api.getFlags).mockResolvedValue(pg<FlagRow>([]));
     vi.mocked(api.getQueue).mockResolvedValue({ disagreements: { count: 0, results: [] }, campaign_conflicts: { count: 0, results: [] } });
