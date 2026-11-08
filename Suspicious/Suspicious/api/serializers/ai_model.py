@@ -26,3 +26,10 @@ def version_summary(v) -> dict:
         "created_at": v.created_at, "shadow_since": v.shadow_since, "shadow_min_days": v.shadow_min_days,
         "recheck": {k: recheck.get(k) for k in ("passed", "finished_at")} if recheck else None,
     }
+
+
+def job_row(j) -> dict:
+    """A RetrainJob without params, prefix or version ids; error is already filtered, capped again here."""
+    return {"job_id": j.job_id, "state": j.state, "trigger": j.trigger, "rows": j.rows,
+            "excluded_rows": j.excluded_rows, "started_at": j.started_at, "finished_at": j.finished_at,
+            "error": j.error[:200]}

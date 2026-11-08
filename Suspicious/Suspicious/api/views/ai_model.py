@@ -1,5 +1,6 @@
 """AI model card endpoints (Plan F, Task 10). Thin: the services decide, the views map their
 refusals to fixed messages (never exception text)."""
+from django.db.models import Count
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import LimitOffsetPagination
@@ -7,12 +8,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ai_model import promotion, registry, retrain, stats
-from ai_model.models import ModelVersion, ShadowCampaignEffect, ShadowResult, ShadowReview
+from ai_model import promotion, registry, retrain, schedule, stats
+from ai_model.ledger import ledger_summary
+from ai_model.models import ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
 from ai_model.serversync import ReloadRefused
 from api.permissions.ai_model import IsAdmin, IsAdminOrCISO
-from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ReviewSerializer,
+from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ReviewSerializer, job_row,
                                       version_summary)
+from connectors.delivery import get_state
 
 S = ModelVersion.Status
 MAX_LIMIT = 100
@@ -83,8 +86,23 @@ class StatusView(Read):
             return version_summary(version) if version else None
 
         job = retrain.running_job()
-        return Response({"active": pick(S.ACTIVE), "previous": pick(S.PREVIOUS), "shadow": pick(S.SHADOW),
-                         "job_running": job is not None, "job_id": job.job_id if job else None})
+        state = get_state("ai_model")
+        counts = {s: 0 for s in S.values}
+        counts.update(ModelVersion.objects.order_by().values("status").annotate(n=Count("id"))
+                      .values_list("status", "n"))
+        return Response({
+            "active": pick(S.ACTIVE), "previous": pick(S.PREVIOUS), "shadow": pick(S.SHADOW),
+            "job_running": job is not None, "job_id": job.job_id if job else None,
+            "health": {"ok": state.last_health_ok, "detail": state.last_health_detail[:200],
+                       "checked_at": state.last_health_at},
+            "breaker": {"state": "unknown", "since": None},  # Task 5 publishes the real state
+            "schedule": {"enabled": schedule.config().get("retrain_enabled") is True,
+                         "interval_days": schedule.interval_days(), "next_run": schedule.next_run(),
+                         "backoff_until": schedule.backoff_until()},
+            "counts": counts,
+            "jobs": [job_row(j) for j in RetrainJob.objects.order_by("-started_at", "-pk")[:5]],
+            "ledger": ledger_summary(),
+        })
 
 
 class VersionsView(ListAPIView, Read):

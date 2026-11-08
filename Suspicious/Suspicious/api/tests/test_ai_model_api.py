@@ -104,6 +104,32 @@ class AiModelApiTest(APITestCase):
         self.assertIsNone(body["active"])
         self.assertIn("job_running", body)
 
+    def test_status_extension(self):
+        from connectors.delivery import get_state
+        st = get_state("ai_model")
+        st.last_health_ok, st.last_health_detail, st.last_health_at = False, "down", timezone.now()
+        st.save()
+        self.shadow()
+        for i in range(7):
+            RetrainJob.objects.create(job_id=f"j{i}", target_version="t", state="failed", prefix="p/",
+                                      trigger="manual", error="E" * 300,
+                                      started_at=timezone.now() - timedelta(hours=10 - i))
+        body = self.client.get(BASE + "status/").json()
+        self.assertEqual(body["health"]["ok"], False)
+        self.assertEqual(body["health"]["detail"], "down")
+        self.assertIsNotNone(body["health"]["checked_at"])
+        self.assertEqual(body["breaker"], {"state": "unknown", "since": None})
+        self.assertEqual(set(body["schedule"]), {"enabled", "interval_days", "next_run", "backoff_until"})
+        self.assertEqual(body["counts"], {"candidate": 0, "shadow": 1, "active": 0, "previous": 0,
+                                          "discarded": 0, "failed": 0})
+        self.assertEqual([j["job_id"] for j in body["jobs"]], ["j6", "j5", "j4", "j3", "j2"])
+        self.assertEqual(len(body["jobs"][0]["error"]), 200)
+        self.assertEqual(set(body["jobs"][0]), {"job_id", "state", "trigger", "rows", "excluded_rows",
+                                                "started_at", "finished_at", "error"})
+        from ai_model.ledger import ledger_summary
+        self.assertEqual(body["ledger"], ledger_summary())
+        self.assertNotIn("MAILTEXT", str(body))
+
     def test_shadow_comparison(self):
         v = self.shadow()
         f = self.flip(v)

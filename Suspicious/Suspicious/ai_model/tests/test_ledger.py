@@ -372,3 +372,29 @@ class LedgerSummaryTest(CaseMixin, TestCase):
         observe(review())
         observe(review(folder="1_SPAM"))
         self.assertEqual(ledger.ledger_summary()["by_source"], {"imap_folder": {"Unwanted": 1}})
+
+
+class LabelMixTest(TestCase):
+    def rows(self, label_class, n, days_ago):
+        from datetime import timedelta
+        from django.utils import timezone
+        for i in range(n):
+            LabelRecord.objects.create(
+                message_id_hash=f"{label_class}{days_ago}{i}", source=LabelRecord.Source.IMAP_FOLDER,
+                label=label_class, label_class=label_class, trust=LabelRecord.Trust.FOLDER,
+                observed_at=timezone.now() - timedelta(days=days_ago))
+
+    def test_shares_and_jump(self):
+        self.rows("Safe", 60, 40)
+        self.rows("Dangerous", 40, 40)
+        self.rows("Dangerous", 60, 1)
+        mix = ledger.label_mix()
+        self.assertEqual(mix["rows"], {"now": 160, "before": 100})
+        self.assertAlmostEqual(mix["before"]["Safe"], 0.6)
+        self.assertAlmostEqual(mix["now"]["Safe"], 0.375)
+        self.assertEqual(mix["jump"]["class"], "Dangerous")
+
+    def test_no_jump_below_row_floor(self):
+        self.rows("Safe", 10, 40)
+        self.rows("Dangerous", 10, 1)
+        self.assertIsNone(ledger.label_mix()["jump"])
