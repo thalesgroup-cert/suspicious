@@ -130,7 +130,8 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         )}
       </Box>
 
-      <RetrainButton jobRunning={s.job_running} job={jobs.data?.results[0] ?? s.jobs[0]} onSeeCandidate={onSeeCandidate} />
+      {/* The jobs cache is only fresh while a job runs; once it ends the status holds the truth. */}
+      <RetrainButton jobRunning={s.job_running} job={s.job_running ? (jobs.data?.results[0] ?? s.jobs[0]) : s.jobs[0]} onSeeCandidate={onSeeCandidate} />
     </Stack>
   );
 }

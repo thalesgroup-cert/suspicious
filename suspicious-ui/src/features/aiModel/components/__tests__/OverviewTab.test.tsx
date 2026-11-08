@@ -198,6 +198,24 @@ describe("OverviewTab", () => {
     const msgs = await screen.findAllByText(/Shared cache is down/);
     expect(msgs.some((m) => m.closest("[role=status]"))).toBe(true);
   });
+  it("shows the finished job from the status, not the stale running one from the jobs cache", async () => {
+    const running = { job_id: "j1", state: "running", trigger: "manual", rows: 120, excluded_rows: 0, started_at: daysAgo(0), finished_at: null, error: "" };
+    vi.mocked(api.getStatus).mockResolvedValue(status({ job_running: true, job_id: "j1", jobs: [running] }));
+    vi.mocked(api.getJobs).mockResolvedValue({ count: 1, next: null, previous: null, results: [running] });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <SnackbarProvider>
+          <OverviewTab onSeeCandidate={vi.fn()} />
+        </SnackbarProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(api.getJobs).toHaveBeenCalled());
+    expect(await screen.findByText(/Last job: running/)).toBeInTheDocument();
+    vi.mocked(api.getStatus).mockResolvedValue(status({ jobs: [{ ...running, state: "succeeded", finished_at: daysAgo(0) }] }));
+    await qc.invalidateQueries({ queryKey: ["ai-model", "status"] });
+    expect(await screen.findByText(/Last job: succeeded/)).toBeInTheDocument();
+  });
   it("offers See candidate for a succeeded job", async () => {
     const { onSeeCandidate } = renderTab(status({
       jobs: [{ job_id: "j2", state: "succeeded", trigger: "manual", rows: 100, excluded_rows: 0, started_at: daysAgo(1), finished_at: daysAgo(1), error: "" }],
