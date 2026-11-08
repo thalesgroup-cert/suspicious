@@ -247,8 +247,9 @@ version.
 
 **Version 0.** On first enable, the connector imports the weights that run in production today as
 version 0, with the legacy preprocessing and the legacy decision rule. Cutover therefore changes no
-verdict. Version 0 has no calibration, so its tier is computed by fitting a temperature on the
-ledger once enough labels exist; until then the UI shows "confidence not calibrated" for it.
+verdict. Version 0 has no calibration and the UI shows "confidence not calibrated" for it until the first
+promotion replaces it. (Plan F rule F16: the fit of a version 0 temperature on the ledger is not
+built, because it would need a version 0 bundle that exists only to be replaced.)
 
 ### 4. The label ledger
 
@@ -311,7 +312,9 @@ never redelivers it. Training itself runs in the `ai_inference` image.
 - Main decision: the mean of the calibrated probabilities of the head hierarchy and of a 5-nearest-
   neighbour vote over the labelled embeddings (cosine, distance-weighted). Sub-types come from
   the heads.
-- Calibration: one temperature fitted on predictions for groups the model did not train on.
+- Calibration: one temperature per component (hierarchy and neighbour vote), each fitted on held-out
+  predictions for groups the model did not train on; the stored value is the median over the
+  gate's calibration halves.
 - Tier cutoffs: chosen on the same held-out predictions so the High tier meets a precision target.
 
 **Groups.** Two kinds of group, both connected components:
@@ -321,7 +324,8 @@ never redelivers it. Training itself runs in the `ai_inference` image.
   legacy embedding space; chunk-averaged embeddings are more similar to each other, so the builder
   re-checks it (random-split versus grouped-split accuracy should still differ).
 - Campaign groups: mails whose campaign embeddings are within the profile's distance threshold
-  (similarity 0.75), joined with the ties recorded in `CampaignMember` for cases that are known. The
+  (similarity 0.75), joined with the ties recorded in `CampaignMember` for cases that are known (the export sends
+  them as a `ties` array, so linked cases stay together however far apart they embed). The
   gate's campaign check (below) splits on these.
 
 A live case that is already in the ledger, for example after "Redo analysis", is excluded from its
@@ -355,9 +359,14 @@ phishing (see Evidence, E6) can add a recall floor; it is off by default.
 ### 6. Shadow mode
 
 A candidate that passes the gate becomes `shadow`. From then on, every new mail case is scored by
-the active and the shadow version in one classify call. The shadow answer is stored (`ShadowResult`)
-and never reaches `score_ai` or the engine. A shadow failure or timeout is logged and ignored, with
-a shorter timeout than the real one.
+the active and the shadow version in one classify call (`versions: ["active", "shadow"]`). The server
+answers the active part first and then scores the shadow under its own deadline
+(`AI_SHADOW_TIMEOUT`, default 8 s, shorter than the connector's 20 s); `results.shadow` is the
+answer or `{"error": <class name>}`. The shadow answer is stored (`ShadowResult`) and never reaches
+`score_ai` or the engine. A shadow failure or timeout is logged by class and ignored. The registry is
+the truth and the inference server follows it: after every pointer move and every 300 s the backend
+compares the server's loaded versions with the registry and reloads, which also restores a restarted
+server.
 
 Each stored shadow result also records the verdict the case would have received had the shadow
 model's answer been the AI vote. The engine is pure (`score_process/scoring/engine.py`), so this is
@@ -369,11 +378,16 @@ retrained model's confidence is calibrated and will not look like the legacy num
 which mails reach it and how many TheHive alerts follow. Shadow therefore runs detection for the
 candidate in dry-run mode:
 
-- A separate shadow collection holds the candidate's own classification of each document. At shadow
-  start it is seeded by classifying the live collection's documents (about 15 days, 1,300 documents
-  at the owner's volume) with the candidate (**Call**), so the first days are not blind.
-- Dry run creates no `Campaign` or `CampaignMember` rows, sends no event and touches no live
-  collection. It records what would have happened for each case: no check, no campaign, would
+- There is no separate shadow collection (plan F rule F7). The campaign embedding is the same
+  whatever the classifier, so neighbours come from the live collection; the candidate's classes come
+  from its stored `ShadowResult` rows in the database. The dry run queries 60 nearest neighbours
+  without the class filter, keeps those the candidate called Dangerous and applies the live
+  threshold and member rules. At shadow start the live collection's documents (about 15 days, 1,300
+  documents at the owner's volume) are classified with the candidate and stored as seed rows
+  (**Call**), so the first days are not blind. A second collection was dropped because the proxy
+  blocks deleting collections and the cleanup connector watches only the live name.
+- Dry run creates no `Campaign` or `CampaignMember` rows, sends no event and writes nothing to the
+  live collection. It records what would have happened for each case: no check, no campaign, would
   create, would join, with the member case ids (`ShadowCampaignEffect`).
 - The comparison with the real events of the same period gives the **alert delta**: campaigns the
   candidate would have raised that the active model did not, and the reverse.

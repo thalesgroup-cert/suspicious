@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Shadow scoring, promotion and rollback of AI model versions. An admin starts a gate-eligible
+  candidate as the shadow (`POST /api/ai-model/shadow/start/`); every new mail is then also scored
+  by it in the same classify call, under its own deadline (`AI_SHADOW_TIMEOUT`, default 8 s), and
+  the answer, the verdict it would have given and a campaign dry run (what detection would have
+  done with its classes) are stored without touching any live verdict, campaign or event. Promotion
+  needs 7 days, 500 live results, reviewed Safe/Dangerous flips and alert-delta cases, a passing
+  gate recheck and no running job; it is refused by the service otherwise. New endpoints under
+  `/api/ai-model/` (status, versions, shadow, reviews, recheck, extend, promote, rollback, discard;
+  reads for Admin and CISO, writes for Admin). The inference server follows the registry and is
+  brought back within five minutes after a restart. Daily per-version counters, label purity and a
+  60-day age warning. `python manage.py ai_model_engine_replay <version_id>` measures how the
+  scoring engine reacts to the shadow's calibrated confidence before a first promotion. Compose and
+  `.env.example` gain `AI_SHADOW_TIMEOUT`. See `docs/components/analyzers.md`.
 - `python manage.py ai_model_retrain [--wait [--timeout S]] [--status] [--cancel]` exports the
   label ledger, starts a training job on the `ai_inference` server (`POST /v2/train`) and polls it
   every 30 s for up to 6 hours. A finished job is registered as a `candidate` model version with

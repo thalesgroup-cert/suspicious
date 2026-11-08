@@ -32,7 +32,9 @@ detection. Scoring then finalises most mails that the analyzer count does not ma
 notification mail, the TheHive challenge text and the dashboards show that verdict. Upgrade step:
 enable `ai_model` (and set its `url` and `token`) as part of the upgrade.
 `python manage.py ai_model_campaign_replay <campaign_ref>` replays a campaign the Cortex AI path built
-through its detection. Setup, failures and the replay command:
+through its detection. While a model version is the shadow, `case_finalised` also queues a campaign
+dry run for it, and the `/api/ai-model/` endpoints (Admin and CISO read, Admin write) manage shadow,
+promotion and rollback. Setup, failures, the replay command and the runbook:
 [AI / ML Analyzers](../analyzers.md).
 
 ## case_search
