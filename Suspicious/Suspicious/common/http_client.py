@@ -100,7 +100,7 @@ class _PublishState(pybreaker.CircuitBreakerListener):
             cache.set(STATE_KEY.format(cb.name),
                       {"state": new_state.name, "since": datetime.now(UTC).isoformat()}, timeout=None)
             _publish_failing = False
-        except Exception:  # noqa: BLE001 — any cache error
+        except Exception:  # noqa: BLE001 (any cache error)
             if not _publish_failing:
                 _publish_failing = True
                 logger.warning("circuit breaker %s: could not publish its state to the cache", cb.name)
@@ -123,7 +123,7 @@ class _EpochBreaker(pybreaker.CircuitBreaker):
             self._epoch_checked = now
             try:
                 epoch = cache.get(EPOCH_KEY.format(self.name))
-            except Exception:  # noqa: BLE001 — cache down: the breaker behaves as before
+            except Exception:  # noqa: BLE001 (cache down: the breaker behaves as before)
                 return
             if epoch is None or epoch == self._epoch:
                 return

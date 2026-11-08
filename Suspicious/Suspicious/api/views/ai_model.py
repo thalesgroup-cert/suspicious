@@ -326,7 +326,7 @@ class BreakerResetView(APIView):
                 registry.record_breaker_reset(request.user, ser.validated_data["note"])
                 try:
                     epoch = request_reset("ai_model")
-                except Exception as exc:  # noqa: BLE001 — any cache error; never echo it
+                except Exception as exc:  # noqa: BLE001 (any cache error; never echo it)
                     raise _CacheDown from exc
         except _CacheDown as down:
             logger.warning("breaker reset refused: %s", type(down.__cause__).__name__)
