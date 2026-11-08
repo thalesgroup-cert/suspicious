@@ -21,13 +21,13 @@ export function RetrainButton({ jobRunning, job, onSeeCandidate }: { jobRunning:
         {refusal && <Typography variant="body2">{refusal}</Typography>}
         {job && (
           <Typography variant="body2">
-            Last job: {job.state}
+            Last job{job.kind === "recheck" ? " (gate recheck)" : ""}: {job.state}
             {job.rows != null ? `, ${job.rows} rows` : ""}
             {job.excluded_rows ? `, ${job.excluded_rows} excluded` : ""}
           </Typography>
         )}
       </Box>
-      {job?.state === "succeeded" && !jobRunning && (
+      {job?.kind === "retrain" && job.state === "succeeded" && !jobRunning && (
         <Button size="small" onClick={onSeeCandidate}>
           See candidate
         </Button>

@@ -135,7 +135,7 @@ class AiModelApiTest(APITestCase):
         self.assertEqual(body["counts"], {"candidate": 1, "shadow": 1, "active": 0, "previous": 0,
                                           "discarded": 1, "failed": 0})
         self.assertEqual([j["job_id"] for j in body["jobs"]], ["j6", "j5", "j4", "j3", "j2"])
-        self.assertEqual(set(body["jobs"][0]), {"job_id", "state", "trigger", "rows", "excluded_rows",
+        self.assertEqual(set(body["jobs"][0]), {"job_id", "kind", "state", "trigger", "rows", "excluded_rows",
                                                 "started_at", "finished_at", "error"})
         from ai_model.ledger import ledger_summary
         self.assertEqual(body["ledger"], ledger_summary())
@@ -146,6 +146,12 @@ class AiModelApiTest(APITestCase):
     def test_job_row_caps_error(self):
         from api.serializers.ai_model import job_row
         self.assertEqual(len(job_row(RetrainJob(job_id="j", error="E" * 300))["error"]), 200)
+
+    def test_job_row_kind(self):
+        from api.serializers.ai_model import job_row
+        self.assertEqual(job_row(RetrainJob(job_id="j", params={"recheck": True}))["kind"], "recheck")
+        self.assertEqual(job_row(RetrainJob(job_id="j", params={"seed": 7}))["kind"], "retrain")
+        self.assertEqual(job_row(RetrainJob(job_id="j", params=None))["kind"], "retrain")
 
     def test_candidates(self):
         gate = {"checks": {"calibration_error": {"passed": False, "value": 0.2, "detail": "D" * 400},
@@ -391,7 +397,7 @@ class AiModelApiTest(APITestCase):
             self.assertEqual(body["count"], 3)
             self.assertEqual([j["job_id"] for j in body["results"]], ["j2", "j1"])
             self.assertEqual(len(body["results"][0]["error"]), 200)
-            self.assertEqual(set(body["results"][0]), {"job_id", "state", "trigger", "rows", "excluded_rows",
+            self.assertEqual(set(body["results"][0]), {"job_id", "kind", "state", "trigger", "rows", "excluded_rows",
                                                        "started_at", "finished_at", "error"})
         for u in (self.cert, self.reporter):
             self.client.force_authenticate(u)

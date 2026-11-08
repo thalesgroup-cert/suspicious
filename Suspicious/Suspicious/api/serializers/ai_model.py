@@ -40,8 +40,10 @@ def version_summary(v) -> dict:
 
 
 def job_row(j) -> dict:
-    """A RetrainJob without params, prefix or version ids; error is already filtered, capped again here."""
-    return {"job_id": j.job_id, "state": j.state, "trigger": j.trigger, "rows": j.rows,
+    """A RetrainJob without params, prefix or version ids (kind is read from params.recheck); error is
+    already filtered, capped again here."""
+    return {"job_id": j.job_id, "kind": "recheck" if (j.params or {}).get("recheck") else "retrain",
+            "state": j.state, "trigger": j.trigger, "rows": j.rows,
             "excluded_rows": j.excluded_rows, "started_at": j.started_at, "finished_at": j.finished_at,
             "error": j.error[:200]}
 

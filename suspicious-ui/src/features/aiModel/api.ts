@@ -21,6 +21,8 @@ export type VersionSummary = {
 
 export type JobRow = {
   job_id: string;
+  /** "recheck": a gate recheck of the shadow, which never makes a candidate. */
+  kind: "retrain" | "recheck";
   state: string;
   trigger: string;
   rows: number | null;

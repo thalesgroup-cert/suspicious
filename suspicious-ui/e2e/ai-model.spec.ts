@@ -46,7 +46,7 @@ type Mock = {
 
 function status(m: Mock) {
   const job = {
-    job_id: "j1", state: "succeeded", trigger: "manual", rows: 1200, excluded_rows: 30,
+    job_id: "j1", kind: "retrain", state: "succeeded", trigger: "manual", rows: 1200, excluded_rows: 30,
     started_at: "2026-11-01T10:00:00Z", finished_at: "2026-11-01T10:20:00Z", error: "",
   };
   return {

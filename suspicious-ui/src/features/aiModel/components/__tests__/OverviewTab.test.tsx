@@ -161,7 +161,7 @@ describe("OverviewTab", () => {
   it("disables retrain and shows the job while one runs", async () => {
     renderTab(status({
       job_running: true, job_id: "j1",
-      jobs: [{ job_id: "j1", state: "running", trigger: "manual", rows: 120, excluded_rows: 3, started_at: daysAgo(0), finished_at: null, error: "" }],
+      jobs: [{ job_id: "j1", kind: "retrain", state: "running", trigger: "manual", rows: 120, excluded_rows: 3, started_at: daysAgo(0), finished_at: null, error: "" }],
     }));
     expect(await screen.findByRole("button", { name: /retrain now/i })).toBeDisabled();
     expect(screen.getByText(/running/i)).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe("OverviewTab", () => {
     expect(msgs.some((m) => m.closest("[role=status]"))).toBe(true);
   });
   it("shows the finished job from the status, not the stale running one from the jobs cache", async () => {
-    const running = { job_id: "j1", state: "running", trigger: "manual", rows: 120, excluded_rows: 0, started_at: daysAgo(0), finished_at: null, error: "" };
+    const running = { job_id: "j1", kind: "retrain" as const, state: "running", trigger: "manual", rows: 120, excluded_rows: 0, started_at: daysAgo(0), finished_at: null, error: "" };
     vi.mocked(api.getStatus).mockResolvedValue(status({ job_running: true, job_id: "j1", jobs: [running] }));
     vi.mocked(api.getJobs).mockResolvedValue({ count: 1, next: null, previous: null, results: [running] });
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -216,9 +216,16 @@ describe("OverviewTab", () => {
     await qc.invalidateQueries({ queryKey: ["ai-model", "status"] });
     expect(await screen.findByText(/Last job: succeeded/)).toBeInTheDocument();
   });
+  it("labels a finished recheck as a recheck and offers no candidate for it", async () => {
+    renderTab(status({
+      jobs: [{ job_id: "j3", kind: "recheck", state: "succeeded", trigger: "manual", rows: 100, excluded_rows: 0, started_at: daysAgo(1), finished_at: daysAgo(1), error: "" }],
+    }));
+    expect(await screen.findByText(/Last job \(gate recheck\): succeeded/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /see candidate/i })).toBeNull();
+  });
   it("offers See candidate for a succeeded job", async () => {
     const { onSeeCandidate } = renderTab(status({
-      jobs: [{ job_id: "j2", state: "succeeded", trigger: "manual", rows: 100, excluded_rows: 0, started_at: daysAgo(1), finished_at: daysAgo(1), error: "" }],
+      jobs: [{ job_id: "j2", kind: "retrain", state: "succeeded", trigger: "manual", rows: 100, excluded_rows: 0, started_at: daysAgo(1), finished_at: daysAgo(1), error: "" }],
     }));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await user.click(await screen.findByRole("button", { name: /see candidate/i }));
