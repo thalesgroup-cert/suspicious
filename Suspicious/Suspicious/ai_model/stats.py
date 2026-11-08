@@ -2,6 +2,7 @@
 from collections import defaultdict
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Min
 from django.utils import timezone
 
@@ -22,7 +23,7 @@ def recompute(days=3, now=None):
     from case_handler.models import CampaignMember
     from connectors.models import ConnectorDelivery
 
-    today = (now or timezone.now()).date()
+    today = timezone.localdate(now)
     first = today - timedelta(days=days - 1)
     start = timezone.make_aware(timezone.datetime.combine(first, timezone.datetime.min.time()))
     counts = defaultdict(lambda: defaultdict(int))  # (version_id, day) -> counter
@@ -33,8 +34,9 @@ def recompute(days=3, now=None):
         c["dangerous"] += a["result"] == AiAssessment.Result.DANGEROUS
 
     # A campaign's first member created it; every later member joined it.
-    firsts = dict(CampaignMember.objects.values("campaign_id").annotate(m=Min("id")).values_list("campaign_id", "m"))
     members = list(CampaignMember.objects.filter(joined_at__gte=start).values("id", "campaign_id", "case_id", "joined_at"))
+    firsts = dict(CampaignMember.objects.filter(campaign_id__in={m["campaign_id"] for m in members})
+                  .values("campaign_id").annotate(m=Min("id")).values_list("campaign_id", "m"))
     deliveries = list(ConnectorDelivery.objects.filter(
         created_at__gte=start, status=ConnectorDelivery.STATUS_SUCCESS, case_id__isnull=False,
     ).filter(connector="ai_model", event="case_finalised").values("case_id", "created_at"))
@@ -48,18 +50,20 @@ def recompute(days=3, now=None):
             key = "created" if firsts[m["campaign_id"]] == m["id"] else "joined"
             counts[(owner[m["case_id"]], timezone.localtime(m["joined_at"]).date())][key] += 1
     # ponytail: campaign_checks = successful ai_model case_finalised deliveries (the hook queues the
-    # detection); a delivery is a queued check, not proof the task finished.
+    # detection); a delivery is a queued check, not proof it ran: the task returns without
+    # detecting when the mail text is unreadable, so this can overcount.
     for rows, key in ((deliveries, "campaign_checks"), (alerts, "alerts")):
         for r in rows:
             if r["case_id"] in owner:
                 counts[(owner[r["case_id"]], timezone.localtime(r["created_at"]).date())][key] += 1
 
     by_id = {v.version_id: v for v in ModelVersion.objects.filter(version_id__in={k[0] for k in counts})}
-    ModelVersionStats.objects.filter(day__gte=first).delete()
-    ModelVersionStats.objects.bulk_create(
-        ModelVersionStats(version=by_id[vid], day=day, **c)
-        for (vid, day), c in counts.items() if vid in by_id and day >= first
-    )
+    with transaction.atomic():
+        ModelVersionStats.objects.filter(day__gte=first).delete()
+        ModelVersionStats.objects.bulk_create(
+            ModelVersionStats(version=by_id[vid], day=day, **c)
+            for (vid, day), c in counts.items() if vid in by_id and day >= first
+        )
 
 
 def purity(version, now=None):

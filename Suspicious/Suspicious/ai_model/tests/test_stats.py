@@ -23,7 +23,7 @@ class StatsTest(TestCase):
         return case
 
     def row(self, version=None):
-        return ModelVersionStats.objects.get(version=version or self.v0, day=timezone.now().date())
+        return ModelVersionStats.objects.get(version=version or self.v0, day=timezone.localdate())
 
     def test_counters_per_version_and_day(self):
         a, b, c = self.case(result="DANGEROUS"), self.case(result="DANGEROUS"), self.case()
@@ -40,10 +40,12 @@ class StatsTest(TestCase):
         self.assertEqual((r.scored, r.dangerous, r.campaign_checks, r.created, r.joined, r.alerts),
                          (3, 2, 1, 1, 1, 1))
         self.assertEqual(ModelVersionStats.objects.count(), 1)
+        materialise_model_stats()
+        self.assertEqual(self.row().scored, 3)
 
     def test_a_version_without_data_has_no_rows_and_old_days_are_left_alone(self):
         self.case(version="s1")  # no ModelVersion row: skipped
-        old = ModelVersionStats.objects.create(version=self.v0, day=timezone.now().date() - timedelta(days=10), scored=7)
+        old = ModelVersionStats.objects.create(version=self.v0, day=timezone.localdate() - timedelta(days=10), scored=7)
         materialise_model_stats()
         self.assertEqual(list(ModelVersionStats.objects.all()), [old])
 
@@ -78,3 +80,38 @@ class StatsTest(TestCase):
     def test_age_warning_at_sixty_days_from_creation(self):
         self.assertFalse(stats.age_warning(self.v0))
         self.assertTrue(stats.age_warning(self.v0, now=timezone.now() + timedelta(days=61)))
+
+    def test_two_versions_backdated_rows_and_the_window_edge(self):
+        v1 = ModelVersion.objects.create(version_id="s1", status="candidate", trigger="manual")
+        now = timezone.now()
+
+        def back(case, days):
+            AiAssessment.objects.filter(case=case).update(created_at=now - timedelta(days=days))
+
+        today_s1 = self.case("s1", "DANGEROUS")
+        yesterday = self.case("v0")
+        back(yesterday, 1)
+        edge = self.case("v0")  # 4 days old: outside the 3-day window
+        back(edge, 4)
+        ConnectorDelivery.objects.create(connector="ai_model", event="case_finalised", case_id=yesterday.id, status="success")
+        ConnectorDelivery.objects.filter(case_id=yesterday.id).update(created_at=now - timedelta(days=1))
+        old = ModelVersionStats.objects.create(version=self.v0, day=timezone.localdate() - timedelta(days=4), scored=9)
+        materialise_model_stats()
+        y = ModelVersionStats.objects.get(version=self.v0, day=timezone.localdate() - timedelta(days=1))
+        self.assertEqual((y.scored, y.campaign_checks), (1, 1))
+        t = self.row(v1)
+        self.assertEqual((t.scored, t.dangerous, t.campaign_checks), (1, 1, 0))
+        self.assertFalse(ModelVersionStats.objects.filter(version=self.v0, day=timezone.localdate()).exists())
+        old.refresh_from_db()
+        self.assertEqual(old.scored, 9)
+        self.assertEqual(ModelVersionStats.objects.count(), 3)
+        self.assertIsNotNone(today_s1)
+
+    def test_exact_edges(self):
+        self.labelled(self.v0, "Dangerous", 8)
+        self.labelled(self.v0, "Safe", 2)
+        p = stats.purity(self.v0)
+        self.assertEqual((p["labelled"], p["purity"], p["warning"]), (10, 0.8, False))
+        base = self.v0.created_at
+        self.assertFalse(stats.age_warning(self.v0, now=base + timedelta(days=60)))
+        self.assertTrue(stats.age_warning(self.v0, now=base + timedelta(days=61)))
