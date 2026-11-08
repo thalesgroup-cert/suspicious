@@ -27,8 +27,11 @@ export const useAiModelCandidates = list(aiModelKeys.candidates, api.getCandidat
 export const useAiModelShadow = (params?: api.PageParams, poll = false) =>
   useQuery({ queryKey: aiModelKeys.shadow(params), queryFn: () => api.getShadow(params), retry: false, placeholderData: keepPreviousData, refetchInterval: poll ? 10_000 : false });
 export const useAiModelReviews = list(aiModelKeys.reviews, api.getReviews);
-export const useAiModelFlags = list(aiModelKeys.flags, api.getFlags);
-export const useAiModelQueue = list(aiModelKeys.queue, api.getQueue);
+/** Keep the old page on screen while another loads, so an open resolve dialog stays mounted. */
+export const useAiModelFlags = (params?: api.PageParams) =>
+  useQuery({ queryKey: aiModelKeys.flags(params), queryFn: () => api.getFlags(params), retry: false, placeholderData: keepPreviousData });
+export const useAiModelQueue = (params?: api.PageParams) =>
+  useQuery({ queryKey: aiModelKeys.queue(params), queryFn: () => api.getQueue(params), retry: false, placeholderData: keepPreviousData });
 export const useAiModelLedger = () => useQuery({ queryKey: aiModelKeys.ledger(), queryFn: api.getLedger, retry: false });
 
 /** Jobs are fetched and polled every 10 s only while a job runs; otherwise the status carries the last jobs. */

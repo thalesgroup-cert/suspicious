@@ -115,7 +115,7 @@ export type FlagRow = {
   observed_at: string;
 };
 
-export type Disagreement = { case_id: number; verdict: string; ai_class: string; [k: string]: unknown };
+export type Disagreement = { case_id: number; verdict: string; ai_class: string; date: string };
 export type CampaignConflict = { campaign_ref: string; classes: string[]; date: string };
 export type QueueResponse = {
   disagreements: SubList<Disagreement>;

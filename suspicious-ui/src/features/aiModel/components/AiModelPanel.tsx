@@ -2,6 +2,7 @@ import * as React from "react";
 import { Box, Tab, Tabs, Typography } from "@mui/material";
 
 import { CandidateTab } from "./CandidateTab";
+import { LedgerTab } from "./LedgerTab";
 import { OverviewTab } from "./OverviewTab";
 import { ShadowTab } from "./ShadowTab";
 import { VersionsTab } from "./VersionsTab";
@@ -27,6 +28,7 @@ export function AiModelPanel() {
         {tab === "Candidate" && <CandidateTab />}
         {tab === "Shadow" && <ShadowTab onSeeCandidate={() => setTab("Candidate")} />}
         {tab === "Versions" && <VersionsTab />}
+        {tab === "Ledger" && <LedgerTab />}
       </Box>
     </Box>
   );

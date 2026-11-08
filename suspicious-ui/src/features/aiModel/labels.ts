@@ -37,3 +37,9 @@ export function refusalMessage(error: unknown, context: RefusalContext = "action
   if (ctx) return ctx;
   return typeof res.data?.detail === "string" && res.data.detail ? res.data.detail : FALLBACK;
 }
+
+/** Every flag_reason the backend emits (ledger.MISMATCH today); unknown values fall back to a neutral phrase. */
+export const FLAG_REASON_TEXT: Record<string, string> = {
+  folder_verdict_mismatch: "folder label disagrees with the analyst verdict",
+};
+export const flagReasonText = (r: string) => FLAG_REASON_TEXT[r] ?? "flagged for review";
