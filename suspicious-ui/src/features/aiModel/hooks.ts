@@ -27,13 +27,14 @@ export const useAiModelFlags = list(aiModelKeys.flags, api.getFlags);
 export const useAiModelQueue = list(aiModelKeys.queue, api.getQueue);
 export const useAiModelLedger = () => useQuery({ queryKey: aiModelKeys.ledger(), queryFn: api.getLedger, retry: false });
 
-/** Jobs poll every 10 s only while a job runs. */
+/** Jobs are fetched and polled every 10 s only while a job runs; otherwise the status carries the last jobs. */
 export const useAiModelJobs = (jobRunning: boolean, params?: api.PageParams) =>
   useQuery({
     queryKey: aiModelKeys.jobs(params),
     queryFn: () => api.getJobs(params),
     retry: false,
     refetchInterval: jobRunning ? 10_000 : false,
+    enabled: jobRunning,
   });
 
 /** A write refreshes the whole card; a refusal is shown in words and leaves the cache as the server has it. */

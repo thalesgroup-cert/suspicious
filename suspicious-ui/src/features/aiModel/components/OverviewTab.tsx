@@ -3,9 +3,11 @@ import { Alert, Box, Button, Stack, Table, TableBody, TableCell, TableHead, Tabl
 
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
-import { useAiModelStatus, useResetBreaker } from "../hooks";
+import { useAiModelJobs, useAiModelStatus, useResetBreaker } from "../hooks";
+import { refusalMessage } from "../labels";
 import { RetrainButton } from "./RetrainButton";
 
+// Mirrors stats.AGE_WARNING_DAYS in ai_model/stats.py (the status payload has no age flag).
 const AGE_WARNING_DAYS = 60;
 const day = (iso: string) => new Date(iso).toLocaleDateString();
 const ageDays = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -13,8 +15,10 @@ const ageDays = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime(
 export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
   const { data: s, isError } = useAiModelStatus();
   const reset = useResetBreaker();
+  const jobs = useAiModelJobs(s?.job_running ?? false);
   const [confirm, setConfirm] = React.useState(false);
-  const [resetDone, setResetDone] = React.useState(false);
+  // The breaker state seen when a reset succeeded; the note hides once the published state moves.
+  const [resetAt, setResetAt] = React.useState<string | null>(null);
   if (isError) return <Alert severity="error">Could not load the AI model status.</Alert>;
   if (!s) return <Typography>Loading</Typography>;
 
@@ -39,7 +43,10 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
             Reset breaker
           </Button>
         )}
-        <Box role="status">{resetDone && <Typography variant="body2">The breaker was reset.</Typography>}</Box>
+        <Box role="status">
+          {resetAt !== null && resetAt === s.breaker.state && <Typography variant="body2">The breaker was reset.</Typography>}
+          {reset.isError && <Typography variant="body2">{refusalMessage(reset.error, "breaker")}</Typography>}
+        </Box>
         <ConfirmDialog
           open={confirm}
           title="Reset the circuit breaker?"
@@ -48,7 +55,8 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
           onCancel={() => setConfirm(false)}
           onConfirm={() => {
             setConfirm(false);
-            reset.mutate(undefined, { onSuccess: () => setResetDone(true) });
+            setResetAt(null);
+            reset.mutate(undefined, { onSuccess: () => setResetAt(s.breaker.state) });
           }}
         />
       </Box>
@@ -57,7 +65,7 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         {s.active ? (
           <>
             <Typography>
-              Active version: {s.active.version_id}, {age} days old
+              Active version: {s.active.version_id}, {age} {age === 1 ? "day" : "days"} old
             </Typography>
             {s.active.version_id === "v0" && <Typography variant="body2">Confidence not calibrated.</Typography>}
             {age > AGE_WARNING_DAYS && (
@@ -117,7 +125,7 @@ export function OverviewTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         )}
       </Box>
 
-      <RetrainButton jobRunning={s.job_running} job={s.jobs[0]} onSeeCandidate={onSeeCandidate} />
+      <RetrainButton jobRunning={s.job_running} job={jobs.data?.results[0] ?? s.jobs[0]} onSeeCandidate={onSeeCandidate} />
     </Stack>
   );
 }

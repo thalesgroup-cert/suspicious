@@ -151,6 +151,28 @@ describe("OverviewTab", () => {
     const msgs = await screen.findAllByText(/The retrain was refused/);
     expect(msgs.some((m) => m.closest("[role=status]"))).toBe(true);
   });
+  it("fetches jobs only while a job runs", async () => {
+    renderTab(status());
+    await screen.findByText(/Connector health/);
+    expect(api.getJobs).not.toHaveBeenCalled();
+  });
+  it("fetches jobs while a job runs", async () => {
+    renderTab(status({ job_running: true, job_id: "j1" }));
+    await waitFor(() => expect(api.getJobs).toHaveBeenCalled());
+  });
+  it("says 1 day old", async () => {
+    renderTab(status({ active: version("v3", 1) }));
+    expect(await screen.findByText(/1 day old/)).toBeInTheDocument();
+  });
+  it("shows a failed reset inline", async () => {
+    vi.mocked(api.postResetBreaker).mockRejectedValue({ response: { status: 503, data: { detail: "Shared cache is down." } } });
+    renderTab(status({ breaker: { state: "open", since: null } }));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.click(await screen.findByRole("button", { name: /reset breaker/i }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^reset$/i }));
+    const msgs = await screen.findAllByText(/Shared cache is down/);
+    expect(msgs.some((m) => m.closest("[role=status]"))).toBe(true);
+  });
   it("offers See candidate for a succeeded job", async () => {
     const { onSeeCandidate } = renderTab(status({
       jobs: [{ job_id: "j2", state: "succeeded", trigger: "manual", rows: 100, excluded_rows: 0, started_at: daysAgo(1), finished_at: daysAgo(1), error: "" }],
