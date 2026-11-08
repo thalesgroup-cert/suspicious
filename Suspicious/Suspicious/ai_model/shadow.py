@@ -56,7 +56,7 @@ def record_would_be(case, signals, deny_listed, deny_reason, evidence, live_verd
     row = ShadowResult.objects.filter(
         case=case, version__status=ModelVersion.Status.SHADOW, origin=ShadowResult.Origin.LIVE,
     ).first()
-    if row is None or row.error:
+    if row is None:
         return None
     missing = row.result == AiAssessment.Result.INCONCLUSIVE
     ai = None

@@ -34,7 +34,7 @@ def _candidate_dangerous(similar: dict, version, trigger: str) -> dict:
     """The neighbours whose case the candidate called ``trigger``, in the query's shape."""
     ids = _case_ids(similar)
     dangerous = {str(cid) for cid in ShadowResult.objects.filter(
-        version=version, case_id__in=ids, result=trigger, error="").values_list("case_id", flat=True)}
+        version=version, case_id__in=ids, result=trigger).values_list("case_id", flat=True)}
     keep = [i for i, meta in enumerate(similar["metadatas"][0])
             if str((meta or {}).get("suspicious_case_id")) in dangerous]
     return {key: [[similar[key][0][i] for i in keep]] for key in _KEYS}
