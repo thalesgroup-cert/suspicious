@@ -644,13 +644,18 @@ runs on its own: no shadow starts and no version is promoted without an admin.
 - **Dual classify.** While a shadow exists, the connector sends `versions: ["active", "shadow"]` in
   the one classify call. The server answers the active part first, then scores the shadow under its
   own deadline, `AI_SHADOW_TIMEOUT` seconds (default 8, set in `deployment/.env`; the connector's own
-  timeout is 20 s). `results.shadow` is the answer or `{"error": "<ClassName>"}` (`NoShadow`,
-  `Timeout` or the exception class). A shadow error is never an HTTP error when `active` was asked.
-  On a timeout the worker thread keeps running to its end and holds a classify slot meanwhile.
-  `["shadow"]` alone is used by the seeding and the replay; it answers `409` when no shadow is loaded.
-- **Stored result.** When the case's AI job closes, the answer becomes one `ShadowResult` per
-  (case, version) (class, score, confidence, probabilities, tier). A shadow error is logged by class
-  and no row is written, so a failing shadow only lowers the count. The row is dropped when its
+  timeout is 20 s). The response waits for it up to that deadline. `results.shadow` is the answer or
+  `{"error": "<ClassName>"}`: `NoShadow`, `Timeout`, `Busy` (another shadow pass holds the shadow's
+  slot), `Skipped` (the active pass took more than 10 s) or the exception class. A shadow error is
+  never an HTTP error when `active` was asked. The shadow runs under its own single slot, outside the
+  live classify slots, so a slow shadow never makes a live pass wait; on a timeout the worker thread
+  keeps running to its end and holds that shadow slot meanwhile. `["shadow"]` alone is used by the
+  seeding and the replay; it waits up to 15 s for the shadow slot (then `503`), and answers `409`
+  when no shadow is loaded.
+- **Stored result.** When the case's AI job closes, in the same transaction and before the case is
+  reconciled, the answer becomes one `ShadowResult` per (case, version) (class, score, confidence,
+  probabilities, tier). A shadow error answer writes no row; a failure to store is logged by class
+  and leaves the live analysis written, so a failing shadow only lowers the count. The row is dropped when its
   version is no longer the shadow. It never reaches `Case.*_ai`, `AiAssessment`, `score_ai`, the
   campaign collection or any event.
 - **Would-be verdict.** After the live verdict, the scoring engine is run again on the same inputs
@@ -663,7 +668,10 @@ runs on its own: no shadow starts and no version is promoted without an admin.
   itself again) and stores `ShadowResult` rows with `origin = "seed"`. Seed rows are insert-only: an
   existing row, live or seed, is never touched. They feed the campaign dry run but do not count
   toward the 500 mails. If the server or the vector store is away, or the server does not hold the
-  shadow yet, the task pauses and retries after 5 minutes.
+  shadow yet, the task pauses and retries after 5 minutes. Each document is classified with its own
+  case left out of the neighbour vote. A run holds one Celery worker for up to about 31 minutes (20
+  minutes of work, a 30-minute soft and a 31-minute hard time limit), so keep the worker's
+  concurrency at 4 or more.
 - **Campaign dry run.** On `case_finalised` the connector also queues a dry run for the shadow. It
   uses the live collection for geometry (the campaign embedding does not depend on the classifier)
   and the database for the candidate's classes: it queries the 60 nearest neighbours without a class
@@ -682,12 +690,18 @@ runs on its own: no shadow starts and no version is promoted without an admin.
 The registry is the truth. The server keeps loaded models in memory only, so after a restart it
 holds the legacy weights (`active: null`) and no shadow. `ai_model/serversync.py` compares the
 registry with `GET /v2/models/ai_mail` (version ids) and pushes `POST /v2/reload` when they differ.
-It runs after every pointer move and from the beat entry `ai-model-server-sync` every 300 s, so a
-restarted server is brought back to the registry state within five minutes. If the server refuses a
-reload with a 4xx right after a promotion or rollback, the pointer move is reverted and the request
-fails; a promoted version whose revert finds the shadow slot taken by another version goes back to
+It runs after every pointer move, after a shadow start and a discard, and from the beat entry
+`ai-model-server-sync` every 300 s, so a restarted server is brought back to the registry state
+within five minutes. `/v2/reload` is all-or-nothing, so a reload refused (4xx) while a shadow is
+wanted is retried once without the shadow: the active pointer never depends on the shadow bundle.
+When that retry succeeds, the shadow gets a `shadow_refused` event (one per run of refusals) and the
+server runs without it until the bundle loads or an admin discards it. After a shadow start the
+shadow must load: if the server refuses it, the version goes back to `candidate` (`shadow_since`
+cleared, a `shadow_refused` event) and the request fails. A discard syncs best effort: a failure is
+only logged. If the server refuses a reload with a 4xx right after a promotion or rollback, even
+without the shadow, the pointer move is reverted and the request fails; a promoted version whose revert finds the shadow slot taken by another version goes back to
 `candidate`, not `shadow`. A transient failure (server down, timeout) keeps the new pointer and the
-beat retries; until it succeeds the connector health check says "registry and server differ". Every
+beat retries; so does a connector without a usable token or url. Until it succeeds the connector health check says "registry and server differ". Every
 answer carries its version id, so nothing is mislabelled meanwhile.
 
 ### Promotion conditions
@@ -700,7 +714,7 @@ the codes of the unmet conditions.
 |---|---|
 | `not_shadow` | the version is the shadow |
 | `too_young` | at least `shadow_min_days` (7, can be extended) since `shadow_since` |
-| `too_few_results` | at least 500 live shadow results (seed rows do not count) |
+| `too_few_results` | at least 500 live shadow results with a would-be verdict (seed rows and rows without a would-be verdict do not count, the same population as the flips and the agreement) |
 | `unreviewed_flips` | every critical flip has a review |
 | `unreviewed_campaigns` | every `candidate_only` and `active_only` case has a review |
 | `recheck_missing`, `recheck_failed`, `recheck_stale` | a gate recheck that passed, finished after the minimum period was met and less than 7 days ago |
@@ -736,15 +750,18 @@ group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<
 | `GET /api/ai-model/versions/` | Admin, CISO | versions with counters, purity and the age warning (`limit`, `offset`) |
 | `GET /api/ai-model/shadow/` | Admin, CISO | the shadow with agreement, flips (`flips_`), dry-run effects (`effects_`), the alert delta (`candidate_only_`, `active_only_`) and the unmet `conditions` |
 | `GET /api/ai-model/reviews/` | Admin, CISO | the review log, optional `?version_id=` |
-| `POST /api/ai-model/shadow/start/` | Admin | `{version_id, note}`: a gate-eligible candidate becomes the shadow, seeding is queued |
+| `POST /api/ai-model/shadow/start/` | Admin | `{version_id, note}`: a gate-eligible candidate becomes the shadow, seeding is queued and the server is synced; `409` and back to `candidate` when the server refuses the bundle |
 | `POST /api/ai-model/reviews/` | Admin | `{kind: "flip" or "campaign", case_id, note}` for the shadow |
 | `POST /api/ai-model/recheck/` | Admin | start a gate recheck of the shadow; `202 {job_id}` |
 | `POST /api/ai-model/extend/` | Admin | `{days}`: a new total for `shadow_min_days`, above the current one, at most 365 |
 | `POST /api/ai-model/promote/` | Admin | promote the shadow (or `version_id`); `409` with `codes` when refused |
 | `POST /api/ai-model/rollback/` | Admin | the `previous` version becomes active; `409 no_previous` without one |
-| `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version and free the shadow slot |
+| `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version, free the shadow slot and sync the server (best effort) |
 
-Every write adds a `ModelEvent` with the user and note. Stored results of earlier cases are never
+Every write adds a `ModelEvent` with the user. Its note is the request's note for shadow start,
+promote, rollback and discard; `<days> days` plus the note for extend; `<kind> <case_id>` for a
+review (the review text is on the `ShadowReview` row); the job id for a recheck start. A recheck
+that finishes adds a `recheck` event without a user, noting the job id and the outcome. Stored results of earlier cases are never
 recomputed by a promotion or a rollback.
 
 ### Operator runbook
@@ -799,8 +816,9 @@ reports. Record the dates and figures in the promotion note. This has not been r
 
 | Symptom | Likely cause and check |
 |---|---|
-| `shadow/start/` answers `409` | the version is not a `candidate`, did not pass the gate, or another version is the shadow (discard it first) |
-| No live results accumulate | the connector is off, the server does not hold the shadow (health says "registry and server differ"; check `GET /v2/models/ai_mail`), or the shadow keeps timing out (`results.shadow.error` is logged by class; raise `AI_SHADOW_TIMEOUT`) |
+| `shadow/start/` answers `409` | the version is not a `candidate`, did not pass the gate, or another version is the shadow (discard it first); or the server refused the bundle, the version is back to `candidate` with a `shadow_refused` event: check the `ai_inference` logs |
+| A `shadow_refused` event on the running shadow | the server refused the shadow bundle on a reload and runs without it; the beat keeps trying. Check the `ai_inference` logs, or discard the shadow |
+| No live results accumulate | the connector is off, the server does not hold the shadow (health says "registry and server differ"; check `GET /v2/models/ai_mail`), or the shadow keeps timing out, is `Busy` or `Skipped` (`results.shadow.error` is logged by class; raise `AI_SHADOW_TIMEOUT`, check the server's load) |
 | `409` on promote with `too_few_results` | seed rows do not count; wait for live mail or extend |
 | `409` on promote with `recheck_stale` | the recheck is older than 7 days or finished before the minimum period was met: run a new one |
 | `409` on promote with `job_running` | a training or recheck job is running; wait for it |
