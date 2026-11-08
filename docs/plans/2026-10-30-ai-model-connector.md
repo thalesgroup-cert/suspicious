@@ -129,7 +129,7 @@ Deliverable: a passing candidate becomes `shadow`, is compared on live mail, and
 
 ## Plan G: Settings "AI model" card
 
-Status: detailed in `docs/plans/2026-11-08-ai-model-connector-g-admin-card.md` (12 tasks: five backend reads and writes, then the card). Outline below kept for reference.
+Status: done on branch `feat/ai-model-plan-g`, not pushed. Detailed in `docs/plans/2026-11-08-ai-model-connector-g-admin-card.md` (12 tasks: five backend reads and writes, then the card). Outline below kept for reference.
 
 Deliverable: the admin card, hidden when the module is disabled.
 
