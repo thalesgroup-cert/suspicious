@@ -6,16 +6,17 @@ from case_handler.models import Result
 from score_process.scoring.engine import AiSignal, score_case
 
 
-def store_shadow_result(case, payload: dict):
+def store_shadow_result(case, payload: dict, origin=ShadowResult.Origin.LIVE):
     """Upsert the (case, version) row from a server shadow answer; None when its version is not
-    the registry's current shadow (a promote or discard raced it). Maps like ProviderResult."""
+    the registry's current shadow (a promote or discard raced it). Maps like ProviderResult.
+    origin="seed" for the seeding of already-stored mails (Ruling F8)."""
     version = ModelVersion.objects.filter(
         status=ModelVersion.Status.SHADOW, version_id=payload["version"]).first()
     if version is None:
         return None
     sub_class = str(payload["sub_class"])
     row, _ = ShadowResult.objects.update_or_create(case=case, version=version, defaults={
-        "origin": ShadowResult.Origin.LIVE,
+        "origin": origin,
         "result": payload["class"],
         "sub_class": sub_class[:ShadowResult._meta.get_field("sub_class").max_length],
         "score": round(float(payload["score"])),

@@ -160,7 +160,8 @@ def discard(version, user=None, note=""):
 
 
 def set_shadow(version, user=None, note=""):
-    """A gate-eligible candidate becomes the one shadow. Seeding is queued by a later task."""
+    """A gate-eligible candidate becomes the one shadow; its seeding (Ruling F8) is queued once
+    the change commits."""
     S = ModelVersion.Status
 
     def run():
@@ -176,10 +177,17 @@ def set_shadow(version, user=None, note=""):
             locked.shadow_since = timezone.now()
             locked.save(update_fields=["status", "shadow_slot", "shadow_since"])
             _event(locked, "set_shadow", user, note)
+            transaction.on_commit(lambda: _queue_seeding(locked.version_id))
 
     _retry(run)
     version.refresh_from_db()
     return version
+
+
+def _queue_seeding(version_id):
+    from .tasks import seed_shadow
+
+    seed_shadow.delay(version_id)
 
 
 def fail(version, error, user=None):

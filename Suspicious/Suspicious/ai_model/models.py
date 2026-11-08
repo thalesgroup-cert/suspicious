@@ -276,3 +276,25 @@ class ShadowResult(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["case", "version"], name="ai_model_shadow_result_case_version")]
+
+
+class ShadowCampaignEffect(models.Model):
+    """What campaign detection would have done for one case with the shadow's classes (Ruling F7)."""
+
+    class Effect(models.TextChoices):
+        NO_CHECK = "no_check"
+        NONE = "none"
+        WOULD_CREATE = "would_create"
+        WOULD_JOIN = "would_join"
+
+    case = models.ForeignKey("case_handler.Case", on_delete=models.CASCADE, related_name="shadow_campaign_effects")
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="campaign_effects")
+    effect = models.CharField(max_length=12, choices=Effect.choices)
+    member_case_ids = models.JSONField(default=list)
+    live_campaign = models.ForeignKey("case_handler.Campaign", null=True, blank=True,
+                                      on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["case", "version"],
+                                               name="ai_model_shadow_campaign_case_version")]

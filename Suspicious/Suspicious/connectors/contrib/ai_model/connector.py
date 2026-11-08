@@ -31,7 +31,7 @@ from connectors.contrib.ai_model import imap_sync
 from connectors.contrib.ai_model.campaigns import collection_mismatch
 from connectors.contrib.ai_model.client import AiInferenceClient
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
-from connectors.tasks import run_campaign_detection
+from connectors.tasks import run_campaign_detection, run_shadow_campaign
 
 logger = logging.getLogger("connectors.contrib.ai_model")
 
@@ -190,6 +190,11 @@ class AiModelConnector(Connector):
         # Only queued: this hook runs under the connector's breaker, which the classification
         # calls share, and a Chroma outage during detection must not open it.
         run_campaign_detection.delay(event.case_id)
+        try:
+            if ModelVersion.objects.filter(status=ModelVersion.Status.SHADOW).exists():
+                run_shadow_campaign.delay(event.case_id)
+        except Exception as exc:  # noqa: BLE001 — a shadow failure never fails the live hook
+            logger.warning("Shadow campaign check not queued for case %s: %s", event.case_id, type(exc).__name__)
 
     def analyze(self, kind: str, case_id: int) -> ProviderResult:
         case = Case.objects.select_related("fileOrMail__mail").get(pk=case_id)
