@@ -15,8 +15,9 @@ overrides:
   # disclosure, TLS validation bypass (GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3
   # et al); 7.29.0 and earlier fixed the CRLF/desync set (GHSA-jr45-8vmc-qm54).
   undici: 7.30.1
-  # follow-redirects <1.16.1 (via axios): GHSA fixed in 1.16.1.
-  follow-redirects: 1.16.1
+  # follow-redirects <1.16.2 (via axios): cross-realm sensitiveHeaders arrays
+  # (GHSA-mrwp-f3q8-3g9p), fixed in 1.16.2.
+  follow-redirects: 1.16.2
   # zod <4.6.6 (also pulled in by eslint-plugin-react-hooks, dev-only): memory
   # exhaustion on oversized constrained collections (GHSA-mrhx-c7xc-m3w5).
   zod: 4.6.6
