@@ -94,6 +94,7 @@ class LabelRecord(models.Model):
         indexes = [
             models.Index(fields=["message_id_hash", "source", "status"]),
             models.Index(fields=["trust", "status"]),
+            models.Index(fields=["status", "observed_at"], name="ai_label_status_observed_idx"),
         ]
 
     # Ruling D4: the only columns a save() may change; case only from null.
