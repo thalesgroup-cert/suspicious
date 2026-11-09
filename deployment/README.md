@@ -1,148 +1,158 @@
-# Modern Deployment Guide
+# Deployment Guide
 
-This project provides a **modular, automated, Docker-based deployment system** designed for reliability, maintainability, and ease of use.
-It relies on:
-
-* **Docker Compose v2**
-* **Environment configuration via `.env`**
-* **Self-contained helper scripts** (`scripts/`)
-* **Optional Makefile shortcuts** for convenience
-* A comprehensive **checklist** that prepares all required files, directories, and certificates
-
----
+Docker Compose v2 deployment of the Suspicious stack, driven by `make` targets
+that wrap the scripts in `scripts/`. Run everything from this directory.
+Related guides: `docs/operations/deploy.md` (upgrades), `VAULT.md` (secrets),
+`Migration_from_MinIO_to_RustFS.md`, and `CONFIG.md` at the repository root.
 
 ## Requirements
 
-Before running any commands, ensure you have:
+* Docker and Docker Compose v2 (`docker compose`)
+* `curl`
+* Outbound internet on first `make init` (Cortex catalogs)
 
-* **Docker**
-* **Docker Compose v2 (`docker compose` subcommand)**
-* **curl**
+First-time interactive setup: `make install` (runs `install.py`, writes `.env`
+and `settings.json`, creates the network, optionally generates certificates and
+starts the stack). `install.sh` is the curl-pipe bootstrapper that installs the
+installer's dependencies and launches it.
 
-The `scripts/init.sh` and `scripts/check-network.sh` utilities will verify and prepare the environment automatically.
-
----
-
-## Initialization
-
-Run the full initialization script:
+## Quick start (non-interactive)
 
 ```bash
-make init
+make init     # config files, network, certificates, secrets, Cortex catalogs
+make up       # start the stack
+make createsuperuser
 ```
 
-This performs:
+`make init` (`scripts/init.sh`) checks the required binaries, creates `.env`
+from `.env.example` if missing, validates the directory layout, downloads the
+Cortex `application.conf` and analyzer/responder catalogs, generates TLS
+certificates when missing, fills empty Redis/Elasticsearch/ChromaDB secrets
+(`.env`, `.env.data`; existing values are never overwritten) and checks Docker
+socket permissions.
 
-* Creation of the `.env` file (or uses yours if present)
-* Directory structure validation
-* Download/creation of config files
-* Certificate generation (if missing)
-* Generation of the Redis, Elasticsearch and ChromaDB secrets (`.env`, `.env.data`; existing values are never overwritten)
-* Cortex catalog download
-* Check of Docker socket permissions
-  …and other required system checks.
+`make up` runs `check-secrets`, `check-mounts.sh`, `check-network.sh` and
+`replace-tls.sh`, starts Vault and unseals it (needs a terminal), starts
+Elasticsearch and bootstraps its service accounts, then starts everything else.
 
-This step ensures the project is ready to run.
+## Make targets
 
----
+All targets come from `Makefile`; `make help` prints the same list.
 
-## Starting the Stack
+| Group | Target | What it does |
+|---|---|---|
+| Setup | `install` | Interactive wizard (`install.py`) |
+| | `init` | Non-interactive setup (`scripts/init.sh`) |
+| | `network` | Create the `NETWORK_NAME` bridge network (idempotent) |
+| | `create-certs` | Generate TLS certificates (`openssl-certificates-generator.sh`) |
+| | `secrets-init` | Generate missing data-service secrets (`gen-service-secrets.sh`) |
+| | `install-hooks` | Set git `core.hooksPath` to `.githooks` (Conventional Commits validator) |
+| Lifecycle | `up` | Start all services, no pull, no migration |
+| | `down` | Stop and remove containers, volumes kept |
+| | `restart` | Restart running services |
+| | `redeploy [s=<svc>]` | Force-recreate containers to pick up new images; Vault is kept up and unsealed |
+| | `deploy` / `upgrade` | Rolling deploy (`scripts/deploy.sh`): pull, build, migrate, restart in order |
+| | `build` | Build local images and the Cortex analyzer images |
+| | `pull` | Pull images without restarting |
+| Django | `migrate` | `manage.py migrate` in the web container |
+| | `seed-config` | Seed runtime config from `settings.json` into the DB |
+| | `collectstatic` | Collect static files |
+| | `createsuperuser` | Interactive Django superuser |
+| Database | `backup-db` | Gzipped dump into `./backups/` (see `docs/operations/backups.md`) |
+| | `restore-db f=<file>` | Restore a `.sql.gz` dump (5 s abort window) |
+| | `db-replica-init`, `replica-up`, `replica-down`, `replica-status` | Optional MariaDB read replica (profile `replica`) |
+| Vault | `provision-vault`, `seed-vault-secrets`, `unseal` | See "Secrets & Vault" below |
+| Diagnostics | `check-secrets` | Fail if placeholder secrets remain in `.env` |
+| | `db-auth-check` | Verify Redis, Elasticsearch and ChromaDB reject anonymous access |
+| | `db-auth-migrate` | One-time upgrade of an existing stack to authenticated data services |
+| | `network-check` | Verify each service is only on the networks it needs |
+| | `check-updates` | Compare running image digests with the registry |
+| | `logs [s=<svc>]`, `status`, `shell`, `db-shell` | Follow logs, `ps -a`, bash in `suspicious`, MariaDB shell |
+| Cleanup | `clean`, `prune` | Remove stopped containers; prune all unused Docker resources (irreversible) |
 
-### Start all services
+`make deploy` first runs `check-secrets`, then `deploy.sh`, which refuses to run
+until the data services enforce authentication: on an existing stack run
+`make db-auth-migrate` once (about 2 minutes of maintenance window, queued
+Celery tasks are discarded), then `make deploy`. Details in
+`docs/operations/deploy.md`.
 
-```bash
-make up
-```
+## Compose layout
 
-or manually:
+`docker-compose.yml` (project name `suspicious`) is the entry point. It declares
+volumes and networks once and pulls service definitions from the base files with
+`extends:`.
 
-```bash
-docker compose --env-file .env up -d
-```
+| File | Role |
+|---|---|
+| `docker-compose.yml` | Main composition: image tags, container names, dependencies, volumes, networks |
+| `compose_apps.yaml` | Base definitions for suspicious, suspicious_ui, celery, beat, cortex, docker_proxy_cortex, feeder, mail_renderer, ai_inference, vault |
+| `compose_databases.yaml` | Base definitions for MariaDB (and replica), Redis, Elasticsearch, ChromaDB, RustFS |
+| `compose_reverse_proxy.yaml` | Traefik |
+| `docker-compose.override.yml` | Auto-loaded; only `build:` deltas so contributors run images built from their working tree |
+| `docker-compose.dev-extras.yml` | Opt-in, never auto-loaded: GreenMail (SMTP 3025 / IMAP 3143), OpenLDAP, Ollama (GPU). Pass it with `-f docker-compose.yml -f docker-compose.dev-extras.yml` |
+| `compose.ci.yaml` | CI overlay: stub Cortex in the `cortex` slot plus GreenMail; used by `scripts/ci/bootstrap.sh` |
 
-### Stop all services
+`make` targets pass `--env-file .env --profile ai`.
 
-```bash
-make down
-```
+### Profiles
 
----
+| Profile | Service | Notes |
+|---|---|---|
+| `ai` | `ai_inference` | AIMailAnalyzer model server called by the `ai_model` connector. Enabled by every `make` target; with plain `docker compose` add `--profile ai`. Weights live in `Analyzers/AIMailAnalyzer/models/` (git-ignored) |
+| `replica` | `db_suspicious_replica` | MariaDB read replica, managed by `make db-replica-init` / `replica-up` |
 
-## Deployment Workflow
+### Networks
 
-To pull new images, rebuild if needed, and restart services safely:
+`suspicious_network` is external (`NETWORK_NAME`, `NETWORK_SUBNET`,
+`NETWORK_GATEWAY`, `NETWORK_IP_RANGE` in `.env`, created by `make network` or
+`check-network.sh`) and is the shared integration network (reverse proxy, UI,
+feeder, Vault, external peers). The others segment the stack:
 
-```bash
-make deploy
-```
+| Network | Internal | Members |
+|---|---|---|
+| `data` | yes | MariaDB, Redis, ChromaDB proxy: Django, Celery and beat only |
+| `storage` | no | RustFS: Django, Celery, the feeder and ai_inference |
+| `cortex` | no | Cortex and Elasticsearch: Django and Celery |
+| `renderer` | yes | `mail_renderer`: Django and Celery, no route out |
+| `chroma_internal` | yes | ChromaDB and its proxy |
+| `docker_cortex` | yes | Cortex and `docker_proxy_cortex` (restricted Docker socket access) |
+| `reverse_network` | no | Traefik and the services it publishes |
 
-This command runs:
+`make network-check` verifies this membership against Docker.
 
-* Network checks
-* TLS/hostname replacement
-* Safety check for empty workload queues
-* Deployment script execution
+## Scripts
 
----
+All scripts are in `scripts/` and expect to run from `deployment/` (they
+`source .env`).
 
-## 🛠 Development & Maintenance Commands
-
-### Build images
-
-```bash
-make build
-```
-
-### Pull latest images
-
-```bash
-make pull
-```
-
-### Run database migrations
-
-```bash
-make migrate
-```
-
-### Create a superuser
-
-```bash
-make superuser
-```
-
-### Backup the database
-
-```bash
-make backup
-```
-
-### Regenerate certificates
-
-```bash
-make create-certs
-```
-
----
-
-## Project Structure
-
-```
-.
-├── docker-compose.yml           # Main orchestration file
-├── .env.example                 # Example configuration (safe to commit)
-├── .env                         # Real configuration (never commit)
-├── scripts/                     # Modular shell scripts
-│   ├── init.sh                  # Main initializer (system checks + setup)
-│   ├── check-network.sh
-│   ├── wait-empty.sh
-│   ├── deploy.sh
-│   ├── migrate.sh
-│   ├── backup-db.sh
-│   ├── create-superuser.sh
-│   └── openssl-certificates-generator.sh
-└── Makefile                     # User-friendly command shortcuts
-```
+| Script | Purpose |
+|---|---|
+| `init.sh` | Non-interactive setup behind `make init` |
+| `openssl-certificates-generator.sh` | Generate the root CA, server and optional client certificates under `certificates/<env>/`; `--force` regenerates |
+| `gen-service-secrets.sh` | Fill empty Redis/Elasticsearch/ChromaDB secrets with random hex, never overwriting |
+| `gen-vault-tls.sh` | Generate the Vault listener certificate and CA (`vault/tls`, `vault/ca`), idempotent |
+| `check-network.sh` | Create the external Docker network from `.env` if missing |
+| `check-mounts.sh` | Fail before `up` when a bind-mount host path (`settings.json`, `config.json`, log dirs) is missing, since Docker would create it as a root-owned directory |
+| `check-secrets.sh` | Abort when placeholder secrets remain in `.env` |
+| `check-traefik-provider.sh` | Abort when `traefik.yaml` enables the Docker provider (Traefik has no Docker socket) |
+| `replace-tls.sh` | Rewrite the Traefik `tls.yaml` host rule to `DOMAIN_CORP` |
+| `build-analyzers.sh` | Build the local images Cortex runs the custom analyzers from |
+| `deploy.sh` | Rolling deploy: pull, build, migrate, mail_renderer, web, workers, feeder, UI, then network check |
+| `health-wait.sh` | Wait for a container to become healthy (used by `deploy.sh`) |
+| `wait-empty.sh` | Wait until a directory in the web container is empty |
+| `migrate.sh` | `manage.py migrate` in the web container |
+| `create-superuser.sh` | Interactive `createsuperuser` in the web container |
+| `backup-db.sh` | `mariadb-dump` into `./backups/` |
+| `init-replica.sh` | Bootstrap the MariaDB read replica from the primary (dump with binlog coordinates) |
+| `db-auth-check.sh` | Exit 0 only if every data service refuses anonymous access and accepts the `.env` credential |
+| `db-auth-migrate.sh` | One-time upgrade to authenticated data services (`--force`, `ASSUME_YES=1`) |
+| `network-check.sh` | Verify per-service network membership and reachability |
+| `es-security-bootstrap.sh` | Create or refresh the Elasticsearch roles and users used by Suspicious and Cortex |
+| `enable-dev-analyzers.sh` | Enable Cortex analyzers that need no API key, for dev stacks |
+| `check-updates.sh` | Compare the running image digest with GHCR; exit 1 when an update exists |
+| `provision-vault.sh` | Enable KV v2 and AppRole in Vault, write role and secret IDs to `.env` |
+| `seed-vault-secrets.sh` | Write secrets from exported env vars into Vault KV |
+| `unseal-vault.sh` | Unseal Vault from a hidden prompt; no-op if unsealed or no terminal |
 
 ---
 
@@ -234,29 +244,7 @@ The app now reads secrets from Vault and runtime config from the DB. Later resta
 
 ## Security Notes
 
-* `.env` **must never be committed** — it contains secrets.
-* `.env` is already included in `.gitignore`.
+* `.env` must never be committed; it is git-ignored and contains secrets.
 * `.env.data` holds the Elasticsearch superuser password (mode 600, git-ignored); only the `elasticsearch` service and `scripts/es-security-bootstrap.sh` read it.
 * Upgrading an existing stack: run `make db-auth-migrate` once (see `docs/operations/deploy.md`); `make deploy` refuses to run until the data services enforce authentication.
-* Secrets can also be provided through:
-
-  * environment variables
-  * CI/CD secret stores
-  * Docker Compose overrides
-
----
-
-## Summary
-
-| Action                | Command             |
-| --------------------- | ------------------- |
-| Initialize everything | `make init`         |
-| Start services        | `make up`           |
-| Stop services         | `make down`         |
-| Deploy updates        | `make deploy`       |
-| Provision Vault       | `make provision-vault` |
-| Seed Vault secrets    | `make seed-vault-secrets` |
-| Run migrations        | `make migrate`      |
-| Backup database       | `make backup`       |
-| Create superuser      | `make superuser`    |
-| Generate certificates | `make create-certs` |
+* Secrets can also be provided through environment variables, CI/CD secret stores or Compose overrides.
