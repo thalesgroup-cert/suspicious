@@ -9,4 +9,5 @@ the full surface, read the code under `Suspicious/Suspicious/` and
 - [case_handler models](case_handler-models.md) — `Case` and related models
 - [score_process](score_process.md) — scoring and integration entry points
 - [tasp tasks](tasp-tasks.md) — Celery task wrappers
-- [AI Mail Analyzer](aimailanalyzer.md) — ML classifier modules
+- [AI Mail Analyzer](aimailanalyzer.md) — classifier, inference server (`/v2`), training and `ai_model` registry modules
+- [Management commands](management-commands.md) — maintenance and backfill commands

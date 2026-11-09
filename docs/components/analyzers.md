@@ -6,6 +6,9 @@
 For the order of work (weights, token, deploy, enable, verify, retrain, harden), start with the
 [AI inference operator guide](../getting-started/ai-inference.md); this page is the reference.
 
+The other custom analyzer, which does run in Cortex, is documented in
+[Mail Header Analyzer](mail-header-analyzer.md).
+
 ## How it works
 
 - **Embeddings:** a Sentence Transformers model

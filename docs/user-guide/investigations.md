@@ -13,6 +13,35 @@ same scoring inputs that set the band — never a separate, independently
 "guessed" verdict. Click **Show source breakdown** to see which sources
 counted toward the decision and why.
 
+## AI model assessment
+
+When an administrator has enabled the `ai_model` connector, the case view (the
+investigation overview and the submission drawer) shows an **AI model
+assessment** section for mail cases the model has analysed. Nothing is shown
+while the connector is off or when the mail could not be analysed.
+
+- **Result:** the model's class (Safe, Unwanted, Dangerous or Inconclusive), a
+  sub-class chip when there is one, and a confidence tier: **High** ("the model is
+  confident"), **Medium** ("the model leans this way, check the evidence") or
+  **Low** ("the model is unsure, rely on the other evidence"). On Low the
+  runner-up class is shown. No numeric confidence is displayed. "Confidence not
+  calibrated" appears when the active model has no tiers (the legacy version).
+- **Model line:** the model version, when the case was analysed, and what the
+  model read: the body text only, not the headers or attachments.
+- **Campaign:** the campaign reference and its number of mails when the case
+  belongs to a detected campaign.
+- **Similar cases:** a table of earlier cases the model found alike, with their
+  label and provenance. You only see the cases you are allowed to open.
+
+Investigators and administrators (users who can see the case beyond their own
+submission) also get the analyst material: a **cross-check** list of the facts
+behind the verdict (decisive rule, counted sources, a deny or allow list hit), a
+warning **AI disagrees with the evidence** when the model sits on the opposite
+side of Safe/Dangerous from the case verdict, the labels analysts gave the other
+campaign mails, and a warning **Campaign members disagree** when those labels
+conflict. The assessment is context for the analyst: the verdict itself still
+comes from the scoring described in *Why this verdict*.
+
 ## Downloading the full report
 
 The **Full report** button (on a case's detail view) downloads a
