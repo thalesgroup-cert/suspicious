@@ -30,7 +30,7 @@
 Suspicious inspects, classifies, and reports suspicious emails, files, URLs, IPs,
 and file hashes. Submit an item from the web UI or forward an email to a
 monitored mailbox; Suspicious runs it through YARA rules, a sandbox, metadata
-checks, and a machine-learning email classifier, then returns a scored verdict
+checks, and a machine-learning email classifier (the `ai_inference` server), then returns a scored verdict
 and a full report.
 
 Built and maintained by the [Thales Group CERT](https://www.thalesgroup.com/).
@@ -59,7 +59,7 @@ Page-by-page clips are in the [Product tour](#product-tour) below.
 - **Ingests** email automatically from IMAP/IMAPS mailboxes.
 - **Notifies** reporters of the outcome by email.
 - **Integrates** with Cortex, TheHive, MISP, LDAP, Elasticsearch, ChromaDB, and
-  S3-compatible storage.
+  S3-compatible or Google Cloud storage.
 
 ## Quick start
 
@@ -107,53 +107,63 @@ See **[CONFIG.md](CONFIG.md)** for every parameter.
 | Component | Role |
 |-----------|------|
 | **Django REST API** | Submission, analysis orchestration, reports. Gunicorn on port 9020. |
-| **React UI** (React 19, Vite, MUI) | Frontend served by Nginx on port 9021. |
-| **Celery worker + beat** | Background jobs: case finalisation, Cortex sync, stale-job rescue, KPI snapshots. |
-| **MariaDB** | Metadata, results, KPIs. Holds the `CaseAnalyzerJob` ledger behind the Cortex webhook lookup. |
-| **Valkey / Redis** | Celery broker and Django cache. |
+| **React UI** (React 19, Vite, MUI 9) | Frontend served by Nginx on port 9021. |
+| **Celery worker** (`suspicious_celery`) | Background jobs: Cortex reconciliation, connector deliveries, AI provider calls, retraining. |
+| **Celery beat** (`suspicious_celery_beat`) | Separate scheduler container. Without it no periodic task runs (email polling, stale-job rescue, connector sync, KPI snapshots). |
+| **MariaDB 11.4** | Metadata, results, KPIs. Holds the `CaseAnalyzerJob` ledger behind the Cortex webhook lookup. |
+| **Valkey 9** | Celery broker and Django cache (per-case lock, webhook dedup). |
 | **Elasticsearch** | Search and indexing. |
-| **Cortex** | Analyzer engine — YARA, AI, sandbox, metadata, FileInfo. Reports back via an HMAC-signed webhook. |
-| **ChromaDB** | Vector store for semantic similarity against past cases. |
-| **RustFS** (S3-compatible) | Stores uploads, attachments, artifacts. |
+| **Cortex** | Analyzer engine: YARA, sandbox, metadata, FileInfo. Reports back via an HMAC-signed webhook. No AI analyzer. |
+| **`ai_inference`** | AIMailAnalyzer model server (FastAPI, compose profile `ai`, internal port 8090). Holds the encoder and classifier weights; also runs retraining jobs. |
+| **`ai_model` connector** | Calls `ai_inference` for the mail AI verdict, runs campaign detection and the review-mailbox label sync. Off by default. |
+| **ChromaDB** | Vector store for campaign detection (collection `suspicious_mails`), behind a token-checking proxy. |
+| **`mail_renderer`** | Isolated headless Chromium that draws the mail preview image; no route out. |
+| **Object storage** | RustFS (S3 API) by default, or Google Cloud Storage (`storage.provider`). Uploads, attachments, previews, AI datasets and model bundles. |
 | **Email Feeder** | Polls IMAP/IMAPS mailboxes and imports emails. Runs as a non-root user. |
 | **Traefik** | Reverse proxy and TLS termination. |
 | **Vault** | Production secret storage. |
 
+Network layout, the service table and diagrams are in
+[Architecture](docs/architecture.md).
+
 ### How an analysis runs
 
-1. Django creates a `Case`. For each analyzer it writes an `AnalyzerReport` and a
-   `CaseAnalyzerJob` row in one transaction, pinning the `(case, cortex job)`
-   mapping at dispatch.
+1. Django creates a `Case`. For each Cortex analyzer it writes an
+   `AnalyzerReport` and a `CaseAnalyzerJob` row in one transaction, pinning the
+   `(case, cortex job)` mapping at dispatch. A mail with a readable archive is
+   also handed to the `ai_model` provider (a `provider-` ledger row), if enabled.
 2. Cortex runs each analyzer and posts to the HMAC-signed webhook on completion.
-3. The webhook looks up the case in `CaseAnalyzerJob`, then enqueues a Celery
-   task that takes a per-case lock, updates the job, and calls `finalise_case`
-   once the case has no pending jobs left.
-4. `finalise_case` scores the case, pushes to TheHive/MISP if configured, queries
-   ChromaDB for similar past cases, and emails the reporter.
-5. Celery beat re-checks any webhook the platform missed (every 300 s) and fails
+3. The webhook looks up the case in `CaseAnalyzerJob` and enqueues
+   `reconcile_case`. The task takes a per-case Redis lock and calls
+   `reconcile_case_core`, which syncs the ledger and advances the case state.
+4. When no job is pending, `reconcile_case_core` aggregates the score and the
+   case reaches its final verdict, then emits `case_finalised`.
+5. Every connector subscribed to `case_finalised` fires independently: MISP,
+   SMTP notification to the reporter, `ai_narration`, the ChromaDB cleanup, and
+   the `ai_model` campaign detection. TheHive alerts come from the challenge
+   flow, the push button and campaign detection.
+6. Celery beat re-checks any webhook the platform missed (every 300 s) and fails
    jobs stuck past `STALE_JOB_TIMEOUT_SECONDS` (every 600 s), so cases never stall.
 
 ## AI email classifier
 
 `Analyzers/AIMailAnalyzer` classifies emails by intent (phishing, malicious,
-suspicious, benign) using a Sentence-Transformers embedding model and a custom
-classifier, with ChromaDB for similarity search. It runs as a Cortex analyzer
-alongside the static rules.
+suspicious, benign) with a Sentence-Transformers embedding model and a custom
+classifier. It runs as the `ai_inference` model server, not as a Cortex
+analyzer. The `ai_model` connector sends it the mail text and stores the
+answer; the same connector runs campaign detection against ChromaDB and the
+retraining pipeline (label ledger, gate, shadow, promotion, rollback).
 
-To train it on your own data:
+The connector is **off by default**. To enable it, set `AI_INFERENCE_TOKEN` in
+`deployment/.env` (an empty token makes the `/v2` API answer 503), put the same
+value in the connector's `token`, start the `ai` compose profile and enable
+`ai_model` in Settings. Without it a mail gets no AI vote and is usually
+finalised as Inconclusive. Step-by-step setup, retraining and troubleshooting:
+**[AI inference guide](docs/getting-started/ai-inference.md)**; reference in
+[AI / ML Analyzers](docs/components/analyzers.md).
 
-1. Open `Analyzers/AIMailAnalyzer/` for the training scripts.
-2. Prepare a labeled dataset (legitimate vs phishing).
-3. Train the model.
-4. Deploy it in Cortex with the other analyzers.
-5. Review precision and false-positive rates; retrain as needed.
-
-Use it alongside YARA, sandbox, and metadata analyzers. Do not auto-block on the
-classifier alone.
-
-The classifier now runs as the `ai_inference` model server called by the `ai_model` connector, not
-as a Cortex analyzer. Setup, deployment and operation:
-[AI inference guide](docs/getting-started/ai-inference.md).
+Use the classifier alongside YARA, sandbox, and metadata analyzers. Do not
+auto-block on it alone.
 
 ## Contributing
 
