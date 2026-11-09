@@ -96,3 +96,22 @@ class ChallengeTokenTests(TestCase):
         url = CaseChallengeToken.build_challenge_url(42, "abc123", "https://host/api")
         self.assertEqual(url, "https://host/api/cases/42/challenge/abc123/")
         self.assertNotIn("?token=", url)
+
+
+@patch("api.views.challenge.notify_and_record_challenge")
+class ChallengeTokenLedgerDbErrorTest(TestCase):
+    def test_a_ledger_db_error_keeps_the_challenge(self, _notify):
+        from django.db import IntegrityError
+        from ai_model.models import LabelRecord
+        from connectors.models import ConnectorState
+        ConnectorState.objects.update_or_create(name="ai_model", defaults={"enabled": True})
+        reporter = User.objects.create_user(username="ch_tok_db", password="pw")
+        case = Case.objects.create(reporter=reporter, description="case", results="Dangerous")
+        raw, _ = CaseChallengeToken.issue_token(case)
+        url = reverse("case-challenge", kwargs={"case_id": case.id, "token": raw})
+        with patch.object(LabelRecord, "_save_table", side_effect=IntegrityError("x")):
+            resp = self.client.post(url, GOOD)
+        self.assertEqual(resp.status_code, 302)
+        case.refresh_from_db()
+        self.assertTrue(case.is_challenged)
+        self.assertIsNotNone(CaseChallengeToken.objects.get(case=case).used_at)

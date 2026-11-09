@@ -10,6 +10,11 @@ const TIER_MEANING = {
 
 const TIER_LABEL = { high: "High", medium: "Medium", low: "Low" } as const;
 
+const LABEL_ORDER = ["Dangerous", "Unwanted", "Safe"];
+
+const labelLine = (labels: Record<string, number>) =>
+  LABEL_ORDER.filter((c) => labels[c] > 0).map((c) => `${labels[c]} ${c}`).join(", ");
+
 const humanise = (s: string) => {
   const t = s.toLowerCase().replace(/_/g, " ");
   return t.charAt(0).toUpperCase() + t.slice(1);
@@ -41,6 +46,10 @@ export function AiAssessmentSection({ assessment: a }: { assessment: AiAssessmen
       {a.campaign && (
         <Typography variant="body2">{`Campaign ${a.campaign.ref}, ${a.campaign.size} ${a.campaign.size === 1 ? "mail" : "mails"}`}</Typography>
       )}
+      {a.campaign?.labels && labelLine(a.campaign.labels) && (
+        <Typography variant="body2">{`Labelled by analysts: ${labelLine(a.campaign.labels)}`}</Typography>
+      )}
+      {a.campaign?.members_disagree && <Alert severity="warning">Campaign members disagree</Alert>}
       {a.cross_check?.disagrees && <Alert severity="warning">AI disagrees with the evidence</Alert>}
       {a.cross_check && a.cross_check.facts.length > 0 && (
         <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>

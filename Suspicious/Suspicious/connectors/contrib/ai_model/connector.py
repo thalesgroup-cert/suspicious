@@ -4,9 +4,15 @@ the Cortex AI analyzer. See docs/specs for the ai_model design."""
 from __future__ import annotations
 
 import logging
+from time import monotonic  # module-level so tests can patch the clock
 
+from django.db import transaction
+from django.utils import timezone
+
+from ai_model import ledger
 from ai_model.campaign_profile import COLLECTION_NAME
-from ai_model.models import AiAssessment
+from ai_model.models import AiAssessment, LabelSyncState
+from ai_model.taxonomy import FOLDERS, class_of
 from case_handler.models import Case
 from connectors.base import (
     EVENT_CASE_FINALISED,
@@ -16,8 +22,10 @@ from connectors.base import (
     ConnectorManifest,
     HealthStatus,
     ProviderResult,
+    Schedule,
     valid_url,
 )
+from connectors.contrib.ai_model import imap_sync
 from connectors.contrib.ai_model.campaigns import collection_mismatch
 from connectors.contrib.ai_model.client import AiInferenceClient
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
@@ -27,6 +35,10 @@ logger = logging.getLogger("connectors.contrib.ai_model")
 
 DEFAULT_URL = "http://ai_inference:8090"
 DEFAULT_TIMEOUT = 20
+FOLDER_BATCH = 500  # ruling D8: UIDs examined per folder per run (skipped and already-observed ones included)
+CHUNK = 25  # mails fetched, matched, embedded and committed together; one chunk stays far under 540 s
+TIME_BUDGET_SECONDS = 300  # a run stops between chunks and embed batches after this; Celery's soft limit is 540 s
+EMBED_BATCH = 32  # the /v2/embed limit
 
 
 def _inconclusive(reason: str) -> ProviderResult:
@@ -58,6 +70,47 @@ def result_from_server(payload: dict) -> ProviderResult:
     )
 
 
+class EmbedRefused(Exception):
+    """The inference server refused a chunk's embed (4xx) or answered inconsistently: this folder only."""
+
+
+class _BudgetSpent(Exception):
+    pass
+
+
+class LabelSyncIncomplete(Exception):
+    """Raised after the run when some folders were skipped because their embed was refused (the
+    other folders are committed), or before it when no configured folder is a known one. A retry
+    would hit the same cause, so it waits for the next run or an operator."""
+
+    retryable = False
+
+
+def _embed(client, texts: list[str], started: float, budget) -> tuple[dict, dict]:
+    """({profile: [vector, ...]}, versions) for both profiles, in batches of EMBED_BATCH.
+    EmbedRefused on a 4xx, an answer that does not fit the batch or versions changing within it;
+    _BudgetSpent when the time budget runs out before a later batch."""
+    vectors = {"classifier": [], "campaign": []}
+    seen = {"classifier": set(), "campaign": set()}
+    for start in range(0, len(texts), EMBED_BATCH):
+        if start and budget is not None and monotonic() - started >= budget:
+            raise _BudgetSpent
+        batch = texts[start:start + EMBED_BATCH]
+        for profile in vectors:
+            try:
+                answer = client.embed(batch, profile)
+            except ValueError as exc:  # the message is not kept: only the class
+                raise EmbedRefused(type(exc).__name__) from None
+            if len(answer["vectors"]) != len(batch):
+                raise EmbedRefused("answer does not match the batch size")
+            vectors[profile].extend(answer["vectors"])
+            seen[profile].add((answer["preprocessing_version"], answer["embedding_version"]))
+    if any(len(v) > 1 for v in seen.values()):
+        raise EmbedRefused("versions changed within a chunk")
+    classifier, campaign = (next(iter(seen[p]), ("", "")) for p in ("classifier", "campaign"))
+    return vectors, {"preprocessing_version": classifier[0], "embedding_version": campaign[1]}
+
+
 class AiModelConnector(Connector):
     manifest = ConnectorManifest(
         name="ai_model",
@@ -74,8 +127,17 @@ class AiModelConnector(Connector):
             ConfigField("token", "secret", required=True,
                         help="Bearer token the inference server expects (AI_INFERENCE_TOKEN)."),
             ConfigField("timeout_seconds", "int", default=DEFAULT_TIMEOUT),
+            ConfigField("imap_host", "str",
+                        help="IMAP server of the review mailbox. Empty: no label sync."),
+            ConfigField("imap_port", "int", default=993),
+            ConfigField("imap_user", "str"),
+            ConfigField("imap_password", "secret"),
+            ConfigField("imap_use_ssl", "bool", default=True),
+            ConfigField("imap_folders", "str", default=",".join(FOLDERS),
+                        help="Comma-separated review folders; the digit prefix gives the class."),
         ),
         events=(EVENT_CASE_FINALISED,),
+        schedules=(Schedule("label-sync", 86400),),
         enabled_by_default=False,
         provides=PROVIDER_KIND_MAIL_AI,
     )
@@ -128,3 +190,88 @@ class AiModelConnector(Connector):
             logger.warning("ai_model: case %s refused by the inference server: %s", case_id, exc)
             return _inconclusive(str(exc))
         return result_from_server(payload)
+
+    def sync(self, *, unlimited: bool = False) -> None:
+        """Nightly label sync: read the review folders (read-only) into the label ledger.
+
+        Each folder is read in chunks of CHUNK mails, up to FOLDER_BATCH per run. A chunk is
+        embedded first, then its rows and the folder checkpoint commit in one transaction, so a
+        failure leaves earlier chunks committed and the next run resumes after them. The run
+        stops cleanly once TIME_BUDGET_SECONDS have passed (checked between chunks), under
+        Celery's 540 s soft limit, also between embed batches (the cut chunk is not committed);
+        unlimited (the backfill command) lifts the per-folder cap and the time budget. A folder
+        that cannot be read is skipped. A folder whose embed is refused (4xx, inconsistent answer) is skipped too, and once the other
+        folders ran LabelSyncIncomplete (not retried) fails the delivery; so does a folder list
+        with no known folder, before connecting. A failed login or TLS handshake (not retried), a
+        lost connection or an unavailable embed endpoint raises at once and fails the run.
+        """
+        host = self.config.get("imap_host")
+        if not host:
+            return
+        started = monotonic()
+        cap = None if unlimited else FOLDER_BATCH
+        budget = None if unlimited else TIME_BUDGET_SECONDS
+        client = self._client()
+        folders = [f.strip() for f in (self.config.get("imap_folders") or "").split(",") if f.strip()] or list(FOLDERS)
+        unknown = [f for f in folders if class_of(f) is None]
+        if len(unknown) == len(folders):  # a sync that can read nothing must not record a success
+            names = ", ".join(ascii(f)[:64] for f in unknown)
+            raise LabelSyncIncomplete(f"no known review folder: {len(unknown)} unknown name(s): {names}")
+        imap = imap_sync.connect(
+            host, int(self.config.get("imap_port") or 993), self.config.get("imap_user") or "",
+            self.config.get("imap_password") or "", self.config.get("imap_use_ssl", True) is not False,
+        )
+        refused = []
+        try:
+            for folder in folders:
+                if class_of(folder) is None:
+                    logger.warning("ai_model sync: folder %s has no known class, skipped", ascii(folder)[:64])
+                    continue
+                try:
+                    if not self._sync_folder(imap, client, folder, started, cap, budget):
+                        logger.info("ai_model sync: time budget spent, stopping at %s", ascii(folder)[:64])
+                        break
+                except imap_sync.FolderUnavailable as exc:
+                    logger.warning("ai_model sync: folder unavailable: %s", exc)
+                except EmbedRefused as exc:
+                    logger.warning("ai_model sync: embed refused for %s (%s), folder skipped", ascii(folder)[:64], exc)
+                    refused.append(folder)
+        finally:
+            try:
+                imap.logout()
+            except Exception:  # noqa: BLE001 -- the connection may already be gone
+                pass
+        if refused:
+            names = ", ".join(ascii(f)[:64] for f in refused)
+            raise LabelSyncIncomplete(f"embed refused for {len(refused)} folder(s): {names}")
+
+    def _sync_folder(self, imap, client, folder: str, started: float, cap, budget) -> bool:
+        """Sync one folder chunk by chunk; False once the time budget is spent."""
+        state, _ = LabelSyncState.objects.get_or_create(folder=folder)
+        examined_total, skipped_total = 0, 0
+        while cap is None or examined_total < cap:
+            if budget is not None and monotonic() - started >= budget:
+                return False
+            mails, skipped, uidvalidity, last_uid = imap_sync.read_folder(
+                imap, folder, since_uid=state.last_uid, limit=CHUNK if cap is None else min(CHUNK, cap - examined_total),
+                known_uidvalidity=state.uidvalidity,
+            )
+            examined = len(mails) + skipped
+            examined_total, skipped_total = examined_total + examined, skipped_total + skipped
+            new = [o for o in map(ledger.prepare_folder_observation, mails) if o is not None]
+            try:
+                vectors, versions = _embed(client, [o.mail.text for o in new], started, budget)
+            except _BudgetSpent:
+                return False
+            with transaction.atomic():
+                state = LabelSyncState.objects.select_for_update().get(pk=state.pk)
+                for i, observation in enumerate(new):
+                    ledger.record_folder_observation(
+                        observation, {p: v[i] for p, v in vectors.items()}, **versions,
+                    )
+                state.uidvalidity, state.last_uid, state.skipped = uidvalidity, last_uid, skipped_total
+                state.last_run_at = timezone.now()
+                state.save()
+            if examined < CHUNK:
+                break
+        return True

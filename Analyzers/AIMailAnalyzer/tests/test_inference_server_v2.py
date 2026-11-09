@@ -200,3 +200,62 @@ def test_503_when_the_vectorizer_is_missing(client, token_env, monkeypatch):
     resp = post_v2(client, token_env, raw=True)
     assert resp.status_code == 503
     assert resp.json() == {"detail": "Vectorizer unavailable: boom"}
+
+
+# --- embed ----------------------------------------------------------------------------
+
+
+def post_embed(client, headers=None, texts=("a", "b"), profile="classifier"):
+    return client.post("/v2/embed", json={"texts": list(texts), "profile": profile}, headers=headers or {})
+
+
+def test_embed_needs_the_token(client, token_env, monkeypatch):
+    assert post_embed(client).status_code == 401
+    assert post_embed(client, {"Authorization": "Bearer wrong"}).status_code == 401
+    monkeypatch.delenv("AI_INFERENCE_TOKEN")
+    assert post_embed(client, token_env).status_code == 503
+
+
+def test_embed_returns_one_768_vector_per_text(client, token_env):
+    resp = post_embed(client, token_env)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["vectors"]) == 2 and all(len(v) == 768 for v in body["vectors"])
+    assert all(isinstance(x, float) for x in body["vectors"][0])
+    assert body["preprocessing_version"] == "legacy-first128"
+    assert body["embedding_version"] == "cmp-e1"
+
+
+def test_embed_rejects_a_bad_profile_or_too_many_texts(client, token_env):
+    assert post_embed(client, token_env, profile="other").status_code == 422
+    assert post_embed(client, token_env, texts=["x"] * 33).status_code == 422
+    assert post_embed(client, token_env, texts=["x"] * 32).status_code == 200
+
+
+def test_embed_truncates_a_long_text_instead_of_rejecting_it(client, token_env):
+    FakeVectorizer.reset()
+    assert post_embed(client, token_env, texts=["x " * server.MAX_MAIL_CHARS]).status_code == 200
+    assert FakeVectorizer.max_len_seen <= server.MAX_MAIL_CHARS
+
+
+def test_embed_accepts_a_lone_surrogate(client, token_env):
+    resp = client.post(
+        "/v2/embed", content=b'{"texts": ["a \\ud800 b"], "profile": "campaign"}',
+        headers={**token_env, "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def test_embed_503_when_the_vectorizer_is_missing(client, token_env, monkeypatch):
+    monkeypatch.setattr(server.store, "vectorizer", None)
+    monkeypatch.setattr(server.store, "vectorizer_error", "boom")
+    resp = post_embed(client, token_env)
+    assert resp.status_code == 503
+    assert resp.json() == {"detail": "Vectorizer unavailable: boom"}
+
+
+def test_campaign_vector_equals_the_classify_campaign_embedding(client, token_env):
+    import json
+    vector = post_embed(client, token_env, texts=[BODY], profile="campaign").json()["vectors"][0]
+    classified = post_v2(client, token_env)
+    assert json.loads(classified["campaign_embedding"]) == vector

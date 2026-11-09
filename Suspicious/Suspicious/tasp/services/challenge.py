@@ -1,9 +1,13 @@
+import logging
+
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
 
 from dashboard.models import UserCasesMonthlyStats
 from connectors.contrib.thehive.challenge import ChallengeToTheHiveService
+
+logger = logging.getLogger(__name__)
 
 
 def _load_mail_config() -> dict:
@@ -59,6 +63,20 @@ class CaseChallengeService:
             body += f", proposing {proposed}" if proposed else ""
             CaseComment.objects.create(case=self.case, author=self.challenger,
                                        body=body + (f": {reason}" if reason else "."))
+        self._record_proposal(proposed)
+
+    def _record_proposal(self, proposed: str) -> None:
+        """The reporter's proposal in the label ledger; never fails the challenge. Runs after the
+        challenge's own atomic block but possibly inside a caller's (the token view), so in its own
+        savepoint: a DB error rolls back the ledger write only."""
+        from ai_model import ledger
+        try:
+            with transaction.atomic():
+                if proposed and ledger.enabled():
+                    ledger.record_challenge(self.case, proposed)
+        except Exception as exc:  # noqa: BLE001 -- the ledger is provenance, the challenge is saved
+            logger.warning("label ledger challenge row not written for case %s: %s", self.case.pk,
+                           type(exc).__name__)
 
     def update_user_stats(self):
         _update_case_challenge_stats(self.case.reporter)

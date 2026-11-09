@@ -1,9 +1,10 @@
 """Token-protected /v2 API of the inference server."""
 import time
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .auth import require_token
 
@@ -19,6 +20,11 @@ ACTIVE_VERSION = {
 class ClassifyRequest(BaseModel):
     mail_body: str
     versions: list[str] = ["active"]
+
+
+class EmbedRequest(BaseModel):
+    texts: list[str] = Field(max_length=32)
+    profile: Literal["classifier", "campaign"]
 
 
 def make_v2_router(*, store, classify, slots, max_chars) -> APIRouter:
@@ -71,6 +77,23 @@ def make_v2_router(*, store, classify, slots, max_chars) -> APIRouter:
             "campaign_embedding": legacy["email_embedding"],
             "campaign_embedding_version": ACTIVE_VERSION["campaign_embedding_version"],
             "latency_ms": round((time.perf_counter() - started) * 1000),
+        }
+
+    @router.post("/embed", dependencies=[Depends(require_token)])
+    def embed(req: EmbedRequest):
+        # Version 0: both profiles use the legacy encode, so they give the same vectors.
+        vectorizer = store.vectorizer
+        if vectorizer is None:
+            raise HTTPException(
+                503, f"Vectorizer unavailable: {store.vectorizer_error or 'still loading, try again shortly'}"
+            )
+        texts = [t[:max_chars].encode("utf-8", "replace").decode("utf-8") for t in req.texts]
+        with slots:
+            vectors = vectorizer.encode(texts, show_progress_bar=False)
+        return {
+            "vectors": [[float(x) for x in row] for row in vectors],
+            "preprocessing_version": ACTIVE_VERSION["preprocessing"],
+            "embedding_version": ACTIVE_VERSION["campaign_embedding_version"],
         }
 
     return router

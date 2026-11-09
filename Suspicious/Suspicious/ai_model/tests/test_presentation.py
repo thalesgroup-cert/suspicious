@@ -3,7 +3,7 @@ from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
-from ai_model.models import AiAssessment
+from ai_model.models import AiAssessment, LabelRecord
 from ai_model.presentation import _campaign, cross_check, present_assessment
 from case_handler.models import Campaign, CampaignMember, Case
 
@@ -218,3 +218,107 @@ class CrossCheckTest(TestCase):
     def test_allow_list_hit_is_a_fact(self):
         out = self._check("SAFE", None, is_allowlisted=True, list_reason="good.example")
         self.assertEqual([f["kind"] for f in out["facts"]], ["list"])
+
+
+class CampaignLabelsTest(TestCase):
+    """Sibling folder labels on the campaign line, for elevated viewers only."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Group
+        users = get_user_model().objects
+        self.reporter = users.create_user(username="r", password="pass")
+        self.analyst = users.create_user(username="cert", password="pass")
+        self.analyst.groups.add(Group.objects.get_or_create(name="CERT")[0])
+        self.case = Case.objects.create(description="", reporter=self.reporter)
+        self.campaign = Campaign.objects.create()
+        CampaignMember.objects.create(campaign=self.campaign, case=self.case)
+        AiAssessment.objects.create(
+            case=self.case, model_version="v0", result="DANGEROUS", score=9, confidence=90
+        )
+
+    def _sibling(self, *labels, status="active", source="imap_folder", trust="folder"):
+        sibling = Case.objects.create(description="", reporter=self.reporter)
+        CampaignMember.objects.create(campaign=self.campaign, case=sibling)
+        for n, label_class in enumerate(labels):
+            LabelRecord.objects.create(
+                message_id=f"m{sibling.pk}.{n}", message_id_hash=f"h{sibling.pk}.{n}", case=sibling,
+                source=source, label="x", label_class=label_class, trust=trust, status=status,
+            )
+        return sibling
+
+    def _campaign_for(self, user):
+        case = Case.objects.select_related("ai_assessment", "campaign_membership__campaign").get(
+            pk=self.case.pk
+        )
+        return present_assessment(case, user)["campaign"]
+
+    def test_labels_count_active_folder_rows_of_the_siblings(self):
+        for _ in range(3):
+            self._sibling("Dangerous")
+        self._sibling("Safe")
+        out = self._campaign_for(self.analyst)
+        self.assertEqual(out["labels"], {"Dangerous": 3, "Safe": 1})
+        self.assertEqual(out["size"], 5)
+
+    def test_this_case_flagged_superseded_and_non_folder_rows_do_not_count(self):
+        LabelRecord.objects.create(
+            message_id="own", message_id_hash="own", case=self.case, source="imap_folder",
+            label="x", label_class="Safe", trust="folder",
+        )
+        self._sibling("Safe", status="flagged")
+        self._sibling("Safe", status="superseded")
+        self._sibling("Safe", source="analyst_verdict", trust="verdict")
+        self._sibling("Safe", source="challenge", trust="proposal")
+        self.assertEqual(
+            self._campaign_for(self.analyst),
+            {"ref": self.campaign.ref, "size": 5, "labels": {}, "members_disagree": False},
+        )
+
+    def test_no_labelled_sibling_gives_empty_labels_and_no_disagreement(self):
+        self._sibling()
+        out = self._campaign_for(self.analyst)
+        self.assertEqual((out["labels"], out["members_disagree"]), ({}, False))
+
+    def test_siblings_with_dangerous_and_safe_disagree(self):
+        AiAssessment.objects.filter(case=self.case).update(result="UNWANTED")
+        self._sibling("Dangerous")
+        self._sibling("Safe")
+        self.assertTrue(self._campaign_for(self.analyst)["members_disagree"])
+
+    def test_dangerous_ai_against_a_safe_sibling_disagrees(self):
+        self._sibling("Safe")
+        self.assertTrue(self._campaign_for(self.analyst)["members_disagree"])
+
+    def test_safe_ai_against_a_dangerous_sibling_disagrees(self):
+        AiAssessment.objects.filter(case=self.case).update(result="Safe")
+        self._sibling("Dangerous")
+        self.assertTrue(self._campaign_for(self.analyst)["members_disagree"])
+
+    def test_same_side_and_unwanted_do_not_disagree(self):
+        self._sibling("Dangerous")
+        self._sibling("Unwanted")
+        out = self._campaign_for(self.analyst)
+        self.assertEqual(out["labels"], {"Dangerous": 1, "Unwanted": 1})
+        self.assertFalse(out["members_disagree"])
+        LabelRecord.objects.filter(label_class="Dangerous").delete()
+        AiAssessment.objects.filter(case=self.case).update(result="UNWANTED")
+        self._sibling("Safe")
+        self.assertFalse(self._campaign_for(self.analyst)["members_disagree"])
+
+    def test_reporter_sees_ref_and_size_only(self):
+        self._sibling("Dangerous")
+        self.assertEqual(
+            self._campaign_for(self.reporter), {"ref": self.campaign.ref, "size": 2}
+        )
+
+    def test_labels_of_all_siblings_take_one_query(self):
+        for label_class in ("Dangerous", "Safe", "Dangerous", "Unwanted"):
+            self._sibling(label_class)
+        case = (
+            Case.objects.select_related("ai_assessment")
+            .prefetch_related("campaign_membership__campaign__members")
+            .get(pk=self.case.pk)
+        )
+        with self.assertNumQueries(1):
+            out = _campaign(case, case.ai_assessment, elevated=True)
+        self.assertEqual(out["labels"], {"Dangerous": 2, "Unwanted": 1, "Safe": 1})

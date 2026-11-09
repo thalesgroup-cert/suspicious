@@ -126,7 +126,13 @@ export type AiAssessment = {
     label: string | null;
     provenance: string | null;
   }[];
-  campaign: { ref: string; size: number } | null;
+  // labels and members_disagree come only for elevated viewers (absent for a reporter)
+  campaign: {
+    ref: string;
+    size: number;
+    labels?: Record<string, number>;
+    members_disagree?: boolean;
+  } | null;
   cross_check: null | { facts: { kind: "rule" | "source" | "list"; text: string }[]; disagrees: boolean };
 };
 
