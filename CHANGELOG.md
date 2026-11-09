@@ -152,6 +152,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loads or hot-reloads `models_public/`, `/health` lists only the `personal` variant, and
   `ai_inference` no longer mounts `models_public/`.
 
+### Changed
+
+- Documentation: `docs/getting-started/examples/deployment-env.example` is a faithful copy of
+  `deployment/.env.example` (current image versions, `AI_*`, `CELERY_*`, `BACKEND_URL`,
+  `FEEDER_API_TOKEN`). `CONFIG.md` documents the Redis cache socket timeouts (3 s, fail fast), the
+  feeder `imap-idle` key and the backend-provided feeder S3/SMTP config, and the previously
+  undocumented env vars (`CELERY_*`, `CORTEX_NO_PROXY`, `FEEDER_CA_BUNDLE`, `MAIL_RENDERER_PATH`,
+  `SVC_PREFIX`, `DB_SERVER_ID`, `LOG_LEVEL`). Install, migration and deploy guides now say that
+  `ai_model` is off by default and that `AI_INFERENCE_TOKEN` is created by hand and must equal
+  `integrations.ai_model.token`.
+
 ### Fixed
 
 - A repeated finalisation of a case already in a campaign sends `campaign_updated` again, and

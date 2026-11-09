@@ -11,7 +11,13 @@ make restore-db f=<file>    # restore from a dump
 
 Artifacts and attachments live in the `rustfs` S3 bucket
 (`storage.s3.media_bucket`). Back it up with your S3 client of choice against
-the configured endpoint.
+the configured endpoint. With `storage.provider: gcs`, use the bucket's own
+versioning or export tooling instead.
+
+The AI model keeps its retrained bundles in the `ai-models` bucket (the registry
+points at them); `ai-datasets` is transient. Also back up
+`Analyzers/AIMailAnalyzer/models/` (git-ignored, no public source). See
+[AI inference](../getting-started/ai-inference.md#13-backups).
 
 ## Elasticsearch, ChromaDB and Redis
 
