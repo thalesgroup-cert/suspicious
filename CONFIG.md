@@ -42,11 +42,20 @@ DB_SUSPICIOUS_VERSION=11.4
 RUSTFS_VERSION=1.0.0-alpha.90
 CORTEX_VERSION=4.1.0-1
 ELASTICSEARCH_VERSION=8.19.23
-TRAEFIK_VERSION=v3.3.4
-CHROMADB_VERSION=0.6.3
+TRAEFIK_VERSION=v3.6
+CHROMADB_VERSION=1.5.5
+CHROMA_PROXY_VERSION=1.29-alpine   # nginx in front of chromadb (token check)
 REDIS_BROKER_VERSION=9-alpine
 REDIS_CACHE_VERSION=9-alpine
 ```
+
+Two more image tags are read by `compose` but not listed in `.env.example`; set
+them only to pin:
+
+| Variable | Default | Image |
+|---|---|---|
+| `AI_INFERENCE_VERSION` | `local` | `aimailanalyzer-inference:<tag>`, built locally by the `ai` profile |
+| `SUSPICIOUS_MAIL_RENDERER_VERSION` | `SUSPICIOUS_VERSION`, else `latest` | `ghcr.io/thalesgroup-cert/suspicious-mail-renderer:<tag>` |
 
 > This set was brought up together successfully. Only change versions when you
 > know they are compatible — mismatched versions can break services.
@@ -58,6 +67,7 @@ SUSPICIOUS_PORT=9020
 SUSPICIOUS_UI_PORT=9021
 MINIO_PORT=35000         # MinIO / RustFS console — local access only
 CORTEX_PORT=9001
+ELASTICSEARCH_PORT=9200  # bound to 127.0.0.1; not published externally
 ```
 
 ### 1.3 Network Configuration
@@ -116,7 +126,8 @@ DOCKER_PATH=../docker
 YARA_PATH=../yara-rules
 MISP_PATH=../misp
 CORTEX_PATH=/opt/suspicious/cortex   # ABSOLUTE when running Cortex (see note)
-AIANALYZER_PATH=../Analyzers/AIMailAnalyzer
+DOCKER_SOCK_GID=999                  # gid of /var/run/docker.sock (Cortex job runner)
+CUSTOM_ANALYZERS_PATH=../Analyzers   # custom analyzers; also the AIMailAnalyzer build context
 CA_PATH=./certificates
 TRAEFIK_PATH=../traefik
 ```
@@ -127,18 +138,48 @@ TRAEFIK_PATH=../traefik
 > fails at startup with `invalid mount path: '../cortex/jobs' mount path must be
 > absolute`. A relative path is fine if you do not run Cortex (core dev stack).
 
+`MAIL_RENDERER_PATH` (default `../mail-renderer`) is the build context of the
+`mail_renderer` image in `docker-compose.override.yml`; it is not in
+`.env.example`. Set it only if the directory lives elsewhere.
+
 ### 1.8 Proxy Settings
 
 ```env
 HTTP_PROXY=
 HTTPS_PROXY=
 NO_PROXY=localhost
+CORTEX_NO_PROXY=localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious
 ```
 
 Leave blank unless your environment requires an outbound proxy. These values are
 also passed as **build args** to `docker compose build`, so set them before
 building images on a proxy-only network — otherwise the build fails with a
 `uv pip install` (PyPI) or npm connection timeout.
+
+`CORTEX_NO_PROXY` is the `no_proxy` list Cortex gets instead of `NO_PROXY`:
+Cortex's Kubernetes client rejects `*` wildcards and will not boot. Override it
+only when Cortex must reach corporate-internal hosts directly; use dot-form
+(`.corp.example`), never `*`, and keep the internal service names.
+
+### 1.9 Worker, feeder and AI variables
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CELERY_CONCURRENCY` | `4` | Prefork pool size of `suspicious_celery`. Keep it at 4 or more: the `ai_model` shadow seeding holds one worker for up to about 31 minutes per run, and live AI analysis, finalisation and sync tasks share the pool. |
+| `CELERY_MAX_MEMORY_PER_CHILD_KB` | `1000000` | A child is recycled after the task that pushes it past this RSS (KiB). |
+| `CELERY_MEM_LIMIT` | `8g` | Container memory cap; Docker restarts the worker if it exceeds it. |
+| `BACKEND_URL` / `FEEDER_API_TOKEN` | `http://suspicious:9020` / empty | Feeder config authority, see [Config authority](#config-authority-shared-config-across-services). Both blank keeps the feeder on its local `config.json`. |
+| `FEEDER_CA_BUNDLE` | `/etc/private/rootcafile.pem` | CA bundle the feeder uses for HTTPS calls (`REQUESTS_CA_BUNDLE`). Set it when the backend or an IMAPS server is signed by a different CA. Not in `.env.example`. |
+| `AI_INFERENCE_TOKEN` | empty | Bearer token of the `ai_inference` `/v2` API. Create it by hand (`openssl rand -hex 24`): neither `make init` nor `gen-service-secrets.sh` generates it. Put the same value in `integrations.ai_model.token`. Empty makes the token-protected routes answer 503. |
+| `AI_BUNDLE_HOSTS` | `rustfs:9000` | Hosts the server may use for presigned dataset and bundle URLs. |
+| `AI_TRAIN_THREADS` | `2` | Threads of the training worker only. |
+| `AI_SHADOW_TIMEOUT` | `8` | Seconds to wait for the shadow model's answer in a dual classify call. |
+| `AI_INFERENCE_MEM_LIMIT` | `8g` | Memory limit of `ai_inference`. |
+| `LOG_LEVEL` | `INFO` | Log level of `ai_inference`, the feeder and `mail_renderer`. Not in `.env.example`. The Django level is `app.log_level` in `settings.json`. |
+| `SVC_PREFIX` | empty | Prefix for every `container_name` (`${SVC_PREFIX}suspicious`), so several stacks can share a host. `scripts/db-auth-migrate.sh` honours it. Not in `.env.example`. |
+| `DB_SERVER_ID` | `1` | MariaDB `--server-id` of the primary. The replica uses `2`; change only when you run your own replication topology. Not in `.env.example`. |
+
+See [AI inference](docs/getting-started/ai-inference.md) for the `AI_*` details.
 
 ---
 
@@ -456,7 +497,7 @@ identical `Mail` rows) is green in staging.
     "webhook_secret": "CHANGE_ME_LONG_RANDOM_STRING",
     "stale_job_timeout_seconds": 7200,
     "analyzers": {
-        "header":    "MailHeader_4_0",
+        "header":    "Mail_Header_Analyzer_1_0",
         "ai":        "AI_Mail_Analyzer_1_4",
         "sandbox":   "ThreatGridOnPrem_1_0",
         "yara":      "Yara_Boosted_3_2",
@@ -471,7 +512,7 @@ identical `Mail` rows) is green in staging.
 | `api_key` | string | — | Cortex API key. Generate via Cortex → Organization → User → API keys. |
 | `webhook_secret` | string | `""` (disabled) | Bearer token Cortex sends to `POST /api/cortex/webhook/`. Compared via `hmac.compare_digest` to defeat timing oracles. Empty → webhook returns 503; configure Cortex with the matching shared secret. |
 | `stale_job_timeout_seconds` | int | `7200` (2 h) | `CaseAnalyzerJob` rows pending past this window are auto-failed by the `fail_stale_jobs` Celery task every 600 s, so cases never stall when Cortex drops a delivery or loses a job in a restart. Raise it only if an analyzer legitimately runs longer. |
-| `analyzers` | object | — | Analyzer names must match those installed in your Cortex instance, exactly. |
+| `analyzers` | object | — | Analyzer names must match those installed in your Cortex instance, exactly. `ai` is the exception: there is no Cortex AI analyzer any more. It only names the `Analyzer` row that carries the AI vote of the `ai_model` connector (its ledger row, its weight, the historical Cortex AI reports); absent, the name is `AI_Mail_Analyzer`. Keep it on an upgraded instance, see [AI inference](docs/getting-started/ai-inference.md#10-upgrading-an-existing-instance). |
 
 The webhook view writes `cortex_job_processed:<jobId>` into the Redis cache with a 1 hour TTL on first delivery; duplicate Cortex retries short-circuit there. The cron fallback (`update_ongoing_cases`, every 300 s) covers any delivery that is missed entirely.
 
@@ -488,7 +529,12 @@ The webhook view writes `cortex_job_processed:<jobId>` into the Redis cache with
 }
 ```
 
-Used by the AI analyzer for semantic similarity search across processed mails.
+Holds the processed-mail embeddings (collection `suspicious_mails`) that the
+`ai_model` connector's campaign detection searches for similar mails, and that
+the `chromadb` connector prunes daily. `collection_name` must match between the
+two, or the cleanup misses the collection.
+For the AI inference stack (`ai_inference`, the `ai_model` connector and its `url` and `token`), see
+[AI inference: set up, deploy and operate](docs/getting-started/ai-inference.md).
 `token` (secret) is sent as `X-Chroma-Token`; when empty the app falls back to
 the `CHROMA_TOKEN` environment variable. Requests without it are rejected by
 `chromadb_proxy`. See [Internal service authentication](#internal-service-authentication).
@@ -760,68 +806,41 @@ deactivate a connector without removing it.
 | `working-path` | Temporary directory for fetched emails, attachments, and processing queue |
 | `timer-inbox-emails` | Polling interval in seconds |
 
-### 3.3 MinIO Storage
+### 3.3 Polling mode (`imap-idle`)
 
 ```json
-"s3": {
-  "endpoint": "rustfs:9000",
-  "access_key": "minioadmin",
-  "secret_key": "minioadmin",
-  "secure": false
-}
+"imap-idle": true
 ```
 
-Must match `.env` `MINIO_*` values. Used to store attachments and extraction results.
+| Key | Default | Description |
+|-----|---------|-------------|
+| `imap-idle` | `true` | With exactly one enabled IDLE-capable mailbox, the feeder blocks in IMAP IDLE and fetches on arrival instead of sleeping `timer-inbox-emails` seconds between polls. Set `false` to force interval polling everywhere. With several enabled mailboxes it always polls. |
 
-### 3.4 Outgoing Mail (Notifications)
+### 3.4 Storage and outgoing mail (from the backend)
 
-```json
-"mail": {
-    "tls":          true,
-    "server":       "smtp_server",
-    "port":         25,
-    "password":     "smtp_password",
-    "username":     "smtp_user",
-    "footer":       "Limited Distribution",
-    "group":        "Your Cybersecurity Team Name",
-    "suspicious_web": "https://suspicious.test/submissions/",
-    "company_name": "test.com",
-    "company_url":  "https://www.test.com/en",
-    "socials": {
-        "facebook":  "https://fr-fr.facebook.com/test",
-        "twitter":   "https://x.com/test",
-        "instagram": "https://www.instagram.com/test",
-        "linkedin":  "https://www.linkedin.com/company/test",
-        "youtube":   "https://www.youtube.com/test"
-    },
-    "glossary":      "https://glossary_to_cyber_terms",
-    "inquiry":       "mailto:inquiry@yourcompany.com",
-    "inquiry_text":  "inquiry@yourcompany.com",
-    "security":      "mailto:security@yourcompany.com",
-    "security_msg":  "security@yourcompany.com",
-    "logos": {
-        "company":            "data:image/png;base64,BASE64_COMPANY_LOGO",
-        "acknowledge-badmail": "data:image/png;base64,BASE64_BADMAIL_BANNER"
-    }
-}
-```
+The feeder has no `s3` or `mail` block in `config.json` (`config-sample.json`
+does not ship them). When `BACKEND_URL` and `FEEDER_API_TOKEN` are set in
+`deployment/.env`, it fetches them at boot from `GET /api/config/feeder/` (see
+[Config authority](#config-authority-shared-config-across-services)) and merges
+them with the local `mail-connectors`, `working-path`, `timer-inbox-emails` and
+`imap-idle`. They are configured once, in `settings.json`:
 
-This section configures the **email-feeder container's** standalone mail service (distinct from the main application's `settings.json` email section). It is used to send the bad-submission acknowledgement email when a forwarded message cannot be processed.
+| Feeder uses | Source in `settings.json` |
+|---|---|
+| S3 endpoint, `access_key`, `secret_key`, `secure` | `storage.s3.*` |
+| SMTP `server`, `port`, `username`, `password`, `tls` | `email.smtp.*` |
+| Footer, team name, domain, website | `email.content.footer`, `team_name`, `global_domain`, `website` |
+| Submissions portal, glossary, inquiry and security contacts | `email.links.submissions`, `glossary`, `inquiry`, `inquiry_text`, `security_contact`, `security_text` |
+| Social links, logos | `email.socials`, `email.logos` |
 
-| Key | Description |
-|-----|-------------|
-| `tls` | Enable STARTTLS |
-| `server` / `port` | SMTP host and port |
-| `username` / `password` | SMTP credentials |
-| `group` | Team name shown in the email body |
-| `suspicious_web` | Portal URL linked in the footer |
-| `company_name` | Domain / company identifier shown in the footer |
-| `company_url` | Link for the global team name in the footer |
-| `glossary` | Cybersecurity glossary URL shown in the footer |
-| `inquiry` / `inquiry_text` | Contact `mailto:` URI and display label |
-| `security` / `security_msg` | Security team `mailto:` URI and display label |
-| `logos.company` | Company logo — accepts `data:image/png;base64,...`, `data:image/svg+xml;base64,...`, or `https://` URL. Outlook receives a text wordmark fallback automatically |
-| `logos.acknowledge-badmail` | Hero banner image for the bad-submission email |
+The mail settings drive the acknowledgement sent when a forwarded message
+cannot be processed; the keys are documented in [§2.10](#210-email--notification).
+
+If either variable is empty, the feeder reads the whole configuration from the
+local `config.json` instead, in which case it needs an `s3` block (`endpoint`,
+`access_key`, `secret_key`, `secure`) and a `mail` block (the keys of the
+`email.*` rows above, flattened). On a backend failure it falls back to the
+last-good cache (`.config-cache.json`); with no cache it exits.
 
 ---
 
@@ -907,9 +926,8 @@ The feeder now fetches S3 credentials, SMTP settings, and branding from
 `GET /api/config/feeder/` at boot when `BACKEND_URL` and `FEEDER_API_TOKEN`
 are set. It writes a last-good cache (`.config-cache.json`, mode 0600) and
 falls back to it on a backend blip; with no cache and no backend it exits
-immediately. As a result, the `storage`, `outgoing-mail`, and `branding`
-blocks have been removed from `email-feeder/config.json` — that file now
-holds only `mail-connectors`, `working-path`, and polling settings
+immediately. As a result, `email-feeder/config.json` holds only
+`mail-connectors`, `working-path`, `timer-inbox-emails` and `imap-idle`
 (see [§3](#3-email-feederconfigjson-email-ingestion-service)).
 
 ---
@@ -937,6 +955,14 @@ matching secret-store key (Vault / `settings.json`, e.g. `redis.broker_password`
 **Why a proxy for ChromaDB:** the pinned Chroma release has no built-in
 token authentication, so `chromadb` sits on an internal-only network and
 `chromadb_proxy` (nginx) checks the `X-Chroma-Token` header before forwarding.
+
+**Redis cache timeouts:** the Django cache connection uses
+`socket_timeout` and `socket_connect_timeout` of 3 s (`REDIS_CACHE_OPTIONS` in
+`suspicious/settings.py`, not configurable). The cache only serves short
+`add`/`get`/`set`/`delete` calls (per-case reconcile lock, feeder fetch lock,
+webhook `jobId` dedup), so a hung or very slow `redis_cache` fails fast with a
+cache error after 3 s instead of blocking a request or worker. Look at
+`redis_cache` first when you see those errors.
 
 **Limitations:** traffic between containers on the internal network is plain
 HTTP/TCP (no TLS); the credentials protect against anonymous or

@@ -18,6 +18,14 @@ make backup-db        # Backup MariaDB
 make shell            # Bash into the web container
 ```
 
+Two services are easy to miss: `suspicious_celery_beat` (the Celery beat
+scheduler, a separate container from the `suspicious_celery` worker; without it no
+periodic task runs) and `ai_inference` (the mail AI model server, compose profile
+`ai`, started by the `make` targets; the `ai_model` connector needs it and
+`AI_INFERENCE_TOKEN`). On an existing stack, `make deploy` waits for
+`make db-auth-migrate` (authenticated Redis, Elasticsearch and ChromaDB), and
+`make db-auth-check` verifies it.
+
 The full installation walkthrough is in
 [Getting Started → Installation](../getting-started/installation.md); operational
 runbooks are under [Operations](../operations/deploy.md).

@@ -18,7 +18,7 @@ config. When `VAULT_ADDR` is unset, secrets are read straight from
 
 ## The secret map
 
-These thirteen keys are stored in Vault and overlaid onto the matching
+These thirteen boot-time keys are stored in Vault and overlaid onto the matching
 `settings.json` paths at boot when `VAULT_ADDR` is set. Each lives at KV v2 path
 `suspicious/<dotted-key>` with a single field, `value`.
 
@@ -39,6 +39,21 @@ These thirteen keys are stored in Vault and overlaid onto the matching
 | `email.smtp.password` | `email.smtp.password` | optional |
 
 Optional secrets that are not set are written empty by the seeder.
+
+Connector secrets set through the Settings UI or seeded from `settings.json` at
+boot are **not** limited to this list: every `secret` field of a connector is
+stored at `suspicious/integrations.<connector>.<field>` and overlaid the same
+way. That covers `integrations.ai_model.token` and `imap_password`,
+`integrations.ai_narration.*_api_key`, `integrations.xsoar.api_key`,
+`integrations.elastic_siem.api_key` and `integrations.case_search.password`.
+`seed-vault-secrets` does not write them; see
+[Editing connector secrets from the UI](#editing-connector-secrets-from-the-ui).
+
+`AI_INFERENCE_TOKEN` (the `ai_inference` server's `/v2` bearer token) is not a
+Vault secret. It is a value in `deployment/.env` that you create by hand
+(`openssl rand -hex 24`): `make init`, `gen-service-secrets.sh` and
+`seed-vault-secrets` do not generate it. Its counterpart on the Django side,
+`integrations.ai_model.token`, is the connector secret above and must be equal.
 
 ---
 
@@ -123,7 +138,7 @@ DB. Restarting the stack later requires only re-unsealing Vault (step 3).
 ## Editing connector secrets from the UI
 
 Admins can set/rotate connector secrets (`integrations.*` — cortex, thehive,
-misp, watcher) from the Settings UI, which writes straight to Vault.
+misp, watcher, ai_model, and the other connectors) from the Settings UI, which writes straight to Vault.
 `make provision-vault` already grants this — the `suspicious-read` policy it
 writes includes scoped create/update on the integration secret paths:
 

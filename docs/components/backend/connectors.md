@@ -1,9 +1,9 @@
 # connectors
 
-Plugin framework every integration with an external system (TheHive, MISP,
-Watcher, ChromaDB, SMTP notifications, the `ai_narration` LLM connector, the
-`ai_model` mail classifier) is
-built on: registry, event dispatch, retry + circuit breaker, and a
+Plugin framework every integration with an external system is built on. The
+ten built-in connectors are `thehive`, `misp`, `watcher`, `smtp_notify`,
+`chromadb`, `ai_narration`, `case_search`, `elastic_siem`, `xsoar` and
+`ai_model`. The framework provides registry, event dispatch, retry + circuit breaker, and a
 `ConnectorDelivery` audit ledger.
 
 See [`Suspicious/Suspicious/connectors/README.md`](https://github.com/thalesgroup-cert/suspicious/blob/main/Suspicious/Suspicious/connectors/README.md)
@@ -18,11 +18,16 @@ The mail AI classifier. It is off by default (`enabled_by_default=False`).
   the mail text to the model server's `/v2` API (`http://ai_inference:8090` on `suspicious_net`,
   bearer token `AI_INFERENCE_TOKEN`) and stores the answer as one `AiAssessment` per case plus the
   case's AI result, score, confidence and category. Only one connector may provide `mail_ai`.
-- **Events:** `case_finalised`. The hook only queues `connectors.tasks.run_campaign_detection`, which
+- **Events:** `case_finalised` (the only event it subscribes to; it also has a daily `label-sync`
+  schedule). The hook only queues `connectors.tasks.run_campaign_detection`, which
   runs campaign detection outside the connector's circuit breaker and sends `campaign_updated` (the
   TheHive campaign alert) when a case creates or joins a campaign.
 - **Config** (`integrations.ai_model`): `url` (default `http://ai_inference:8090`), `token`
-  (secret, required), `timeout_seconds` (default 20).
+  (secret, required), `timeout_seconds` (default 20). Label sync from a review mailbox:
+  `imap_host` (empty disables the sync), `imap_port` (993), `imap_user`, `imap_password` (secret),
+  `imap_use_ssl` (true), `imap_folders` (comma-separated, default the known review folders; the
+  digit prefix of a folder name gives the class). Scheduled retrain: `retrain_enabled` (false) and
+  `retrain_interval_days` (30). Details: [`ai_model` app](ai_model.md).
 - **Health check:** `/v2/health/ready`, then the token against `/v2/models/ai_mail`; it also reports
   when the `chromadb` cleanup connector watches another collection than `suspicious_mails`.
 
@@ -74,3 +79,28 @@ The live test (`connectors.contrib.case_search.tests.test_live_es`) runs only
 when `ES_TEST_URL` is set. Elasticsearch now requires authentication, so also
 set `ES_TEST_USER` and `ES_TEST_PASSWORD` (a user allowed to manage
 `suspicious-*` indices, e.g. `suspicious_app`).
+
+## elastic_siem
+
+Indexes one ECS document per case (`_id` = case id) into an operator-supplied
+Elasticsearch for Elastic Security. Subscribes to `case_finalised` and
+`case_modified`; only cases at or above `min_verdict` (default `Suspicious`) are
+sent, and a case downgraded below it only updates an existing document. Config
+(`integrations.elastic_siem`): `url`, `api_key` (secret, the base64 `encoded`
+value), `index` (default `logs-suspicious.case`), `min_verdict`, `verify_tls`,
+`timeout_seconds`, `create_index`, `ui_base_url`. Backfill with
+`python manage.py reindex_siem [--since YYYY-MM-DD] [--min-verdict V] [--dry-run]`.
+Off by default. Full description:
+[connectors README](https://github.com/thalesgroup-cert/suspicious/blob/main/Suspicious/Suspicious/connectors/README.md#elastic_siem).
+
+## xsoar
+
+Opens one Cortex XSOAR incident per finalised case at or above `min_verdict`
+(default `Suspicious`), recorded in `ConnectorLink` so a replay opens nothing.
+Subscribes to `case_finalised`. Cases whose `external_ref` starts with
+`skip_ref_prefix` (default `xsoar:`) came from an XSOAR playbook and are not
+pushed back. Config (`integrations.xsoar`): `url`, `api_key` (secret),
+`api_key_id` (XSOAR 8 only), `incident_type`, `min_verdict`,
+`create_investigation`, `skip_ref_prefix`, `verify_tls`, `timeout_seconds`,
+`ui_base_url`. Off by default. Full description:
+[connectors README](https://github.com/thalesgroup-cert/suspicious/blob/main/Suspicious/Suspicious/connectors/README.md#xsoar).

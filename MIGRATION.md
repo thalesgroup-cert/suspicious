@@ -30,7 +30,7 @@ verified the new deployment — see [Rollback](#rollback) below.
 - **`Suspicious/settings.json`**: every top-level key was renamed and
   regrouped (`suspicious`/`thehive`/`cortex`/`misp`/`minio`/`ldap`/`mail` →
   `app`/`branding`/`integrations.*`/`storage`/`authentication`/`email`). See
-  [Remapping settings.json](#remapping-settingsjson) below — nothing here is
+  [Remapping settings.json](#step-2--remapping-settingsjson) below — nothing here is
   additive, your old file will not load as-is.
 - **New services**: `suspicious_celery` (Celery split out of the `suspicious`
   container), `redis_broker` + `redis_cache`, `chromadb` (similarity search),
@@ -60,10 +60,13 @@ new optional tuning knobs):
 | `SUSPICIOUS_UI_PORT` | New — port for the React frontend (default `9021`) |
 | `SUSPICIOUS_UI_PATH` | New — must point at `../suspicious-ui` |
 | `SUSPICIOUS_UI_VERSION`, `SUSPICIOUS_FEEDER_VERSION` | Optional; default to `SUSPICIOUS_VERSION` |
-| `CHROMADB_VERSION` | New — required, `chromadb` is a new service |
+| `CHROMADB_VERSION`, `CHROMA_PROXY_VERSION` | New — required, `chromadb` and its token-checking nginx proxy are new services |
 | `REDIS_BROKER_VERSION`, `REDIS_CACHE_VERSION` | New — required, two new services |
 | `BACKEND_URL`, `FEEDER_API_TOKEN` | New, optional — see [Step 3](#step-3--feeder-config) |
 | `VAULT_ADDR`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | New, optional — leave unset to keep secrets in `settings.json` |
+| `AI_INFERENCE_TOKEN` | New — create it by hand (`openssl rand -hex 24`); must equal `integrations.ai_model.token`, see [Step 8](#step-8--ai-model) |
+| `AI_BUNDLE_HOSTS`, `AI_TRAIN_THREADS`, `AI_SHADOW_TIMEOUT`, `AI_INFERENCE_MEM_LIMIT`, `AI_INFERENCE_VERSION` | New — `ai_inference` tuning, defaults are fine ([CONFIG.md § 1.9](CONFIG.md#19-worker-feeder-and-ai-variables)) |
+| `CELERY_CONCURRENCY`, `CELERY_MAX_MEMORY_PER_CHILD_KB`, `CELERY_MEM_LIMIT` | New, optional — worker pool size (keep at 4 or more) and memory bounds |
 | `CORTEX_NO_PROXY` | New if you're behind a corporate proxy — Cortex's k8s client rejects `*` wildcards in `NO_PROXY`, so it reads this separately |
 
 `RUSTFS_*` was already present in v1.3.8 (the MinIO→RustFS migration predates
@@ -108,7 +111,8 @@ that path still works.
 ## Authenticated data services
 
 Existing deployments upgrade once with `make db-auth-migrate` (maintenance
-window of about 2 minutes; see `docs/operations/deploy.md`). It generates the
+window of about 2 minutes; see `docs/operations/deploy.md`). `make deploy`
+refuses to run until it has been done. It generates the
 Redis, Elasticsearch and ChromaDB secrets, restarts the data tier with
 authentication and verifies the result.
 
@@ -153,6 +157,23 @@ If you want secrets out of `settings.json` entirely, see
 [`deployment/VAULT.md`](deployment/VAULT.md) for the bring-up + `make
 provision-vault` / `make unseal` flow. This is opt-in — leaving `VAULT_ADDR`
 unset keeps everything reading from `settings.json` exactly like v1.3.8 did.
+
+## Step 8 — AI model
+
+The Cortex AI analyzer is gone. The AI vote now comes from the `ai_inference`
+model server, called by the `ai_model` connector, which is **off by default**.
+Until you enable it, mail verdicts that need the AI vote end `Inconclusive`.
+
+1. Put `AI_INFERENCE_TOKEN` in `deployment/.env` and the same value in
+   `integrations.ai_model.token` (`settings.json` or the Settings tile).
+2. Place the weights in `Analyzers/AIMailAnalyzer/models/` and start the
+   server (`make up`, or `docker compose --env-file .env --profile ai up -d --build ai_inference`).
+3. Enable the `ai_model` connector and set `integrations.chromadb.collection_name`
+   to `suspicious_mails`.
+4. Keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the
+   analyzer row that holds the AI weight and the historical AI reports.
+
+Details: [AI inference](docs/getting-started/ai-inference.md#10-upgrading-an-existing-instance).
 
 ## Verify
 

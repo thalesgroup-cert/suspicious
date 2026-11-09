@@ -31,6 +31,10 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
 
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js
+  - javascripts/mermaid-init.js
+
 exclude_docs: |
   superpowers/
   plans/
@@ -66,7 +70,11 @@ markdown_extensions:
   - admonition
   - tables
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight
   - pymdownx.tabbed:
       alternate_style: true
@@ -80,6 +88,7 @@ nav:
       - Quick Start: getting-started/quick-start.md
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
+      - AI inference: getting-started/ai-inference.md
   - User Guide:
       - UI tour: user-guide/tour.md
       - Submitting: user-guide/submitting.md
@@ -97,6 +106,7 @@ nav:
           - cortex_job: components/backend/cortex_job.md
           - score_process: components/backend/score_process.md
           - connectors: components/backend/connectors.md
+          - ai_model: components/backend/ai_model.md
           - email_process: components/backend/email_process.md
           - Observable Processors: components/backend/observable-processors.md
           - dashboard: components/backend/dashboard.md
@@ -108,6 +118,7 @@ nav:
       - Frontend (React UI): components/frontend.md
       - Email Feeder: components/email-feeder.md
       - AI / ML Analyzers: components/analyzers.md
+      - Mail Header Analyzer: components/mail-header-analyzer.md
       - Cortex + YARA: components/cortex-yara.md
       - Deployment / Infra: components/deployment.md
   - Operations:
@@ -126,5 +137,6 @@ nav:
           - score_process: reference/score_process.md
           - tasp tasks: reference/tasp-tasks.md
           - AI Mail Analyzer: reference/aimailanalyzer.md
+          - Management commands: reference/management-commands.md
   - Building a connector: connectors.md
   - Contributing: contributing.md

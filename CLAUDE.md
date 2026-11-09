@@ -24,6 +24,8 @@ make shell              # Bash into the web container
 make db-shell           # Open MariaDB shell
 make backup-db          # Backup MariaDB
 make restore-db f=<file>
+make db-auth-migrate    # One-time upgrade of an existing stack to authenticated Redis/ES/Chroma (make deploy blocks until run)
+make db-auth-check      # Verify Redis/Elasticsearch/Chroma enforce authentication
 ```
 
 ### Frontend (`suspicious-ui/`)
@@ -60,7 +62,7 @@ python manage.py createsuperuser
 | `db_suspicious` | MariaDB 11.4 (primary read/write; opt-in replica via R6 router) |
 | `redis_broker` / `redis_cache` | Valkey 9 — Celery broker + Django cache (per-case lock, webhook jobId dedup) |
 | `elasticsearch` | Search and indexing |
-| `rustfs` | MinIO-compatible S3 object storage (artifacts/attachments) |
+| `rustfs` | S3-compatible object storage (artifacts/attachments, AI datasets and model bundles). Provider is selectable (`storage.provider`: `s3` or `gcs`) |
 | `cortex` | Analyzer execution engine (YARA, sandbox, metadata); reports back via HMAC-signed webhook |
 | `chromadb` | Vector DB for semantic similarity search |
 | `mail_renderer` | Isolated headless Chromium (`mail-renderer/`) that draws the mail preview PNG from sanitised HTML; internal network shared only with Django and Celery, no route out |
@@ -88,6 +90,8 @@ python manage.py createsuperuser
 | `email_process` | Email parsing and submission |
 | `cortex_job` | Cortex job orchestration (cortex4py). Defines `Analyzer`, `AnalyzerReport`, and the `CaseAnalyzerJob` junction ledger that powers the webhook lookup |
 | `score_process` | Risk scoring; rule-based verdict explanation (`scoring/explanation/`) and the deterministic narration safety-lock + prompt builder (`scoring/narration/`) that `ai_narration` calls |
+| `ai_model` | AI classifier lifecycle: label ledger, model registry (`ModelVersion`, `ModelEvent`), retrain orchestration, shadow and promotion, server sync, `/api/ai-model/` backend. Works with the `ai_model` connector |
+| `common` | Shared infrastructure: object-store providers (`common/storage`, S3 and GCS), locks, HTTP client |
 | `connectors` | Connector framework: registry, dispatch, delivery ledger, circuit breaker, contrib connectors for TheHive/MISP/Watcher/SMTP-notify/ChromaDB/`ai_narration`/`ai_model` (the mail AI classifier and campaign detection). See [Connectors](docs/components/backend/connectors.md) |
 | `domain_process` / `url_process` / `ip_process` / `hash_process` / `file_process` | Per-observable analysis |
 | `dashboard` | KPI metrics |
@@ -98,7 +102,7 @@ python manage.py createsuperuser
 
 ### Frontend (`suspicious-ui/`)
 
-React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v7, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Submissions/Investigations, Campaigns, Dashboard, Settings, Profile, About (`app/router.tsx` is the source of truth for the current route list — an "Alerts" page existed early in the repo's history but was orphaned/unwired and removed as dead code; don't resurrect it from an old doc). API calls are proxied from Vite dev server to the Django backend.
+React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v8, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Submissions/Investigations, Campaigns, Dashboard, Settings, Profile, About (`app/router.tsx` is the source of truth for the current route list — an "Alerts" page existed early in the repo's history but was orphaned/unwired and removed as dead code; don't resurrect it from an old doc). API calls are proxied from Vite dev server to the Django backend.
 
 ### Email Feeder (`email-feeder/`)
 
@@ -108,7 +112,7 @@ Standalone Python service using Pydantic v2. Polls IMAP/IMAPS mailboxes, extract
 
 Sentence Transformers model (`paraphrase-multilingual-mpnet-base-v2`) for embeddings. Custom ResNetMLP binary classifier for phishing detection. Vector store is ChromaDB for similarity search against prior cases.
 
-**Inference path.** With the `ai_model` connector enabled (`connectors/contrib/ai_model/`, off by default), the Celery worker reads the mail text (object store first, then the archive) and POSTs it to the persistent `inference_server/` at `http://ai_inference:8090/v2/models/ai_mail/classify` with the bearer token `AI_INFERENCE_TOKEN`. The server keeps the vectorizer and the `models/` (`personal`) weights resident and hot-reloads them when the retrain pipeline overwrites them; `/v2` classifies with the registry's active version (version 0 is the `personal` weights) and, while an admin shadows a candidate, scores it too in the same call (`versions: ["active", "shadow"]`; promotion and rollback via `/api/ai-model/`, see `docs/components/analyzers.md`). The answer becomes one `AiAssessment` per case plus the case's AI fields. There is no Cortex AI analyzer any more; historical Cortex AI reports on old cases are still parsed and kept out of the weighted blend, and keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the AI vote's `Analyzer` row (default `AI_Mail_Analyzer` when absent). Campaign detection runs from the connector on `case_finalised` and writes to the ChromaDB collection `suspicious_mails` (set `integrations.chromadb.collection_name` to match, or the cleanup misses it); `python manage.py ai_model_campaign_replay <campaign_ref>` replays a Cortex-built campaign through it. If AI verdicts are missing, check the connector's deliveries (`GET /api/connectors/ai_model/deliveries/`) and `docker compose --profile ai exec ai_inference curl -s http://127.0.0.1:8090/health` (it names the missing vectorizer/model file). Details and a troubleshooting table: `docs/components/analyzers.md`. Tests: `cd Analyzers/AIMailAnalyzer && python -m pytest tests`.
+**Inference path.** With the `ai_model` connector enabled (`connectors/contrib/ai_model/`, off by default), the Celery worker reads the mail text (object store first, then the archive) and POSTs it to the persistent `inference_server/` at `http://ai_inference:8090/v2/models/ai_mail/classify` with the bearer token `AI_INFERENCE_TOKEN`. The server keeps the vectorizer and the `models/` (`personal`) weights resident and hot-reloads them when the retrain pipeline overwrites them; `/v2` classifies with the registry's active version (version 0 is the `personal` weights) and, while an admin shadows a candidate, scores it too in the same call (`versions: ["active", "shadow"]`; promotion and rollback via `/api/ai-model/`, see `docs/components/analyzers.md`). The answer becomes one `AiAssessment` per case plus the case's AI fields. There is no Cortex AI analyzer any more; historical Cortex AI reports on old cases are still parsed and kept out of the weighted blend, and keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the AI vote's `Analyzer` row (default `AI_Mail_Analyzer` when absent). Campaign detection runs from the connector on `case_finalised` and writes to the ChromaDB collection `suspicious_mails` (set `integrations.chromadb.collection_name` to match, or the cleanup misses it); `python manage.py ai_model_campaign_replay <campaign_ref>` replays a Cortex-built campaign through it. If AI verdicts are missing, check the connector's deliveries (`GET /api/connectors/ai_model/deliveries/`) and `docker compose --profile ai exec ai_inference curl -s http://127.0.0.1:8090/health` (it names the missing vectorizer/model file). Operator setup guide: `docs/getting-started/ai-inference.md`. Details and a troubleshooting table: `docs/components/analyzers.md`. Tests: `cd Analyzers/AIMailAnalyzer && python -m pytest tests`.
 
 ## Key Configuration Files
 
@@ -224,7 +228,7 @@ docker compose --env-file .env up -d suspicious suspicious_celery suspicious_cel
 ### 7. Verify
 
 ```bash
-docker compose --env-file .env run --rm --no-deps suspicious python manage.py test   # 525 tests as of this session
+docker compose --env-file .env run --rm --no-deps suspicious python manage.py test
 ```
 For a real pipeline smoke test: build a multipart email with a `message/rfc822` attachment (the phishing sample) using Python's `email` module, `smtplib.SMTP('127.0.0.1', 3025).send_message(...)` it to `suspicious@meridian.example`, wait ~10–20s for `email_feeder`'s IMAP poll, then check `Case.objects.all()` via `manage.py shell` — a case should appear and finalize automatically.
 
