@@ -80,9 +80,10 @@ Mapping from the backend `settings.json` (see `CONFIG.md` at the repository root
 | `mail.security`, `security_msg` | `email.links.security_contact`, `security_text` |
 | `mail.socials`, `mail.logos` | `email.socials`, `email.logos` |
 
-In API mode the whole `s3` block is replaced by the API values, so a local
-`s3.feeder_bucket` is not carried over and the feeder uses legacy
-bucket-per-submission mode.
+In API mode the whole `s3` block is replaced by the API values, including
+`storage.s3.feeder_bucket`: set it in `settings.json` to use the prefix
+contract, leave it empty for legacy bucket-per-submission mode. A local
+`s3.feeder_bucket` is ignored.
 
 Without `BACKEND_URL`/`FEEDER_API_TOKEN` (standalone or development), put the
 `s3` and `mail` blocks in `config.json` yourself:
