@@ -191,6 +191,33 @@ describe("SubmissionDrawer - overview", () => {
     expect(screen.queryByText("Not classified")).toBeNull();
   });
 
+  it("an ai_assessment replaces the legacy AI chips; null keeps them", async () => {
+    const withData = (ai: unknown) => {
+      const p = multi({}, { score_ai: 7, confidence_ai: 80 });
+      (p.details as never as { data: Record<string, unknown> }).data.ai_assessment = ai;
+      return p;
+    };
+    const { unmount } = renderWithProviders(<SubmissionDrawer {...withData({ result: "Dangerous", sub_class: "CREDENTIAL_PHISHING", tier: "high", runner_up: null, model_version: "v1", analysed_at: "2026-09-21T10:00:00Z", reads: "body only", similar_cases: [], campaign: null, cross_check: { facts: [], disagrees: false } })} />);
+    expect(await screen.findByRole("heading", { name: "AI model assessment" })).toBeInTheDocument();
+    expect(screen.queryByText("score 7")).toBeNull();
+    expect(screen.queryByText("conf 80%")).toBeNull();
+    expect(screen.queryByText("AI classifier")).toBeNull();
+    unmount();
+    renderWithProviders(<SubmissionDrawer {...withData(null)} />);
+    expect(await screen.findByText("score 7")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "AI model assessment" })).toBeNull();
+  });
+
+  it("an ai_assessment renders without case_infos", async () => {
+    const p = multi();
+    const data = (p.details as never as { data: Record<string, unknown> }).data;
+    data.case_infos = undefined;
+    data.ai_assessment = { result: "Dangerous", sub_class: null, tier: "high", runner_up: null, model_version: "v1", analysed_at: "2026-09-21T10:00:00Z", reads: "body only", similar_cases: [], campaign: null, cross_check: { facts: [], disagrees: false } };
+    renderWithProviders(<SubmissionDrawer {...p} />);
+    expect(await screen.findByRole("heading", { name: "AI model assessment" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sources" })).toBeNull();
+  });
+
   it("multi-observable: Summary with the sentence and the observable count", async () => {
     renderWithProviders(<SubmissionDrawer {...multi()} />);
     expect(await screen.findByRole("heading", { name: "Summary" })).toBeInTheDocument();

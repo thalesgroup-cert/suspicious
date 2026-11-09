@@ -104,13 +104,14 @@ The connector's errors are in the delivery `error` of its rows
 | Symptom | Cause / fix |
 |---|---|
 | Delivery `error` `inference server unreachable: ...` | The worker cannot reach the server. Check that `ai_inference` is up on `suspicious_net` (it runs under the `ai` profile), that the connector `url` is `http://ai_inference:8090`, and run step 4 above. |
-| Delivery `error` `inference server HTTP 503: Vectorizer unavailable: ...` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy), or the server is still loading. `/health` shows the exact error. |
-| Delivery `error` `inference server HTTP 503: Required models unavailable for variant 'personal': ...` | `Analyzers/AIMailAnalyzer/models/` is empty or has a corrupt/truncated `.pth`; `/health` lists which file and why. |
+| Delivery `error` `inference server HTTP 503: vectorizer unavailable` | The inference image was built without the vectorizer weights (the build fetches them from Hugging Face; check the build log / proxy). The row fails at once, without retry. `/health` shows the exact error. |
+| Delivery `error` `inference server HTTP 503` (no phrase after the status) | The server is still loading its vectorizer, or answered another 5xx. The call is retried; the row fails with this error only when the retries run out. Check `/health` and the `ai_inference` log. |
+| Delivery `error` `inference server HTTP 503: models unavailable` | `Analyzers/AIMailAnalyzer/models/` is empty or has a corrupt/truncated `.pth`; `/health` lists which file and why. |
 | Delivery `error` `inference server HTTP 503: token not configured` | `AI_INFERENCE_TOKEN` is not set on the server. Set it in `deployment/.env` and recreate `ai_inference`. |
 | Delivery `error` `inference server rejected the token (HTTP 401)`, or `token rejected (HTTP 401)` in the `ai_model` health detail | Wrong token: the connector's `token` differs from the server's `AI_INFERENCE_TOKEN`. The connector's own empty `token` fails before any call, as `ValueError: token not configured`. |
 | Verdicts never change after retraining | Weights were baked into an old image instead of mounted, or the mount is not `models/`. Check `/health`, then `POST /reload`. |
 | Worker log warning `The chromadb connector is set to collection 'suspicious', but campaign detection stores mails in 'suspicious_mails' ...`, also in the `ai_model` health detail | The `chromadb` cleanup connector watches another collection, so old campaign documents are never removed. Set `integrations.chromadb.collection_name` to `suspicious_mails` in `settings.json` (see [Campaign detection](#campaign-detection)). |
-| Worker log `Campaign detection for case <id> failed (<error class>), retrying.`, then `Campaign detection for case <id> failed: <error class>` | ChromaDB is down or the `campaign:detect` lock stayed busy. The task retries 3 times (30, 60, 120 s) and then gives up; the case keeps its verdict but joins no campaign. Check `chromadb`. |
+| Worker log `Campaign detection for case <id> failed (<error class>), retrying.`, then `Campaign detection for case <id> failed: <error class>` | ChromaDB is down or the `campaign:detect` lock stayed busy. The task retries 3 times (30, 60, 120 s) and then gives up; the case keeps its verdict but joins no campaign. A case already in a campaign is announced on each try even while ChromaDB is down (worker log `Case <id>: campaign store down ...`). Check `chromadb`. |
 
 ## v2 API and the ai_model connector
 
@@ -159,10 +160,29 @@ over `suspicious_net`, stores the answer as one `AiAssessment` per case (with th
 `v0` today), fills the case's AI result, score, confidence and category, closes the row and queues
 the case's reconcile.
 
-**The case view has no AI assessment section yet.** The AI analyzer card reads the Cortex AI
-analyzer's report (an `AnalyzerReport`), and the connector does not create one, so it stays empty
-for new cases. The AI result in the overview still shows, because it comes from the case's own
-fields. The case view gets its AI section in a later change.
+### Case view
+
+With the connector enabled, the submission drawer and the investigation overview show an "AI model
+assessment" section for a case that has an `AiAssessment`. It shows the class and sub-class, a
+confidence tier chip with its meaning (High, Medium, Low), the runner-up class on tier Low, the
+model version and how long ago it ran, the campaign reference and size when the case is in a
+campaign, and the cross-check facts. The model reads the mail body text only, not the headers or
+attachments. The facts are the decisive rule of the verdict, the counted sources with their
+verdicts, and the allow or deny list hit; a warning reads "AI disagrees with the evidence" when the
+AI class and the case verdict sit on opposite sides of Safe and Dangerous (the stored explanation
+band, or the case's current result when there is no explanation, so an analyst override counts).
+When the AI itself set the verdict (rule `ai-classifier-decisive`) the facts say "No independent
+evidence beyond the AI" and the warning never shows. The cross-check is analyst material: a
+reporter viewing their own submission gets no cross-check block (`cross_check` is `null`). No
+numeric confidence is shown. Similar cases are listed only when the viewer may open them, and the
+list is empty until the label ledger exists (Plan D).
+
+The API field `ai_assessment` is `null`, and the older "AI classifier" caption stays, when the
+connector is disabled or not registered, when the case has no assessment row or its model version is blank (for example a case analysed by the old
+Cortex job), and when the serializer has no request. Version 0 has no tier, so the section says
+"Confidence not calibrated". The campaign line shows reference and size only: sibling labels and
+the "campaign members disagree" flag arrive with the label ledger (Plan D). The AI analyzer card
+still reads Cortex AI reports, so it stays empty for new cases.
 
 ### Campaign detection
 

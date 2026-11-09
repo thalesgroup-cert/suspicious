@@ -17,6 +17,7 @@ import { CloseOutlined, SaveOutlined } from "@mui/icons-material";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 
 import type { InvestigationDetails, InvestigationListResponse } from "@/features/investigation/api";
+import { AiAssessmentSection } from "@/features/submissions/components/AiAssessmentSection";
 import { AllowListSection } from "@/features/submissions/components/AllowListSection";
 import { VerdictExplanation } from "@/features/investigation/VerdictExplanation";
 import { ThreatBadge } from "@/features/investigation/ThreatBadge";
@@ -147,7 +148,9 @@ export function InvestigationOverview({
         </Section>
       ) : null}
 
-      {hasAi ? (
+      {d?.ai_assessment ? (
+        <AiAssessmentSection assessment={d.ai_assessment} />
+      ) : hasAi ? (
         <Section title="AI classifier">
           {aiUnclassified ? (
             <Typography variant="body2" color="text.secondary">Not classified</Typography>

@@ -78,6 +78,31 @@ class FetchMaterialTest(SimpleTestCase):
             m = fetch_mail_material(client, MAIL, "Haruto_Sato-1")
         self.assertEqual((m.headers, m.text, m.eml, m.attachments), ("", "", b"", []))
 
+    def test_an_unreadable_object_logs_the_class_never_its_name(self):
+        client = fake_store({"haruto-submission-261007071836": {
+            f"{MAIL}/{MAIL}.headers": b"Subject: Hi",
+            f"{MAIL}/attachments/secret-plan.pdf": b"%PDF",
+        }})
+        real_open = client.open
+
+        def failing_open(bucket, key):
+            if "secret-plan" in key:
+                raise RuntimeError(f"cannot open {key}")
+            return real_open(bucket, key)
+
+        for error in (RuntimeError, None):
+            with self.subTest(error=error):
+                if error is None:  # a vanished object: not_found
+                    client.open = lambda b, k: (_ for _ in ()).throw(StoreError("not_found", k)) \
+                        if "secret-plan" in k else real_open(b, k)
+                else:
+                    client.open = failing_open
+                with self.assertLogs("tasp.cron.update_ongoing_case_jobs", "WARNING") as logs:
+                    m = fetch_mail_material(client, MAIL, "haruto-submission-261007071836")
+                self.assertEqual(m.headers, "Subject: Hi")
+                self.assertNotIn("secret-plan", "\n".join(logs.output))
+                self.assertIn("RuntimeError" if error else "not_found", "\n".join(logs.output))
+
     def test_a_store_outage_propagates(self):
         client = fake_store({})
         client.list_buckets = client.bucket_exists = lambda *a: (_ for _ in ()).throw(StoreError("unavailable"))
@@ -149,6 +174,14 @@ class TarFallbackTest(SimpleTestCase):
             with self.subTest(mail_archive=mail_archive):
                 self.assertEqual(_parts(fetch_mail_material(client, MAIL, "", mail_archive)), EMPTY)
         self.assertEqual(_parts(fetch_mail_material(client, MAIL)), EMPTY)
+
+    def test_each_member_read_stops_one_byte_past_the_file_cap(self):
+        from connectors.contrib.thehive import campaign_material
+
+        with patch.object(campaign_material, "MAX_FILE_BYTES", 8):
+            m = self.fetch({**WEB_TAR, "./attachments/big.bin": b"B" * 100})
+        big = next(a for a in m.attachments if a.name == "big.bin")
+        self.assertEqual(big.data, b"B" * 9)
 
     def test_an_uploaded_file_stands_in_only_when_the_mail_eml_is_absent(self):
         members = {k: v for k, v in WEB_TAR.items() if k != f"./{MAIL}.eml"}

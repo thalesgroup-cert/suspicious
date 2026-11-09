@@ -213,6 +213,7 @@ export function SubmissionDrawer({
                   observableCount={detailsQuery.isLoading ? 0 : reportGroups.length}
                   noAnalyzersRan={noAnalyzersRan}
                   verdictHex={verdictHex}
+                  aiAssessment={detailsQuery.data?.ai_assessment}
                   onSeeAll={() => {
                     setTabState({ id: selectedRow.id, tab: "analysis" });
                     // The button that was focused unmounts with the Overview panel; keep focus in the tablist.

@@ -14,7 +14,7 @@ from api.submissions.constants import (
     SUBMISSION_STATUS_CHOICES,
     SUBMISSION_TYPE_CHOICES,
 )
-from api.permissions.submissions import has_elevated_view
+from api.utils.ai_assessment import ai_assessment_for, viewer_is_elevated
 
 
 def _normalize_whitespace(value: str) -> str:
@@ -304,15 +304,20 @@ class SubmissionDetailsSerializer(SubmissionRowSerializer):
     analyzer_reports = serializers.SerializerMethodField()
     case_infos = serializers.SerializerMethodField()
     url_artifacts = serializers.SerializerMethodField()
+    ai_assessment = serializers.SerializerMethodField()
 
     class Meta(SubmissionRowSerializer.Meta):
         fields = SubmissionRowSerializer.Meta.fields + [
+            "ai_assessment",
             "analyzer_reports",
             "case_infos",
             "url_artifacts",
             "challenge_proposed_result",
             "challenge_reason",
         ]
+
+    def get_ai_assessment(self, obj):
+        return ai_assessment_for(obj, self.context.get("request"))
 
     def get_analyzer_reports(self, obj):
         reports = self.context.get("analyzer_reports", [])
@@ -378,7 +383,7 @@ class AdminSubmissionDetailsSerializer(SubmissionDetailsSerializer):
 
     def get_raw(self, obj):
         request = self.context.get("request")
-        if not request or not has_elevated_view(request.user, obj):
+        if not request or not viewer_is_elevated(obj, request):
             return None
 
         file_or_mail = None

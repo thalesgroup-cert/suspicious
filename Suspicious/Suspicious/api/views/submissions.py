@@ -55,6 +55,10 @@ CASE_DETAIL_SELECT_RELATED = CASE_LIST_SELECT_RELATED + (
 )
 
 
+# Only the detail view reads these; the list and the other CASE_DETAIL users must not join them.
+AI_SELECT_RELATED = ("ai_assessment", "campaign_membership__campaign")
+
+
 def case_analyzer_reports(case) -> list:
     """Newest AnalyzerReport per (analyzer, target) across every observable of a
     case. Shared by the submission detail and ticket views.
@@ -168,7 +172,8 @@ class SubmissionDetailsView(RetrieveAPIView):
 
     def get_queryset(self):
         queryset = (
-            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
+            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED, *AI_SELECT_RELATED)
+            .defer("ai_assessment__campaign_embedding")
             .prefetch_related(
                 "fileOrMail__mail__mail_attachments",
                 "fileOrMail__mail__mail_artifacts",

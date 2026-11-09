@@ -164,7 +164,8 @@ class ConnectorsApiTest(APITestCase):
         from settings.models import RuntimeConfig
         for value in ("file:///etc/passwd", "ftp://x/y", "javascript:alert(1)",
                       "http://user:pw@host", "http:///no-host", " http://x", "http://x/ ",
-                      "http://x\ty", "http://x/a\r\nHost: y", "http://x/\n"):
+                      "http://x\ty", "http://x/a\r\nHost: y", "http://x/\n", "\x01http://evil",
+                      "http://host\x00x", "http://ho st", "http://x/\x7f"):
             with self.subTest(value=value):
                 response = self.client.put(
                     "/api/connectors/dummy/config/", {"url": "http://ok", "ui_url": value}, format="json",

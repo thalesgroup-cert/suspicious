@@ -9,14 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An "AI model assessment" section in the submission drawer and the investigation overview, shown
+  while the `ai_model` connector is enabled and the case has an assessment: class, confidence tier,
+  runner-up on tier Low, model version, campaign line and, for analysts only, cross-check facts
+  (`cross_check` is `null` for a reporter). Otherwise the older AI classifier caption stays. The submission and investigation detail APIs gain `ai_assessment`.
 - The AI mail analyzer runs as a connector, `ai_model`, and no longer as a Cortex job. It is off by
   default. With the connector enabled, a mail is handed to it, and the result is stored as an
   `AiAssessment` per case (model version `v0` today) plus the case's AI result, score, confidence and
   category. The model server gets a `/v2` API (`AI_INFERENCE_TOKEN`): every `/v2` route except
   `/v2/health/live` and `/v2/health/ready` needs the token, and answers 503 when the server has none
   set. Set the same token in `integrations.ai_model.token`. See `docs/components/analyzers.md`. The
-  case view has no AI assessment section yet (a later change): the AI analyzer card reads Cortex
-  reports, so it stays empty for new cases. The AI result in the overview still shows.
+  AI analyzer card reads Cortex reports, so it stays empty for new cases. The AI result in the
+  overview still shows.
 - Campaign detection runs from the `ai_model` connector. Its `case_finalised` hook queues a Celery
   task, `connectors.tasks.run_campaign_detection`, that adds the mail to the ChromaDB collection
   `suspicious_mails` and, when the AI result is `DANGEROUS` and at least three similar mails are
@@ -79,7 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case's ChromaDB document if it is missing and tags the campaign's members, so a worker killed
   after the campaign rows were written no longer leaves the campaign unannounced. Two runs for one
   case at the same time make one campaign. While ChromaDB is down, a case already in a campaign
-  is still announced; its document and the members' tags wait for a later run.
+  is still announced on each try, and the task retries so that its document and the members'
+  tags are written once ChromaDB is back.
 - A refusal from the AI inference server no longer stores or logs the server's detail text: the
   `ai_model` delivery error and the worker log carry only the HTTP status, because a 422 detail
   echoes the request, so the mail body. A `503` the operator must fix keeps a fixed phrase
@@ -87,8 +92,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A mail uploaded through the web form now appears in the TheHive campaign alert's material (its
   headers, bodies, `.eml` and attachments). Its object-store location is not recorded, so the
   material is read from the submission's tar archive, under the same member and size limits as
-  the `ai_model` mail reader. A web-uploaded mail whose archive can no longer be read is still
-  missing from the alert.
+  the `ai_model` mail reader, and at most 10 MB plus one byte is read from each file (a larger
+  attachment is listed as too large, as from the object store). A web-uploaded mail whose archive
+  can no longer be read is still missing from the alert.
+- The trusted-sender check (`scoring.trusted_authserv_ids`) now finds a feeder mail stored under
+  its submission prefix. It never overrules the AI for a mail uploaded through the web form: the
+  uploader wrote that file, `Authentication-Results` headers included.
 - A connector `url` field (type `url` in the connector's schema) is now checked when its
   configuration is saved, through `PUT /api/connectors/<name>/config/` or the Django admin's
   runtime config page: it must use `http` or `https`, name a host and carry no user name or
