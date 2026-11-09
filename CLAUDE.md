@@ -24,6 +24,8 @@ make shell              # Bash into the web container
 make db-shell           # Open MariaDB shell
 make backup-db          # Backup MariaDB
 make restore-db f=<file>
+make db-auth-migrate    # One-time upgrade of an existing stack to authenticated Redis/ES/Chroma (make deploy blocks until run)
+make db-auth-check      # Verify Redis/Elasticsearch/Chroma enforce authentication
 ```
 
 ### Frontend (`suspicious-ui/`)
@@ -60,7 +62,7 @@ python manage.py createsuperuser
 | `db_suspicious` | MariaDB 11.4 (primary read/write; opt-in replica via R6 router) |
 | `redis_broker` / `redis_cache` | Valkey 9 — Celery broker + Django cache (per-case lock, webhook jobId dedup) |
 | `elasticsearch` | Search and indexing |
-| `rustfs` | MinIO-compatible S3 object storage (artifacts/attachments) |
+| `rustfs` | S3-compatible object storage (artifacts/attachments, AI datasets and model bundles). Provider is selectable (`storage.provider`: `s3` or `gcs`) |
 | `cortex` | Analyzer execution engine (YARA, sandbox, metadata); reports back via HMAC-signed webhook |
 | `chromadb` | Vector DB for semantic similarity search |
 | `mail_renderer` | Isolated headless Chromium (`mail-renderer/`) that draws the mail preview PNG from sanitised HTML; internal network shared only with Django and Celery, no route out |
@@ -88,6 +90,8 @@ python manage.py createsuperuser
 | `email_process` | Email parsing and submission |
 | `cortex_job` | Cortex job orchestration (cortex4py). Defines `Analyzer`, `AnalyzerReport`, and the `CaseAnalyzerJob` junction ledger that powers the webhook lookup |
 | `score_process` | Risk scoring; rule-based verdict explanation (`scoring/explanation/`) and the deterministic narration safety-lock + prompt builder (`scoring/narration/`) that `ai_narration` calls |
+| `ai_model` | AI classifier lifecycle: label ledger, model registry (`ModelVersion`, `ModelEvent`), retrain orchestration, shadow and promotion, server sync, `/api/ai-model/` backend. Works with the `ai_model` connector |
+| `common` | Shared infrastructure: object-store providers (`common/storage`, S3 and GCS), locks, HTTP client |
 | `connectors` | Connector framework: registry, dispatch, delivery ledger, circuit breaker, contrib connectors for TheHive/MISP/Watcher/SMTP-notify/ChromaDB/`ai_narration`/`ai_model` (the mail AI classifier and campaign detection). See [Connectors](docs/components/backend/connectors.md) |
 | `domain_process` / `url_process` / `ip_process` / `hash_process` / `file_process` | Per-observable analysis |
 | `dashboard` | KPI metrics |
@@ -98,7 +102,7 @@ python manage.py createsuperuser
 
 ### Frontend (`suspicious-ui/`)
 
-React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v7, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Submissions/Investigations, Campaigns, Dashboard, Settings, Profile, About (`app/router.tsx` is the source of truth for the current route list — an "Alerts" page existed early in the repo's history but was orphaned/unwired and removed as dead code; don't resurrect it from an old doc). API calls are proxied from Vite dev server to the Django backend.
+React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v8, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Submissions/Investigations, Campaigns, Dashboard, Settings, Profile, About (`app/router.tsx` is the source of truth for the current route list — an "Alerts" page existed early in the repo's history but was orphaned/unwired and removed as dead code; don't resurrect it from an old doc). API calls are proxied from Vite dev server to the Django backend.
 
 ### Email Feeder (`email-feeder/`)
 
@@ -224,7 +228,7 @@ docker compose --env-file .env up -d suspicious suspicious_celery suspicious_cel
 ### 7. Verify
 
 ```bash
-docker compose --env-file .env run --rm --no-deps suspicious python manage.py test   # 525 tests as of this session
+docker compose --env-file .env run --rm --no-deps suspicious python manage.py test
 ```
 For a real pipeline smoke test: build a multipart email with a `message/rfc822` attachment (the phishing sample) using Python's `email` module, `smtplib.SMTP('127.0.0.1', 3025).send_message(...)` it to `suspicious@meridian.example`, wait ~10–20s for `email_feeder`'s IMAP poll, then check `Case.objects.all()` via `manage.py shell` — a case should appear and finalize automatically.
 
