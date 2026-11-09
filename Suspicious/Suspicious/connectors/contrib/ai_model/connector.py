@@ -4,14 +4,15 @@ the Cortex AI analyzer. See docs/specs for the ai_model design."""
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from time import monotonic  # module-level so tests can patch the clock
 
 from django.db import transaction
 from django.utils import timezone
 
-from ai_model import ledger
+from ai_model import ledger, serversync
 from ai_model.campaign_profile import COLLECTION_NAME
-from ai_model.models import AiAssessment, LabelSyncState
+from ai_model.models import AiAssessment, LabelSyncState, ModelVersion
 from ai_model.taxonomy import FOLDERS, class_of
 from ai_model.training_data import TRAINING_PREPROCESSING
 from case_handler.models import Case
@@ -30,7 +31,7 @@ from connectors.contrib.ai_model import imap_sync
 from connectors.contrib.ai_model.campaigns import collection_mismatch
 from connectors.contrib.ai_model.client import AiInferenceClient
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
-from connectors.tasks import run_campaign_detection
+from connectors.tasks import run_campaign_detection, run_shadow_campaign
 
 logger = logging.getLogger("connectors.contrib.ai_model")
 
@@ -163,8 +164,10 @@ class AiModelConnector(Connector):
         )
 
     def health_check(self) -> HealthStatus:
+        client = None
         try:
-            ok, detail = self._client().ready()
+            client = self._client()
+            ok, detail = client.ready()
         except ValueError as exc:
             ok, detail = False, str(exc)
         # Campaign detection is a function of this connector too: say when the cleanup misses it.
@@ -175,12 +178,23 @@ class AiModelConnector(Connector):
             mismatch = None
         if mismatch:
             detail = f"{detail.rstrip('. ')}. {mismatch}" if detail else mismatch
+        if ok:
+            try:
+                if not serversync.server_matches(client):
+                    detail = f"{detail.rstrip('. ')}. registry and server differ"
+            except Exception as exc:  # noqa: BLE001 — a health check must not raise
+                logger.debug("Registry sync check failed: %s", type(exc).__name__)
         return HealthStatus(ok=ok, detail=detail)
 
     def on_case_finalised(self, event) -> None:
         # Only queued: this hook runs under the connector's breaker, which the classification
         # calls share, and a Chroma outage during detection must not open it.
         run_campaign_detection.delay(event.case_id)
+        try:
+            if ModelVersion.objects.filter(status=ModelVersion.Status.SHADOW).exists():
+                run_shadow_campaign.delay(event.case_id)
+        except Exception as exc:  # noqa: BLE001 — a shadow failure never fails the live hook
+            logger.warning("Shadow campaign check not queued for case %s: %s", event.case_id, type(exc).__name__)
 
     def analyze(self, kind: str, case_id: int) -> ProviderResult:
         case = Case.objects.select_related("fileOrMail__mail").get(pk=case_id)
@@ -191,14 +205,20 @@ class AiModelConnector(Connector):
         if body is None:
             return _inconclusive("archive_unreadable")
         client = self._client()
+        has_shadow = ModelVersion.objects.filter(status=ModelVersion.Status.SHADOW).exists()
+        # Always the case itself: smaller than a ledger lookup, and a no-op when it is not in
+        # the bundle's neighbour index.
+        extra = {"versions": ["active", "shadow"]} if has_shadow else {}
         try:
-            # Always the case itself: smaller than a ledger lookup, and a no-op when it is not in
-            # the bundle's neighbour index.
-            payload = client.classify(body, exclude_case_ids=[case_id])
+            payload = client.classify(body, exclude_case_ids=[case_id], **extra)
         except ValueError as exc:  # the server refused this mail: a verdict of "can't tell"
             logger.warning("ai_model: case %s refused by the inference server: %s", case_id, exc)
             return _inconclusive(str(exc))
-        return result_from_server(payload)
+        result = result_from_server(payload)
+        shadow = payload.get("results", {}).get("shadow") if has_shadow else None
+        if isinstance(shadow, dict) and "error" not in shadow:
+            result = replace(result, shadow=shadow)
+        return result
 
     def sync(self, *, unlimited: bool = False) -> None:
         """Nightly label sync: read the review folders (read-only) into the label ledger.

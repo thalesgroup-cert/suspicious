@@ -12,6 +12,9 @@ row). Per job, a monitor thread:
    worker's process group, then SIGKILL after a grace period), reads the result file;
 4. PUTs each bundle file to its own presigned URL, manifest last;
 5. removes the directory, on every exit path. Leftovers of a crashed server are swept at start.
+A recheck job (params.recheck, Ruling F11) runs the gate only: the worker writes no bundle, step 4
+is skipped (bundle_urls may be omitted and are ignored) and the report is the gate summary plus the
+version id rechecked.
 
 URLs (Ruling E9): http or https, no userinfo, no fragment, printable ASCII only, and the
 host:port (as parsed, the scheme's default port when none is given) must be in AI_BUNDLE_HOSTS. The allow-list is the
@@ -42,7 +45,7 @@ from typing import Literal, Optional
 from urllib.parse import urlsplit
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from training.bundle import (
     BUNDLE_FILES, JSON_CAPS, MANIFEST, BundleError, json_shape_ok, read_file_capped,
@@ -183,6 +186,8 @@ class TrainParams(BaseModel):
     encoder_id: str = Label
     trainer_revision: str = Label
     campaign_profile: dict  # copied into the bundle as is (spec section 3)
+    # Ruling F11: run the gate only (version_id is the version rechecked); no final fit, no bundle
+    recheck: bool = False
 
     @field_validator("campaign_profile")
     @classmethod
@@ -205,17 +210,25 @@ class TrainRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     job_id: str = Field(pattern=JOB_ID_PATTERN)
     dataset_url: str = Field(max_length=MAX_URL)
-    bundle_urls: dict[str, str]
+    bundle_urls: Optional[dict[str, str]] = None  # ignored by a recheck, required otherwise
     params: TrainParams
 
     @field_validator("bundle_urls")
     @classmethod
     def _names(cls, v):
+        if v is None:
+            return v
         if set(v) != set(UPLOAD_NAMES):
             raise ValueError("bundle_urls must name exactly the bundle files")
         if any(len(u) > MAX_URL for u in v.values()):
             raise ValueError("URL too long")
         return v
+
+    @model_validator(mode="after")
+    def _uploads_unless_recheck(self):
+        if self.bundle_urls is None and not self.params.recheck:
+            raise ValueError("bundle_urls is required for a training job")
+        return self
 
 
 # --- URLs ------------------------------------------------------------------------------------
@@ -525,8 +538,9 @@ class JobController:
             try:
                 hosts = allowed_hosts()
                 dataset = check_url(req.dataset_url, hosts, "dataset download")
-                uploads = {n: check_url(req.bundle_urls[n], hosts, f"bundle upload {n}")
-                           for n in UPLOAD_NAMES}
+                uploads = None if req.params.recheck else {
+                    n: check_url(req.bundle_urls[n], hosts, f"bundle upload {n}")
+                    for n in UPLOAD_NAMES}
             except JobError as e:
                 job.state, job.error = "failed", str(e)
                 return 202, job.view()
@@ -582,12 +596,17 @@ class JobController:
                 if handle.exitcode != 0:
                     _log_worker_tail(workdir)
                     raise JobError(f"worker exited with code {handle.exitcode}")
-                result, blobs = self._collect(workdir)
-                for name in UPLOAD_NAMES:
-                    self._checkpoint(job, deadline)
-                    self._upload(client, uploads[name], blobs[name], name)
-            report = {**result["summary"], "manifest_sha256": result["manifest_sha256"],
-                      "encoder_hash": params["encoder_hash"], "uploaded": list(UPLOAD_NAMES)}
+                if params["recheck"]:  # the gate summary only: nothing to collect or upload
+                    report = {**self._read_result(workdir)["summary"],
+                              "version_id": params["version_id"], "recheck": True}
+                else:
+                    result, blobs = self._collect(workdir)
+                    for name in UPLOAD_NAMES:
+                        self._checkpoint(job, deadline)
+                        self._upload(client, uploads[name], blobs[name], name)
+                    report = {**result["summary"], "manifest_sha256": result["manifest_sha256"],
+                              "encoder_hash": params["encoder_hash"],
+                              "uploaded": list(UPLOAD_NAMES)}
             final = ("succeeded", report, None)
         except _Cancelled:
             final = ("cancelled", None, None)
@@ -635,9 +654,7 @@ class JobController:
         except httpx.HTTPError as e:
             raise JobError(f"{what}: {type(e).__name__}") from None
 
-    def _collect(self, workdir):
-        """The worker's result and the bundle bytes. The pin returned is the parent's own SHA-256
-        of the manifest bytes it uploads, and it must equal the worker's."""
+    def _read_result(self, workdir):
         out = os.path.join(workdir, training_worker.OUT)
         raw = _read_small(os.path.join(out, training_worker.RESULT), MAX_RESULT)
         try:
@@ -648,8 +665,16 @@ class JobController:
             raise JobError("worker left no readable result")
         if "error" in result:
             raise JobError(f"training: {str(result['error'])[:500]}")
-        if not isinstance(result.get("summary"), dict) \
-                or not isinstance(result.get("manifest_sha256"), str):
+        if not isinstance(result.get("summary"), dict):
+            raise JobError("worker result incomplete")
+        return result
+
+    def _collect(self, workdir):
+        """The worker's result and the bundle bytes. The pin returned is the parent's own SHA-256
+        of the manifest bytes it uploads, and it must equal the worker's."""
+        out = os.path.join(workdir, training_worker.OUT)
+        result = self._read_result(workdir)
+        if not isinstance(result.get("manifest_sha256"), str):
             raise JobError("worker result incomplete")
         blobs, spent = {}, 0
         try:

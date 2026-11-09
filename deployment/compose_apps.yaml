@@ -300,6 +300,8 @@ services:
       # OMP/MKL/OPENBLAS thread counts. Classify keeps torch's default threads. A future CPU
       # limit on this container needs its own server-thread variable, or classify oversubscribes.
       AI_TRAIN_THREADS: "${AI_TRAIN_THREADS:-2}"
+      # Seconds to wait for the shadow answer in one classify call (shorter than the connector's 20 s).
+      AI_SHADOW_TIMEOUT: "${AI_SHADOW_TIMEOUT:-8}"
     volumes:
       # Weights are bind-mounted (not baked into the image) so the retrain
       # pipeline can promote new ones in place; the server hot-reloads them.

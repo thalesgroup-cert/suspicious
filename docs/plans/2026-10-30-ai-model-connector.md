@@ -116,6 +116,8 @@ Deliverable: `manage.py ai_model_retrain` (and a start/poll task) turns the ledg
 
 ## Plan F: Shadow, promotion, campaign dry run, counters (outline)
 
+**Status: done**, merged locally into design/ai-model-connector (f936cc3c), not pushed; dev-stack acceptance run recorded in `docs/plans/2026-11-08-ai-model-f-acceptance-run.md`. Detailed plan: `docs/plans/2026-11-07-ai-model-connector-f-shadow.md` (11 tasks). The outline below is the earlier sketch; the detailed plan's Rulings supersede it (dry run on the live collection, gate recheck job, server sync, no v0 temperature fit).
+
 Deliverable: a passing candidate becomes `shadow`, is compared on live mail, and can be promoted or rolled back.
 
 1. **Dual classify**: server accepts `versions: ["active", "shadow"]`; provider stores `ShadowResult` and never lets a shadow failure touch the case (shorter timeout).
@@ -125,7 +127,9 @@ Deliverable: a passing candidate becomes `shadow`, is compared on live mail, and
 5. **Promote, rollback, discard, extend**: conditions from the spec enforced server-side; atomic pointer moves; `ModelEvent` audit; reload call; concurrency with a running job refused.
 6. **Review API**: review a flip or a campaign difference with a note; list of open items.
 
-## Plan G: Settings "AI model" card (outline)
+## Plan G: Settings "AI model" card
+
+Status: detailed in `docs/plans/2026-11-08-ai-model-connector-g-admin-card.md` (12 tasks: five backend reads and writes, then the card). Outline below kept for reference.
 
 Deliverable: the admin card, hidden when the module is disabled.
 

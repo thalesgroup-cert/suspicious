@@ -151,6 +151,11 @@ class ModelVersion(models.Model):
     # 1 while active, NULL otherwise. MariaDB has no partial unique index, so this unique column is
     # what stops two active versions. Set and cleared only by ai_model.registry.
     active_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    # 1 while shadow, NULL otherwise: one shadow at a time, same trick as active_slot.
+    shadow_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    shadow_since = models.DateTimeField(null=True, blank=True)
+    shadow_min_days = models.PositiveSmallIntegerField(default=7)
+    recheck = models.JSONField(default=dict)  # {job_id, passed, finished_at} of the gate recheck
     bundle_prefix = models.CharField(max_length=255, blank=True)  # "" for version 0 (no bundle)
     manifest = models.JSONField(default=dict)
     manifest_sha256 = models.CharField(max_length=64, blank=True)  # blank for version 0
@@ -171,7 +176,12 @@ class ModelVersion(models.Model):
                 condition=models.Q(status="active", active_slot=1, active_slot__isnull=False)
                 | (~models.Q(status="active") & models.Q(active_slot__isnull=True)),
                 name="ai_model_active_slot_matches_status",
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status="shadow", shadow_slot=1, shadow_slot__isnull=False)
+                | (~models.Q(status="shadow") & models.Q(shadow_slot__isnull=True)),
+                name="ai_model_shadow_slot_matches_status",
+            ),
         ]
 
     def __str__(self):
@@ -232,3 +242,106 @@ class RetrainJob(models.Model):
 
     def __str__(self):
         return f"{self.job_id} ({self.state})"
+
+
+class ShadowResult(models.Model):
+    """What the shadow model answered for one case. Never read by the live verdict."""
+
+    class Origin(models.TextChoices):
+        LIVE = "live"
+        SEED = "seed"
+
+    class Flip(models.TextChoices):
+        NONE = "none"
+        CHANGED = "changed"
+        CRITICAL = "critical"
+
+    case = models.ForeignKey("case_handler.Case", on_delete=models.CASCADE, related_name="shadow_results")
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="shadow_results")
+    origin = models.CharField(max_length=4, choices=Origin.choices, default=Origin.LIVE)
+    result = models.CharField(max_length=20, choices=AiAssessment.Result.choices)
+    sub_class = models.CharField(max_length=32, blank=True)
+    score = models.FloatField()
+    confidence = models.FloatField()  # percent, as in Case.confidence_ai
+    probabilities = models.JSONField(default=dict)
+    tier = models.CharField(max_length=8, blank=True)
+    error = models.CharField(max_length=64, blank=True)
+    live_result = models.CharField(max_length=20, blank=True)
+    would_be_result = models.CharField(max_length=20, blank=True)
+    would_be_score = models.FloatField(null=True, blank=True)
+    would_be_confidence = models.FloatField(null=True, blank=True)
+    would_be_rule = models.CharField(max_length=64, blank=True)
+    flip = models.CharField(max_length=8, choices=Flip.choices, default=Flip.NONE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["case", "version"], name="ai_model_shadow_result_case_version")]
+
+
+class ShadowCampaignEffect(models.Model):
+    """What campaign detection would have done for one case with the shadow's classes (Ruling F7)."""
+
+    class Effect(models.TextChoices):
+        NO_CHECK = "no_check"
+        NONE = "none"
+        WOULD_CREATE = "would_create"
+        WOULD_JOIN = "would_join"
+
+    case = models.ForeignKey("case_handler.Case", on_delete=models.CASCADE, related_name="shadow_campaign_effects")
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="campaign_effects")
+    effect = models.CharField(max_length=12, choices=Effect.choices)
+    member_case_ids = models.JSONField(default=list)
+    live_campaign = models.ForeignKey("case_handler.Campaign", null=True, blank=True,
+                                      on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["case", "version"],
+                                               name="ai_model_shadow_campaign_case_version")]
+
+
+class ShadowReview(models.Model):
+    """An admin's review of one flip or alert-delta item of a shadow version (ai_model.promotion).
+    Append-only: a second review adds a row, the latest counts.
+    ponytail: a guard on save()/delete() only; QuerySet.update()/delete() and the version's
+    cascade bypass it. A DB trigger is the upgrade if reviews get other writers."""
+
+    class Kind(models.TextChoices):
+        FLIP = "flip"
+        CAMPAIGN = "campaign"
+
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="reviews")
+    kind = models.CharField(max_length=8, choices=Kind.choices)
+    case_id = models.PositiveIntegerField()  # not a FK: the review outlives the case for audit
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                             on_delete=models.SET_NULL, related_name="+")
+    note = models.TextField(blank=True)
+    at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["version", "kind", "case_id"], name="ai_model_review_item")]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("ShadowReview is append-only")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("ShadowReview is append-only")
+
+
+class ModelVersionStats(models.Model):
+    """Daily counters of one model version, attributed through the case's assessment (Ruling F10).
+    Recomputed by ai_model.stats; never written by the live path."""
+
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="stats")
+    day = models.DateField()
+    scored = models.PositiveIntegerField(default=0)
+    dangerous = models.PositiveIntegerField(default=0)
+    campaign_checks = models.PositiveIntegerField(default=0)
+    created = models.PositiveIntegerField(default=0)
+    joined = models.PositiveIntegerField(default=0)
+    alerts = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["version", "day"], name="ai_model_stats_version_day")]

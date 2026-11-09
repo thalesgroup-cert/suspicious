@@ -125,7 +125,7 @@ no Cortex job.
 | `GET /v2/health/ready` | no | The same body as `/health`: `200` when the vectorizer and the `personal` models are loaded, otherwise `503`. |
 | `GET /v2/models/ai_mail` | yes | Model metadata: the versions the server holds, with their `preprocessing` and `manifest_sha256`. Without a loaded bundle, `active` is `v0`, the legacy classifier. |
 | `POST /v2/embed` | yes | Body `{"texts": [...], "profile": "classifier"}` or `"campaign"`, at most 32 texts, optional `"preprocessing"` (`legacy-first128` by default, `chunkmean-tokens-v1`, `chunkmean-words90-v1`; the `campaign` profile always uses the first 128 tokens). Returns `{"vectors": [...], "preprocessing_version": <the form actually used>, "embedding_version": "cmp-e1"}`. With the default form both profiles give the same vectors. `503` while the vectorizer is not loaded. The label sync uses it. |
-| `POST /v2/models/ai_mail/classify` | yes | Body `{"mail_body": "...", "versions": ["active"]}`, optional `exclude_case_ids` (at most 1000, used by bundles only: those cases are left out of the neighbour vote; the `ai_model` connector always sends the classified case's own id). Returns the verdict under `results.active` (class, score, confidence, class and sub-class probabilities, contributing phrases, `tier`) plus the campaign embedding, its version and the latency. `tier` is `null` for version 0 and `legacy-first128` bundles. `400` for any other `versions`, `503` when models or vectorizer are not loaded. |
+| `POST /v2/models/ai_mail/classify` | yes | Body `{"mail_body": "...", "versions": ["active"]}` (`["active", "shadow"]` and `["shadow"]` are also accepted, see [Shadow](#shadow-promotion-and-rollback)), optional `exclude_case_ids` (at most 1000, used by bundles only: those cases are left out of the neighbour vote; the `ai_model` connector always sends the classified case's own id). Returns the verdict under `results.active` (class, score, confidence, class and sub-class probabilities, contributing phrases, `tier`) plus the campaign embedding, its version and the latency. `tier` is `null` for version 0 and `legacy-first128` bundles. `400` for any other `versions`, `409` for `["shadow"]` while no shadow is loaded, `503` when models or vectorizer are not loaded. |
 | `POST /v2/train`, `GET /v2/train/{job_id}`, `POST /v2/train/{job_id}/cancel` | yes | One training job at a time; see [Retraining](#retraining). |
 | `POST /v2/reload` | yes | Body `{"active": {...} \| null, "shadow": {...} \| null}`. Loads a bundle; `active: null` goes back to the legacy weights. See [Model registry](#model-registry). |
 
@@ -455,7 +455,7 @@ folders. It prints counts only. A rerun adds nothing for what is already recorde
 
 `python manage.py ai_model_retrain` trains a new model version from the
 [label ledger](#label-ledger) on the `ai_inference` server and registers it as a `candidate`. It never
-changes the active model: shadow runs and promotion come in a later release (Plan F).
+changes the active model: a candidate becomes live only through [shadow, promotion and rollback](#shadow-promotion-and-rollback).
 
 ### What is trained
 
@@ -521,7 +521,7 @@ The first row comes from retraining version 0's recipe and scoring the held-out 
 the shipped version 0 weights, which have seen these 505 mails; live version 0 confidences differ.
 
 The scoring engine compares `confidence_ai` with the base confidence and applies `CONF_FLOOR`, so a
-promoted version can change which signal decides a verdict. Replay recent cases before promoting.
+promoted version can change which signal decides a verdict. Run `ai_model_engine_replay` on the shadow before the first promotion (see the [runbook](#operator-runbook)).
 
 ### Running it
 
@@ -620,7 +620,7 @@ with the user and a note. Both are read-only in the Django admin. Status changes
 | Status | Meaning |
 |---|---|
 | `candidate` | a finished retrain, not serving |
-| `shadow` | reserved for shadow runs (Plan F) |
+| `shadow` | scored beside the active version on live mail, never used for a verdict; at most one (a unique `shadow_slot` column) |
 | `active` | the version that classifies; exactly one (a unique column plus locking reads) |
 | `previous` | the version active before the current one; one only |
 | `discarded` | set aside; an older `previous` becomes `discarded` when a new version goes active |
@@ -628,8 +628,210 @@ with the user and a note. Both are read-only in the Django admin. Status changes
 
 Version 0 (`v0`) is a row without a bundle, created by the first retrain when no version is active: the server runs the legacy
 weights from `models/` when told `active: null`, so rolling back to version 0 needs no file.
-`registry.reload_payload(version)` builds the `/v2/reload` body (presigned GETs, 15 minutes). Plan E
-has no command that activates a version or reloads the server.
+`registry.reload_payload(active, shadow)` builds the `/v2/reload` body (presigned GETs, 15 minutes).
+Activating, shadowing, discarding and rolling back go through the
+[`/api/ai-model/` endpoints](#shadow-promotion-and-rollback); there is no management command for them.
+
+## Shadow, promotion and rollback
+
+A candidate that passed the gate (`eligible: true`) is not used for any verdict. An admin starts it
+as the **shadow**: from then on every new mail case is also scored by the candidate, the answer is
+stored and compared, and the candidate can be promoted only after the checks below. Nothing here
+runs on its own: no shadow starts and no version is promoted without an admin.
+
+### What the shadow does
+
+- **Dual classify.** While a shadow exists, the connector sends `versions: ["active", "shadow"]` in
+  the one classify call. The server answers the active part first, then scores the shadow under its
+  own deadline, `AI_SHADOW_TIMEOUT` seconds (default 8, set in `deployment/.env`; the connector's own
+  timeout is 20 s). The response waits for it up to that deadline. `results.shadow` is the answer or
+  `{"error": "<ClassName>"}`: `NoShadow`, `Timeout`, `Busy` (another shadow pass, often the
+  seeding, held the shadow's slot for more than 1 s), `Skipped` (the active pass took longer than
+  18 s minus `AI_SHADOW_TIMEOUT`, so 10 s by default, which keeps the whole call under the
+  connector's 20 s) or the exception class. A shadow error is
+  never an HTTP error when `active` was asked. The shadow runs under its own single slot, outside the
+  live classify slots, so a slow shadow never makes a live pass wait; on a timeout the worker thread
+  keeps running to its end and holds that shadow slot meanwhile. `["shadow"]` alone is used by the
+  seeding and the replay; it waits up to 15 s for the shadow slot (then `503`), and answers `409`
+  when no shadow is loaded.
+- **Stored result.** When the case's AI job closes, in the same transaction and before the case is
+  reconciled, the answer becomes one `ShadowResult` per (case, version) (class, score, confidence,
+  probabilities, tier). A shadow error answer writes no row; a failure to store is logged by class
+  and leaves the live analysis written, so a failing shadow only lowers the count. The row is dropped when its
+  version is no longer the shadow. It never reaches `Case.*_ai`, `AiAssessment`, `score_ai`, the
+  campaign collection or any event.
+- **Would-be verdict.** After the live verdict, the scoring engine is run again on the same inputs
+  with the shadow's answer as the AI vote, and the result, score, rule and flip are stored on the
+  `ShadowResult`. The flip is `none`, `changed`, or `critical` (Safe to Dangerous or Dangerous to
+  Safe only; Inconclusive and Suspicious changes are `changed`). With the kill switch
+  `scoring.mail_embedded_categorical` off, the would-be fields stay empty.
+- **Seeding.** When the shadow starts, a Celery task classifies the documents of the live campaign
+  collection with the shadow (25 per chunk, at most 20 minutes of work per run, then it queues
+  itself again) and stores `ShadowResult` rows with `origin = "seed"`. Seed rows are insert-only: an
+  existing row, live or seed, is never touched. They feed the campaign dry run but do not count
+  toward the 500 mails. If the server or the vector store is away, or the server does not hold the
+  shadow yet, the task pauses and retries after 5 minutes. Each document is classified with its own
+  case left out of the neighbour vote, and the task pauses 1 s after each classify so that live
+  dual calls can take the shadow slot. Live shadow answers can still be `Busy` while seeding runs,
+  so most live results, the ones that count toward the 500, accumulate after it. A run holds one Celery worker for up to about 31 minutes (20
+  minutes of work, a 30-minute soft and a 31-minute hard time limit), so keep the worker's
+  concurrency at 4 or more.
+- **Campaign dry run.** On `case_finalised` the connector also queues a dry run for the shadow. It
+  uses the live collection for geometry (the campaign embedding does not depend on the classifier)
+  and the database for the candidate's classes: it queries the 60 nearest neighbours without a class
+  filter, keeps those whose case the candidate called Dangerous, and applies the live threshold and
+  member rules. It writes one `ShadowCampaignEffect` per case (`no_check`, `none`, `would_create`,
+  `would_join`, with the member case ids) and nothing to the collection, `Campaign`,
+  `CampaignMember` or the event bus. Neighbours beyond rank 60 are missed on the shadow side, where
+  the live query uses 20 Dangerous ones. This replaces the separate shadow collection of the design
+  spec: the proxy blocks deleting collections and the cleanup connector watches only the live name.
+- **Alert delta.** Per case with a dry-run effect: `candidate_only` (the effect is `would_create` or
+  `would_join` and the live case is in no campaign) and `active_only` (the live case is in a campaign
+  and the effect is `none` or `no_check`). The unit is the case, not the campaign.
+
+### The server follows the registry
+
+The registry is the truth. The server keeps loaded models in memory only, so after a restart it
+holds the legacy weights (`active: null`) and no shadow. `ai_model/serversync.py` compares the
+registry with `GET /v2/models/ai_mail` (version ids) and pushes `POST /v2/reload` when they differ.
+It runs after every pointer move, after a shadow start and a discard, and from the beat entry
+`ai-model-server-sync` every 300 s, so a restarted server is brought back to the registry state
+within five minutes. `/v2/reload` is all-or-nothing, so a reload refused (4xx) while a shadow is
+wanted is retried once without the shadow: the active pointer never depends on the shadow bundle.
+When that retry succeeds, the shadow gets a `shadow_refused` event, unless its latest event is already one (so a refusal
+right after a recovery may go unrecorded), and the
+server runs without it until the bundle loads or an admin discards it. After a shadow start the
+shadow must load: if the server refuses it, the version goes back to `candidate` (`shadow_since`
+cleared, a `shadow_refused` event) and the request fails. A discard syncs best effort: a failure is
+only logged. If the server refuses a reload with a 4xx right after a promotion or rollback, even
+without the shadow, the pointer move is reverted and the request fails; a promoted version whose revert finds the shadow slot taken by another version goes back to
+`candidate`, not `shadow`. A transient failure (server down, timeout) keeps the new pointer and the
+beat retries; so does a connector without a usable token or url. Until it succeeds the connector health check says "registry and server differ". Every
+answer carries its version id, so nothing is mislabelled meanwhile.
+
+### Promotion conditions
+
+`promotion.can_promote` is the only place they live; `promote` re-checks them under row locks, so
+whatever a client sends, an unmet condition refuses the promotion. The endpoint answers `409` with
+the codes of the unmet conditions.
+
+| Code | Condition |
+|---|---|
+| `not_shadow` | the version is the shadow |
+| `too_young` | at least `shadow_min_days` (7, can be extended) since `shadow_since` |
+| `too_few_results` | at least 500 live shadow results with a would-be verdict (seed rows and rows without a would-be verdict do not count, the same population as the flips and the agreement) |
+| `unreviewed_flips` | every critical flip has a review |
+| `unreviewed_campaigns` | every `candidate_only` and `active_only` case has a review |
+| `recheck_missing`, `recheck_failed`, `recheck_stale` | a gate recheck that passed, finished after the minimum period was met and less than 7 days ago |
+| `profile_window` | only when the candidate's campaign profile differs from the active one: dry-run effects spanning at least 15 days |
+| `job_running` | no training or recheck job is running |
+
+Reviews are append-only: a review is a `ShadowReview` row with a note, the latest one per item
+counts, and a review of an item that no longer exists is refused. Only critical flips can be
+reviewed; the other changes are listed but not required.
+
+### Counters and warnings
+
+A daily beat task (`ai-model-materialise-stats`) rebuilds `ModelVersionStats` for the last three
+days from `AiAssessment` (scored, Dangerous, per `model_version`), `CampaignMember` (created,
+joined) and the successful `ConnectorDelivery` rows. Two figures are proxies. `campaign_checks`
+counts successful `ai_model` `case_finalised` deliveries, which queue the detection, so it can
+overcount when the mail text was unreadable. `alerts` counts successful TheHive `campaign_updated`
+deliveries, attributed through the case's assessment version. Counters lag by up to a day.
+
+- **Purity** (shown per version): over 30 days, among the version's campaign members that carry an
+  active label, the share labelled Dangerous. The warning needs at least 10 labelled members and a
+  purity under 80%.
+- **Age warning:** the version was registered (`ModelVersion.created_at`) more than 60 days ago.
+
+### Endpoints
+
+Reads need the `Admin` or `CISO` group, writes the `Admin` group. A superuser without the `Admin`
+group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<prefix>_offset`.
+
+| Route | Role | What it does |
+|---|---|---|
+| `GET /api/ai-model/status/` | Admin, CISO | active, previous and shadow summaries, and whether a job is running |
+| `GET /api/ai-model/versions/` | Admin, CISO | versions with counters, purity and the age warning (`limit`, `offset`) |
+| `GET /api/ai-model/shadow/` | Admin, CISO | the shadow with agreement, flips (`flips_`), dry-run effects (`effects_`), the alert delta (`candidate_only_`, `active_only_`) and the unmet `conditions` |
+| `GET /api/ai-model/reviews/` | Admin, CISO | the review log, optional `?version_id=` |
+| `POST /api/ai-model/shadow/start/` | Admin | `{version_id, note}`: a gate-eligible candidate becomes the shadow, seeding is queued and the server is synced; `409` and back to `candidate` when the server refuses the bundle |
+| `POST /api/ai-model/reviews/` | Admin | `{kind: "flip" or "campaign", case_id, note}` for the shadow |
+| `POST /api/ai-model/recheck/` | Admin | start a gate recheck of the shadow; `202 {job_id}` |
+| `POST /api/ai-model/extend/` | Admin | `{days}`: a new total for `shadow_min_days`, above the current one, at most 365 |
+| `POST /api/ai-model/promote/` | Admin | promote the shadow (or `version_id`); `409` with `codes` when refused |
+| `POST /api/ai-model/rollback/` | Admin | the `previous` version becomes active; `409 no_previous` without one |
+| `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version, free the shadow slot and sync the server (best effort) |
+
+Every write adds a `ModelEvent` with the user. Its note is the request's note for shadow start,
+promote, rollback and discard; `<days> days` plus the note for extend; `<kind> <case_id>` for a
+review (the review text is on the `ShadowReview` row); the job id for a recheck start. A recheck
+that finishes adds a `recheck` event without a user, noting the job id and the outcome. Stored results of earlier cases are never
+recomputed by a promotion or a rollback.
+
+### Operator runbook
+
+1. **Check the setup.** The connector is enabled, `ai_inference` runs with `--profile ai`, and a
+   candidate with `eligible: true` exists (`GET /api/ai-model/versions/`, or `ai_model_retrain
+   --status`). Only one shadow can exist: discard an old one first.
+2. **Start the shadow.** `POST /api/ai-model/shadow/start/` with the `version_id`. Seeding begins
+   at once; the dry run table is useful from the first day.
+3. **Wait and read the table.** `GET /api/ai-model/shadow/` shows live results, agreement (class
+   and verdict), the flips, the dry-run effects, the alert delta and `conditions`. The minimum is 7
+   days and 500 live results; at about 85 mails a day that is about a week.
+4. **Review the flips.** For each critical flip and each alert-delta case, open the case, decide,
+   and `POST /api/ai-model/reviews/` with `kind`, `case_id` and a note. A flip is reviewable only
+   while it exists; the table says `reviewable` and `reviewed` per row.
+5. **Run the engine replay and record the figures.** The first promotion waits for this reading,
+   because a calibrated model reports lower confidence than version 0 and the engine compares
+   `confidence_ai` with a floor.
+   ```bash
+   docker compose --env-file .env exec suspicious python manage.py ai_model_engine_replay <version_id> --limit 200 --since-days 30
+   ```
+   The command rebuilds the non-AI signals read-only and replays recent finalised mail cases with
+   the live AI signal and with the shadow's. It prints the transition matrix, the number of changed
+   and critical verdicts, the Inconclusive rate and the median confidence, before and after. It
+   leaves out the embedded-evidence step in both passes, so the figures are a sensitivity study, not
+   an oracle. It stops after 5 consecutive classify failures and counts skipped cases by exception
+   class. Write the figures in the promotion note.
+6. **Recheck.** `POST /api/ai-model/recheck/` after the minimum period is met. It runs the gate on
+   the current ledger with the shadow's recipe and seed, writes no bundle and cannot promote
+   anything. Its result is stored on the version as passed or failed with a time, and must be less
+   than 7 days old at promotion. A recheck stored while the shadow is not in that state is refused.
+   Poll it with `GET /api/ai-model/status/` (`job_running`).
+7. **Extend if needed.** `POST /api/ai-model/extend/` with a larger total of days, for example when
+   the table has too few results or a profile window is still open.
+8. **Promote.** `POST /api/ai-model/promote/`. On `409`, the `codes` name what is missing. On
+   success the shadow is active, the old active is `previous`, an older `previous` is `discarded`,
+   and the server is reloaded.
+9. **Roll back.** `POST /api/ai-model/rollback/` returns the `previous` version to active and reloads
+   the server. The version rolled back from becomes `previous`. Mails scored since keep their stored
+   version and results.
+10. **After a server restart.** The restarted server serves version 0 until the beat entry syncs it
+    (at most five minutes); to hurry it, run the task `ai_model.tasks.sync_server` from a Django
+    shell. No registry change is needed.
+
+**Dev-stack acceptance run (operator step, not part of the test suites).** On the dev stack from
+`CLAUDE.md`, shadow a real candidate over a few days of replayed mail, then do one promote, one
+rollback and one server restart (`docker compose --profile ai restart ai_inference`), checking after
+each that `GET /v2/models/ai_mail` on the server lists the versions `GET /api/ai-model/status/`
+reports. Record the dates and figures in the promotion note. This has not been run yet.
+
+### Troubleshooting shadow and promotion
+
+| Symptom | Likely cause and check |
+|---|---|
+| `shadow/start/` answers `409` | the version is not a `candidate`, did not pass the gate, or another version is the shadow (discard it first); or the server refused the bundle, the version is back to `candidate` with a `shadow_refused` event: check the `ai_inference` logs |
+| A `shadow_refused` event on the running shadow | the server refused the shadow bundle on a reload and runs without it; the beat keeps trying. Check the `ai_inference` logs, or discard the shadow |
+| No live results accumulate | the connector is off, the server does not hold the shadow (health says "registry and server differ"; check `GET /v2/models/ai_mail`), or the shadow keeps timing out, is `Busy` or `Skipped` (`results.shadow.error` is logged by class). `Busy` is expected while seeding runs: live results accumulate after it. For timeouts, check the server's load or raise `AI_SHADOW_TIMEOUT`; raising it shortens the window in which a slow active pass still gets a shadow (18 s minus the timeout), and above about 15 s slow mails get no shadow (`Skipped`) |
+| `409` on promote with `too_few_results` | seed rows do not count; wait for live mail or extend |
+| `409` on promote with `recheck_stale` | the recheck is older than 7 days or finished before the minimum period was met: run a new one |
+| `409` on promote with `job_running` | a training or recheck job is running; wait for it |
+| "The inference server refused the change; it was reverted" | the reload got a 4xx (bundle hash, encoder change, token); the pointer is back where it was. Check the `ai_inference` logs |
+| Promoted, but the server still answers the old version | a transient reload failure; the registry is right and the beat entry retries every 5 minutes |
+| Seeding stopped or keeps pausing | the log line names the class; a paused run requeues itself after 5 minutes. A missing token or url stops it (`ValueError`). When the server refuses the shadow bundle (a `shadow_refused` event), the sync returns without the shadow and seeding pauses every 5 minutes (`ProviderUnavailable`) until the bundle loads or the shadow is discarded |
+| Engine replay prints few cases | the skipped reasons name the exception classes (`NoMailText`, `ShadowRefused`, ...) |
+| Counters look low | they are rebuilt daily for the last three days; `campaign_checks` is a proxy |
 
 ## Source
 
@@ -646,7 +848,7 @@ has no command that activates a version or reloads the server.
 
 The connector lives in the backend: `Suspicious/Suspicious/connectors/contrib/ai_model/`
 (`connector.py`, `client.py`, `campaigns.py`, `mailtext.py`, `imap_sync.py`), the ledger in
-`Suspicious/Suspicious/ai_model/` (`models.py`, `ledger.py`, `messageid.py`, `taxonomy.py`), and the
+`Suspicious/Suspicious/ai_model/` (`models.py`, `ledger.py`, `messageid.py`, `taxonomy.py`, `registry.py`, `promotion.py`, `serversync.py`, `shadow.py`, `stats.py`, `tasks.py`), the dry run in `connectors/contrib/ai_model/dryrun.py`, the endpoints in `api/views/ai_model.py`, and the
 replay and backfill commands in `Suspicious/Suspicious/ai_model/management/commands/`.
 
 ### Tests

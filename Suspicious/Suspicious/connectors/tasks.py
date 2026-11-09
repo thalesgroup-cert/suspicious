@@ -167,3 +167,44 @@ def run_campaign_detection(self, case_id: int) -> None:
         logger.warning("Campaign detection for case %s failed (%s), retrying.", case_id, failure)
         raise self.retry(countdown=30 * 2 ** self.request.retries)
     logger.error("Campaign detection for case %s failed: %s", case_id, failure)
+
+
+@shared_task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3)
+def run_shadow_campaign(self, case_id: int) -> None:
+    """Ruling F7: record what campaign detection would do with the shadow's class for one finalised
+    case (connectors.contrib.ai_model.dryrun). Writes only a ShadowCampaignEffect row: no Campaign,
+    no live collection write, no event. Retried as run_campaign_detection; only the exception class
+    is logged."""
+    from ai_model.campaign_profile import current_profile
+    from ai_model.models import AiAssessment, ModelVersion, ShadowResult
+    from connectors.contrib.ai_model.campaigns import open_collection
+    from connectors.contrib.ai_model.dryrun import dry_run_campaign
+    from connectors.contrib.ai_model.mailtext import (
+        header_dict, mail_archive_for, read_archive_material,
+    )
+
+    try:
+        row = ShadowResult.objects.select_related("case__fileOrMail__mail", "version").filter(
+            case_id=case_id, version__status=ModelVersion.Status.SHADOW, error="").first()
+        assessment = AiAssessment.objects.filter(case_id=case_id).first() if row else None
+        archive = mail_archive_for(row.case) if assessment else None
+        material = read_archive_material(archive) if archive else None
+        if material is None:
+            logger.info("Case %s: no shadow answer, AI assessment or mail, no shadow campaign check.", case_id)
+            return
+        try:
+            headers = header_dict(material.headers)
+        except Exception as exc:  # noqa: BLE001 — as run_campaign_detection
+            logger.warning("Case %s: unreadable headers (%s), dry run without them.", case_id, type(exc).__name__)
+            headers = {}
+        profile = current_profile()
+        # A case the candidate does not call Dangerous needs no collection: Chroma down cannot hold it.
+        collection = open_collection(profile) if row.result == profile.trigger_class else None
+        dry_run_campaign(row.case, row, assessment, headers, profile, collection)
+        return
+    except Exception as exc:  # noqa: BLE001
+        failure = type(exc).__name__
+    if self.request.retries < self.max_retries:
+        logger.warning("Shadow campaign check for case %s failed (%s), retrying.", case_id, failure)
+        raise self.retry(countdown=30 * 2 ** self.request.retries)
+    logger.error("Shadow campaign check for case %s failed: %s", case_id, failure)

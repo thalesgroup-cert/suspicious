@@ -594,7 +594,7 @@ def test_in_flight_classify_finishes_on_the_old_model(loaded, token_env, tmp_pat
     assert classify(client, token_env)["results"]["active"]["version"] == "v-new"
 
 
-def test_shadow_is_stored_but_not_used(loaded, token_env, tmp_path):
+def test_shadow_is_stored_and_scored_only_when_asked(loaded, token_env, tmp_path):
     client, holder, storage, base = loaded
     old = holder.state[0]
     spec, _ = make_bundle(tmp_path, storage, version="v-shadow")
@@ -606,9 +606,8 @@ def test_shadow_is_stored_but_not_used(loaded, token_env, tmp_path):
     meta = client.get("/v2/models/ai_mail", headers=token_env).json()["versions"]
     assert meta["active"]["id"] == "v-act" and meta["shadow"]["id"] == "v-shadow"
     assert classify(client, token_env)["results"]["active"]["version"] == "v-act"
-    assert client.post("/v2/models/ai_mail/classify",
-                       json={"mail_body": BODY, "versions": ["shadow"]},
-                       headers=token_env).status_code == 400
+    both = classify(client, token_env, versions=["active", "shadow"])["results"]
+    assert both["shadow"]["version"] == "v-shadow"
 
 
 def test_reload_logs_carry_no_presigned_url(app, token_env, tmp_path, caplog):

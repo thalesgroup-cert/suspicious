@@ -146,8 +146,14 @@ def test_v0_has_no_tier_and_no_similar_cases(client, token_env):
 
 
 def test_unknown_version_is_400(client, token_env):
-    assert post_v2(client, token_env, versions=["shadow"], raw=True).status_code == 400
-    assert post_v2(client, token_env, versions=["active", "shadow"], raw=True).status_code == 400
+    assert post_v2(client, token_env, versions=["canary"], raw=True).status_code == 400
+    assert post_v2(client, token_env, versions=[], raw=True).status_code == 400
+
+
+def test_shadow_without_a_loaded_shadow(client, token_env):
+    assert post_v2(client, token_env, versions=["shadow"], raw=True).status_code == 409
+    out = post_v2(client, token_env, versions=["active", "shadow"], raw=True).json()
+    assert out["results"]["shadow"] == {"error": "NoShadow"}
 
 
 def test_classify_is_401_without_a_token(client, token_env):

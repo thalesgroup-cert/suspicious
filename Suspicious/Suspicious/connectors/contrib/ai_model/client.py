@@ -32,6 +32,11 @@ class ServerBusy(Exception):
     """409: another training job or reload is running on the server."""
 
 
+class ShadowNotLoaded(ValueError):
+    """409 on a ["shadow"]-only classify: the server holds no shadow (restarted, not synced yet).
+    A ValueError, so callers that treat a refusal as "this mail only" keep working."""
+
+
 class TrainJobGone(Exception):
     """GET /v2/train/{job_id} answered 404: the server does not know the job (restarted, evicted)."""
 
@@ -72,13 +77,19 @@ class AiInferenceClient:
             return False, f"model metadata: HTTP {response.status_code}"
         return True, "ready, token accepted"
 
-    def classify(self, mail_body: str, exclude_case_ids: list[int] | None = None) -> dict:
+    def classify(self, mail_body: str, exclude_case_ids: list[int] | None = None,
+                 versions=("active",)) -> dict:
         """exclude_case_ids: cases left out of a bundle's neighbour vote (the case itself, so a case
         already in the label ledger does not vote for its own verdict). Version 0 ignores it."""
-        payload = {"mail_body": mail_body, "versions": ["active"]}
+        payload = {"mail_body": mail_body, "versions": list(versions)}
         if exclude_case_ids:
             payload["exclude_case_ids"] = list(exclude_case_ids)
-        return self._post(_MODEL_PATH + "/classify", payload)
+        special = {409: ShadowNotLoaded} if list(versions) == ["shadow"] else None
+        return self._post(_MODEL_PATH + "/classify", payload, special=special)
+
+    def metadata(self) -> dict:
+        """GET /v2/models/ai_mail: {"name", "versions": {"active": {"id", ...}, "shadow"?: {...}}}."""
+        return self._request("get", _MODEL_PATH, None)
 
     def embed(self, texts: list[str], profile: str, preprocessing: str | None = None) -> dict:
         """POST /v2/embed: {"vectors", "preprocessing_version", "embedding_version"}.
