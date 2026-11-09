@@ -1,8 +1,10 @@
 """Plan F, Task 10: /api/ai-model/ shadow, promotion and review endpoints."""
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from ai_model.models import ModelEvent, ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
@@ -173,9 +175,9 @@ class AiModelApiTest(APITestCase):
         manifest = {"eligible": False, "rows": 10, "excluded_rows": 2, "gate": gate,
                     "link": "http://leak", "seed": 7}
         c1 = cand("c1", manifest=manifest)
-        c2 = cand("c2", manifest={"eligible": True, "rows": 5, "excluded_rows": 0,
-                                  "gate": {"checks": {"n": "see http://leak.example/p"}}})
-        sh = self.shadow("sh")
+        cand("c2", manifest={"eligible": True, "rows": 5, "excluded_rows": 0,
+                              "gate": {"checks": {"n": "see http://leak.example/p"}}})
+        self.shadow("sh")
         old = cand("old", manifest={})
         ModelVersion.objects.filter(pk=old.pk).update(status=S.DISCARDED)
         r = self.client.get(BASE + "candidates/")
@@ -527,7 +529,9 @@ class CandidatesEdgeTest(APITestCase):
         for i, vid in enumerate(("p1", "p2", "p3")):
             v = cand(vid, manifest={})
             ModelVersion.objects.filter(pk=v.pk).update(created_at=now - timedelta(days=10 - i))
-        ids = lambda q: [x["version_id"] for x in self.client.get(BASE + "candidates/" + q).json()["results"]]
+        def ids(q):
+            return [x["version_id"] for x in self.client.get(BASE + "candidates/" + q).json()["results"]]
+
         self.assertEqual(ids(""), ["p3", "p2", "p1"])
         self.assertEqual(ids("?limit=1&offset=1"), ["p2"])
         self.assertEqual(self.client.get(BASE + "candidates/?limit=1").json()["count"], 3)
