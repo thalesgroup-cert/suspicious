@@ -498,7 +498,7 @@ identical `Mail` rows) is green in staging.
     "stale_job_timeout_seconds": 7200,
     "analyzers": {
         "header":    "Mail_Header_Analyzer_1_0",
-        "ai":        "AI_Mail_Analyzer_1_4",
+        "ai":        "AI_Mail_Analyzer",
         "sandbox":   "ThreatGridOnPrem_1_0",
         "yara":      "Yara_Boosted_3_2",
         "file_info": "FileInfo_8_0"

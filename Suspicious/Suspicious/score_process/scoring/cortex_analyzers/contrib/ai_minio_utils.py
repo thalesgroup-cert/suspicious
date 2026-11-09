@@ -1,5 +1,6 @@
 """
-MinIO helpers for the AI analyzer.
+Object-store helpers that read a mail's text and headers (used by the ai_model connector,
+trusted-sender lookup and TheHive campaign material).
 """
 from __future__ import annotations
 
