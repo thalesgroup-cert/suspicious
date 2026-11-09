@@ -78,7 +78,10 @@ class Write(WriteMixin, APIView):
 
 class StatusView(Read):
     def get(self, request):
-        pick = lambda s: (lambda v: version_summary(v) if v else None)(ModelVersion.objects.filter(status=s).first())
+        def pick(status):
+            version = ModelVersion.objects.filter(status=status).first()
+            return version_summary(version) if version else None
+
         job = retrain.running_job()
         return Response({"active": pick(S.ACTIVE), "previous": pick(S.PREVIOUS), "shadow": pick(S.SHADOW),
                          "job_running": job is not None, "job_id": job.job_id if job else None})

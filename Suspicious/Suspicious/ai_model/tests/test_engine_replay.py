@@ -73,7 +73,8 @@ class EngineReplayTest(TestCase):
         c1 = self.case("Safe", 2)
         self.case("Dangerous", 9)
         client = FakeClient([answer("DANGEROUS", 9), answer("DANGEROUS", 9)])
-        counts = lambda: (Case.objects.count(), ShadowResult.objects.count(), ModelEvent.objects.count())
+        def counts():
+            return Case.objects.count(), ShadowResult.objects.count(), ModelEvent.objects.count()
         before = counts()
         with CaptureQueriesContext(connection) as q:
             data = json.loads(self.run_cmd(client, "--json"))

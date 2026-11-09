@@ -1,10 +1,8 @@
 """Plan F, Task 10: /api/ai-model/ shadow, promotion and review endpoints."""
-from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from ai_model.models import ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview

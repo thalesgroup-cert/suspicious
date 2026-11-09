@@ -26,7 +26,7 @@ class StatsTest(TestCase):
         return ModelVersionStats.objects.get(version=version or self.v0, day=timezone.localdate())
 
     def test_counters_per_version_and_day(self):
-        a, b, c = self.case(result="DANGEROUS"), self.case(result="DANGEROUS"), self.case()
+        a, b, _ = self.case(result="DANGEROUS"), self.case(result="DANGEROUS"), self.case()
         camp = Campaign.objects.create()
         CampaignMember.objects.create(campaign=camp, case=a)
         CampaignMember.objects.create(campaign=camp, case=b)
