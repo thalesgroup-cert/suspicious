@@ -98,9 +98,10 @@ class LabelRecord(models.Model):
 
     # Ruling D4: the only columns a save() may change; case only from null.
     # ponytail: a guard on save() only, not a database rule. Not covered: QuerySet.update() and
-    # bulk_update() (ai_model.ledger uses update() on these columns only); a new instance given an
-    # existing pk (_state.adding is True, so the check is skipped and save() updates the row); raw
-    # SQL. The row is read then written without a lock (TOCTOU), so two concurrent saves are each
+    # bulk_update() (ai_model.ledger uses update() on these columns only, plus embedding and
+    # preprocessing_version in replace_embedding, the re-embed command's write); a new instance
+    # given an existing pk (_state.adding is True, so the check is skipped and save() updates the
+    # row); raw SQL. The row is read then written without a lock (TOCTOU), so two concurrent saves are each
     # checked against the row as it was. A DB trigger is the upgrade if the ledger gets other writers.
     MUTABLE = frozenset({"status", "flag_reason", "case_id", "resolved_by_id", "resolved_at", "resolution_note"})
 
@@ -127,3 +128,107 @@ class LabelSyncState(models.Model):
     last_uid = models.BigIntegerField(default=0)
     last_run_at = models.DateTimeField(null=True, blank=True)
     skipped = models.IntegerField(default=0)
+
+
+class ModelVersion(models.Model):
+    """One registered model version. Status changes only through ai_model.registry."""
+
+    class Status(models.TextChoices):
+        CANDIDATE = "candidate"
+        SHADOW = "shadow"
+        ACTIVE = "active"
+        PREVIOUS = "previous"
+        DISCARDED = "discarded"
+        FAILED = "failed"
+
+    class Trigger(models.TextChoices):
+        MANUAL = "manual"
+        SCHEDULE = "schedule"
+        IMPORT = "import"
+
+    version_id = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=10, choices=Status.choices, db_index=True)
+    # 1 while active, NULL otherwise. MariaDB has no partial unique index, so this unique column is
+    # what stops two active versions. Set and cleared only by ai_model.registry.
+    active_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    bundle_prefix = models.CharField(max_length=255, blank=True)  # "" for version 0 (no bundle)
+    manifest = models.JSONField(default=dict)
+    manifest_sha256 = models.CharField(max_length=64, blank=True)  # blank for version 0
+    campaign_profile = models.JSONField(default=dict)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children"
+    )
+    trigger = models.CharField(max_length=10, choices=Trigger.choices)
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    job_id = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status="active", active_slot=1, active_slot__isnull=False)
+                | (~models.Q(status="active") & models.Q(active_slot__isnull=True)),
+                name="ai_model_active_slot_matches_status",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.version_id} ({self.status})"
+
+
+class ModelEvent(models.Model):
+    """One row per registry transition."""
+
+    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="events")
+    action = models.CharField(max_length=32)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    at = models.DateTimeField(default=timezone.now)
+    note = models.TextField(blank=True)
+
+
+class RetrainJob(models.Model):
+    """One /v2/train job (ai_model.retrain). Written before the server is called, so a crash leaves
+    a visible job that the next poll or start fails. No URL and no server error text is stored."""
+
+    class State(models.TextChoices):
+        RUNNING = "running"
+        SUCCEEDED = "succeeded"
+        FAILED = "failed"
+        CANCELLED = "cancelled"
+
+    job_id = models.CharField(max_length=64, unique=True)
+    target_version = models.CharField(max_length=64)  # the candidate's version_id if the job succeeds
+    state = models.CharField(max_length=10, choices=State.choices, db_index=True)
+    # 1 while running, NULL otherwise: the unique column allows one running job (as active_slot).
+    running_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    prefix = models.CharField(max_length=255)  # the bundle prefix, ai-models/<version_id>/<job_id>/
+    params = models.JSONField(default=dict)  # the /v2/train params: ids, digests, campaign profile
+    rows = models.PositiveIntegerField(default=0)
+    excluded_rows = models.PositiveIntegerField(default=0)  # trainable rows left out (not re-embedded)
+    parent = models.ForeignKey(ModelVersion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    version = models.ForeignKey(ModelVersion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    trigger = models.CharField(max_length=10, choices=ModelVersion.Trigger.choices)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    # A class name, or the server's own short `error` filtered by retrain.server_error; never an
+    # exception message from Django.
+    error = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(state="running", running_slot=1, running_slot__isnull=False)
+                | (~models.Q(state="running") & models.Q(running_slot__isnull=True)),
+                name="ai_model_running_slot_matches_state",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.job_id} ({self.state})"

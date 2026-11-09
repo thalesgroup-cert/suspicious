@@ -448,3 +448,14 @@ def test_sub_probabilities_zero_fill_a_missing_model_keeping_the_vector_width():
     assert (probs[2:4] == 0).all()
     assert probs[:2].sum() == pytest.approx(0.5, abs=1e-5)
     assert probs[4:].sum() == pytest.approx(0.2, abs=1e-5)
+
+
+def test_the_encoder_download_is_pinned_to_a_commit():
+    """encoder_hash covers every encoder file, so a moving `main` would make registered bundles
+    unloadable after a rebuild: the Dockerfile fetches one Hugging Face commit."""
+    import re
+    text = (Path(__file__).resolve().parent.parent / "inference_server" / "Dockerfile").read_text()
+    assert "resolve/main" not in text
+    pin = re.search(r"^ARG ENCODER_REVISION=([0-9a-f]{40})$", text, re.M)
+    assert pin, "ENCODER_REVISION must be a full commit sha"
+    assert "/resolve/${ENCODER_REVISION}" in text

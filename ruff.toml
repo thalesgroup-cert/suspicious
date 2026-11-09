@@ -22,3 +22,8 @@ ignore = [
     "E402",  # module-level import not at top — deliberate: CONFIG_PATH blocks
              # are intentionally placed after logger setup in several modules.
 ]
+
+[lint.per-file-ignores]
+# pytest fixtures are imported from a sibling test module and then requested as
+# arguments, which F811 reads as a redefinition.
+"Analyzers/**/tests/*.py" = ["F811"]

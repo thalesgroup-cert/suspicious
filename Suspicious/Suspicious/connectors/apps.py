@@ -29,5 +29,10 @@ class ConnectorsConfig(AppConfig):
             }
             for name, schedule in registry.scheduled()
         }
+        if "ai_model" in registry.names():  # whether it is enabled is checked in the task
+            entries["ai-model-retrain-check"] = {
+                "task": "ai_model.tasks.maybe_start_retrain",
+                "schedule": 86400.0,
+            }
         if entries:
             celery_app.conf.beat_schedule.update(entries)

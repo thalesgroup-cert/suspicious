@@ -293,12 +293,26 @@ services:
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       # Bearer token for the /v2 API (used by the ai_model connector). Empty = /v2 answers 503.
       AI_INFERENCE_TOKEN: "${AI_INFERENCE_TOKEN:-}"
+      # Hosts the presigned dataset and bundle URLs may point at (host:port, comma separated);
+      # empty refuses every URL. The object store as Django presigns it (get_store()).
+      AI_BUNDLE_HOSTS: "${AI_BUNDLE_HOSTS:-rustfs:9000}"
+      # Threads of the training worker only: the server passes it to the worker as its
+      # OMP/MKL/OPENBLAS thread counts. Classify keeps torch's default threads. A future CPU
+      # limit on this container needs its own server-thread variable, or classify oversubscribes.
+      AI_TRAIN_THREADS: "${AI_TRAIN_THREADS:-2}"
     volumes:
       # Weights are bind-mounted (not baked into the image) so the retrain
       # pipeline can promote new ones in place; the server hot-reloads them.
       - "${CUSTOM_ANALYZERS_PATH}/AIMailAnalyzer/models:/worker/AIMailAnalyzer/models:ro"
+    # Server (encoder resident, about 0.8 GB idle) + one training worker (torch, the group
+    # matrix of up to about 1.6 GB at 8000 rows, the gate's fits): estimated about 4.5 GB at
+    # peak, not measured (plan Ruling E22).
+    # An OOM kill fails the job ("worker exited with code -9"). One uvicorn worker only (the
+    # image's CMD): the job controller's state lives in that process.
+    mem_limit: ${AI_INFERENCE_MEM_LIMIT:-8g}
     networks:
       - suspicious_network
+      - storage   # RustFS, for the presigned training dataset and bundle files
 
   # ── feeder (Python — email-feeder/) ──────────────────────────────────────
 
@@ -397,7 +411,7 @@ networks:
   # the services below are reachable only from the networks they need.
   data:                # MariaDB, Redis, Chroma proxy: Django, Celery and beat only
     internal: true
-  storage:             # RustFS: Django, Celery and the feeder only
+  storage:             # RustFS: Django, Celery, the feeder and ai_inference only
   cortex:              # Cortex and Elasticsearch: Django and Celery only
   renderer:            # mail_renderer: Django and Celery only, no route out
     internal: true

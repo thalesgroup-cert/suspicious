@@ -15,6 +15,7 @@ INFERENCE_RELOAD_CHECK_SECONDS and hot-swapped when they change. POST /reload
 forces the same check immediately. A file that fails to load (half-copied,
 corrupt) never replaces a working model.
 """
+import collections
 import logging
 import os
 import threading
@@ -32,6 +33,8 @@ import mail_analysis
 from mail_analysis import MODEL_SPECS
 from ResNetMLP import ResNetMLP
 
+from .bundles import ModelHolder
+from .training_job import JobController
 from .v2 import make_v2_router
 
 logger = logging.getLogger("inference_server")
@@ -89,6 +92,9 @@ class ModelStore:
         self.model_dirs = model_dirs
         self.vectorizer: Optional[SentenceTransformer] = None
         self.vectorizer_error: Optional[str] = None
+        self.vectorizer_path: Optional[str] = None
+        self._encoder_hash: Optional[str] = None
+        self._hash_lock = threading.Lock()
         self.slots = {
             variant: {spec.filename: Slot(None, None, None) for spec in MODEL_SPECS}
             for variant in model_dirs
@@ -102,10 +108,23 @@ class ModelStore:
         try:
             self.vectorizer = SentenceTransformer(path, device=str(device))
             self.vectorizer_error = None
+            self.vectorizer_path, self._encoder_hash = path, None
         except Exception as exc:  # noqa: BLE001 - surfaced via /health, not swallowed
             self.vectorizer = None
             self.vectorizer_error = f"{type(exc).__name__}: {exc}"
             logger.error("could not load vectorizer from %s: %s", path, exc)
+
+    def encoder_hash(self) -> Optional[str]:
+        """encoder_digest of the loaded vectorizer's directory, computed at first use and cached
+        (a load resets it). None while no vectorizer is loaded. Lazy rather than at load, so a
+        start or a test client that never trains or reloads does not read ~1 GB of weights."""
+        if self.vectorizer is None or not self.vectorizer_path:
+            return None
+        with self._hash_lock:
+            if self._encoder_hash is None:
+                from . import training_job  # looked up here so tests can count the calls
+                self._encoder_hash = training_job.encoder_digest(self.vectorizer_path)
+            return self._encoder_hash
 
     def refresh(self, force: bool = False) -> dict:
         """(Re)load every model file that is new or changed on disk.
@@ -200,8 +219,49 @@ class ModelStore:
         }
 
 
+class FairSemaphore:
+    """A bounded semaphore served in arrival order. threading.Semaphore lets a thread that releases
+    and asks again take the slot back before a waiting thread wakes, so a request that loops over
+    texts (one slot per text, /v2/embed) could starve a classify. Here a new acquire queues behind
+    the waiters."""
+
+    def __init__(self, n: int):
+        self._cond = threading.Condition()
+        self._max = self.free = n
+        self._queue = collections.deque()
+
+    def acquire(self):
+        with self._cond:
+            me = object()
+            self._queue.append(me)
+            try:
+                while self._queue[0] is not me or not self.free:
+                    self._cond.wait()
+            except BaseException:  # interrupted while queued: leave the queue, wake the next one
+                self._queue.remove(me)
+                self._cond.notify_all()
+                raise
+            self._queue.popleft()
+            self.free -= 1
+            self._cond.notify_all()  # the next in line may find a slot too
+
+    def release(self):
+        with self._cond:
+            if self.free >= self._max:
+                raise ValueError("released too many times")
+            self.free += 1
+            self._cond.notify_all()
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+
+
 store = ModelStore(MODEL_DIRS)
-_inference_slots = threading.BoundedSemaphore(MAX_CONCURRENCY)
+_inference_slots = FairSemaphore(MAX_CONCURRENCY)
 
 
 @asynccontextmanager
@@ -289,7 +349,12 @@ def _classify(models: dict, mail_body: str) -> dict:
 
 # Token-protected /v2 API; needs _classify, so it is mounted here rather than
 # right after app = FastAPI(...).
+# The training job controller keeps one job and its state in this process: the server must run as
+# a single uvicorn worker (the Dockerfile CMD), or the one-job lock and the leftover sweep break.
+trainer = JobController(encoder_hash=store.encoder_hash)
+holder = ModelHolder()  # loaded bundles (POST /v2/reload); empty = the legacy weights in models/
 app.include_router(
-    make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS)
+    make_v2_router(store=store, classify=_classify, slots=_inference_slots, max_chars=MAX_MAIL_CHARS,
+                   trainer=trainer, holder=holder)
 )
 

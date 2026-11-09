@@ -34,6 +34,12 @@ class ClassifyTest(SimpleTestCase):
             headers={"Authorization": "Bearer s3cret"}, timeout=7,
         )
 
+    def test_sends_the_case_to_leave_out_of_the_neighbour_vote(self):
+        client = client_with(post=mock.Mock(return_value=reply(200, {"results": {}})))
+        client.classify("hello", exclude_case_ids=[42])
+        self.assertEqual(client.session.post.call_args.kwargs["json"],
+                         {"mail_body": "hello", "versions": ["active"], "exclude_case_ids": [42]})
+
     def test_connection_errors_and_timeouts_are_retryable(self):
         for error in (requests.ConnectionError("down"), requests.Timeout("slow")):
             with self.subTest(error=type(error).__name__):
@@ -162,6 +168,12 @@ class EmbedTest(SimpleTestCase):
             headers={"Authorization": "Bearer s3cret"}, timeout=7,
         )
 
+    def test_sends_the_preprocessing_when_given(self):
+        client = client_with(post=mock.Mock(return_value=reply(200, {"vectors": []})))
+        client.embed(["hi"], "classifier", preprocessing="chunkmean-tokens-v1")
+        self.assertEqual(client.session.post.call_args.kwargs["json"],
+                         {"texts": ["hi"], "profile": "classifier", "preprocessing": "chunkmean-tokens-v1"})
+
     def test_503_is_provider_unavailable(self):
         client = client_with(post=mock.Mock(return_value=reply(503, {"detail": "Vectorizer unavailable: still loading"})))
         with self.assertRaises(ProviderUnavailable) as caught:
@@ -174,3 +186,64 @@ class EmbedTest(SimpleTestCase):
             client.embed(["SECRET MAIL TEXT"], "classifier")
         self.assertIn("422", str(caught.exception))
         self.assertNotIn("SECRET", str(caught.exception))
+
+
+class TrainTest(SimpleTestCase):
+    H = {"Authorization": "Bearer s3cret"}
+
+    def test_train_posts_the_body_and_accepts_202_and_200(self):
+        for status in (202, 200):
+            with self.subTest(status=status):
+                client = client_with(post=mock.Mock(return_value=reply(status, {"state": "queued"})))
+                self.assertEqual(client.train({"job_id": "j"}), {"state": "queued"})
+                client.session.post.assert_called_once_with(
+                    f"{URL}/v2/train", json={"job_id": "j"}, headers=self.H, timeout=7)
+
+    def test_train_409_is_server_busy(self):
+        from connectors.contrib.ai_model.client import ServerBusy
+        client = client_with(post=mock.Mock(return_value=reply(409, {"detail": "x"})))
+        with self.assertRaises(ServerBusy):
+            client.train({})
+
+    def test_train_status_gets_the_job_and_404_is_a_distinct_error(self):
+        from connectors.contrib.ai_model.client import TrainJobGone
+        client = client_with(get=mock.Mock(return_value=reply(200, {"state": "running"})))
+        self.assertEqual(client.train_status("j-1"), {"state": "running"})
+        client.session.get.assert_called_once_with(f"{URL}/v2/train/j-1", headers=self.H, timeout=7)
+        client = client_with(get=mock.Mock(return_value=reply(404, {"detail": "unknown"})))
+        with self.assertRaises(TrainJobGone):
+            client.train_status("j-1")
+
+    def test_train_status_408_and_429_mean_try_later(self):
+        from connectors.contrib.ai_model.client import TryLater
+        for status in (408, 429):
+            client = client_with(get=mock.Mock(return_value=reply(status, {"detail": "slow"})))
+            with self.subTest(status=status), self.assertRaises(TryLater):
+                client.train_status("j-1")
+
+    def test_train_status_errors_are_status_only(self):
+        client = client_with(get=mock.Mock(return_value=reply(500, text="X-Amz-Signature=abc")))
+        with self.assertRaises(ProviderUnavailable) as caught:
+            client.train_status("j-1")
+        self.assertNotIn("Amz", str(caught.exception))
+        client = client_with(get=mock.Mock(side_effect=requests.ConnectionError("http://rustfs?sig")))
+        with self.assertRaises(ProviderUnavailable) as caught:
+            client.train_status("j-1")
+        self.assertNotIn("rustfs", str(caught.exception))
+
+    def test_cancel_and_reload(self):
+        from connectors.contrib.ai_model.client import ServerBusy
+        client = client_with(post=mock.Mock(return_value=reply(202, {"state": "cancelled"})))
+        self.assertEqual(client.train_cancel("j-1"), {"state": "cancelled"})
+        client.session.post.assert_called_once_with(
+            f"{URL}/v2/train/j-1/cancel", json={}, headers=self.H, timeout=7)
+        client = client_with(post=mock.Mock(return_value=reply(200, {"active": {}})))
+        self.assertEqual(client.reload({"active": None, "shadow": None}), {"active": {}})
+        self.assertEqual(client.session.post.call_args.args[0], f"{URL}/v2/reload")
+        client = client_with(post=mock.Mock(return_value=reply(409, {})))
+        with self.assertRaises(ServerBusy):
+            client.reload({"active": None, "shadow": None})
+        client = client_with(post=mock.Mock(return_value=reply(422, text="https://rustfs/x?X-Amz-Signature=s")))
+        with self.assertRaises(ValueError) as caught:
+            client.reload({"active": None, "shadow": None})
+        self.assertNotIn("rustfs", str(caught.exception))

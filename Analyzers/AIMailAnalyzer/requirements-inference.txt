@@ -5,3 +5,10 @@
 
 fastapi>=0.115
 uvicorn[standard]>=0.32
+# The retrain recipe (training/) runs in this image: class weights, groups, temperature fit.
+scikit-learn>=1.9.1
+scipy>=1.10.0
+# The training job (/v2/train): presigned URL download and upload, and the gate's legacy_recipe
+# baseline (version 0: SMOTE + random oversampling), imported only inside that function.
+httpx>=0.28
+imbalanced-learn>=0.14

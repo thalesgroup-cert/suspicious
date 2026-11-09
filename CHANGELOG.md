@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `python manage.py ai_model_retrain [--wait [--timeout S]] [--status] [--cancel]` exports the
+  label ledger, starts a training job on the `ai_inference` server (`POST /v2/train`) and polls it
+  every 30 s for up to 6 hours. A finished job is registered as a `candidate` model version with
+  its gate report (`eligible: false` when a gate check failed); the active model is never changed.
+  A failed or cancelled job registers nothing and its uploaded files are deleted. New connector
+  fields `retrain_enabled` (default false) and `retrain_interval_days` (default 30): a daily check
+  starts a retrain when enabled and the newest version is older than the interval; a failed or
+  refused scheduled retrain pauses it for 7 days. `--status` shows a failed job's reason as the
+  inference server gave it (filtered). Compose:
+  `ai_inference` joins the storage network and gets `AI_BUNDLE_HOSTS`, `AI_TRAIN_THREADS` and a
+  memory limit (`AI_INFERENCE_MEM_LIMIT`, 8g); see `deployment/.env.example`.
+- A model registry: `ai_model.models.ModelVersion` (statuses `candidate`, `shadow`, `active`,
+  `previous`, `discarded`, `failed`; one `active`, one `previous`) and `ModelEvent`, read-only in
+  the admin. Version 0 is a row without a bundle that runs the legacy weights. Retrained versions
+  are stored as verified bundles in the `ai-models` bucket; their manifest SHA-256 is pinned in the
+  registry.
+- The inference server's `POST /v2/reload` loads a bundle (`active: null` goes back to the legacy
+  weights) and refuses one with a hash mismatch, an unknown preprocessing version or another
+  encoder. Classify with a retrained version returns calibrated probabilities and a `tier` (High,
+  Medium, Low) from the bundle's cutoffs; version 0 keeps its answer and has no tier. Calibrated
+  confidences are lower: on the 505-mail dataset the median `confidence_ai` goes from 100 to 87 and
+  Inconclusive from 0.1% to 4.6% (`tools/confidence_shift.py`). The "before" figures come from
+  retraining version 0's recipe and scoring held-out folds, not from the shipped version 0 weights,
+  which have seen these mails, so live version 0 confidences differ. See "Retraining" in
+  `docs/components/analyzers.md`.
+- `POST /v2/embed` takes an optional `preprocessing` (`legacy-first128` by default,
+  `chunkmean-tokens-v1`, `chunkmean-words90-v1`); the `campaign` profile always uses the first 128
+  tokens. The label sync now embeds folder rows in `chunkmean-tokens-v1`, the form retraining uses
+  (up to 8 encoder passes per mail instead of 1). `python manage.py ai_model_reembed_ledger
+  [--limit N] [--dry-run]` re-reads the mails of older rows over IMAP and re-embeds them; the
+  training export leaves out rows still in another form and counts them (`left out N`).
 - A label ledger for the `ai_model` connector (`ai_model.models.LabelRecord`, append-only). A sync
   about every 24 hours (schedule 86400 s, counted from when Celery beat started) reads the analysts'
   review folders over IMAP, read-only (`BODY.PEEK[]`), matches each forwarded mail to a case by
