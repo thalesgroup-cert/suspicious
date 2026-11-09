@@ -86,6 +86,7 @@ describe("DashboardPage - Test Suite", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -219,6 +220,8 @@ describe("DashboardPage - Test Suite", () => {
     });
 
     it("operates the scope, month and year pickers with the keyboard alone", async () => {
+      // The month under test is relative to today, so pin the date (October, as the fixtures are).
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 9, 15) });
       const user = userEvent.setup();
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
       const scopeBox = await screen.findByRole("combobox", { name: "Scope" }, { timeout: 5000 });
