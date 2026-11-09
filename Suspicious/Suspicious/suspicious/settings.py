@@ -717,6 +717,12 @@ LOGGING = {
             "propagate": False,
         },
 
+        "common.storage": {
+            "handlers":  ["suspicious_file", "console"],
+            "level":     _trace_level,
+            "propagate": False,
+        },
+
         "tasp.cron.fetch_and_process_emails": {
             "handlers":  ["fetch_mail"],
             "level":     _trace_level,

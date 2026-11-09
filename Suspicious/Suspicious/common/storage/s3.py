@@ -13,6 +13,7 @@ from botocore.exceptions import (
 
 from . import base
 from .base import HealthStatus, ObjectInfo, ObjectStore, ObjectStream, StoreError
+from .util import content_disposition
 
 _DEFAULT_REGION = "us-east-1"
 _DELETE_BATCH = 1000
@@ -239,7 +240,7 @@ class S3Store(ObjectStore):
     def presign_get(self, bucket, key, expires: timedelta, *, filename=None):
         params = {"Bucket": bucket, "Key": key}
         if filename:
-            params["ResponseContentDisposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+            params["ResponseContentDisposition"] = content_disposition(filename)
         return self._presign("get_object", params, expires)
 
     def presign_put(self, bucket, key, expires: timedelta, *, content_type=None):

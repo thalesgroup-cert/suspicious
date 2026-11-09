@@ -39,6 +39,7 @@ django-import-export==4.4.1
 requests==2.34.2
 PyJWT==2.15.1
 boto3==1.43.111
+google-cloud-storage==3.17.0
 tenacity==9.1.4
 pybreaker==1.4.1
 

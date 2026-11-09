@@ -33,6 +33,7 @@ SECRET_FIELDS: dict[str, tuple[str, ...]] = {
     "integrations.misp.instances.secondary": ("api_key",),
     "integrations.watcher": ("api_key",),
     "storage.s3": ("secret_key",),
+    "storage.gcs": ("service_account_json",),
     "authentication.ldap": ("bind_password",),
     "authentication.oidc": ("client_secret",),
     "email.smtp": ("password",),
@@ -47,7 +48,7 @@ SCOPE_SECTIONS: dict[str, list[str]] = {
         "integrations.cortex", "integrations.thehive", "integrations.misp",
         "integrations.misp.instances.primary",
         "integrations.misp.instances.secondary", "integrations.watcher",
-        "integrations.chromadb", "authentication.ldap",
+        "integrations.chromadb", "authentication.ldap", "storage.gcs",
     ],
     "feeder": [],
 }
