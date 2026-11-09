@@ -37,7 +37,7 @@ bash "${SCRIPTS}/check-mounts.sh"
 bash "${SCRIPTS}/check-network.sh"
 bash "${SCRIPTS}/check-traefik-provider.sh"
 for svc in redis_broker redis_cache elasticsearch chromadb_proxy; do
-  [ -n "$($COMPOSE ps -q --status running "$svc" 2>/dev/null)" ] || { echo "Data service $svc is not running: start it (make up) first."; exit 1; }
+  [ -n "$($COMPOSE ps -q --status running "$svc" 2>/dev/null)" ] || { echo "Data service $svc is not running: start it (make up) first. Upgrading from 1.6.x? Run make db-auth-migrate once instead."; exit 1; }
 done
 bash "${SCRIPTS}/db-auth-check.sh" || {
   echo "Data services do not enforce authentication yet (or the check could not reach them): run 'make db-auth-migrate' once, then re-run 'make deploy'."
