@@ -45,6 +45,10 @@ class RegistryError(Exception):
     pass
 
 
+class StateChanged(RegistryError):
+    """The version is no longer in the state the caller saw (a stale screen)."""
+
+
 def _check_id(value, what):
     if not isinstance(value, str) or not _ID.fullmatch(value):
         raise RegistryError(f"{what} must match [A-Za-z0-9_-]{{1,64}}")
@@ -214,9 +218,10 @@ def revert_promote(target, old_active, old_previous, user=None, note=""):
     return _retry(run)
 
 
-def rollback_to_previous(user, note=""):
+def rollback_to_previous(user, note="", expected_id=None):
     """The previous version becomes active again, picked under the row locks. Returns
-    (target, old_active), or None when there is no previous."""
+    (target, old_active), or None when there is no previous. With expected_id, a previous with
+    another id raises StateChanged."""
     S = ModelVersion.Status
     picked = []
 
@@ -227,6 +232,8 @@ def rollback_to_previous(user, note=""):
             target = next((r for r in rows if r.status == S.PREVIOUS), None)
             if target is None:
                 return
+            if expected_id is not None and target.version_id != expected_id:
+                raise StateChanged("the previous version changed")
             old_active = next((r for r in rows if r.status == S.ACTIVE), None)
             set_active(target, user, note)  # refreshes target, so old_active is read first
             _event(target, "rollback", user, note)
@@ -271,10 +278,13 @@ def extend_shadow(version, days, user=None, note=""):
     return version
 
 
-def discard(version, user=None, note=""):
+def discard(version, user=None, note="", expected_status=None):
+    """With expected_status, a version in another status raises StateChanged."""
     S = ModelVersion.Status
     with transaction.atomic():
         locked = _lock(version)
+        if expected_status is not None and locked.status != expected_status:
+            raise StateChanged(f"the version is {locked.status} now")
         if locked.status in (S.ACTIVE, S.DISCARDED, S.FAILED):
             raise RegistryError(f"cannot discard a {locked.status} version")
         locked.status, locked.shadow_slot = S.DISCARDED, None
@@ -335,6 +345,29 @@ def unshadow(version, user=None):
 def recheck_started(version, user, job_id):
     """Ruling F11: a gate recheck of this version was posted (retrain.start_recheck)."""
     _event(version, "start_recheck", user, job_id)
+
+
+def retrain_requested(version, user, note):
+    """A manual retrain was started (api retrain view); version is the job's parent."""
+    _event(version, "retrain_requested", user, note)
+
+
+def _unversioned_event(action, user, note):
+    """An event that belongs to no version goes on the active one (else the newest, else version 0)."""
+    versions = ModelVersion.objects
+    version = (versions.filter(status=ModelVersion.Status.ACTIVE).first()
+               or versions.order_by("-pk").first() or ensure_version_zero(user))
+    _event(version, action, user, note)
+
+
+def flag_resolved(user, note):
+    """A flagged label was resolved (api flag view)."""
+    _unversioned_event("flag_resolved", user, note)
+
+
+def record_breaker_reset(user, note):
+    """An admin reset the ai_model circuit breaker (api breaker view)."""
+    _unversioned_event("breaker_reset", user, note)
 
 
 def review_recorded(version, user, note):

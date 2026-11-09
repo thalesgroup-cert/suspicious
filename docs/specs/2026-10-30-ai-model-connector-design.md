@@ -501,14 +501,19 @@ evidence" flag when they conflict. No numeric confidence is shown. Cases analyse
 was on keep their stored section, read-only and labelled with the version; with the module off they
 are hidden too (**Call**).
 
-**Settings "AI model" card.** Admin-only and hidden when disabled. It shows: server health and
-breaker state with a reset; the active version, age, label counts by class and source; the
+**Settings "AI model" card.** Admin-only and hidden when disabled. The Settings page itself admits
+Admin and CERT; the card is listed only for the `Admin` group while the connector is enabled
+(amended by Plan G). It shows: server health and
+breaker state with a reset (the state is published by each process to the shared cache, keys
+`breaker:<name>` and `breaker-epoch:<name>`, because `pybreaker` state is per process; amended by
+Plan G); the active version, age, label counts by class and source; the
 schedule and the Retrain button; the latest candidate and its gate results, including the
 campaign-held-out result; the shadow comparison, the review list and the campaign dry-run table with
 the alert delta; the version history with rollback and, per version, the campaign counters and
 purity; the label ledger summary and the list of flagged labels. A queue lists mails where the AI and
 the other evidence disagree, and cases whose campaign members disagree, as candidates for review and
-labelling.
+labelling. The disagreement list covers finalised mail cases of the last 30 days; the campaign conflict
+list has no time window; each list holds at most 200 rows (amended by Plan G).
 
 **Connector gallery.** The standard card (enabled, configuration, health, last sync). It shows a
 read-only line pointing to the AI model card (**Call**).

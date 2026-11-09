@@ -13,6 +13,7 @@ vi.mock("@/api/auth", () => ({
   hydrateColorsAfterSso: vi.fn(),
   hydrateAppearanceFromMe: vi.fn(),
 }));
+vi.mock("@/features/aiModel/api", () => ({}));
 vi.mock("@/features/settings/api", () => ({
   listItems: vi.fn(),
   addItems: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock("@/features/settings/components/connectors", () => ({
   getConnectorConfig: vi.fn().mockResolvedValue({ url: "https://misp.example", api_key: "", verify_tls: true, timeout: 30, model: "m" }),
   putConnectorConfig: vi.fn(),
   testConnector: vi.fn(),
+  getEnabledConnectors: vi.fn().mockResolvedValue([]),
   listDeliveries: vi.fn().mockResolvedValue([
     { id: 1, event: "case_finalised", case_id: 7, status: "success", error: "", duration_ms: 120, attempt: 1, created_at: "2026-10-19T08:00:00Z" },
     { id: 2, event: "case_finalised", case_id: 8, status: "failed", error: "boom", duration_ms: 90, attempt: 2, created_at: "2026-10-19T08:05:00Z" },

@@ -8,10 +8,12 @@ import {
   HubOutlined,
   InsertDriveFileOutlined,
   MailOutlined,
+  PsychologyOutlined,
   TuneOutlined,
 } from "@mui/icons-material";
 
 import type { EditableListSection, SettingsSection } from "@/features/settings/api";
+import { AiModelPanel } from "@/features/aiModel/components/AiModelPanel";
 import { ConnectorsPanel } from "@/features/settings/components/ConnectorsPanel";
 import { CisoUsersPanel } from "@/features/settings/components/CisoUsersPanel";
 import { DomainPairPanel } from "@/features/settings/components/ReadOnlyListPanel";
@@ -19,10 +21,10 @@ import { EditableListPanel } from "@/features/settings/components/EditableListPa
 import { FeederPanel } from "@/features/settings/components/FeederPanel";
 import { ScoringTable } from "@/features/settings/components/ScoringTable";
 
-export type SectionKind = "list" | "toggle" | "scoring" | "ciso_users" | "domain_pair" | "connectors";
+export type SectionKind = "list" | "toggle" | "scoring" | "ciso_users" | "domain_pair" | "connectors" | "ai_model";
 
 /** Sidebar keys: backend settings sections plus UI-only panels. */
-export type SectionKey = SettingsSection | "connectors";
+export type SectionKey = SettingsSection | "connectors" | "ai_model";
 
 export type SectionGroupKey = "lists" | "access" | "ingestion" | "scoring" | "integrations";
 
@@ -34,7 +36,17 @@ export type SectionMeta = {
   icon: React.ReactNode;
   kind: SectionKind;
   badge?: number;
+  /** Listed only for users in this group. */
+  requiresGroup?: string;
+  /** Listed only while this connector is enabled. */
+  requiresConnector?: string;
 };
+
+/** Ruling G1 and G2: the AI model card is Admin-only and follows the connector's toggle. */
+export function isSectionVisible(s: SectionMeta, groups: readonly string[], enabledConnectors: readonly string[]) {
+  return (!s.requiresGroup || groups.includes(s.requiresGroup)) &&
+    (!s.requiresConnector || enabledConnectors.includes(s.requiresConnector));
+}
 
 /**
  * One sentence per list on what it does, taken from the backend: allow_list.py and case_handler.py
@@ -77,6 +89,8 @@ export function SectionContent({ section }: { section: SectionMeta }) {
       return <CisoUsersPanel />;
     case "connectors":
       return <ConnectorsPanel />;
+    case "ai_model":
+      return <AiModelPanel />;
     default:
       return null;
   }
@@ -154,6 +168,16 @@ export const SECTIONS: SectionMeta[] = [
     subtitle: "Enable integrations and tune their config.",
     icon: <HubOutlined />,
     kind: "connectors",
+  },
+  {
+    key: "ai_model",
+    group: "integrations",
+    title: "AI model",
+    subtitle: "Retrain, shadow, promote and roll back the mail classifier.",
+    icon: <PsychologyOutlined />,
+    kind: "ai_model",
+    requiresGroup: "Admin",
+    requiresConnector: "ai_model",
   },
 ];
 

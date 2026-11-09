@@ -1,5 +1,10 @@
 """AI model card endpoints (Plan F, Task 10). Thin: the services decide, the views map their
 refusals to fixed messages (never exception text)."""
+import logging
+
+from django.db import transaction
+from django.db.models import Count
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import LimitOffsetPagination
@@ -7,13 +12,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ai_model import promotion, registry, retrain, stats
-from ai_model.models import ModelVersion, ShadowCampaignEffect, ShadowResult, ShadowReview
+from ai_model import promotion, queue, registry, retrain, schedule, stats
+from ai_model.ledger import label_mix, ledger_summary, resolve_flag
+from ai_model.models import LabelRecord, ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
 from ai_model.serversync import ReloadRefused
+from common.http_client import breaker_state, request_reset
 from api.permissions.ai_model import IsAdmin, IsAdminOrCISO
-from api.serializers.ai_model import (ActionSerializer, ExtendSerializer, ReviewSerializer,
-                                      version_summary)
+from api.serializers.ai_model import (ActionSerializer, DiscardSerializer, ExtendSerializer, ResolveSerializer,
+                                      ReviewSerializer, candidate_row, flag_row, job_row, version_summary)
+from connectors.delivery import get_state
 
+logger = logging.getLogger(__name__)
 S = ModelVersion.Status
 MAX_LIMIT = 100
 
@@ -83,8 +92,27 @@ class StatusView(Read):
             return version_summary(version) if version else None
 
         job = retrain.running_job()
-        return Response({"active": pick(S.ACTIVE), "previous": pick(S.PREVIOUS), "shadow": pick(S.SHADOW),
-                         "job_running": job is not None, "job_id": job.job_id if job else None})
+        state = get_state("ai_model")
+        cfg, now = schedule.config(), timezone.now()
+        backoff = schedule.backoff_until(now)
+        detail = state.last_health_detail or ""  # CISO reads it too: no URL, host or exception text with one
+        counts = {s: 0 for s in S.values}
+        counts.update(ModelVersion.objects.order_by().values("status").annotate(n=Count("id"))
+                      .values_list("status", "n"))
+        return Response({
+            "active": pick(S.ACTIVE), "previous": pick(S.PREVIOUS), "shadow": pick(S.SHADOW),
+            "job_running": job is not None, "job_id": job.job_id if job else None,
+            "health": {"ok": state.last_health_ok, "detail": None if "http" in detail.lower() else detail[:200],
+                       "checked_at": state.last_health_at},
+            "breaker": breaker_state("ai_model"),
+            "schedule": {"enabled": cfg.get("retrain_enabled") is True,
+                         "interval_days": retrain.interval_days(cfg),
+                         "next_run": schedule.next_run(now, cfg=cfg, running=job, backoff=backoff),
+                         "backoff_until": backoff},
+            "counts": counts,
+            "jobs": [job_row(j) for j in RetrainJob.objects.order_by("-started_at", "-pk")[:5]],
+            "ledger": ledger_summary(),
+        })
 
 
 class VersionsView(ListAPIView, Read):
@@ -99,6 +127,16 @@ class VersionsView(ListAPIView, Read):
         return self.get_paginated_response([
             {**version_summary(v), "stats": totals[v.version_id], "purity": purity[v.version_id],
              "age_warning": stats.age_warning(v)} for v in page])
+
+
+class CandidatesView(ListAPIView, Read):
+    pagination_class = Page
+
+    def get_queryset(self):
+        return ModelVersion.objects.filter(status__in=[S.CANDIDATE, S.SHADOW]).order_by("-created_at", "-pk")
+
+    def list(self, request, *args, **kwargs):
+        return self.get_paginated_response([candidate_row(v) for v in self.paginate_queryset(self.get_queryset())])
 
 
 class ShadowView(Read):
@@ -189,12 +227,15 @@ class RollbackView(Write):
     needs_target = False
 
     def act(self, request, version, data):
-        return _done(promotion.rollback(request.user, data["note"]))
+        # version_id, when sent, is the rollback target the client saw (a stale screen is refused)
+        return _done(promotion.rollback(request.user, data["note"], data.get("version_id")))
 
 
 class DiscardView(Write):
+    serializer_class = DiscardSerializer
+
     def act(self, request, version, data):
-        return _done(promotion.discard(version, request.user, data["note"]))
+        return _done(promotion.discard(version, request.user, data["note"], data.get("expected_status")))
 
 
 class ExtendView(Write):
@@ -208,3 +249,91 @@ class RecheckView(Write):
     def act(self, request, version, data):
         job = retrain.start_recheck(version, request.user)
         return Response({"job_id": job.job_id}, status=status.HTTP_202_ACCEPTED)
+
+
+class RetrainView(Write):
+    needs_target = False
+
+    def act(self, request, version, data):
+        job = retrain.start_retrain(request.user, trigger=ModelVersion.Trigger.MANUAL)
+        registry.retrain_requested(job.parent, request.user, data["note"])
+        return Response({"job_id": job.job_id}, status=status.HTTP_202_ACCEPTED)
+
+
+class JobsView(ListAPIView, Read):
+    pagination_class = Page
+
+    def get_queryset(self):
+        return RetrainJob.objects.order_by("-started_at", "-pk")
+
+    def list(self, request, *args, **kwargs):
+        return self.get_paginated_response([job_row(j) for j in self.paginate_queryset(self.get_queryset())])
+
+
+class LedgerView(Read):
+    def get(self, request):
+        return Response({**ledger_summary(), "mix": label_mix()})
+
+
+class FlagsView(ListAPIView, Read):
+    pagination_class = Page
+
+    def get_queryset(self):
+        return LabelRecord.objects.filter(status=LabelRecord.Status.FLAGGED).order_by("-observed_at", "-pk")
+
+    def list(self, request, *args, **kwargs):
+        return self.get_paginated_response([flag_row(r) for r in self.paginate_queryset(self.get_queryset())])
+
+
+class ResolveFlagView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        ser = ResolveSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        keep, note = ser.validated_data["keep"], ser.validated_data["note"]
+        record = LabelRecord.objects.filter(pk=pk).first()
+        if record is None:
+            return Response({"detail": "Unknown label."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            with transaction.atomic():  # a failed event write must not close the label unaudited
+                resolve_flag(record, request.user, note, keep=keep)
+                registry.flag_resolved(request.user, f"label {record.pk}: keep={str(keep).lower()}: {note}"[:2000])
+        except ValueError:
+            return _refused("The label is not flagged.")
+        return Response(flag_row(record))
+
+
+class QueueView(Read):
+    def get(self, request):
+        return Response({
+            "disagreements": _paged(queue.disagreements(), request, "disagreements", lambda r: r),
+            "campaign_conflicts": _paged(queue.campaign_conflicts(), request, "conflicts", lambda r: r),
+        })
+
+
+class _CacheDown(Exception):
+    pass
+
+
+class BreakerResetView(APIView):
+    """Move the ai_model breaker's reset epoch; each worker closes its own breaker before its next
+    call. A server that is really down re-opens it after five failures."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        ser = ActionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():  # no epoch move without its event, no event without the move
+                registry.record_breaker_reset(request.user, ser.validated_data["note"])
+                try:
+                    epoch = request_reset("ai_model")
+                except Exception as exc:  # noqa: BLE001 (any cache error; never echo it)
+                    raise _CacheDown from exc
+        except _CacheDown as down:
+            logger.warning("breaker reset refused: %s", type(down.__cause__).__name__)
+            return Response({"detail": "The shared cache is unavailable; the breaker was not reset."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"epoch": epoch}, status=status.HTTP_202_ACCEPTED)

@@ -369,8 +369,9 @@ folder label against a Dangerous one; Unwanted, Suspicious and Inconclusive neve
 proposal never flags. Whichever arrives first, the folder row gets status `flagged`
 (`flag_reason = folder_verdict_mismatch`) and is not trainable until the flag is resolved.
 `ai_model.ledger.resolve_flag(record, user, note, keep=...)` resolves it (keep makes the row active
-again, otherwise it is superseded); it has no API or screen yet, that comes with the Settings card
-(Plan G). `ai_model.ledger.ledger_summary()` gives the counts per source and class, the flagged count
+again, otherwise it is superseded); the Settings card lists flagged labels and resolves them
+(`POST /api/ai-model/flags/<id>/resolve/`, see [The Settings card](#the-settings-card)).
+`ai_model.ledger.ledger_summary()` gives the counts per source and class, the flagged count
 and the trainable count, over the rows not superseded.
 
 **Backfill: `ai_model_backfill_labels`.**
@@ -744,6 +745,62 @@ deliveries, attributed through the case's assessment version. Counters lag by up
   purity under 80%.
 - **Age warning:** the version was registered (`ModelVersion.created_at`) more than 60 days ago.
 
+### The Settings card
+
+Settings, section "AI model" (`/settings/ai_model`). The Settings page admits Admin and CERT; this
+section is listed only for a user in the `Admin` group and only while the `ai_model` connector is
+enabled. For anyone else the section is absent and its URL redirects to the first section. The
+connector gallery tile for `ai_model` carries a line pointing here, with a link for an Admin.
+
+Five tabs:
+
+- **Overview:** connector health, the circuit breaker state with a reset (only while open or
+  half-open), the active version and its age (a warning past 60 days), labels by source and class,
+  the schedule, and "Retrain now".
+- **Candidate:** the newest candidate, its gate checks with value and threshold (failed checks
+  first), the campaign held-out result and the tier cutoffs. "Start shadow" is unavailable when the
+  candidate is not eligible or a shadow exists. Discard.
+- **Shadow:** age and live results against the promotion minimums, agreement, verdict changes with
+  review, campaign effects and the alert delta, the promotion conditions (met and unmet, in words),
+  Promote, Extend, Recheck, Discard.
+- **Versions:** history with counters and purity, and Rollback on the `previous` version.
+- **Ledger:** label mix with its jump warning, flagged labels with resolve, and the review queue.
+
+Retrain, promote, rollback, discard, resolve and the breaker reset each ask for confirmation. A
+`409` is shown in words from its `codes`; the card shows only what the server confirmed. Every
+version action sends the `version_id` it shows (and discard its expected status), so an action
+from a stale screen is refused instead of acting on whatever the server holds now.
+
+**Schedule rule.** `schedule.next_run` is not stored. It is the newest version's `created_at` plus
+`retrain_interval_days` (default 30), or now when there is no version. The newest version counts candidate, shadow, active and previous
+versions only; discarded and failed ones are ignored. It is `null` when the
+connector is disabled, `retrain_enabled` is not true, or a job runs. After a failed scheduled job
+(including a refused one) started within the last 7 days, the date is pushed to the end of that
+7-day backoff, reported as `backoff_until`. The beat check runs once a day, so the card says
+"about".
+
+**Breaker publication.** `pybreaker` state lives in each process. Each process writes
+`{state, since}` to the shared Django cache key `breaker:<name>` (`breaker:ai_model`) on every state
+change, last writer wins, with no expiry; `status` reports that value, or `unknown` when the key is
+absent or the cache fails. A reset (`POST /api/ai-model/breaker/reset/`) increments the integer at
+`breaker-epoch:<name>`. Before a call, a process compares the epoch with the one it last applied
+and closes its own breaker when it moved, so each process closes its breaker before its next call
+(it reads the epoch at most once per 5 seconds per breaker). The published state changes only when a
+process makes a call: with no traffic, the card can keep showing `open` after a reset. A cache outage never breaks a call (the check fails open).
+A reset does not hide a server that is down: the breaker opens again after five failures
+(`BREAKER_FAIL_MAX`). Each reset adds a `ModelEvent`.
+
+**Label mix warning.** `GET /api/ai-model/ledger/` compares the Dangerous, Safe and Unwanted shares
+of the active `imap_folder` rows now with the shares among the active `imap_folder` rows observed
+more than 30 days ago. `jump` is `{class, from, to}` for the class that moved most, when it moved
+by more than 15 percentage points and each window holds at least 50 rows; otherwise it is `null`.
+
+**Review queue.** `disagreements`: mail cases finalised in the last 30 days whose latest AI class
+is on the other side of the Safe/Dangerous axis from the case verdict and where the AI did not set
+the band (the cross-check rule of the case view). `campaign_conflicts`: campaigns whose active
+folder-labelled members include both Dangerous and Safe. Each list holds at most 200 rows before
+paging and carries ids, classes and dates only, never mail text, subject or sender.
+
 ### Endpoints
 
 Reads need the `Admin` or `CISO` group, writes the `Admin` group. A superuser without the `Admin`
@@ -751,7 +808,7 @@ group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<
 
 | Route | Role | What it does |
 |---|---|---|
-| `GET /api/ai-model/status/` | Admin, CISO | active, previous and shadow summaries, and whether a job is running |
+| `GET /api/ai-model/status/` | Admin, CISO | active, previous and shadow summaries, whether a job is running, and the card header: `health` (`{ok, detail, checked_at}`, `detail` capped at 200 characters and `null` when it contains `http`), `breaker`, `schedule`, `counts` (versions by status), `jobs` (the last five) and `ledger` |
 | `GET /api/ai-model/versions/` | Admin, CISO | versions with counters, purity and the age warning (`limit`, `offset`) |
 | `GET /api/ai-model/shadow/` | Admin, CISO | the shadow with agreement, flips (`flips_`), dry-run effects (`effects_`), the alert delta (`candidate_only_`, `active_only_`) and the unmet `conditions` |
 | `GET /api/ai-model/reviews/` | Admin, CISO | the review log, optional `?version_id=` |
@@ -760,8 +817,16 @@ group is refused. Lists take `?<prefix>_limit` (default 50, at most 100) and `?<
 | `POST /api/ai-model/recheck/` | Admin | start a gate recheck of the shadow; `202 {job_id}` |
 | `POST /api/ai-model/extend/` | Admin | `{days}`: a new total for `shadow_min_days`, above the current one, at most 365 |
 | `POST /api/ai-model/promote/` | Admin | promote the shadow (or `version_id`); `409` with `codes` when refused |
-| `POST /api/ai-model/rollback/` | Admin | the `previous` version becomes active; `409 no_previous` without one |
-| `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version, free the shadow slot and sync the server (best effort) |
+| `POST /api/ai-model/rollback/` | Admin | the `previous` version becomes active; `409 no_previous` without one. With `version_id` (the target the screen shows), `409 state_changed` and no change when the `previous` is another version |
+| `POST /api/ai-model/discard/` | Admin | set aside a candidate, shadow or previous version, free the shadow slot and sync the server (best effort). With `expected_status`, `409 state_changed` and no change when the version is no longer in that status |
+| `GET /api/ai-model/candidates/` | Admin, CISO | candidates and the shadow, newest first (`limit`, `offset`): `{version_id, status, created_at, trigger, rows, excluded_rows, eligible, gate}`. `gate` is a whitelisted copy of the manifest (`checks`, `candidate`, `baseline`, `campaign`, `tier_cutoffs`; numbers, booleans and strings up to 300 characters, nested at most 4 levels, lists cut at 50 items; any string or key containing `http` is dropped); the manifest, bundle prefix and URLs never leave the registry |
+| `GET /api/ai-model/jobs/` | Admin, CISO | the retrain job history, newest first (`limit`, `offset`): `{job_id, kind, state, trigger, rows, excluded_rows, started_at, finished_at, error}`, `kind` is `recheck` for a gate recheck of the shadow (no candidate) and `retrain` otherwise, `error` capped at 200 characters |
+| `GET /api/ai-model/ledger/` | Admin, CISO | `ledger_summary()` (`by_source`, `flagged`, `trainable`) plus `mix`, the label mix and its jump warning (see below) |
+| `GET /api/ai-model/flags/` | Admin, CISO | flagged labels, newest first (`limit`, `offset`): `{id, case_id, label_class, source, flag_reason, observed_at}`; no message id, subject or sender |
+| `GET /api/ai-model/queue/` | Admin, CISO | `disagreements` and `campaign_conflicts`, each `{count, results}` (rows: `{case_id, verdict, ai_class, date}` and `{campaign_ref, classes, date}`), paged with `disagreements_limit`/`disagreements_offset` and `conflicts_limit`/`conflicts_offset` |
+| `POST /api/ai-model/retrain/` | Admin | `{note}`: start a manual retrain; `202 {job_id}`; `409` with a fixed message when a job runs or the retrain is refused |
+| `POST /api/ai-model/flags/<id>/resolve/` | Admin | `{keep, note}` (note required, at most 2000 characters): `keep: true` makes the label active again, `false` supersedes it; `404` for an unknown label, `409` when it is not flagged; answers the label row |
+| `POST /api/ai-model/breaker/reset/` | Admin | `{note}`: move the breaker's reset epoch; `202 {epoch}`; `503` when the shared cache is unavailable |
 
 Every write adds a `ModelEvent` with the user. Its note is the request's note for shadow start,
 promote, rollback and discard; `<days> days` plus the note for extend; `<kind> <case_id>` for a

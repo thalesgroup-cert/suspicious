@@ -7,7 +7,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass
-from datetime import timezone
+from datetime import timedelta, timezone
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -292,3 +292,29 @@ def ledger_summary() -> dict:
         "flagged": rows.filter(status=FLAGGED).count(),
         "trainable": rows.filter(trust=LabelRecord.Trust.FOLDER, status=ACTIVE).count(),
     }
+
+
+MIX_CLASSES = ("Dangerous", "Safe", "Unwanted")
+MIX_WINDOW_DAYS, MIX_MIN_ROWS, MIX_JUMP = 30, 50, 0.15  # ruling G8
+
+
+def label_mix(now=None) -> dict:
+    """Share of each class among the active folder rows now and among those observed more than
+    MIX_WINDOW_DAYS ago. `jump` names the class whose share moved most, when that is more than MIX_JUMP, when
+    both windows hold at least MIX_MIN_ROWS rows; else None."""
+    cutoff = (now or dj_timezone.now()) - timedelta(days=MIX_WINDOW_DAYS)
+    rows = LabelRecord.objects.filter(source=LabelRecord.Source.IMAP_FOLDER, status=ACTIVE).order_by()
+
+    def mix(qs):
+        counts = dict(qs.values_list("label_class").annotate(n=Count("id")))
+        total = sum(counts.values())
+        return ({c: counts.get(c, 0) / total for c in MIX_CLASSES} if total else {}), total
+
+    now_mix, now_n = mix(rows)
+    before_mix, before_n = mix(rows.filter(observed_at__lt=cutoff))
+    jump = None
+    if now_n >= MIX_MIN_ROWS and before_n >= MIX_MIN_ROWS:
+        c = max(MIX_CLASSES, key=lambda c: abs(now_mix[c] - before_mix[c]))
+        if abs(now_mix[c] - before_mix[c]) > MIX_JUMP:
+            jump = {"class": c, "from": before_mix[c], "to": now_mix[c]}
+    return {"now": now_mix, "before": before_mix, "rows": {"now": now_n, "before": before_n}, "jump": jump}

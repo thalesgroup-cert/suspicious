@@ -163,9 +163,13 @@ def promote(version, user, note=""):
     return version
 
 
-def rollback(user, note=""):
-    """The previous version becomes active again; PromotionRefused(["no_previous"]) without one."""
-    picked = registry.rollback_to_previous(user, note)
+def rollback(user, note="", expected_id=None):
+    """The previous version becomes active again; PromotionRefused(["no_previous"]) without one,
+    PromotionRefused(["state_changed"]) when expected_id names another version."""
+    try:
+        picked = registry.rollback_to_previous(user, note, expected_id)
+    except registry.StateChanged:
+        raise PromotionRefused(["state_changed"]) from None
     if picked is None:
         raise PromotionRefused(["no_previous"])
     target, old_active = picked
@@ -196,9 +200,13 @@ def start_shadow(version, user, note=""):
     return version
 
 
-def discard(version, user, note=""):
-    """registry.discard, then a best-effort server sync (a discarded shadow leaves the server)."""
-    registry.discard(version, user, note)
+def discard(version, user, note="", expected_status=None):
+    """registry.discard, then a best-effort server sync (a discarded shadow leaves the server).
+    PromotionRefused(["state_changed"]) when the version is no longer in expected_status."""
+    try:
+        registry.discard(version, user, note, expected_status)
+    except registry.StateChanged:
+        raise PromotionRefused(["state_changed"]) from None
     try:
         if not serversync.sync():
             logger.warning("ai_model server sync after a discard failed, the beat retries")

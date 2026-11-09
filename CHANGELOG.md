@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Settings "AI model" card for Admins, shown while the `ai_model` connector is enabled: connector
+  health, circuit breaker state with a reset, active version and age, label counts, the retrain
+  schedule and a Retrain button, the latest candidate with its gate checks, the shadow comparison
+  with review, promotion and rollback, version history with counters, the label mix with a jump
+  warning, flagged labels with resolve, and a review queue of AI and evidence disagreements and
+  campaign conflicts. New endpoints under `/api/ai-model/`: `candidates/`, `jobs/`, `ledger/`,
+  `flags/`, `queue/` (Admin and CISO), `retrain/`, `flags/<id>/resolve/`, `breaker/reset/`
+  (Admin); `status/` gains `health`, `breaker`, `schedule`, `counts`, `jobs` and `ledger`. The
+  breaker state is now published through the shared cache (`breaker:<name>`), so the card shows what
+  the workers see. The `ai_model` gallery tile points to the card. See `docs/components/analyzers.md`.
 - Shadow scoring, promotion and rollback of AI model versions. An admin starts a gate-eligible
   candidate as the shadow (`POST /api/ai-model/shadow/start/`); every new mail is then also scored
   by it in the same classify call, under its own deadline (`AI_SHADOW_TIMEOUT`, default 8 s) and

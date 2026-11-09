@@ -372,3 +372,52 @@ class LedgerSummaryTest(CaseMixin, TestCase):
         observe(review())
         observe(review(folder="1_SPAM"))
         self.assertEqual(ledger.ledger_summary()["by_source"], {"imap_folder": {"Unwanted": 1}})
+
+
+class LabelMixTest(TestCase):
+    def rows(self, label_class, n, days_ago):
+        from datetime import timedelta
+        from django.utils import timezone
+        for i in range(n):
+            LabelRecord.objects.create(
+                message_id_hash=f"{label_class}{days_ago}{i}", source=LabelRecord.Source.IMAP_FOLDER,
+                label=label_class, label_class=label_class, trust=LabelRecord.Trust.FOLDER,
+                observed_at=timezone.now() - timedelta(days=days_ago))
+
+    def test_shares_and_jump(self):
+        self.rows("Safe", 60, 40)
+        self.rows("Dangerous", 40, 40)
+        self.rows("Dangerous", 60, 1)
+        mix = ledger.label_mix()
+        self.assertEqual(mix["rows"], {"now": 160, "before": 100})
+        self.assertAlmostEqual(mix["before"]["Safe"], 0.6)
+        self.assertAlmostEqual(mix["now"]["Safe"], 0.375)
+        self.assertEqual(mix["jump"]["class"], "Dangerous")
+
+    def test_no_jump_below_row_floor(self):
+        self.rows("Safe", 10, 40)
+        self.rows("Dangerous", 10, 1)
+        self.assertIsNone(ledger.label_mix()["jump"])
+
+    def test_empty_ledger(self):
+        mix = ledger.label_mix()
+        self.assertEqual((mix["now"], mix["before"], mix["jump"]), ({}, {}, None))
+        self.assertEqual(mix["rows"], {"now": 0, "before": 0})
+
+    def test_jump_names_the_largest_change(self):
+        self.rows("Safe", 50, 40)
+        self.rows("Dangerous", 40, 40)
+        self.rows("Unwanted", 10, 40)
+        self.rows("Unwanted", 100, 1)  # Safe -25, Dangerous -20, Unwanted +45 points
+        self.assertEqual(ledger.label_mix()["jump"]["class"], "Unwanted")
+
+    def test_window_boundary_is_strict(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        now = timezone.now()
+        for age, key in ((timedelta(days=30), "edge"), (timedelta(days=30, seconds=1), "past")):
+            for i in range(3):
+                LabelRecord.objects.create(
+                    message_id_hash=f"{key}{i}", source=LabelRecord.Source.IMAP_FOLDER, label="Safe",
+                    label_class="Safe", trust=LabelRecord.Trust.FOLDER, observed_at=now - age)
+        self.assertEqual(ledger.label_mix(now=now)["rows"], {"now": 6, "before": 3})
