@@ -243,6 +243,11 @@ from suspicious.service_urls import redis_url, service_secret
 
 _redis_cache_host = _redis_cfg.get("cache_host", "redis_cache")
 
+# Fail fast on a hung Redis instead of blocking a request/worker forever.
+# The cache users (per-case lock, fetch lock, webhook dedup) only issue short
+# add/get/set/delete calls, so a few seconds is ample.
+REDIS_CACHE_OPTIONS = {"socket_timeout": 3, "socket_connect_timeout": 3}
+
 if _is_test:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 else:
@@ -253,6 +258,7 @@ else:
                 _redis_cache_host,
                 service_secret("REDIS_CACHE_PASSWORD", "redis.cache_password", required=True),
             ),
+            "OPTIONS": REDIS_CACHE_OPTIONS,
         }
     }
 

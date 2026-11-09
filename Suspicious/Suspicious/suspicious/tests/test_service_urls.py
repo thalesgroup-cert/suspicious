@@ -49,3 +49,12 @@ class ServiceSecretTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True), \
              mock.patch.object(service_urls, "get_secret", return_value=None):
             self.assertEqual(service_secret("X_PW", "redis.x", required=False), "")
+
+
+class RedisCacheTimeoutTests(unittest.TestCase):
+    def test_cache_options_set_socket_timeouts(self):
+        from django.conf import settings
+
+        opts = settings.REDIS_CACHE_OPTIONS
+        self.assertTrue(0 < opts["socket_timeout"] <= 5)
+        self.assertTrue(0 < opts["socket_connect_timeout"] <= 5)
