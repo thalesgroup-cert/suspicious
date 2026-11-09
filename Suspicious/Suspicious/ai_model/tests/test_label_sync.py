@@ -299,7 +299,7 @@ class FolderHierarchyTest(TestCase):
     def test_only_unknown_folders_fail_the_run_without_a_retry(self):
         imap = FakeImap({"Inbox": {"uidvalidity": 1, "messages": {1: forward(1)}}})
         with self.assertRaises(module.LabelSyncIncomplete) as caught:
-            connect = self.run_sync(imap, "Inbox, 9_ODD,Archive/\u00e9t\u00e9")
+            self.run_sync(imap, "Inbox, 9_ODD,Archive/\u00e9t\u00e9")
         self.assertIs(caught.exception.retryable, False)
         message = str(caught.exception)
         self.assertIn("3", message)
