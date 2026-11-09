@@ -3,8 +3,6 @@ Tests for POST /v2/reload and bundle-aware classify (Plan E, Task 6b): inference
 and its wiring in v2.py / server.py. Bundles are written with training.bundle.write_bundle and
 served by an httpx.MockTransport; the encoder is a deterministic fake with a word tokenizer.
 """
-import hashlib
-import io
 import json
 import logging
 import os
@@ -22,8 +20,7 @@ httpx = pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from inference_server import bundles, server, training_job  # noqa: E402
-from mail_analysis import MODEL_SPECS  # noqa: E402
+from inference_server import bundles, server  # noqa: E402
 from ResNetMLP import ResNetMLP  # noqa: E402
 from test_inference_server import BODY, FakeVectorizer, write_models  # noqa: E402
 from training import recipe  # noqa: E402

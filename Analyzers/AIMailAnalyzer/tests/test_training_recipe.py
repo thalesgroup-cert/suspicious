@@ -250,7 +250,8 @@ def test_chunk_by_tokens_fits_the_window():
 def test_fit_temperatures_fits_one_per_component():
     zc, y = _sampled(1.0)
     zh = zc * 3.0  # over-confident hierarchy, calibrated knn
-    softmax = lambda z: np.exp(z) / np.exp(z).sum(1, keepdims=True)
+    def softmax(z):
+        return np.exp(z) / np.exp(z).sum(1, keepdims=True)
     preds = Predictions(main=None, hierarchy=None, knn=None, sub={},
                         logits={"hierarchy": np.log(softmax(zh)), "knn": np.log(softmax(zc))})
     t = fit_temperatures(preds, y)

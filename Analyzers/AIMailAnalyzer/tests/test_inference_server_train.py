@@ -35,10 +35,10 @@ from training.bundle import BUNDLE_FILES, read_bundle  # noqa: E402
 
 FOLDERS = dataset_mod.FOLDERS
 HOST = "rustfs:9000"
-SECRET = "X-Amz-Signature=deadbeefsecret"
-DATASET_URL = f"http://{HOST}/models/job-1/dataset.npz?{SECRET}"
+CANARY = "X-Amz-Signature=deadbeefsecret"
+DATASET_URL = f"http://{HOST}/models/job-1/dataset.npz?{CANARY}"
 NAMES = (*BUNDLE_FILES, "manifest.json")
-BUNDLE_URLS = {n: f"http://{HOST}/models/job-1/bundle/{n}?{SECRET}" for n in NAMES}
+BUNDLE_URLS = {n: f"http://{HOST}/models/job-1/bundle/{n}?{CANARY}" for n in NAMES}
 PROFILE = {"embedding_version": "cmp-e1", "metric": "cosine", "distance_threshold": 0.25,
            "min_members": 3, "n_neighbours": 20, "window_days": 15}
 PARAMS = {
@@ -252,7 +252,7 @@ def test_bundle_url_names_must_be_the_fixed_set(train, env, urls):
     r = client.post("/v2/train", json=body(bundle_urls=urls), headers=env)
     assert r.status_code == 422
     assert not launches and not storage.requests
-    assert SECRET not in r.text
+    assert CANARY not in r.text
 
 
 @pytest.mark.parametrize("params", [
@@ -365,31 +365,31 @@ def test_validation_errors_do_not_echo_urls(train, env):
     r = client.post("/v2/train", json=body(dataset_url=123), headers=env)
     assert r.status_code == 422
     r = client.post("/v2/train", json=body(params={**PARAMS, "seed": DATASET_URL}), headers=env)
-    assert r.status_code == 422 and SECRET not in r.text
+    assert r.status_code == 422 and CANARY not in r.text
 
 
 # --- URL rules -------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("url", [
-    f"http://evil:9000/d?{SECRET}",
-    f"http://{HOST}.evil.example/d?{SECRET}",
-    f"http://rustfs:9001/d?{SECRET}",
-    f"http://rustfs/d?{SECRET}",
-    f"ftp://{HOST}/d?{SECRET}",
-    f"file:///etc/passwd?{SECRET}",
-    f"gopher://{HOST}/d?{SECRET}",
-    f"http://user:pw@{HOST}/d?{SECRET}",
-    f"http://user@{HOST}/d?{SECRET}",
-    f"http://evil@{HOST}/d?{SECRET}",
-    f"http://{HOST}\\@evil/d?{SECRET}",
-    f"http://{HOST}#@evil/d?{SECRET}",
-    f"http://{HOST}/d d?{SECRET}",
-    f"http://%72ustfs:9000/d?{SECRET}",
-    f"http://rustfs:9000\n/d?{SECRET}",
-    f"//{HOST}/d?{SECRET}",
-    f"http://[::1]:9000/d?{SECRET}",
-    f"http://127.0.0.1:9000/d?{SECRET}",
+    f"http://evil:9000/d?{CANARY}",
+    f"http://{HOST}.evil.example/d?{CANARY}",
+    f"http://rustfs:9001/d?{CANARY}",
+    f"http://rustfs/d?{CANARY}",
+    f"ftp://{HOST}/d?{CANARY}",
+    f"file:///etc/passwd?{CANARY}",
+    f"gopher://{HOST}/d?{CANARY}",
+    f"http://user:pw@{HOST}/d?{CANARY}",
+    f"http://user@{HOST}/d?{CANARY}",
+    f"http://evil@{HOST}/d?{CANARY}",
+    f"http://{HOST}\\@evil/d?{CANARY}",
+    f"http://{HOST}#@evil/d?{CANARY}",
+    f"http://{HOST}/d d?{CANARY}",
+    f"http://%72ustfs:9000/d?{CANARY}",
+    f"http://rustfs:9000\n/d?{CANARY}",
+    f"//{HOST}/d?{CANARY}",
+    f"http://[::1]:9000/d?{CANARY}",
+    f"http://127.0.0.1:9000/d?{CANARY}",
 ])
 def test_dataset_url_rules(train, env, url):
     client, _, storage, launches, base = train()
@@ -404,7 +404,7 @@ def test_dataset_url_rules(train, env, url):
 
 def test_bundle_url_host_is_checked_before_anything_runs(train, env):
     client, _, storage, launches, _ = train()
-    urls = {**BUNDLE_URLS, "calibration.json": f"http://evil:9000/c?{SECRET}"}
+    urls = {**BUNDLE_URLS, "calibration.json": f"http://evil:9000/c?{CANARY}"}
     client.post("/v2/train", json=body(bundle_urls=urls), headers=env)
     state = wait(client, env)
     assert state["state"] == "failed" and "calibration.json" in state["error"]
@@ -537,7 +537,7 @@ def test_successful_job_trains_writes_and_uploads_the_bundle(train, env, tmp_pat
     assert set(bundle.calibration["temperature"]) == {"hierarchy", "knn"}
 
     # the worker never sees a URL; nothing stays on disk
-    assert launches and "http" not in repr(launches) and SECRET not in repr(launches)
+    assert launches and "http" not in repr(launches) and CANARY not in repr(launches)
     assert not os.listdir(base)
 
 
@@ -935,7 +935,7 @@ class _Storage(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/redirect"):
             self.send_response(302)
-            self.send_header("Location", f"http://127.0.0.1:1/x?{SECRET}")
+            self.send_header("Location", f"http://127.0.0.1:1/x?{CANARY}")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
@@ -968,7 +968,7 @@ def _exercise(controller, host, tmp_path):
     results = []
     with controller._client() as client:
         for path, op in (("ok", "get"), ("ok", "put"), ("redirect", "get"), ("denied", "put")):
-            url = training_job.check_url(f"http://{host}/{path}/k?{SECRET}&X-Amz-Credential=AKIA",
+            url = training_job.check_url(f"http://{host}/{path}/k?{CANARY}&X-Amz-Credential=AKIA",
                                          hosts, "x")
             try:
                 if op == "get":
@@ -979,8 +979,8 @@ def _exercise(controller, host, tmp_path):
                 results.append("ok")
             except training_job.JobError as e:
                 results.append(str(e))
-        url = training_job.check_url(f"http://{host}/ok/k?{SECRET}", hosts, "x")
-    refused = training_job.check_url(f"http://127.0.0.1:1/k?{SECRET}", {"127.0.0.1:1"}, "x")
+        url = training_job.check_url(f"http://{host}/ok/k?{CANARY}", hosts, "x")
+    refused = training_job.check_url(f"http://127.0.0.1:1/k?{CANARY}", {"127.0.0.1:1"}, "x")
     with controller._client() as client:
         try:
             controller._upload(client, refused, b"A", "manifest.json")
@@ -1017,12 +1017,12 @@ def test_log_filter_redacts_even_when_httpx_logs_at_debug(real_storage, caplog, 
     _exercise(controller, real_storage, tmp_path)
     assert any("HTTP Request" in r.getMessage() for r in caplog.records)  # it did log
     _assert_no_secret(caplog)
-    logging.getLogger("inference_server").warning("x http://h:1/p?%s y", SECRET, exc_info=False)
+    logging.getLogger("inference_server").warning("x http://h:1/p?%s y", CANARY, exc_info=False)
     _assert_no_secret(caplog)
 
 
 @pytest.mark.parametrize("message", [
-    f"PUT http://h:9000/b/k?{SECRET} done", f"'https://h/k?a=b&{SECRET}'",
+    f"PUT http://h:9000/b/k?{CANARY} done", f"'https://h/k?a=b&{CANARY}'",
     "X-Amz-Signature=abc&X-Amz-Credential=AKIA%2F", "see https://h:1/x#frag?y",
 ])
 def test_redaction_filter(message):

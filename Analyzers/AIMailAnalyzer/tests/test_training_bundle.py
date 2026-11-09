@@ -2,7 +2,6 @@ import hashlib
 import io
 import json
 import os
-import re
 import shutil
 import signal
 import subprocess
