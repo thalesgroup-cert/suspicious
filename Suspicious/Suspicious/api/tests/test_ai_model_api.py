@@ -33,6 +33,10 @@ class AiModelApiTest(APITestCase):
         self.cert = user("cert", "CERT")
         self.client.force_authenticate(self.admin)
         self.reporter = user("rep")
+        # the view syncs the inference server after a write; never reach a real one from ambient settings
+        patcher = mock.patch(SYNC, return_value=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def case(self):
         return Case.objects.create(reporter=self.reporter, description="MAILTEXT-SECRET")
