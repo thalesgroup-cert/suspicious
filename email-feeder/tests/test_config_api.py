@@ -63,6 +63,20 @@ class FeederConfigApiTest(unittest.TestCase):
         self.assertEqual(str(mc.working_path), "/tmp/suspicious")
         self.assertTrue(self.cache.exists())
 
+    def test_feeder_bucket_from_api_selects_prefix_mode(self):
+        body = json.loads(json.dumps(_API_RESPONSE))
+        body["storage"]["s3"]["feeder_bucket"] = "suspicious-feeder"
+        with mock.patch.object(cs.requests, "get", return_value=self._resp(body=body)):
+            mc = cs.load_config_from_api("http://backend:9020", "tok",
+                                         self.local, self.cache)
+        self.assertEqual(mc.minio.feeder_bucket, "suspicious-feeder")
+
+    def test_no_feeder_bucket_in_api_keeps_legacy_mode(self):
+        with mock.patch.object(cs.requests, "get", return_value=self._resp()):
+            mc = cs.load_config_from_api("http://backend:9020", "tok",
+                                         self.local, self.cache)
+        self.assertEqual(mc.minio.feeder_bucket, "")
+
     def test_maps_branding_into_mail_config(self):
         with mock.patch.object(cs.requests, "get", return_value=self._resp()):
             mc = cs.load_config_from_api("http://backend:9020", "tok",

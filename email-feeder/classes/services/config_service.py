@@ -71,6 +71,8 @@ def _api_to_feeder_json(api: dict, local: dict) -> dict:
         "access_key": s3.get("access_key", ""),
         "secret_key": s3.get("secret_key", ""),
         "secure": bool(s3.get("secure", False)),
+        # without it the feeder silently stays in legacy bucket-per-submission mode
+        "feeder_bucket": s3.get("feeder_bucket", ""),
     }
     merged["mail"] = {
         # SMTP credentials
