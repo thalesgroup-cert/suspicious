@@ -8,10 +8,16 @@ Copy them to the real (git-ignored) paths and adjust:
 
 | Example file | Copy to | Notes |
 |---|---|---|
-| `deployment-env.example` | `deployment/.env` | image versions, ports, DB creds, paths |
+| `deployment-env.example` | `deployment/.env` | faithful copy of `deployment/.env.example` with Meridian dev values; keep it in sync |
 | `Suspicious-settings.example.json` | `Suspicious/settings.json` | Django + integrations runtime config |
-| `email-feeder-config.example.json` | `email-feeder/config.json` | IMAP/SMTP/S3 for the feeder |
+| `email-feeder-config.example.json` | `email-feeder/config.json` | IMAP mailboxes and polling; its `s3`/`mail` blocks are only used while `FEEDER_API_TOKEN` is empty |
 | `suspicious-ui-env.example` | `suspicious-ui/.env` | SPA runtime branding |
+
+**The AI vote is off in these examples.** `integrations.ai_model` ships with an
+empty `token` and the connector is disabled by default. To use it, set
+`AI_INFERENCE_TOKEN` in `deployment/.env` (empty in the example) and the same
+value in `integrations.ai_model.token`, start `ai_inference`, then enable the
+connector (see [AI inference](../ai-inference.md)).
 
 **Two hard rules these examples encode (dev, no Vault):**
 

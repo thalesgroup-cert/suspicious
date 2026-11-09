@@ -85,6 +85,11 @@ curl --noproxy '*' http://localhost:9020/api/health/
 
 `cortex: false` is expected here — the analyzer engine is part of the full stack.
 
+The AI vote is not part of this quick start: the `ai_model` connector is **off
+by default** and `ai_inference` is not started. Without it, mail verdicts that
+need the AI vote end `Inconclusive` (rule `analysis-incomplete`). To turn it
+on, see [AI model](#ai-model-optional-off-by-default).
+
 > Behind a corporate proxy, localhost calls may be intercepted. Add `--noproxy '*'`
 > to `curl`, or `export NO_PROXY=127.0.0.1,localhost`.
 
@@ -138,7 +143,7 @@ templates (the Quick start step 2 copies ready-made examples).
 |------|----------|-------|
 | `deployment/.env` | `deployment/.env.example` | image versions, ports, paths, DB and storage credentials |
 | `Suspicious/settings.json` | `Suspicious/settings-sample.json` | Django settings, integrations, branding, SMTP |
-| `email-feeder/config.json` | `email-feeder/config-sample.json` | IMAP/IMAPS mailboxes, S3, polling |
+| `email-feeder/config.json` | `email-feeder/config-sample.json` | IMAP/IMAPS mailboxes, polling (S3 and SMTP come from the backend when `FEEDER_API_TOKEN` is set) |
 
 The React UI also reads `suspicious-ui/.env` (`suspicious-ui/.env.example`) for
 branding shown at runtime.
@@ -267,9 +272,36 @@ Two services may report unhealthy in a bare setup, by design:
 Forward suspicious emails (as attachments) to the mailbox configured in
 `email-feeder/config.json`. The feeder imports them and queues analysis.
 
+### AI model (optional, off by default)
+
+The AI vote comes from the `ai_inference` model server, called by the
+`ai_model` connector. There is no Cortex AI analyzer any more. The connector is
+disabled on a fresh or upgraded instance, and the token in `deployment/.env`
+and the connector token must be the same value.
+
+1. Generate a token and set it in `deployment/.env` as `AI_INFERENCE_TOKEN`
+   (`openssl rand -hex 24`). Nothing generates it for you, and the example
+   `deployment-env.example` leaves it empty.
+2. Put the same value in `integrations.ai_model.token` (`Suspicious/settings.json`
+   or the Settings tile). A mismatch shows as `rejected the token (HTTP 401)`.
+3. Place the model weights in `Analyzers/AIMailAnalyzer/models/` and start the
+   server: `make up` enables the profile; with plain compose use
+   `docker compose --env-file .env --profile ai up -d --build ai_inference`.
+4. Enable the connector (Settings, connector gallery, tile `ai_model`).
+
+Full procedure, weights, retraining and troubleshooting:
+[AI inference](docs/getting-started/ai-inference.md).
+
+### Object storage provider
+
+`storage.backend: s3` uses RustFS or any S3-compatible store. Google Cloud
+Storage is also available (`storage.provider: gcs`, credentials in Vault as
+`storage.gcs.service_account_json`); see [CONFIG.md § 2.6](CONFIG.md#26-storage-minio--rustfs)
+for its limits.
+
 ### Feeder config authority (optional)
 
-When enabled, the feeder fetches its S3, SMTP, and branding config from the
+When enabled, the feeder fetches its S3 and SMTP config from the
 backend at boot instead of reading those blocks from `email-feeder/config.json`.
 The backend must be reachable on first run; the feeder caches the last-good
 response and tolerates a backend blip after that. With no cache and no backend
@@ -320,11 +352,32 @@ make deploy
 
 - Once `vault/unseal.keys` exists, `make up` and `make deploy` unseal Vault
   automatically — no manual step after a restart.
-- **Connector** secrets (cortex/thehive/misp/watcher) can also just be set in
+- `AI_INFERENCE_TOKEN` is not a Vault secret: it is an `.env` value you create
+  by hand and `seed-vault-secrets` does not touch it. The matching connector
+  token (`integrations.ai_model.token`) is a connector secret, see below.
+- **Connector** secrets (cortex/thehive/misp/watcher/ai_model/...) can also just be set in
   `settings.json` or edited in the Settings UI: on boot the app seeds any
   present-but-missing connector secret into Vault, and reads fall back
   Vault → `settings.json`. Boot-critical secrets (`app.secret_key`,
   `database.password`) stay Vault/ops-seeded by design.
+
+---
+
+## Upgrading an existing instance
+
+`make deploy` pulls, migrates and restarts. Two one-time steps apply to an
+existing stack:
+
+- **Authenticated data services.** `make deploy` stops until `make db-auth-migrate`
+  has run (maintenance window of about 2 minutes), see
+  [Deploy & Rollback](docs/operations/deploy.md#authenticated-data-services).
+- **AI model.** The Cortex AI analyzer is removed. The `ai_model` connector is
+  off by default, so an upgraded instance has no AI vote until you: set
+  `AI_INFERENCE_TOKEN` in `deployment/.env`, put the same value in
+  `integrations.ai_model.token`, start `ai_inference` (`--profile ai` with plain
+  compose), enable the connector and set the `chromadb` `collection_name`. Keep
+  `integrations.cortex.analyzers.ai` in `settings.json`. See
+  [AI inference, section 10](docs/getting-started/ai-inference.md#10-upgrading-an-existing-instance).
 
 ---
 

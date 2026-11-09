@@ -13,6 +13,30 @@ Individual steps are also available: `make migrate`, `make collectstatic`,
 To roll back, redeploy the previous image tags (set in `deployment/.env`) and
 run `make deploy` again.
 
+`make deploy` stops until the data services enforce authentication, so an
+existing stack must run `make db-auth-migrate` once first (next section).
+`make db-auth-check` verifies the result at any time.
+
+## AI model (ai_model connector)
+
+The Cortex AI analyzer is removed. The AI vote comes from `ai_inference`, which
+`make deploy` builds and starts, called by the `ai_model` connector. The
+connector is **off by default**, so an upgraded instance has no AI vote until
+you do this once:
+
+1. Create a token (`openssl rand -hex 24`) and set it as `AI_INFERENCE_TOKEN` in
+   `deployment/.env`. Nothing generates it for you; empty makes the `/v2`
+   routes answer 503.
+2. Set the same value as `integrations.ai_model.token` (`settings.json` or the
+   Settings tile). A mismatch shows as `rejected the token (HTTP 401)`.
+3. Check the weights in `Analyzers/AIMailAnalyzer/models/`, then recreate the
+   app tier: `docker compose --env-file .env up -d --force-recreate --no-deps suspicious suspicious_celery suspicious_celery_beat`.
+4. Enable the `ai_model` connector and set the `chromadb` `collection_name`.
+5. Keep `integrations.cortex.analyzers.ai` in `settings.json`.
+
+Until step 4 is done, mail verdicts that need the AI vote end `Inconclusive`.
+Full procedure: [AI inference](../getting-started/ai-inference.md#10-upgrading-an-existing-instance).
+
 ## Authenticated data services
 
 Redis, Elasticsearch and ChromaDB require credentials (see
@@ -73,8 +97,9 @@ All commands run from `deployment/` after editing the value.
 
 ## Network segmentation
 
-The stack no longer runs on one flat network. `suspicious_network` (created by
-`make network`) stays the shared network for the reverse proxy, the UI, the
+The stack no longer runs on one flat network. The shared network (Compose key
+`suspicious_network`, real name `${NETWORK_NAME}`, default `suspicious_net`,
+created by `make network`) stays the shared network for the reverse proxy, the UI, the
 feeder, Vault and integrations such as TheHive, MISP or monitoring. Three
 networks managed by Compose sit behind it, so a compromised front-end service
 cannot connect to a database:
@@ -82,7 +107,7 @@ cannot connect to a database:
 | Network | Members | Reachable by |
 |---|---|---|
 | `data` (internal, no outbound traffic) | MariaDB (and replica), Redis broker, Redis cache, Chroma proxy | Django, Celery worker, Celery beat |
-| `storage` | RustFS | Django, Celery worker, feeder |
+| `storage` | RustFS | Django, Celery worker, feeder, `ai_inference` (presigned training dataset and bundle URLs) |
 | `cortex` | Cortex, Elasticsearch | Django, Celery worker |
 
 The Chroma server itself sits on its own internal link behind the proxy. The UI,
@@ -103,7 +128,7 @@ they join their own networks and leave the shared one. Compose only recreates a
 service whose configuration changed, so this is a no-op on an up-to-date stack
 and a single restart of MariaDB and RustFS (a few seconds of database errors,
 once) on the first run. Run it in a quiet period. Tools that connected to
-MariaDB, Elasticsearch or Redis through `suspicious_network` from outside the
+MariaDB, Elasticsearch or Redis through `suspicious_net` from outside the
 stack (a backup container, a monitoring exporter) must be attached to the
 network they need or use `docker compose exec`.
 
