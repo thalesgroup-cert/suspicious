@@ -13,6 +13,7 @@ class CacheLockTest(SimpleTestCase):
             with self.assertRaises(RuntimeError):
                 with cache_lock("lock:t", wait=0.3):
                     pass
+        self.assertIsNone(cache.get("lock:t"))
         with cache_lock("lock:t", wait=0.3):  # free again after the first block
             pass
 
@@ -22,3 +23,9 @@ class CacheLockTest(SimpleTestCase):
                 raise ValueError("boom")
         with cache_lock("lock:t", wait=0.3):
             pass
+
+    def test_an_expired_holder_does_not_release_the_next_holder_s_lock(self):
+        with cache_lock("lock:t", ttl=60):
+            cache.delete("lock:t")  # the TTL ran out while the body was still running
+            cache.add("lock:t", "next-holder", timeout=60)  # another worker holds it now
+        self.assertEqual(cache.get("lock:t"), "next-holder")

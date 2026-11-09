@@ -1,13 +1,39 @@
 # connectors
 
 Plugin framework every integration with an external system (TheHive, MISP,
-Watcher, ChromaDB, SMTP notifications, the `ai_narration` LLM connector) is
+Watcher, ChromaDB, SMTP notifications, the `ai_narration` LLM connector, the
+`ai_model` mail classifier) is
 built on: registry, event dispatch, retry + circuit breaker, and a
 `ConnectorDelivery` audit ledger.
 
 See [`Suspicious/Suspicious/connectors/README.md`](https://github.com/thalesgroup-cert/suspicious/blob/main/Suspicious/Suspicious/connectors/README.md)
 for the framework internals and the built-in connector table, and
 [Connectors (author guide)](../../connectors.md) for writing a new one.
+
+## ai_model
+
+The mail AI classifier. It is off by default (`enabled_by_default=False`).
+
+- **Provides** `mail_ai`: a mail case is handed to it instead of a Cortex AI job. A Celery task posts
+  the mail text to the model server's `/v2` API (`http://ai_inference:8090` on `suspicious_net`,
+  bearer token `AI_INFERENCE_TOKEN`) and stores the answer as one `AiAssessment` per case plus the
+  case's AI result, score, confidence and category. Only one connector may provide `mail_ai`.
+- **Events:** `case_finalised`. The hook only queues `connectors.tasks.run_campaign_detection`, which
+  runs campaign detection outside the connector's circuit breaker and sends `campaign_updated` (the
+  TheHive campaign alert) when a case creates or joins a campaign.
+- **Config** (`integrations.ai_model`): `url` (default `http://ai_inference:8090`), `token`
+  (secret, required), `timeout_seconds` (default 20).
+- **Health check:** `/v2/health/ready`, then the token against `/v2/models/ai_mail`; it also reports
+  when the `chromadb` cleanup connector watches another collection than `suspicious_mails`.
+
+Without it, a mail case has no AI vote (`results_ai` is set to `Inconclusive`) and no campaign
+detection. Scoring then finalises most mails that the analyzer count does not make `Dangerous` as
+`Inconclusive` (rule `analysis-incomplete`) instead of `Safe` or `Suspicious`, and the submitter's
+notification mail, the TheHive challenge text and the dashboards show that verdict. Upgrade step:
+enable `ai_model` (and set its `url` and `token`) as part of the upgrade.
+`python manage.py ai_model_campaign_replay <campaign_ref>` replays a campaign the Cortex AI path built
+through its detection. Setup, failures and the replay command:
+[AI / ML Analyzers](../analyzers.md).
 
 ## case_search
 

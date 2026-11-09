@@ -71,9 +71,9 @@ class CollectSignalsTest(TestCase):
         self.assertEqual(ai.confidence, 100)
 
     def test_ai_report_on_archive_file_not_double_counted_as_generic_signal(self):
-        """Regression (prod case 61682): AI_Mail_Analyzer attaches its own
-        AnalyzerReport to the mail archive's `file` (cortex_and_job_management.py
-        manage_ai_jobs), which is the *same* value collect_signals already
+        """Regression (prod case 61682): AI_Mail_Analyzer attached its own
+        AnalyzerReport to the mail archive's `file` (historical Cortex AI
+        reports), which is the *same* value collect_signals already
         surfaces separately via case.score_ai/confidence_ai as `ai`. Without
         excluding it, that one report also gets pulled into the generic
         per-file weighted signal, inflating base_conf to tie ai.confidence —

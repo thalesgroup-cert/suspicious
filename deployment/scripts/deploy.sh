@@ -96,7 +96,7 @@ $COMPOSE up -d --no-deps mail_renderer
 bash "${SCRIPTS}/health-wait.sh" "${SVC_PREFIX:-}mail_renderer" 120
 ok "mail_renderer up"
 
-# ── 4c. AI inference server (the AI_Mail_Analyzer client calls it) ───────
+# ── 4c. AI inference server (the ai_model connector calls it) ────────────
 step "Starting ai_inference"
 $COMPOSE --profile ai up -d --no-deps ai_inference
 ok "ai_inference up"

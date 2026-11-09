@@ -144,6 +144,7 @@ INSTALLED_APPS = [
     "score_process.apps.ScoreConfig",
     "submission_queue.apps.SubmissionQueueConfig",
     "connectors.apps.ConnectorsConfig",
+    "ai_model.apps.AiModelConfig",
 ]
 
 MIDDLEWARE = [
@@ -530,7 +531,7 @@ APP_LOGGERS = [
     "api", "case_handler", "cortex_job", "score_process", "connectors",
     "mail_feeder", "email_process", "url_process", "ip_process",
     "hash_process", "file_process", "domain_process", "dashboard",
-    "settings", "profiles", "tasp", "suspicious",
+    "settings", "profiles", "tasp", "suspicious", "common",
 ]
 assert len(APP_LOGGERS) == len(set(APP_LOGGERS)), "duplicate name in APP_LOGGERS"
 

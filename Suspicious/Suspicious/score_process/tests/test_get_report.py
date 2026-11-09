@@ -46,10 +46,10 @@ class GetReportIntegrationTest(TestCase):
         self.assertTrue(case.kpi_counted)
 
     def test_mail_case_still_scores_when_ai_report_not_yet_available(self):
-        """Regression: a mail case with no AnalyzerReport yet for the
+        """Regression: a mail case with no AnalyzerReport for the
         configured AI analyzer (analysis genuinely still pending, or AI
-        never dispatched) used to crash manage_ai_jobs with an
-        UnboundLocalError that propagated out of get_report()'s try block —
+        never dispatched) used to crash the AI step of get_report() with an
+        UnboundLocalError that propagated out of its try block —
         skipping collect_signals / score_case / apply_verdict entirely and
         leaving Case.results at its default Inconclusive no matter what the
         other analyzers found. A malicious IP report here must still drive

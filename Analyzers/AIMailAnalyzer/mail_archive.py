@@ -1,9 +1,7 @@
-"""Mail-archive helpers shared by the Cortex client and the inference server.
+"""Mail-archive helpers (stdlib only).
 
-Stdlib only on purpose: ai_mail_classifier.py (the thin Cortex client) imports
-this, and its image ships neither numpy nor torch. Everything that needs the ML
-stack lives in mail_analysis.py, which re-exports these names so existing
-callers (`mail_analysis.untar_file`) keep working.
+Everything that needs the ML stack lives in mail_analysis.py, which re-exports
+these names so existing callers (`mail_analysis.untar_file`) keep working.
 """
 import os
 import tarfile

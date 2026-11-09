@@ -1,10 +1,9 @@
 # Persistent inference server image. Built from Analyzers/AIMailAnalyzer/ as
-# the build context (see deployment/compose_apps.yaml's ai_inference service),
-# unlike the parent Dockerfile (the Cortex one-shot client) this one stays
-# running and is never invoked by Cortex's docker job runner directly.
+# the build context (see deployment/docker-compose.override.yml's ai_inference
+# service). A long-running server on suspicious_net.
 FROM python:3.14-slim
 
-# Build-time proxy only, same as the parent Dockerfile.
+# Build-time proxy only.
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
@@ -26,7 +25,7 @@ RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --sys
 # The files the server imports as siblings via cwd (mail_analysis.py,
 # mail_archive.py, ResNetMLP.py), the inference_server/ package, and the repo's
 # small tokenizer / sentence-transformers config files for the vectorizer.
-# Model weights are deliberately NOT copied in: models/ and models_public/ are
+# Model weights are deliberately NOT copied in: models/ is
 # bind-mounted at runtime (compose), so the monthly retrain can promote new
 # weights without rebuilding this image, and the server hot-reloads them.
 COPY mail_analysis.py mail_archive.py ResNetMLP.py ./
@@ -36,7 +35,7 @@ COPY vectorizers/ ./vectorizers/
 # The vectorizer's own weights are excluded from the build context
 # (.dockerignore) — always the same public checkpoint, so fetch it here.
 # Without this step SentenceTransformer() fails at startup (only the tokenizer
-# files are in the repo) and every /classify answers 503.
+# files are in the repo) and every classify call answers 503.
 RUN VEC=/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2 && \
     BASE=https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2/resolve/main && \
     mkdir -p "$VEC/1_Pooling" && \

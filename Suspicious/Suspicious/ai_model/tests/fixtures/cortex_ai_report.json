@@ -1,0 +1,177 @@
+{
+  "DANGEROUS": {
+    "full": {
+      "classification": "DANGEROUS",
+      "classification_breakdown": {
+        "DANGEROUS": 0.9638538360595703,
+        "SAFE": 1.962964344622638e-26,
+        "UNWANTED": 0.03614615276455879
+      },
+      "classification_probabilities": "[1.9629643e-26 3.6146153e-02 9.6385384e-01]",
+      "confidence": "0.9638538360595703",
+      "contributing_phrases": [
+        {
+          "impact": 0.4167,
+          "text": "Bonjour,\nVeuillez confirmer votre mot de passe sous 24h : https://secure-compte.example.com/verifier\nMerci."
+        }
+      ],
+      "malscore": "9.75",
+      "report": {
+        "analyzed_mail_content": "<placeholder body>",
+        "analyzed_mail_headers": "<placeholder headers>",
+        "classification_probabilities": "[1.9629643e-26 3.6146153e-02 9.6385384e-01]",
+        "email_embedding": "[0.1, -0.2, 0.3]",
+        "mail_file_name": "noname.ext",
+        "mail_file_path": "/job/input/attachment",
+        "main_probabilities": {
+          "DANGEROUS": "96.39%",
+          "SAFE": "0.00%",
+          "UNWANTED": "3.61%"
+        },
+        "sub_probabilities": {
+          "BLACKMAILING_PHISHING": "0.00%",
+          "CLASSIC_PHISHING": "0.00%",
+          "CLONE_PHISHING": "0.00%",
+          "EXTERNAL": "0.00%",
+          "INTERNAL": "0.00%",
+          "NEWSLETTER": "0.00%",
+          "SPAM": "3.61%",
+          "WHALING_PHISHING": "96.38%"
+        }
+      },
+      "sub_classification": "CLONE",
+      "sub_classification_breakdown": {
+        "BLACKMAIL": 5.477478680404602e-06,
+        "CLASSIC_PHISHING": 3.0880567010171944e-06,
+        "CLONE": 0.9638451933860779,
+        "EXTERNAL": 1.0626607357648232e-26,
+        "INTERNAL": 9.003034547834192e-27,
+        "NEWSLETTER": 2.1357865129245646e-11,
+        "SPAM": 0.03614615276455879,
+        "WHALING": 5.713141959517998e-09
+      },
+      "sub_classification_confidence": "0.9638451933860779",
+      "sub_classification_probabilities": "[9.0030345e-27 1.0626607e-26 3.6146153e-02 2.1357865e-11 3.0880567e-06\n 9.6384519e-01 5.4774787e-06 5.7131420e-09]"
+    },
+    "summary": {
+      "classification": "DANGEROUS",
+      "confidence": "0.9638538360595703",
+      "malscore": "9.75"
+    }
+  },
+  "SAFE": {
+    "full": {
+      "classification": "SAFE",
+      "classification_breakdown": {
+        "DANGEROUS": 1.7299470300713438e-06,
+        "SAFE": 0.9876385927200317,
+        "UNWANTED": 0.012359673157334328
+      },
+      "classification_probabilities": "[9.8763859e-01 1.2359673e-02 1.7299470e-06]",
+      "confidence": "0.9876385927200317",
+      "contributing_phrases": [
+        {
+          "impact": 0.7683,
+          "text": "See attached."
+        }
+      ],
+      "malscore": "0.12",
+      "report": {
+        "analyzed_mail_content": "<placeholder body>",
+        "analyzed_mail_headers": "<placeholder headers>",
+        "classification_probabilities": "[9.8763859e-01 1.2359673e-02 1.7299470e-06]",
+        "email_embedding": "[0.1, -0.2, 0.3]",
+        "mail_file_name": "noname.ext",
+        "mail_file_path": "/job/input/attachment",
+        "main_probabilities": {
+          "DANGEROUS": "0.00%",
+          "SAFE": "98.76%",
+          "UNWANTED": "1.24%"
+        },
+        "sub_probabilities": {
+          "BLACKMAILING_PHISHING": "0.00%",
+          "CLASSIC_PHISHING": "0.00%",
+          "CLONE_PHISHING": "0.00%",
+          "EXTERNAL": "98.76%",
+          "INTERNAL": "0.00%",
+          "NEWSLETTER": "0.13%",
+          "SPAM": "1.11%",
+          "WHALING_PHISHING": "0.00%"
+        }
+      },
+      "sub_classification": "EXTERNAL",
+      "sub_classification_breakdown": {
+        "BLACKMAIL": 5.7652265184060525e-08,
+        "CLASSIC_PHISHING": 4.310799397444498e-07,
+        "CLONE": 1.16867488486605e-06,
+        "EXTERNAL": 0.9876385927200317,
+        "INTERNAL": 1.3186118456450492e-20,
+        "NEWSLETTER": 0.0012578200548887253,
+        "SPAM": 0.011101854033768177,
+        "WHALING": 7.253994738221081e-08
+      },
+      "sub_classification_confidence": "0.9876385927200317",
+      "sub_classification_probabilities": "[1.31861185e-20 9.87638593e-01 1.11018540e-02 1.25782005e-03\n 4.31079940e-07 1.16867488e-06 5.76522652e-08 7.25399474e-08]"
+    },
+    "summary": {
+      "classification": "SAFE",
+      "confidence": "0.9876385927200317",
+      "malscore": "0.12"
+    }
+  },
+  "UNWANTED": {
+    "full": {
+      "classification": "UNWANTED",
+      "classification_breakdown": {
+        "DANGEROUS": 1.05818870110852e-07,
+        "SAFE": 0.443909615278244,
+        "UNWANTED": 0.5560902953147888
+      },
+      "classification_probabilities": "[4.4390962e-01 5.5609030e-01 1.0581887e-07]",
+      "confidence": "0.5560902953147888",
+      "contributing_phrases": [],
+      "malscore": "5.17",
+      "report": {
+        "analyzed_mail_content": "<placeholder body>",
+        "analyzed_mail_headers": "<placeholder headers>",
+        "classification_probabilities": "[4.4390962e-01 5.5609030e-01 1.0581887e-07]",
+        "email_embedding": "[0.1, -0.2, 0.3]",
+        "mail_file_name": "noname.ext",
+        "mail_file_path": "/job/input/attachment",
+        "main_probabilities": {
+          "DANGEROUS": "0.00%",
+          "SAFE": "44.39%",
+          "UNWANTED": "55.61%"
+        },
+        "sub_probabilities": {
+          "BLACKMAILING_PHISHING": "0.00%",
+          "CLASSIC_PHISHING": "0.00%",
+          "CLONE_PHISHING": "0.00%",
+          "EXTERNAL": "44.39%",
+          "INTERNAL": "0.00%",
+          "NEWSLETTER": "52.27%",
+          "SPAM": "3.34%",
+          "WHALING_PHISHING": "0.00%"
+        }
+      },
+      "sub_classification": "NEWSLETTER",
+      "sub_classification_breakdown": {
+        "BLACKMAIL": 3.754531950096729e-13,
+        "CLASSIC_PHISHING": 1.0581140230669916e-07,
+        "CLONE": 1.590074426294219e-12,
+        "EXTERNAL": 0.443909615278244,
+        "INTERNAL": 1.6296927349279677e-11,
+        "NEWSLETTER": 0.5227046012878418,
+        "SPAM": 0.03338570147752762,
+        "WHALING": 5.502971776177867e-12
+      },
+      "sub_classification_confidence": "0.5227046012878418",
+      "sub_classification_probabilities": "[1.6296927e-11 4.4390962e-01 3.3385701e-02 5.2270460e-01 1.0581140e-07\n 1.5900744e-12 3.7545320e-13 5.5029718e-12]"
+    },
+    "summary": {
+      "classification": "UNWANTED",
+      "confidence": "0.5560902953147888",
+      "malscore": "5.17"
+    }
+  }
+}

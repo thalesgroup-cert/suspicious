@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 
 from common.storage import StoreError
 from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import (
-    _find_mail_bucket,
     _read_object_safe,
+    find_mail_prefix,
 )
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -40,16 +40,56 @@ class MailMaterial:
     attachments: list[Attachment] = field(default_factory=list)
 
 
-def fetch_mail_material(client, mail_id: str) -> MailMaterial:
-    """Read the mail's stored parts and attachments; empty material if not found."""
+def _put(material: MailMaterial, rel: str, data: bytes) -> None:
+    if rel.startswith("attachments/"):
+        material.attachments.append(Attachment(rel[len("attachments/"):], data))
+    elif rel.endswith(".headers"):
+        material.headers = data.decode("utf-8", "replace")
+    elif rel.endswith(".txt"):
+        material.text = data.decode("utf-8", "replace")
+    elif rel.endswith(".html"):
+        material.html = data.decode("utf-8", "replace")
+    elif rel.endswith(".eml"):
+        material.eml = data
+
+
+def _from_tar(mail_id: str, mail_archive) -> MailMaterial | None:
+    """The material in the submission's tar (mailtext's safety rules), None when there is no tar or
+    it is refused. Root files and ``attachments/``; a file named after the mail wins over another of
+    its kind (a web upload's tar also holds the uploaded ``user_submission.eml``)."""
+    from connectors.contrib.ai_model.mailtext import TAR_ERRORS, open_safe_tar
+
+    stored = getattr(mail_archive, "archive", None)
+    if stored is None:
+        return None
     material = MailMaterial()
-    bucket = _find_mail_bucket(client, mail_id)
-    if not bucket:
-        logger.warning("campaign material: no bucket holds mail %s", mail_id)
+    try:
+        with open_safe_tar(stored) as (tar, files):
+            for path, member in sorted(files, key=lambda f: f[0].stem == mail_id):
+                if len(path.parts) == 1 or (len(path.parts) > 1 and path.parts[0] == "attachments"):
+                    _put(material, str(path), tar.extractfile(member).read())
+    except TAR_ERRORS as exc:
+        # The class only: the message names archive members, which are the mail's file names.
+        logger.warning("campaign material: archive of mail %s refused: %s", mail_id, type(exc).__name__)
+        return None
+    return material
+
+
+def fetch_mail_material(client, mail_id: str, bucket_name: str = "", mail_archive=None) -> MailMaterial:
+    """Read the mail's stored parts and attachments; empty material if not found.
+    ``bucket_name`` is the mail's ``MailArchive.bucket_name`` (see find_mail_prefix). When the store
+    has no location for the mail (a web upload's prefix is not recorded), ``mail_archive``'s tar
+    stands in. Remaining limit: a web upload whose tar can no longer be read gives empty material."""
+    location = find_mail_prefix(client, mail_id, bucket_name)
+    if not location:
+        material = _from_tar(mail_id, mail_archive)
+        if material is None:
+            logger.warning("campaign material: no bucket holds mail %s", mail_id)
+            return MailMaterial()
         return material
-    prefix = f"{mail_id}/"
+    material = MailMaterial()
+    bucket, prefix = location
     for obj in client.list(bucket, prefix=prefix, recursive=True):
-        rel = obj.name[len(prefix):]
         try:
             data = _read_object_safe(client, bucket, obj.name)
         except StoreError as exc:
@@ -60,16 +100,7 @@ def fetch_mail_material(client, mail_id: str) -> MailMaterial:
         except Exception as exc:  # noqa: BLE001 — one unreadable object must not lose the rest
             logger.warning("campaign material: cannot read %s: %s", obj.name, exc)
             continue
-        if rel.startswith("attachments/"):
-            material.attachments.append(Attachment(rel[len("attachments/"):], data))
-        elif rel.endswith(".headers"):
-            material.headers = data.decode("utf-8", "replace")
-        elif rel.endswith(".txt"):
-            material.text = data.decode("utf-8", "replace")
-        elif rel.endswith(".html"):
-            material.html = data.decode("utf-8", "replace")
-        elif rel.endswith(".eml"):
-            material.eml = data
+        _put(material, obj.name[len(prefix):], data)
     return material
 
 

@@ -17,6 +17,8 @@ fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 class AttachmentDispatchResult:
     services: List[AttachmentJobLauncherService] = field(default_factory=list)
     ai_archive: Optional[Any] = None
+    # An archive row with no file: no AI result will come for this mail.
+    ai_missing: bool = False
 
 
 class Handlers:
@@ -65,8 +67,9 @@ class Handlers:
 
             if mail_archive.archive is None:
                 fetch_mail_logger.info(
-                    f"Mail archive {mail_archive.id} has no file attached; skipping Cortex AI"
+                    f"Mail archive {mail_archive.id} has no file attached; skipping the AI"
                 )
+                result.ai_missing = True
             else:
                 result.ai_archive = mail_archive
 

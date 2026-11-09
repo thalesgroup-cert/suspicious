@@ -111,6 +111,36 @@ class TestBreakers(unittest.TestCase):
         self.assertIn("another_connector", BREAKERS)
 
 
+class TestBreakerStateLog(unittest.TestCase):
+    """Every breaker logs its state changes: an opening at WARNING, the rest at INFO."""
+
+    def test_a_breaker_opened_by_fail_max_failures_logs_the_transitions(self):
+        from common.http_client import BREAKER_FAIL_MAX, BREAKERS, ensure_breaker
+        breaker = ensure_breaker("log-probe")
+        self.addCleanup(BREAKERS.pop, "log-probe", None)
+
+        def boom():
+            raise RuntimeError("down")
+
+        with self.assertLogs("common.http_client", level="INFO") as logs:
+            for _ in range(BREAKER_FAIL_MAX):
+                try:
+                    breaker.call(boom)
+                except Exception:
+                    pass
+            breaker.close()
+        self.assertEqual(logs.output, [
+            "WARNING:common.http_client:circuit breaker log-probe: closed -> open",
+            "INFO:common.http_client:circuit breaker log-probe: open -> closed",
+        ])
+
+    def test_the_predefined_breakers_log_too(self):
+        from common.http_client import BREAKERS
+        self.addCleanup(BREAKERS["cortex"].close)
+        with self.assertLogs("common.http_client", level="WARNING"):
+            BREAKERS["cortex"].open()
+
+
 class TestRetryDecorator(unittest.TestCase):
     """RETRY retries on ConnectionError/Timeout/5xx but not 4xx."""
 

@@ -5,7 +5,7 @@ EXPECTED_APP_LOGGERS = [
     "api", "case_handler", "cortex_job", "score_process", "connectors",
     "mail_feeder", "email_process", "url_process", "ip_process",
     "hash_process", "file_process", "domain_process", "dashboard",
-    "settings", "profiles", "tasp", "suspicious",
+    "settings", "profiles", "tasp", "suspicious", "common",
 ]
 
 

@@ -25,6 +25,7 @@ def _make_handlers_mock(mock_handlers_cls):
     attachment_result = MagicMock()
     attachment_result.services = []
     attachment_result.ai_archive = None
+    attachment_result.ai_missing = False
     handlers.handle_attachments.return_value = attachment_result
 
     handlers.handle_mail_header.return_value = []
@@ -246,6 +247,7 @@ class DeferredLaunchTest(django.test.TestCase):
     never started) and the user got "Internal Server Error".
     """
 
+    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
     @patch("tasp.tasks.reconcile_case")
     @patch("tasp.tasks.dispatch_case_analysis")
     @patch("mail_feeder.global_submission.gsubmission.CortexJob")
@@ -254,7 +256,7 @@ class DeferredLaunchTest(django.test.TestCase):
     @patch("mail_feeder.global_submission.gsubmission.Handlers")
     def test_defer_launch_queues_the_task_instead_of_launching(
         self, mock_handlers_cls, mock_user_cls, mock_case_cls, mock_cortex_cls,
-        mock_dispatch, mock_reconcile,
+        mock_dispatch, mock_reconcile, mock_queue,
     ):
         from django.contrib.auth import get_user_model
         from ip_process.models import IP
@@ -279,7 +281,7 @@ class DeferredLaunchTest(django.test.TestCase):
             )
 
         mock_cortex_cls.return_value.launch_cortex_jobs.assert_not_called()
-        mock_cortex_cls.return_value.launch_cortex_ai_jobs.assert_not_called()
+        mock_queue.assert_not_called()
         mock_dispatch.delay.assert_called_once_with(
             7,
             [
@@ -290,3 +292,113 @@ class DeferredLaunchTest(django.test.TestCase):
             use_sender_domain=True,
         )
         mock_reconcile.delay.assert_not_called()
+
+
+class InlineAiHandOffTest(django.test.TestCase):
+    """The inline mail path hands a mail with a readable archive to the mail_ai provider."""
+
+    def run_inline(self, ai_archive, ai_missing=False):
+        from django.contrib.auth import get_user_model
+
+        user = get_user_model().objects.create_user(username="inline_ai_u", password="x")
+        case = MagicMock()
+        case.id = 9
+        order = []
+        gs = "mail_feeder.global_submission.gsubmission"
+        with patch("tasp.tasks.reconcile_case"), \
+                patch(f"{gs}.CortexJob") as cortex_cls, \
+                patch(f"{gs}.CaseCreatorService") as case_cls, \
+                patch(f"{gs}.UserCreationService") as user_cls, \
+                patch(f"{gs}.Handlers") as handlers_cls:
+            handlers = _make_handlers_mock(handlers_cls)
+            handlers.handle_mail_body.return_value = [("/tmp/m/body.txt", "mail_body")]
+            handlers.handle_attachments.return_value.ai_archive = ai_archive
+            handlers.handle_attachments.return_value.ai_missing = ai_missing
+            user_cls.return_value.get_or_create_user.return_value = user
+            case_cls.return_value.create_case.return_value = case
+            cortex_cls.return_value.launch_cortex_jobs.side_effect = lambda **_: order.append("jobs")
+            instance = MagicMock()
+            instance.reportedBy = "x@example.com"
+            GlobalSubmissionService()._handle_common_tasks(instance, "email-1", "mail.tar.gz", "")
+        return case, cortex_cls.return_value, order
+
+    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
+    def test_a_readable_archive_hands_the_case_over_once_after_the_cortex_jobs(self, mock_queue):
+        order = []
+        mock_queue.side_effect = lambda *a: order.append("ai")
+        case, _, jobs = self.run_inline(MagicMock())
+        mock_queue.assert_called_once_with(case)
+        self.assertEqual(jobs + order, ["jobs", "ai"])
+
+    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
+    def test_no_archive_hands_nothing_over(self, mock_queue):
+        self.run_inline(None)
+        mock_queue.assert_not_called()
+
+    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai",
+           side_effect=RuntimeError("boom"))
+    def test_a_failed_hand_off_still_marks_the_case_dispatched(self, mock_queue):
+        case, _, _ = self.run_inline(MagicMock())
+        mock_queue.assert_called_once()
+        case.save.assert_any_call(update_fields=["dispatched_at"])
+
+    def test_without_a_provider_nothing_is_queued_and_no_cortex_ai_job_runs(self):
+        from cortex_job.models import CaseAnalyzerJob
+
+        case, cortex, _ = self.run_inline(MagicMock())
+        self.assertFalse(CaseAnalyzerJob.objects.exists())
+        self.assertEqual([name for name, *_ in cortex.method_calls], ["launch_cortex_jobs"])
+        self.assertEqual(case.results_ai, "Inconclusive")
+        case.save.assert_any_call(update_fields=["results_ai"])
+
+    @patch("mail_feeder.global_submission.gsubmission.mark_ai_missing")
+    def test_an_archive_row_without_a_file_marks_the_ai_missing(self, mark):
+        # The Cortex path marked it Inconclusive: the archive row existed, no AI job ever ran.
+        case, _, _ = self.run_inline(None, ai_missing=True)
+        mark.assert_called_once_with(case)
+
+    @patch("mail_feeder.global_submission.gsubmission.mark_ai_missing")
+    def test_a_mail_without_an_archive_keeps_the_ai_default(self, mark):
+        self.run_inline(None)
+        mark.assert_not_called()
+
+
+class HandleAttachmentsAiArchiveTest(django.test.TestCase):
+    """The real Handlers.handle_attachments decides between ai_archive and ai_missing."""
+
+    def setUp(self):
+        from django.utils import timezone
+        from mail_feeder.models import Mail
+
+        self.mail = Mail.objects.create(
+            subject="s", reportedBy="r", date=timezone.now(), to="t", mail_id="m-att"
+        )
+
+    def handle(self, mail_zip="/tmp/mail.tar.gz"):
+        from mail_feeder.global_submission.handlers import Handlers
+
+        return Handlers().handle_attachments(self.mail, mail_zip)
+
+    def test_an_archive_with_a_file_is_handed_to_the_ai(self):
+        from file_process.models import File
+        from hash_process.models import Hash
+        from mail_feeder.models import MailArchive
+
+        file = File.objects.create(linked_hash=Hash.objects.create(value="h-att"), tmp_path="m.tgz")
+        archive = MailArchive.objects.create(mail=self.mail, archive=file)
+        result = self.handle()
+        self.assertEqual(result.ai_archive, archive)
+        self.assertFalse(result.ai_missing)
+
+    def test_an_archive_row_without_a_file_marks_the_ai_missing(self):
+        from mail_feeder.models import MailArchive
+
+        MailArchive.objects.create(mail=self.mail, archive=None)
+        result = self.handle()
+        self.assertIsNone(result.ai_archive)
+        self.assertTrue(result.ai_missing)
+
+    def test_no_archive_sets_neither(self):
+        result = self.handle(mail_zip=None)
+        self.assertIsNone(result.ai_archive)
+        self.assertFalse(result.ai_missing)

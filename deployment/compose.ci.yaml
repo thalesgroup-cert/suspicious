@@ -14,9 +14,10 @@ services:
     environment:
       BACKEND_URL: "http://suspicious:9020"
       WEBHOOK_SECRET: "${WEBHOOK_SECRET}"
+      # No AI analyzer: settings.ci.json's analyzers.ai names the AI vote's Analyzer row
+      # (ai_model connector), not a Cortex analyzer, and sync_cortex does not check that role.
       ANALYZERS_JSON: >-
-        [{"id":"ai","name":"AI_Mail_Analyzer_2_0","dataType":"file","verdict":"safe"},
-         {"id":"fi","name":"FileInfo_8_0","dataType":"file","verdict":"info"},
+        [{"id":"fi","name":"FileInfo_8_0","dataType":"file","verdict":"info"},
          {"id":"hl","name":"CIRCLHashlookup_1_1","dataType":"hash","verdict":"info"}]
     networks:
       suspicious_network:

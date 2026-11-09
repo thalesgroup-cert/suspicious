@@ -23,7 +23,6 @@ class CortexAnalyzerReports:
         analyzer reports), compute the verdict, and apply it (persist,
         notify, KPI).
         """
-        from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
         from score_process.scoring.collect import collect_signals, collect_votes
         from score_process.scoring.engine import score_case
         from score_process.scoring.apply import apply_verdict
@@ -42,21 +41,6 @@ class CortexAnalyzerReports:
                 return
 
             mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
-            if mail:
-                # AI classification is supplementary — never let a bug or
-                # transient failure in here block the scoring pass below
-                # (previously it could: an unhandled exception here used to
-                # propagate to the outer except and skip collect_signals /
-                # score_case / apply_verdict entirely, silently leaving
-                # every mail case's verdict at its default Inconclusive).
-                try:
-                    CortexJobManager().manage_ai_jobs(case)
-                except Exception as exc:
-                    update_cases_logger.error(
-                        "get_report: manage_ai_jobs failed for case %s: %s",
-                        case.id, exc, exc_info=True,
-                    )
-
             signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
             try:
                 votes = collect_votes(case, ai)
@@ -376,8 +360,8 @@ class CortexAnalyzerReports:
         """Drop the AI mail classifier's own report from a per-artifact
         report list before weighting.
 
-        AI_Mail_Analyzer attaches its report to the mail archive's `file`
-        (see cortex_and_job_management.manage_ai_jobs), and collect.py
+        AI_Mail_Analyzer attached its report to the mail archive's `file`
+        (historical Cortex AI reports on existing cases), and collect.py
         already surfaces that same score/confidence separately as the
         dedicated `ai` override signal (built from case.score_ai/
         confidence_ai). Leaving it inside this generic per-file weighted
@@ -386,9 +370,7 @@ class CortexAnalyzerReports:
         a tie and lets the case fall back to the (possibly neutral) base
         score instead of the AI's actual verdict.
         """
-        from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
+        from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
 
-        ai_name = _get_cortex_config().get("analyzers", {}).get("ai")
-        if not ai_name:
-            return list(reports)
+        ai_name = ai_analyzer_name()
         return [r for r in reports if r.analyzer.name != ai_name]

@@ -7,8 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The AI mail analyzer runs as a connector, `ai_model`, and no longer as a Cortex job. It is off by
+  default. With the connector enabled, a mail is handed to it, and the result is stored as an
+  `AiAssessment` per case (model version `v0` today) plus the case's AI result, score, confidence and
+  category. The model server gets a `/v2` API (`AI_INFERENCE_TOKEN`): every `/v2` route except
+  `/v2/health/live` and `/v2/health/ready` needs the token, and answers 503 when the server has none
+  set. Set the same token in `integrations.ai_model.token`. See `docs/components/analyzers.md`. The
+  case view has no AI assessment section yet (a later change): the AI analyzer card reads Cortex
+  reports, so it stays empty for new cases. The AI result in the overview still shows.
+- Campaign detection runs from the `ai_model` connector. Its `case_finalised` hook queues a Celery
+  task, `connectors.tasks.run_campaign_detection`, that adds the mail to the ChromaDB collection
+  `suspicious_mails` and, when the AI result is `DANGEROUS` and at least three similar mails are
+  found, creates or joins a campaign and sends `campaign_updated`, so TheHive raises its campaign
+  alert. The task does not run under the connector's circuit breaker, so a ChromaDB outage does not
+  stop classification. A failed run is retried up to three times (after 30, 60 and 120 s), then
+  logged at ERROR with the case id and the error class. An object store that answers
+  `access_denied` or `invalid` is not retried and is logged at once. A case deleted before the task
+  runs is skipped, and headers that cannot be parsed are dropped and the mail is detected without
+  them. Set `integrations.chromadb.collection_name` to `suspicious_mails` in `settings.json` (there
+  is no Settings field for it), or the `chromadb` cleanup connector, which deletes documents older
+  than 15 days by default (`threshold_days`), never removes old campaign documents. The name is read
+  from the `chromadb` connector's configuration, so a configuration saved for it in the database
+  wins over `settings.json`. The `ai_model` health check and a one-time worker warning report the
+  mismatch.
+- `python manage.py ai_model_campaign_replay <campaign_ref>` replays a campaign the Cortex AI path
+  built through the connector's detection, from the members' Cortex AI reports, and compares the
+  members. It checks membership only, covers the stored members plus the campaign-less `DANGEROUS`
+  Cortex-reported mails between the lowest and highest member id, and changes nothing: the
+  transaction is rolled back, the mails are compared in an in-process Chroma and no event is sent.
+  It cannot replay a campaign the connector built. It holds the campaign's member row locks for the
+  whole replay, so a replay on the newest campaign can make live detection retry briefly: run it
+  off-peak or expect retries. See `docs/components/analyzers.md`.
+- Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
+  be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already
+  enabled.
+
+### Removed
+
+- The Cortex AI path. The Cortex `AI_Mail_Analyzer` (its catalog entry, `AIMailAnalyzer.json`, the
+  thin client `ai_mail_classifier.py` and its `aimailanalyzer:local` image), the server's legacy
+  `/classify` route, the `inference_url` analyzer item and the `172.17.0.1` host port of
+  `ai_inference` are gone. The server is reachable as `http://ai_inference:8090` on `suspicious_net`
+  only. The backend no longer launches a Cortex AI job (`launch_cortex_ai_jobs`, `manage_ai_jobs`)
+  and `case_handler/campaigns.py` (campaign detection on reconcile) is gone.
+- **Breaking: an instance that does not enable `ai_model` has no AI vote.** A mail case gets
+  `results_ai = Inconclusive` and scoring treats the AI vote as missing, as when the Cortex AI job
+  failed. Such a mail is then `Dangerous` when the number of malicious analyzer results is at least
+  one third of the scored ones, rounded down, and at least one, or when a domain or URL is
+  deny-listed, and `Failure` when no result scored. Otherwise it finalises as `Inconclusive` (rule
+  `analysis-incomplete`), unless an allow-list majority makes it `Safe` or an embedded indicator
+  raises its band. So after the upgrade most mails that the analyzer count does not make `Dangerous`
+  finalise as `Inconclusive` instead of `Safe` or `Suspicious`, and the submitter's notification
+  mail, the TheHive challenge text and the dashboards show that. Without the connector there is no
+  campaign detection either. **Upgrade step: enable `ai_model` (and set its `url` and `token`) as
+  part of the upgrade.**
+- Historical Cortex AI reports on existing cases are still parsed and still kept out of the weighted
+  blend. Keep `integrations.cortex.analyzers.ai` in `settings.json`: it names the `Analyzer` row the
+  connector's ledger row and the AI vote's weight use (without the key the name is
+  `AI_Mail_Analyzer`). The Cortex analyzer sync no longer reports that role as missing from Cortex
+  and leaves its row active.
+- The inference server's `public` model variant. No route classified with it: the server no longer
+  loads or hot-reloads `models_public/`, `/health` lists only the `personal` variant, and
+  `ai_inference` no longer mounts `models_public/`.
+
 ### Fixed
 
+- A repeated finalisation of a case already in a campaign sends `campaign_updated` again, and
+  TheHive's campaign sync is idempotent, so the alert is not duplicated. The run also stores the
+  case's ChromaDB document if it is missing and tags the campaign's members, so a worker killed
+  after the campaign rows were written no longer leaves the campaign unannounced. Two runs for one
+  case at the same time make one campaign. While ChromaDB is down, a case already in a campaign
+  is still announced; its document and the members' tags wait for a later run.
+- A refusal from the AI inference server no longer stores or logs the server's detail text: the
+  `ai_model` delivery error and the worker log carry only the HTTP status, because a 422 detail
+  echoes the request, so the mail body. A `503` the operator must fix keeps a fixed phrase
+  (`models unavailable`, `vectorizer unavailable` or `token not configured`).
+- A mail uploaded through the web form now appears in the TheHive campaign alert's material (its
+  headers, bodies, `.eml` and attachments). Its object-store location is not recorded, so the
+  material is read from the submission's tar archive, under the same member and size limits as
+  the `ai_model` mail reader. A web-uploaded mail whose archive can no longer be read is still
+  missing from the alert.
+- A connector `url` field (type `url` in the connector's schema) is now checked when its
+  configuration is saved, through `PUT /api/connectors/<name>/config/` or the Django admin's
+  runtime config page: it must use `http` or `https`, name a host and carry no user name or
+  password. Any other value, for example `file:///etc/passwd` or `http://user:pw@host`, is refused
+  with HTTP 400 and an error on that field; the value is not echoed. An empty optional url is still
+  accepted. Values saved before the check, or set in `settings.json`, are not rewritten: the
+  connector's "Test connection" button (`POST /api/connectors/<name>/test/`) reports them as an
+  invalid saved url without running the health check, and the `ai_model` connector fails its calls
+  with `url is not a valid http(s) URL`.
 - Deleting a user no longer deletes the allow-list, deny-list and campaign-list entries they added.
   The `user` link on those six list tables is now nullable and set to empty on deletion, so the
   entries stay and only lose their author (migration `settings/0014`). Before, the entries vanished

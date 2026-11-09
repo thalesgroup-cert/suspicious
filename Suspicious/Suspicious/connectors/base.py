@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
+from urllib.parse import urlsplit
 from dataclasses import asdict, dataclass
 from typing import Any, ClassVar
 
@@ -17,6 +18,11 @@ EVENT_CAMPAIGN_UPDATED = "campaign_updated"
 VALID_EVENTS = frozenset({
     EVENT_CASE_CREATED, EVENT_CASE_FINALISED, EVENT_CASE_MODIFIED, EVENT_CAMPAIGN_UPDATED,
 })
+
+# Analysis-provider slots: a connector whose manifest sets ``provides`` to one of
+# these kinds supplies that analysis (see Connector.analyze). One enabled per kind.
+PROVIDER_KIND_MAIL_AI = "mail_ai"
+VALID_PROVIDER_KINDS = frozenset({PROVIDER_KIND_MAIL_AI})
 
 FIELD_TYPES = frozenset({"str", "int", "bool", "url", "secret"})
 
@@ -34,6 +40,47 @@ class ConfigField:
     required: bool = False
     default: Any = None
     help: str = ""
+
+
+URL_ERROR = "must be an http or https URL with a host and no credentials"
+
+
+def _dotted_get(data: dict, dotted: str):
+    node = data
+    for part in dotted.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+    return node
+
+
+def valid_url(value) -> bool:
+    """http or https, a host, a valid port if any, and no user or password in it. Surrounding
+    whitespace, a tab, CR or LF refuse it: urlsplit drops them silently, so the value would not be
+    the one checked."""
+    if not isinstance(value, str) or value != value.strip() or any(c in value for c in "\t\r\n"):
+        return False
+    try:
+        parts = urlsplit(value)
+        parts.port  # noqa: B018 -- raises ValueError on a port out of range
+    except ValueError:
+        return False
+    return (parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
+            and "@" not in parts.netloc)
+
+
+def url_errors(schema, config: dict) -> dict[str, str]:
+    """{field key: URL_ERROR} for every ``url`` field of ``schema`` whose value in ``config`` is
+    set and not a valid_url. None and "" are left to the required check. The message never
+    carries the value: a URL can hold a secret."""
+    errors = {}
+    for field in schema:
+        if field.type != "url":
+            continue
+        value = _dotted_get(config if isinstance(config, dict) else {}, field.key)
+        if value not in (None, "") and not valid_url(value):
+            errors[field.key] = URL_ERROR
+    return errors
 
 
 @dataclass(frozen=True)
@@ -62,11 +109,16 @@ class ConnectorManifest:
     events: tuple[str, ...] = ()
     schedules: tuple[Schedule, ...] = ()
     enabled_by_default: bool = False
+    provides: str = ""  # analysis-provider kind, or "" for a plain connector
 
     def validate(self) -> None:
         if not _SLUG_RE.match(self.name):
             raise ValueError(
                 f"connector name {self.name!r} must match {_SLUG_RE.pattern}"
+            )
+        if self.provides and self.provides not in VALID_PROVIDER_KINDS:
+            raise ValueError(
+                f"unknown provides {self.provides!r} in connector {self.name!r}"
             )
         for event in self.events:
             if event not in VALID_EVENTS:
@@ -81,6 +133,18 @@ class ConnectorManifest:
                 raise ValueError(
                     f"schedule {schedule.name!r} interval must be > 0 seconds"
                 )
+
+
+@dataclass(frozen=True)
+class ProviderResult:
+    """What an analysis provider returns from ``Connector.analyze``."""
+    result: str            # SAFE | UNWANTED | DANGEROUS | INCONCLUSIVE
+    score: float           # as Case.score_ai stores it (already rounded)
+    confidence: float      # percent, as Case.confidence_ai stores it
+    category: str          # as Case.category_ai stores it
+    model_version: str
+    assessment: dict       # remaining AiAssessment fields; keys are the model's field names
+    reason: str = ""       # why, when result is INCONCLUSIVE
 
 
 @dataclass(frozen=True)
@@ -137,4 +201,9 @@ class Connector(ABC):
         raise NotImplementedError
 
     def sync(self) -> None:  # pragma: no cover
+        raise NotImplementedError
+
+    def analyze(self, kind: str, case_id: int) -> ProviderResult:  # pragma: no cover
+        """Analysis-provider hook: implemented by connectors whose manifest
+        ``provides`` the given kind."""
         raise NotImplementedError

@@ -14,6 +14,7 @@ from mail_feeder.email_info.email_info import MailInfoService
 
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
+from connectors.providers import mark_ai_missing, queue_mail_ai
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
 from .models import MailSubmissionData
@@ -167,6 +168,9 @@ class GlobalSubmissionService:
             fetch_mail_logger.error("Case creation failed for email %s; skipping dispatch", email_id)
             return
 
+        if attachment_result.ai_missing:
+            mark_ai_missing(case)
+
         if defer_launch:
             self._defer_launch(case, artifact_service, attachment_result, header_intents + body_intents)
             return
@@ -186,10 +190,10 @@ class GlobalSubmissionService:
                 )
         if attachment_result.ai_archive is not None:
             try:
-                cortex.launch_cortex_ai_jobs(attachment_result.ai_archive, "file", case=case)
+                queue_mail_ai(case)
             except Exception:
                 fetch_mail_logger.exception(
-                    "Failed to launch Cortex AI job (case=%s)",
+                    "Failed to hand the case to the mail AI provider (case=%s)",
                     getattr(case, "id", None),
                 )
 
@@ -205,7 +209,7 @@ class GlobalSubmissionService:
 
         The task re-fetches model instances by pk, takes file paths as plain values
         (the worker shares /app/case and the mail work dir with the web container),
-        and runs the AI analyzer last, as the inline path does.
+        and hands the case to the mail AI provider last, as the inline path does.
         """
         from django.db import transaction
         from tasp.tasks import AI_ARCHIVE_INTENT, PATH_INTENT, dispatch_case_analysis

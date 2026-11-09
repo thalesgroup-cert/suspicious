@@ -159,11 +159,11 @@ def collect_votes(case, ai=None) -> tuple:
     artifact and is allow-listed on another votes dissent, not safe."""
     from api.utils.analyzer_reports import reports_for_case
     from api.views.investigations import _dedup_analyzer_reports
-    from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
+    from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
     from cortex_job.models import Analyzer
     from score_process.scoring.cortex_analyzers.allow_list import is_allow_listed_category
 
-    ai_name = _get_cortex_config().get("analyzers", {}).get("ai")
+    ai_name = ai_analyzer_name()
     seen: dict = {}   # analyzer name -> [weight, worst band, any allow-list hit, any non-Safe report on an unlisted target]
 
     def add(name, weight, report_band, hit, unlisted=False):

@@ -182,7 +182,7 @@ services:
       retries: 10
       start_period: 60s
 
-  # AI_Mail_Analyzer's persistent model server. Behind the `ai` profile so a
+  # AIMailAnalyzer's persistent model server. Behind the `ai` profile so a
   # bare `docker compose up` (e.g. the CI stack, which stubs Cortex) does not
   # build/pull the torch image; the Makefile enables the profile for every
   # `make` target. Plain compose users: `docker compose --profile ai up -d`.

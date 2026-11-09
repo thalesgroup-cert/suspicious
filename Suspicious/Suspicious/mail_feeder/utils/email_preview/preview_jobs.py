@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 from typing import Callable, Optional
 
+from common.storage.layout import resolve_submission_location
 from mail_feeder.models import Mail, MailArchive
 
 logger = logging.getLogger(__name__)
@@ -32,12 +33,9 @@ def build_storage_client():
 def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
     """Stream the previewable .eml from the archive.
 
-    Resolves both storage layouts. Legacy: bucket-per-submission, where
-    ``bucket_name`` is a real bucket holding the .eml at the root. Portable
-    prefix contract: one shared feeder bucket where the submission id is a
-    *prefix*: MailArchive.bucket_name still carries that id, so when no
-    bucket of that name exists we fall back to the feeder bucket + prefix
-    (otherwise listing raises not_found and no preview renders).
+    Resolves both storage layouts (common.storage.layout): a bucket named
+    ``bucket_name`` (legacy, bucket-per-submission) or the shared feeder
+    bucket plus the submission-id prefix (portable prefix contract).
 
     The archive holds both the reporter wrapper (`user_submission.eml` /
     `reporter-submission.eml`) and the reported message (any other .eml).
@@ -45,18 +43,10 @@ def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
     non-wrapper .eml and only fall back to a wrapper when nothing else
     exists (legacy submissions before the split).
     """
-    if storage.client.bucket_exists(bucket_name):
-        bucket, prefix = bucket_name, ""
-    else:
-        try:
-            from settings.config import get_section
-            feeder_bucket = (get_section("storage.s3") or {}).get("feeder_bucket", "")
-        except Exception:
-            feeder_bucket = ""
-        if not feeder_bucket:
-            return None
-        bucket = feeder_bucket
-        prefix = bucket_name.rstrip("/") + "/"
+    location = resolve_submission_location(storage.client, bucket_name)
+    if location is None:
+        return None
+    bucket, prefix = location
 
     objects = list(storage.client.list(bucket, prefix, True))
     eml_keys = [

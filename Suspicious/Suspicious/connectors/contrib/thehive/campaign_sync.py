@@ -41,7 +41,9 @@ def load_member(case, store, own_domains) -> MemberMaterial | None:
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
     if mail is None:
         return None
-    material = fetch_mail_material(store, str(mail.mail_id))
+    archive = mail.mail_archive.select_related("archive").first()
+    bucket_name = (archive.bucket_name if archive else "") or ""
+    material = fetch_mail_material(store, str(mail.mail_id), bucket_name, archive)
     kept, skipped = select_attachments(material.attachments)
     iocs = extract_iocs(material, kept, skipped, own_domains=own_domains)
     info = MemberInfo(

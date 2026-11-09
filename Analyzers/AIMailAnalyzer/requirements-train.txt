@@ -1,8 +1,7 @@
 # Extra deps for train_models.ipynb / mailbox_to_csv.ipynb / build_test_dataset.py
 # / train_test_models.py, on top of requirements.txt
 # (this doesn't duplicate torch/numpy/sentence_transformers pins here on purpose --
-# a second independent copy is exactly how the health.py/ai_mail_classifier.py
-# model-dim drift happened).
+# a second independent copy is exactly how an earlier model-dim drift happened).
 #
 # Usage: pip install -r requirements.txt -r requirements-train.txt
 -r requirements.txt

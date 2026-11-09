@@ -1,5 +1,7 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from import_export import fields, resources
 from import_export.admin import ImportExportModelAdmin
@@ -330,8 +332,30 @@ class AllowListFiletypeAdmin(ImportExportModelAdmin):
 
 
 # RuntimeConfig
+class RuntimeConfigForm(forms.ModelForm):
+    class Meta:
+        model = RuntimeConfig
+        fields = "__all__"
+
+    def clean(self):
+        """A connector section is held to the same url check as the connector config API."""
+        from connectors.base import URL_ERROR, url_errors
+        from connectors.registry import registry
+
+        cleaned = super().clean()
+        key = cleaned.get("key") or ""
+        name = key[len("integrations."):] if key.startswith("integrations.") else ""
+        if name in registry.names():
+            bad = url_errors(registry.get(name).manifest.config_schema, cleaned.get("value"))
+            if bad:
+                raise ValidationError({"value": "invalid url in " + ", ".join(f"'{k}'" for k in bad)
+                                       + f": {URL_ERROR}"})
+        return cleaned
+
+
 @admin.register(RuntimeConfig)
 class RuntimeConfigAdmin(admin.ModelAdmin):
+    form = RuntimeConfigForm
     list_display = ("scope", "key", "value", "updated_at")
     list_filter = ("scope",)
     search_fields = ("key",)

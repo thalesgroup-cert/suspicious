@@ -3,7 +3,7 @@
 with no interactive Jupyter session. Same algorithm, same hyperparameters,
 same 5-model pipeline as the notebook -- transcribed to a plain script so it
 can run inside a container via `python train_test_models.py`. Saves models
-under the exact filenames mail_analysis.MODEL_SPECS / ai_mail_classifier.py
+under the exact filenames mail_analysis.MODEL_SPECS / inference_server/
 expect (the notebook itself saves under different names -- see AIMailAnalyzer
 README/PR notes) so the analyzer can load them without renaming.
 

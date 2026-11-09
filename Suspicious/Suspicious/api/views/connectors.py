@@ -20,6 +20,7 @@ from api.serializers.connectors import (
     ConnectorDeliverySerializer,
     ConnectorSerializer,
 )
+from connectors.base import URL_ERROR, HealthStatus, _dotted_get, url_errors
 from connectors.delivery import get_state
 from connectors.models import ConnectorDelivery
 from connectors.registry import registry
@@ -118,19 +119,17 @@ class ConnectorStateView(APIView):
         if not isinstance(enabled, bool):
             return Response({"detail": "'enabled' must be a boolean."},
                             status=status.HTTP_400_BAD_REQUEST)
+        kind = registry.get(name).manifest.provides
+        if enabled and kind and any(
+            get_state(other).enabled
+            for other in registry.providers(kind) if other != name
+        ):
+            return Response({"detail": f"{name} already provides {kind}"},
+                            status=status.HTTP_409_CONFLICT)
         state = get_state(name)
         state.enabled = enabled
         state.save(update_fields=["enabled", "updated_at"])
         return Response(ConnectorSerializer(_serialize_connector(name)).data)
-
-
-def _dotted_get(data: dict, dotted: str):
-    node = data
-    for part in dotted.split("."):
-        if not isinstance(node, dict) or part not in node:
-            return None
-        node = node[part]
-    return node
 
 
 def _mask_secrets(section: dict, section_name: str) -> dict:
@@ -227,6 +226,7 @@ class ConnectorConfigView(APIView):
                 errors[field.key] = "must be an integer"
             elif value is not None and field.type == "bool" and not isinstance(value, bool):
                 errors[field.key] = "must be a boolean"
+        errors = {**url_errors(schema, payload), **errors}
         if errors:
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -269,9 +269,15 @@ class ConnectorTestView(APIView):
         if _connector_or_none(name) is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
-            health = registry.instantiate(name).health_check()
+            connector = registry.instantiate(name)
+            # A url saved before the check existed (or in settings.json) is reported, not used.
+            bad = url_errors(connector.manifest.config_schema, connector.config)
+            if bad:
+                health = HealthStatus(ok=False, detail="invalid saved url in " + ", ".join(
+                    f"'{key}'" for key in bad) + f": {URL_ERROR}")
+            else:
+                health = connector.health_check()
         except Exception as exc: # noqa: BLE001: surface as failed health
-            from connectors.base import HealthStatus
             health = HealthStatus(ok=False, detail=str(exc))
         state = get_state(name)
         state.last_health_ok = health.ok

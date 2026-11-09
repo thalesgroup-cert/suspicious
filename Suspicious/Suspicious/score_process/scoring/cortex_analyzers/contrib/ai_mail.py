@@ -1,7 +1,7 @@
 """Parser for AI_Mail_Analyzer (classification/malscore/confidence shape).
 
 Pure score extraction. Campaign detection and the TheHive push are not done here:
-they run once per case at finalisation (case_handler.campaigns) and reach
+they run once per case at finalisation (connectors.contrib.ai_model.campaigns) and reach
 connectors through the ``campaign_updated`` event.
 """
 from __future__ import annotations

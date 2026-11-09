@@ -1,4 +1,3 @@
-import json
 import logging
 
 import pybreaker
@@ -10,8 +9,7 @@ from common.http_client import get_breaker, RETRY
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.migrations._tier_seed import tier_for
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
-from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
-from case_handler.models import Case, Result
+from mail_feeder.models import MailBody, MailHeader
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -28,6 +26,16 @@ def _get_cortex_config() -> dict:
     except Exception as exc:
         fetch_mail_logger.error(f"Could not load cortex config: {exc}")
         return {}
+
+
+DEFAULT_AI_ANALYZER_NAME = "AI_Mail_Analyzer"
+
+
+def ai_analyzer_name() -> str:
+    """Name of the Analyzer row that carries the AI vote (and its weight): the configured
+    integrations.cortex.analyzers.ai, else DEFAULT_AI_ANALYZER_NAME. The ai_model connector
+    needs no Cortex analyzer, so the key may be absent."""
+    return _get_cortex_config().get("analyzers", {}).get("ai") or DEFAULT_AI_ANALYZER_NAME
 
 
 # Cortex keeps a job InProgress forever when it restarts mid-run, so this is the only thing that
@@ -122,11 +130,11 @@ class CortexJob:
                     if getattr(
                         value, "file_path", None
                     ) and value.file_path.name.endswith(".eml"):
+                        # .get(role) not .get(role, {}): an absent role must not put an
+                        # unhashable {} in this set (TypeError, swallowed below: no job at all).
                         excluded = {
-                            (cortex_config.get("analyzers", {}).get("ai", {})),
-                            (cortex_config.get("analyzers", {}).get("yara", {})),
-                            (cortex_config.get("analyzers", {}).get("sandbox", {})),
-                            (cortex_config.get("analyzers", {}).get("header", {})),
+                            cortex_config.get("analyzers", {}).get(role)
+                            for role in ("ai", "yara", "sandbox", "header")
                         }
                         analyzers = [
                             a for a in analyzers if a and a.name not in excluded
@@ -164,46 +172,6 @@ class CortexJob:
         except Exception as e:
             fetch_mail_logger.error(f"Error launching Cortex jobs for {data_type}: {e}")
             return []
-
-    def launch_cortex_ai_jobs(self, value, data_type, case):
-        """
-        Launch Cortex AI jobs for the given value and data type.
-
-        Args:
-            value: The object to analyze (file, archive, etc.).
-            data_type (str): The type of data ('file', 'mail_body', etc.).
-            case (Case): The case the dispatched jobs belong to.
-
-        Returns:
-            str or None: The job ID of the launched Cortex AI job, or None if launch failed.
-        """
-        if data_type != "file":
-            return None
-
-        archive = getattr(value, "archive", None)
-        if not archive or not hasattr(archive, "tmp_path"):
-            fetch_mail_logger.warning(
-                f"Invalid value or missing archive for data_type '{data_type}'"
-            )
-            return None
-
-        if archive.tmp_path.endswith(".eml"):
-            fetch_mail_logger.info("Skipping AI analyzer for .eml file")
-            return None
-
-        try:
-            cortex_config = _get_cortex_config()
-            ai_analyzer_name = (cortex_config.get("analyzers", {}).get("ai", {}))
-            analyzer = self.api.analyzers.get_by_name(ai_analyzer_name)
-            if not analyzer:
-                fetch_mail_logger.warning(f"AI analyzer '{ai_analyzer_name}' not found")
-                return None
-
-            report = CortexJob.run(self.api, analyzer, archive, "file", case)
-            return getattr(report, "id", None)
-        except Exception as e:
-            fetch_mail_logger.error(f"Error launching Cortex AI job: {e}")
-            return None
 
     @staticmethod
     def run(api, analyzer, value, data_type, case):
@@ -777,168 +745,3 @@ class CortexJobManager:
             if new_status not in CaseAnalyzerJob.PENDING_STATUSES:
                 caj.completed_at = timezone.now()
             caj.save(update_fields=["status", "completed_at"])
-
-    def manage_ai_jobs(self, case):
-        """
-        Manage AI jobs for a case.
-
-        Updates the case and MailInfo models if AI analysis has completed.
-
-        Args:
-            case (Case): The case to manage.
-        """
-        try:
-            eml = getattr(case.fileOrMail, "mail", None)
-            if not eml or not getattr(eml, "mail_id", None):
-                update_cases_logger.info("No valid mail found for case %s", case.id)
-                return
-        except Exception as e:
-            update_cases_logger.error(
-                "Error retrieving mail for case %s: %s", case.id, e
-            )
-            return
-
-        try:
-            mail_archive = MailArchive.objects.filter(mail=eml).first()
-            if not mail_archive:
-                update_cases_logger.info("No archive file found for case %s", case.id)
-                return
-        except Exception as e:
-            update_cases_logger.error(
-                "Error retrieving MailArchive for case %s: %s", case.id, e
-            )
-            return
-
-        update_cases_logger.info("Processing archive file: %s", mail_archive)
-
-        try:
-            cortex_config = _get_cortex_config()
-            analyzer = AnalyzerReport.objects.get(
-                analyzer__name=(cortex_config.get("analyzers", {}).get("ai", {})),
-                file=mail_archive.archive,
-            )
-            if analyzer is None:
-                raise AnalyzerReport.DoesNotExist
-
-            if analyzer.status == "Failure":
-                update_cases_logger.info(
-                    "AI Mail Analyzer report is Failure for case %s, marked Inconclusive.",
-                    case.id,
-                )
-                case.results_ai = Result.INCONCLUSIVE
-                case.save(update_fields=["results_ai"])
-                return
-            update_cases_logger.info("AI Mail Analyzer report found: %s", analyzer)
-        except AnalyzerReport.DoesNotExist:
-            update_cases_logger.info(
-                "No AI Mail Analyzer report found for archive file: %s",
-                mail_archive.archive,
-            )
-            # `analyzer` was never assigned above (the .get() that would set
-            # it is exactly what raised): use the configured AI analyzer
-            # name directly, not a lookup through a nonexistent report.
-            ai_analyzer_name = cortex_config.get("analyzers", {}).get("ai", {})
-            last_job = (
-                CaseAnalyzerJob.objects
-                .filter(case=case, analyzer__name=ai_analyzer_name)
-                .order_by("-created_at")
-                .first()
-            )
-            if last_job is None or last_job.status == CaseAnalyzerJob.STATUS_FAILURE:
-                case.results_ai = Result.INCONCLUSIVE
-                case.save(update_fields=["results_ai"])
-                update_cases_logger.info(
-                    "AI Mail Analyzer unavailable for case %s, marked Inconclusive.",
-                    case.id,
-                )
-            return
-        except Exception as e:
-            update_cases_logger.error("Error retrieving analyzer report: %s", e)
-            return
-
-        try:
-            case.score_ai = analyzer.score
-            case.confidence_ai = analyzer.confidence
-            case.category_ai = self.get_sub_class(analyzer)
-            case.results_ai = analyzer.level.capitalize()
-            case.save()
-
-            update_cases_logger.info(
-                "AI Mail Analyzer updated for case %s: score=%f, confidence=%f, category=%s",
-                case.id,
-                case.score_ai,
-                case.confidence_ai,
-                case.category_ai,
-            )
-
-            mail_info = MailInfo.objects.get(mail=eml)
-            self.update_mail_models(mail_info, case.category_ai, case.results_ai)
-
-        except Exception as e:
-            update_cases_logger.exception("Error updating case or mail info: %s", e)
-
-    def update_mail_models(self, mail_info, classification, sub_classification):
-        """
-        Update MailInfo model based on classification results.
-
-        Args:
-            mail_info (MailInfo): The mail info object to update.
-            classification (str): The main classification of the mail.
-            sub_classification (str): The subclassification of the mail.
-        """
-        if not mail_info:
-            update_cases_logger.warning("No MailInfo provided to update")
-            return
-
-        try:
-            mail_info.is_analyzed = True
-
-            classification_lower = (classification or "").strip().lower()
-            sub_class_lower = (sub_classification or "").strip().lower()
-
-            if classification_lower in {"classic_phishing", "whaling", "clone"}:
-                mail_info.is_phishing = True
-
-            if sub_class_lower == "dangerous":
-                mail_info.is_dangerous = True
-
-            mail_info.save()
-            update_cases_logger.info(
-                f"MailInfo updated for Mail ID: {getattr(mail_info.mail, 'id', 'Unknown')}"
-            )
-
-        except Exception as e:
-            update_cases_logger.error(f"Error updating MailInfo: {e}")
-
-    def get_sub_class(self, analyzer):
-        """
-        Get the subclass of the analyzer report.
-
-        Args:
-            analyzer (AnalyzerReport): The analyzer report object.
-
-        Returns:
-            str: The subclass of the analyzer, capitalized, or a default message if not found.
-        """
-        default_message = "No subclass found"
-
-        if not analyzer:
-            return default_message
-
-        report_full = getattr(analyzer, "report_full", None)
-        if not report_full:
-            return default_message
-
-        if isinstance(report_full, str):
-            try:
-                report_full = json.loads(report_full)
-            except json.JSONDecodeError:
-                update_cases_logger.warning("Failed to parse report_full as JSON")
-                return default_message
-
-        subclass = report_full.get("sub_classification")
-        if subclass:
-            max_length = Case._meta.get_field("category_ai").max_length
-            return str(subclass).capitalize()[:max_length]
-
-        return default_message

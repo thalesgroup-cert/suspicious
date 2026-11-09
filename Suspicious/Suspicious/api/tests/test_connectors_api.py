@@ -160,10 +160,45 @@ class ConnectorsApiTest(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_config_put_refuses_a_bad_url_naming_the_field_not_the_value(self):
+        from settings.models import RuntimeConfig
+        for value in ("file:///etc/passwd", "ftp://x/y", "javascript:alert(1)",
+                      "http://user:pw@host", "http:///no-host", " http://x", "http://x/ ",
+                      "http://x\ty", "http://x/a\r\nHost: y", "http://x/\n"):
+            with self.subTest(value=value):
+                response = self.client.put(
+                    "/api/connectors/dummy/config/", {"url": "http://ok", "ui_url": value}, format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(list(response.json()["errors"]), ["ui_url"])
+                self.assertNotIn(value, response.content.decode())
+        self.assertFalse(RuntimeConfig.objects.exists())
+
+    def test_config_put_accepts_valid_urls_and_an_empty_optional_one(self):
+        for url, ui_url in (("http://ai_inference:8090", "https://x/y"), ("https://x/y", "")):
+            with self.subTest(url=url):
+                response = self.client.put(
+                    "/api/connectors/dummy/config/", {"url": url, "ui_url": ui_url}, format="json",
+                )
+                self.assertEqual(response.status_code, 200)
+
+    def test_the_test_endpoint_fails_cleanly_on_a_bad_saved_url(self):
+        ConnectorState.objects.create(name="dummy", enabled=True)
+        with mock.patch.object(
+            self.registry, "instantiate", return_value=DummyConnector({"url": "http://user:pw@host"})
+        ), mock.patch.object(DummyConnector, "health_check") as health:
+            response = self.client.post("/api/connectors/dummy/test/")
+        health.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["ok"])
+        self.assertIn("'url'", response.json()["detail"])
+        self.assertNotIn("pw", response.json()["detail"])
+        self.assertFalse(ConnectorState.objects.get(name="dummy").last_health_ok)
+
     def test_test_endpoint_runs_health_check(self):
         ConnectorState.objects.create(name="dummy", enabled=True)
         with mock.patch.object(
-            self.registry, "instantiate", return_value=DummyConnector({"url": "x"})
+            self.registry, "instantiate", return_value=DummyConnector({"url": "http://x"})
         ):
             response = self.client.post("/api/connectors/dummy/test/")
         self.assertEqual(response.status_code, 200)

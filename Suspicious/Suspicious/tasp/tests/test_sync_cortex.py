@@ -116,3 +116,23 @@ class WarnOnUnresolvedConfiguredAnalyzersTests(TestCase):
                 "header" in m and "MailHeader_4_0" in m and "does not match any analyzer" in m
                 for m in cm.output
             ))
+
+    def test_the_ai_role_is_not_checked_and_its_row_stays_active(self):
+        """The AI analyzer left the Cortex catalog; analyzers.ai still names the AI vote's
+        Analyzer row (the ai_model connector), so a missing Cortex analyzer is expected."""
+        ai_row = Analyzer.objects.create(name="AI_Mail_Analyzer_1_4", analyzer_cortex_id="provider:ai")
+        with patch(
+            "tasp.cron.sync_cortex.load_config", return_value=_fake_cron_config(),
+        ), patch(
+            "cortex_job.cortex_utils.session_cortex_api.SessionCortexApi.do_get",
+        ) as mock_do_get, patch(
+            "settings.config.get_section",
+            return_value={"analyzers": self._configured(ai="AI_Mail_Analyzer_1_4")},
+        ), patch(
+            "tasp.cron.sync_cortex.log_analyzers.error",
+        ) as mock_error:
+            mock_do_get.return_value.json.return_value = [{"id": "x3", "name": "FileInfo_8_0"}]
+            sync_cortex_analyzers()
+        mock_error.assert_not_called()
+        ai_row.refresh_from_db()
+        self.assertTrue(ai_row.is_active)
