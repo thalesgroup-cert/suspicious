@@ -67,9 +67,29 @@ detection, and with it the TheHive campaign alert, also needs the connector.
 **Upgrade step:** enable `ai_model` (and set its `url` and `token`) as part of the upgrade, see
 [Enabling the connector](#enabling-the-connector).
 
+### Where the Cortex AI analyzer went
+
+The AI mail analyzer used to be a Cortex analyzer: a thin client (`ai_mail_classifier.py`, image
+`aimailanalyzer:local`) that Cortex launched per mail and that called the inference server. It is now
+the `ai_model` connector, so the call no longer depends on Cortex's job runner, and the model
+lifecycle (versions, shadow, promotion, retraining) lives next to the verdict. What is left under the
+old name, and why:
+
+| Still named `AIMailAnalyzer` / `AI_Mail_Analyzer` | What it is now | Why it stays |
+|---|---|---|
+| `Analyzers/AIMailAnalyzer/` | Code of the `ai_inference` model server, training and tests | Directory name only. Renaming it touches the Dockerfile, CI, dependabot and the LFS rule in `.gitattributes` for no behaviour change |
+| `aimailanalyzer-inference:<tag>` | The `ai_inference` image | Image name only |
+| `AI_Mail_Analyzer` (`integrations.cortex.analyzers.ai`) | The `Analyzer` row that carries the AI vote: ledger row, weight, tier 2 | Scoring and the ledger key on that row. Instances upgraded from the Cortex era may still have it as `AI_Mail_Analyzer_1_4`; keep their value |
+| `score_process/.../contrib/ai_mail.py` | Parser for old Cortex AI reports | Historical cases still display them. They stay out of the weighted blend |
+| `ai_minio_utils.py` | Object-store readers for mail text and headers | Shared by the connector, trusted-sender lookup and TheHive campaign material. The name is historical |
+
+Nothing launches a Cortex AI job any more. Cortex has no AI analyzer to install or sync. If it still
+lists one, it is a leftover (see the upgrade checklist in
+[AI inference setup](../getting-started/ai-inference.md)).
+
 Historical Cortex AI reports on existing cases still display (the AI analyzer card) and are still
 kept out of the weighted blend, so their score is not counted twice.
-`integrations.cortex.analyzers.ai` in `settings.json` (`AI_Mail_Analyzer_1_4` in the example
+`integrations.cortex.analyzers.ai` in `settings.json` (`AI_Mail_Analyzer` in the example
 settings) names the `Analyzer` row of the AI vote; without the key the name is `AI_Mail_Analyzer`:
 
 - the connector puts its ledger row (`CaseAnalyzerJob`) on that analyzer, and creates the row if it
