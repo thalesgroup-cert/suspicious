@@ -489,6 +489,8 @@ The webhook view writes `cortex_job_processed:<jobId>` into the Redis cache with
 ```
 
 Used by the AI analyzer for semantic similarity search across processed mails.
+For the AI inference stack (`ai_inference`, the `ai_model` connector and its `url` and `token`), see
+[AI inference: set up, deploy and operate](docs/getting-started/ai-inference.md).
 `token` (secret) is sent as `X-Chroma-Token`; when empty the app falls back to
 the `CHROMA_TOKEN` environment variable. Requests without it are rejected by
 `chromadb_proxy`. See [Internal service authentication](#internal-service-authentication).

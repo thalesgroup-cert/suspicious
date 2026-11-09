@@ -151,6 +151,10 @@ To train it on your own data:
 Use it alongside YARA, sandbox, and metadata analyzers. Do not auto-block on the
 classifier alone.
 
+The classifier now runs as the `ai_inference` model server called by the `ai_model` connector, not
+as a Cortex analyzer. Setup, deployment and operation:
+[AI inference guide](docs/getting-started/ai-inference.md).
+
 ## Contributing
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding standards and the pull

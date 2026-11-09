@@ -80,6 +80,7 @@ nav:
       - Quick Start: getting-started/quick-start.md
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
+      - AI inference: getting-started/ai-inference.md
   - User Guide:
       - UI tour: user-guide/tour.md
       - Submitting: user-guide/submitting.md

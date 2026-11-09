@@ -3,6 +3,9 @@
 `Analyzers/AIMailAnalyzer/` is the machine-learning email classifier. It runs as a model server,
 `ai_inference`, that the `ai_model` connector calls. It is no longer a Cortex analyzer.
 
+For the order of work (weights, token, deploy, enable, verify, retrain, harden), start with the
+[AI inference operator guide](../getting-started/ai-inference.md); this page is the reference.
+
 ## How it works
 
 - **Embeddings:** a Sentence Transformers model

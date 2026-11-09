@@ -18,6 +18,7 @@ files, URLs, IPs, and file hashes.
 
 - **See it:** [Product demo](demo.md), a 100-second video tour
 - **Run it:** [Getting Started](getting-started/quick-start.md)
+- **Enable the AI classifier:** [AI inference setup and operations](getting-started/ai-inference.md)
 - **Use it:** [User Guide](user-guide/submitting.md)
 - **Understand it:** [Architecture](architecture.md)
 - **Hack on it:** [Components](components/backend/index.md) and [Contributing](contributing.md)
