@@ -2,8 +2,9 @@
 
 Connectors are Suspicious's plugin system for pushing case activity to
 external tools — ticketing, threat-intel platforms, chat, SIEM, an LLM
-narration provider. The built-in TheHive, MISP, Watcher, SMTP-notify,
-ChromaDB, and `ai_narration` integrations are themselves connectors
+narration provider. The ten built-in connectors (TheHive, MISP, Watcher,
+SMTP-notify, ChromaDB, `ai_narration`, `case_search`, `elastic_siem`, `xsoar`
+and `ai_model`) are themselves connectors
 (`connectors/contrib/`) — see
 [`connectors/README.md`](https://github.com/thalesgroup-cert/suspicious/blob/main/Suspicious/Suspicious/connectors/README.md)
 for what each one does — and third-party packages plug in through the same
@@ -28,13 +29,16 @@ with a declarative `ConnectorManifest`. Connectors come in two tiers:
   `suspicious.connectors` entry point, installed at image build time via
   `Suspicious/requirements-connectors.txt`.
 
-A connector can react to three kinds of work:
+A connector can react to these kinds of work:
 
 | Hook | Trigger |
 |---|---|
 | `on_case_created(event)` | a new case enters the pipeline (`case_created`) |
 | `on_case_finalised(event)` | scoring finished and a verdict exists (`case_finalised`) |
+| `on_case_modified(event)` | an analyst changed a finalised case, for example its verdict (`case_modified`) |
+| `on_campaign_updated(event)` | a case created or joined a phishing campaign (`campaign_updated`); `event.campaign_id` names it |
 | `sync()` | a periodic schedule declared in `manifest.schedules`, registered into Celery beat |
+| `analyze(kind, case_id)` | the connector is the enabled analysis provider for `kind` (see [Analysis providers](#analysis-providers)) |
 
 plus a mandatory `health_check()` — a cheap connectivity/auth probe that
 must never raise (return `HealthStatus(ok=False, detail=...)` instead).
@@ -97,7 +101,10 @@ it, it never crashes startup):
 
 - `name` is a slug: `^[a-z][a-z0-9_]{1,63}$`. It doubles as the config
   section name and the breaker/ledger key.
-- `events` may only contain `case_created` / `case_finalised`.
+- `events` may only contain `case_created`, `case_finalised`,
+  `case_modified` or `campaign_updated`.
+- `provides` is empty for a plain connector, or an analysis-provider kind
+  (currently only `mail_ai`); any other value is rejected.
 - `config_schema` field types are `str`, `int`, `bool`, `url` or
   `secret`. Keys may be dotted (`instances.primary.api_key`) to describe
   nested config.
@@ -118,7 +125,7 @@ time. Connectors needing more context must re-fetch the case by id.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `event` | `str` | `case_created` or `case_finalised` |
+| `event` | `str` | `case_created`, `case_finalised`, `case_modified` or `campaign_updated` |
 | `case_id` | `int` | primary key of the case |
 | `status` | `str` | case status at emission time |
 | `results` | `str` | verdict (Safe / Inconclusive / Suspicious / Dangerous) |
@@ -127,6 +134,7 @@ time. Connectors needing more context must re-fetch the case by id.
 | `reporter_email` | `str` | address of the reporting user |
 | `created_at` | `str` | case creation time, ISO-8601 |
 | `schema_version` | `int` | currently `1` |
+| `campaign_id` | `int \| None` | set on `campaign_updated` only; `case_id` is then the case that triggered the update |
 
 **Compatibility promise:** within a major `schema_version`, changes are
 additive only — existing fields keep their name, type and meaning, new
@@ -134,6 +142,31 @@ fields may appear. `CaseEvent.from_dict` rejects payloads with a
 different major version, so a connector built against version 1 either
 receives a payload it understands or a recorded failure — never a
 silently reinterpreted one.
+
+## Analysis providers
+
+A connector whose manifest sets `provides = "mail_ai"` supplies the AI
+verdict of a mail case instead of a Cortex analyzer. The built-in `ai_model`
+connector is the only one. Rules:
+
+- At most one enabled connector per kind. Enabling a second is refused by
+  `PATCH /api/connectors/<name>/` with `{"detail": "<name> already provides mail_ai"}`.
+- When a mail case needs its AI vote, `connectors.providers.queue_mail_ai`
+  writes a pending `CaseAnalyzerJob` ledger row (job id prefixed `provider-`)
+  and queues `run_provider_analysis`. With no provider enabled the AI vote is
+  marked missing and the case is scored without it.
+- The task calls `Connector.analyze(kind, case_id)` under the connector's
+  circuit breaker. It must return a `ProviderResult`: `result`
+  (`SAFE`, `UNWANTED`, `DANGEROUS` or `INCONCLUSIVE`), `score`, `confidence`
+  (percent), `category`, `model_version`, `assessment` (the remaining
+  `AiAssessment` fields), an optional `reason` (why the result is
+  `INCONCLUSIVE`) and an optional `shadow` answer that is stored beside the
+  case and never scored.
+- A result without `model_version` is treated as a failure. Raise
+  `connectors.providers.ProviderUnavailable(message, retryable=...)` when the
+  provider cannot answer: a retryable one is retried (up to 2 retries), any
+  other error closes the ledger row as failed at once. Either way
+  `reconcile_case` then runs and scores the case without the AI vote.
 
 ## Packaging a third-party connector
 
@@ -197,7 +230,8 @@ connectivity with **Test connection**, which calls your
   external side or wait for the next event.
 - **Retries** — a raising hook is retried while `attempt <
   MAX_ATTEMPTS` (3). Each attempt gets its own ledger row.
-- **Idempotency is your job** — `case_finalised` can fire more than
+- **Idempotency is your job** — `case_finalised` (and `campaign_updated`,
+  which is announced again on a redelivery) can fire more than
   once for the same case (re-finalisation after late analyzer results;
   the same was true of the legacy integrations this framework
   replaces). Use `event.case_id` for dedup or make the downstream write

@@ -1,7 +1,8 @@
 # 🔌 Connectors — plugin framework
 
 `connectors` is the framework every integration between Suspicious and an external
-system (TheHive, MISP, a Watcher domain list, an LLM narration provider, ...) is
+system (TheHive, MISP, a Watcher domain list, an LLM narration provider, the AI
+model server, ...) is
 built on: a `Connector` base class, a discovery `registry`, an event `dispatch`,
 and a delivery pipeline with retries, a circuit breaker, and an audit ledger.
 
@@ -17,9 +18,11 @@ what the built-in connectors are.
 
 Two ways a connector runs:
 
-- **Event-driven.** A `Case` is created or reaches its terminal (finalised) state;
-  `connectors.signals`/`cortex_job.cortex_utils.reconciliation.reconcile_case_core`
-  call `connectors.dispatch.emit(event_name, case)`, which fans the event out —
+- **Event-driven.** Four events exist: `case_created` (`connectors.signals`, on
+  `post_save(Case)`), `case_finalised` (`reconcile_case_core` at the terminal state),
+  `case_modified` (an analyst changed a verdict, `api/views/investigations.py`) and
+  `campaign_updated` (`connectors.tasks.run_campaign_detection`, with `campaign_id`).
+  The emitter calls `connectors.dispatch.emit(event_name, case)`, which fans the event out —
   via Celery, after the triggering transaction commits — to every *enabled*
   connector subscribed to that event.
 - **Scheduled.** A connector declares a `Schedule` in its manifest (e.g. Watcher's
@@ -42,7 +45,8 @@ connector gets it for free and consistently.
 ```
 connectors/
 ├── base.py         # Connector, ConnectorManifest, ConfigField, Schedule,
-│                    # HealthStatus, CaseEvent — the public contract
+│                    # HealthStatus, CaseEvent, ProviderResult — the public contract
+├── providers.py     # analysis-provider slot: queue_mail_ai, finish_provider_analysis
 ├── registry.py      # discovery (built-ins + "suspicious.connectors" entry points)
 ├── dispatch.py       # emit(event_name, case) — fan-out to enabled subscribers
 ├── events.py        # build_case_event(...) — Case -> CaseEvent snapshot
@@ -59,7 +63,11 @@ connectors/
     ├── smtp_notify/
     ├── chromadb/
     ├── ai_narration/
-    └── template/      # scaffold to copy when writing a new one
+    ├── case_search/   # Elasticsearch index behind the investigations search box
+    ├── elastic_siem/  # ECS documents for Elastic Security
+    ├── xsoar/         # Cortex XSOAR incidents
+    ├── ai_model/      # mail AI provider (mail_ai), campaign detection, label sync
+    └── template/      # scaffold to copy when writing a new one (not in BUILTIN_CONNECTOR_PATHS)
 ```
 
 ---
@@ -69,7 +77,8 @@ connectors/
 - **`ConnectorManifest`** — `name` (validated slug), `version`, `category`,
   `description`, `config_schema` (tuple of `ConfigField`), `events` (subset of
   `EVENT_CASE_CREATED` / `EVENT_CASE_FINALISED` / `EVENT_CASE_MODIFIED` / `EVENT_CAMPAIGN_UPDATED`), `schedules` (tuple of
-  `Schedule`), `enabled_by_default`. `.validate()` runs at registration time —
+  `Schedule`), `enabled_by_default`, `provides` (an analysis-provider kind, currently
+  only `mail_ai`, or empty). `.validate()` runs at registration time —
   a connector with an invalid manifest fails to register, it does not take the
   app down.
 - **`ConfigField`** — one config key (dotted keys like `instances.primary.api_key`
@@ -78,12 +87,19 @@ connectors/
   every other secret in the app is.
 - **`CaseEvent`** — the frozen, versioned (`schema_version`) snapshot a hook
   receives: `event`, `case_id`, `status`, `results`, `final_score`, `confidence`,
-  `reporter_email`, `created_at`. A connector needing more than this must
+  `reporter_email`, `created_at`, and `campaign_id` (set on `campaign_updated`). A connector needing more than this must
   re-fetch the `Case` by id itself — the payload is deliberately thin so it
   round-trips through Celery/JSON cleanly.
 - **`Connector`** (ABC) — subclasses set a class-level `manifest` and implement
   `health_check()` (must never raise) plus whichever of `on_case_created`,
-  `on_case_finalised`, `on_case_modified`, `sync` their manifest actually subscribes to.
+  `on_case_finalised`, `on_case_modified`, `on_campaign_updated`, `sync` their manifest
+  actually subscribes to or schedules, and `analyze(kind, case_id)` for a provider.
+- **`ProviderResult`** — what `analyze` returns: `result`, `score`, `confidence`,
+  `category`, `model_version`, `assessment`, `reason`, `shadow`. Only one enabled
+  connector may provide a kind (`PATCH /api/connectors/<name>/` answers 409 otherwise).
+  `connectors/providers.py` queues the case (a `CaseAnalyzerJob` row with a `provider-`
+  job id), `connectors.tasks.run_provider_analysis` calls `analyze` under the breaker
+  and `finish_provider_analysis` writes the answer and enqueues `reconcile_case`.
 
 ---
 
@@ -124,12 +140,14 @@ connectors/
 
 | Connector | Category | Trigger | Default | Notes |
 |---|---|---|---|---|
-| `thehive` | Incident Response | `case_finalised`, `campaign_updated` | off | Pushes a TheHive alert for IOC cases, and creates/updates the alert of a detected phishing campaign (see below) |
+| `thehive` | Incident Response | `campaign_updated` | off | Creates/updates the TheHive alert of a detected phishing campaign (see below). Alerts for challenged cases and IOC cases come from the challenge flow and the push button, not from this subscription |
 | `misp` | Threat Intelligence | `case_finalised` | off | Pushes an MISP event |
 | `smtp_notify` | Notifications | `case_created`, `case_finalised`, `case_modified` | **on** | Emails the reporter: acknowledgement on creation, review mail when an analyst changes the verdict, final result on completion. A failed send raises and the framework retries it. Challenge-workflow notifications are separate and wired directly (`tasp/services/challenge.py`), not through this connector |
 | `chromadb` | Maintenance | scheduled (daily) | **on** | Vector-store cleanup, not case-event-driven |
 | `elastic_siem` | SIEM | `case_finalised`, `case_modified` | off | Indexes one ECS document per case (verdict, score, mail subject/sender, IOCs) into an operator-supplied Elasticsearch; see `elastic_siem` below |
 | `xsoar` | SOAR | `case_finalised` | off | Opens one Cortex XSOAR incident per finalised case at or above `min_verdict`; see `xsoar` below |
+| `case_search` | Search | `case_created`, `case_modified`, `case_finalised` | off | Keeps the `suspicious-cases` Elasticsearch index current for the investigations search box. Run `manage.py reindex_cases` before enabling; see [backend/connectors](../../../docs/components/backend/connectors.md) |
+| `ai_model` | AI | `case_finalised`; scheduled `label-sync` (daily) | off | Provides `mail_ai` (the mail AI verdict, from the `ai_inference` server), detects campaigns on `case_finalised`, syncs analyst labels from an IMAP review mailbox. See [`ai_model/README.md`](../ai_model/README.md) |
 | `watcher` | Threat Intelligence | scheduled (every 300s) | off | Reconciles the allow/deny domain lists against the Watcher service — moved here from `tasp`; see `tasp/README.md` |
 | `ai_narration` | AI | `case_finalised` | off | See below — the one connector with an extra, hardcoded data-governance allowlist on its automatic path |
 | `template` | — | — | — | Not a real connector; copy this directory to start a new one |
