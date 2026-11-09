@@ -9,7 +9,6 @@
 #   make up               → start all services
 #   make redeploy         → force-recreate containers (picks up new images)
 #   make down             → stop all containers
-#   make monitor-up       → start Prometheus + Grafana (optional)
 #   make check-updates    → compare running images vs registry
 
 -include .env
