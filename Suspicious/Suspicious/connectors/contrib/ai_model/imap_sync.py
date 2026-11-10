@@ -10,6 +10,7 @@ from __future__ import annotations
 import email
 import imaplib
 import logging
+import os
 import re
 import ssl
 from dataclasses import dataclass
@@ -70,12 +71,16 @@ class ReviewMail:
     inner_message_ids: tuple[str, ...] = ()
 
 
-def connect(host, port, user, password, use_ssl, timeout=30):
-    """A logged-in IMAP4_SSL (certificate verified against the system CA store) or IMAP4 client;
+def connect(host, port, user, password, use_ssl, timeout=30, cafile=None):
+    """A logged-in IMAP4_SSL (certificate verified against the system CA store, plus `cafile` when
+    that file exists: the internal CA the email feeder calls `rootcafile`) or IMAP4 client;
     ImapTlsFailed on a TLS or certificate failure, ImapLoginFailed on login."""
     if use_ssl:
         try:
-            client = imaplib.IMAP4_SSL(host, port, ssl_context=ssl.create_default_context(), timeout=timeout)
+            context = ssl.create_default_context()
+            if cafile and os.path.isfile(cafile):  # ponytail: a missing file falls back to the system store
+                context.load_verify_locations(cafile=cafile)
+            client = imaplib.IMAP4_SSL(host, port, ssl_context=context, timeout=timeout)
         except (ssl.SSLError, ssl.CertificateError) as exc:  # the server's text stays out
             raise ImapTlsFailed(type(exc).__name__) from None
     else:
