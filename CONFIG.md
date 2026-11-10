@@ -156,6 +156,12 @@ also passed as **build args** to `docker compose build`, so set them before
 building images on a proxy-only network — otherwise the build fails with a
 `uv pip install` (PyPI) or npm connection timeout.
 
+The Django, Celery and beat containers always add the internal service names (`cortex`,
+`elasticsearch`, `db_suspicious`, `rustfs`, `chromadb`, the Redis hosts, `vault`, `ai_inference`) to
+their own `no_proxy`, so you only list hosts outside the stack. A service missing from that list is
+sent through `HTTP_PROXY`; the `ai_model` connector test then fails with `not ready (HTTP 403)`, the
+proxy's answer, not the inference server's.
+
 `CORTEX_NO_PROXY` is the `no_proxy` list Cortex gets instead of `NO_PROXY`:
 Cortex's Kubernetes client rejects `*` wildcards and will not boot. Override it
 only when Cortex must reach corporate-internal hosts directly; use dot-form

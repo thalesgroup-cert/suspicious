@@ -37,7 +37,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,vault"
+      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,vault,ai_inference"
       VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_CACERT: /etc/suspicious/vault-ca/ca.pem
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
@@ -98,7 +98,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
+      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault,ai_inference"
       VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_CACERT: /etc/suspicious/vault-ca/ca.pem
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
@@ -138,7 +138,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
+      no_proxy: "${NO_PROXY:-},cortex,elasticsearch,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault,ai_inference"
       VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_CACERT: /etc/suspicious/vault-ca/ca.pem
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
