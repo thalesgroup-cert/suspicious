@@ -113,6 +113,11 @@
                     "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
                 }
             }
+        },
+        "ai_model": {
+            "url": "http://ai_inference:8090",
+            "token": "",
+            "timeout_seconds": 20
         }
     },
     "authentication": {
