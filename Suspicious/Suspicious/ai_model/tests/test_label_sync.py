@@ -47,7 +47,8 @@ class LabelSyncTest(TestCase):
 
     def test_reads_known_folders_embeds_both_profiles_and_checkpoints(self):
         call, connect = self.run_sync()
-        connect.assert_called_once_with("imap.example", 993, "reviewer", "imap-pa55", True)
+        connect.assert_called_once_with("imap.example", 993, "reviewer", "imap-pa55", True,
+                                       cafile="/etc/private/rootcafile.pem")
         selected = [c[1:] for c in self.imap.commands if c[0] == "SELECT"]
         self.assertEqual(selected, [(f'"{PHISH}"', True), (f'"{SPAM}"', True)])  # 9_ODD: no known class
         self.assertEqual([c.args[1] for c in call.call_args_list], ["classifier", "campaign"] * 2)

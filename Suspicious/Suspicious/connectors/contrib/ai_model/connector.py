@@ -37,6 +37,8 @@ logger = logging.getLogger("connectors.contrib.ai_model")
 
 DEFAULT_URL = "http://ai_inference:8090"
 DEFAULT_TIMEOUT = 20
+# The CA file the compose files mount into the Django containers for the email feeder.
+DEFAULT_IMAP_ROOT_CA = "/etc/private/rootcafile.pem"
 FOLDER_BATCH = 500  # ruling D8: UIDs examined per folder per run (skipped and already-observed ones included)
 CHUNK = 25  # mails fetched, matched, embedded and committed together; one chunk stays far under 540 s
 TIME_BUDGET_SECONDS = 300  # a run stops between chunks and embed batches after this; Celery's soft limit is 540 s
@@ -138,6 +140,9 @@ class AiModelConnector(Connector):
             ConfigField("imap_user", "str"),
             ConfigField("imap_password", "secret"),
             ConfigField("imap_use_ssl", "bool", default=True),
+            ConfigField("imap_rootcafile", "str", default=DEFAULT_IMAP_ROOT_CA,
+                        help="CA file trusted for the IMAP server certificate, on top of the system "
+                             "store (the email feeder's rootcafile). Ignored when the file is absent."),
             ConfigField("imap_folders", "str", default=",".join(FOLDERS),
                         help="Comma-separated review folders; the digit prefix gives the class."),
             ConfigField("retrain_enabled", "bool", default=False,
@@ -249,6 +254,7 @@ class AiModelConnector(Connector):
         imap = imap_sync.connect(
             host, int(self.config.get("imap_port") or 993), self.config.get("imap_user") or "",
             self.config.get("imap_password") or "", self.config.get("imap_use_ssl", True) is not False,
+            cafile=self.config.get("imap_rootcafile", DEFAULT_IMAP_ROOT_CA) or None,
         )
         refused = []
         try:

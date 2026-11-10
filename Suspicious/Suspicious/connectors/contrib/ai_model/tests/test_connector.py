@@ -62,7 +62,7 @@ class ManifestTest(SimpleTestCase):
     def test_config_schema(self):
         fields = {f.key: f for f in AiModelConnector.manifest.config_schema}
         self.assertEqual(set(fields), {"url", "token", "timeout_seconds", "imap_host", "imap_port", "imap_user",
-                                       "imap_password", "imap_use_ssl", "imap_folders",
+                                       "imap_password", "imap_use_ssl", "imap_rootcafile", "imap_folders",
                                        "retrain_enabled", "retrain_interval_days"})
         self.assertEqual((fields["url"].type, fields["url"].default, fields["url"].required),
                          ("url", "http://ai_inference:8090", True))

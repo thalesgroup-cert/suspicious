@@ -14,6 +14,7 @@ from django.db import DatabaseError
 from ai_model import ledger
 from ai_model.models import LabelRecord
 from connectors.contrib.ai_model import imap_sync
+from connectors.contrib.ai_model.connector import DEFAULT_IMAP_ROOT_CA
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
 from connectors.providers import ProviderUnavailable
 
@@ -56,7 +57,8 @@ def imap_port(config) -> int:
 
 def open_imap(config, port):
     return imap_sync.connect(config.get("imap_host"), port, config.get("imap_user") or "",
-                             config.get("imap_password") or "", config.get("imap_use_ssl", True) is not False)
+                             config.get("imap_password") or "", config.get("imap_use_ssl", True) is not False,
+                             cafile=config.get("imap_rootcafile", DEFAULT_IMAP_ROOT_CA) or None)
 
 
 class Command(BaseCommand):

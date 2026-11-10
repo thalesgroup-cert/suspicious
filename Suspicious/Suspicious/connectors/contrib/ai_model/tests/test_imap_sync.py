@@ -282,6 +282,48 @@ class ConnectTest(SimpleTestCase):
         self.assertTrue(ctx.exception.__suppress_context__)
 
 
+class ConnectCaFileTest(SimpleTestCase):
+    """An internal CA given as a file (the email feeder's `rootcafile`) is trusted on top of the
+    system store; a missing file changes nothing."""
+
+    def _connect(self, cafile, ctx_mock):
+        with mock.patch.object(imap_sync.ssl, "create_default_context", return_value=ctx_mock), \
+                mock.patch.object(imap_sync.imaplib, "IMAP4_SSL"):
+            return imap_sync.connect("imap.corp.example", 993, "u", "p", True, cafile=cafile)
+
+    def test_an_existing_ca_file_is_loaded_into_the_context(self):
+        import tempfile
+        ctx = mock.MagicMock()
+        with tempfile.NamedTemporaryFile(suffix=".pem") as f:
+            self._connect(f.name, ctx)
+            ctx.load_verify_locations.assert_called_once_with(cafile=f.name)
+
+    def test_a_missing_ca_file_is_ignored(self):
+        ctx = mock.MagicMock()
+        self._connect("/nonexistent/rootcafile.pem", ctx)
+        ctx.load_verify_locations.assert_not_called()
+
+    def test_no_ca_file_uses_the_system_store_only(self):
+        ctx = mock.MagicMock()
+        self._connect(None, ctx)
+        ctx.load_verify_locations.assert_not_called()
+
+    def test_an_unreadable_ca_file_is_a_tls_failure_with_the_class_name_only(self):
+        import ssl
+        import tempfile
+        ctx = mock.MagicMock()
+        ctx.load_verify_locations.side_effect = ssl.SSLError("PEM lib /etc/private/rootcafile.pem")
+        with tempfile.NamedTemporaryFile(suffix=".pem") as f:
+            with self.assertRaises(imap_sync.ImapTlsFailed) as exc:
+                self._connect(f.name, ctx)
+        self.assertEqual(str(exc.exception), "SSLError")
+
+    def test_the_default_context_is_still_the_system_store(self):
+        with mock.patch.object(imap_sync.imaplib, "IMAP4_SSL") as ssl_cls:
+            imap_sync.connect("imap.example", 993, "u", "p", True)
+        self.assertEqual(ssl_cls.call_args.kwargs["ssl_context"].verify_mode, imap_sync.ssl.CERT_REQUIRED)
+
+
 class LoginFailedTest(SimpleTestCase):
     def test_a_login_failure_is_not_retried(self):
         self.assertIs(imap_sync.ImapLoginFailed("error").retryable, False)
