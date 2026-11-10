@@ -10,8 +10,12 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from typing import Any
 
+import tldextract
+
 from score_process.scoring.enrichment.virustotal import _attributes, _iso, _vt_link
 
+# Bundled snapshot of the public suffix list: no network fetch, no cache directory.
+_tld = tldextract.TLDExtract(cache_dir=None, suffix_list_urls=(), fallback_to_snapshot=True)
 _ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"
 _CAT_ORDER = {"malicious": 0, "suspicious": 1}
 
@@ -401,6 +405,14 @@ def _host(value: str) -> str | None:
     return host.lower() if host else None
 
 
+def _registrable(host: str) -> str:
+    """Registrable domain (eTLD+1); an unknown TLD (.test) falls back to the last two labels."""
+    ext = _tld(host)
+    if ext.suffix:
+        return ext.top_domain_under_public_suffix
+    return ".".join(host.split(".")[-2:]) if ext.subdomain else host
+
+
 def key_findings(facts: IndicatorFacts, sources: list[dict], value: str, data_type: str, now: datetime) -> list[str]:
     out: list[str] = []
     for src in sorted(sources, key=lambda s: str(s.get("name") or "").lower()):
@@ -416,14 +428,15 @@ def key_findings(facts: IndicatorFacts, sources: list[dict], value: str, data_ty
     host = _host(value) or ""
     for brand in facts.brands:
         key = re.sub(r"[^a-z0-9]", "", brand.lower())
-        if key and key not in host:
+        if key and host and key not in re.sub(r"[^a-z0-9]", "", _registrable(host)):
             out.append(f"Shows the {brand} brand on another domain")
             break
     if data_type in ("domain", "url") and (created := iso_utc(facts.created)):
         days = (now - datetime.strptime(created, _ISO_FMT).replace(tzinfo=timezone.utc)).days
         if 0 <= days < 30:
             out.append("Domain registered today" if days == 0 else f"Domain registered {days} days ago")
-    if data_type == "url" and facts.final_url and (final := _host(facts.final_url)) and final != host:
+    if data_type == "url" and facts.final_url and (final := _host(facts.final_url)) \
+            and _registrable(final) != _registrable(host):
         out.append(f"Redirects to {final}")
     for source, rank in facts.popularity_ranks.items():
         if rank <= 1000:

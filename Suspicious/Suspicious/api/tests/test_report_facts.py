@@ -310,6 +310,31 @@ class KeyFindingTests(SimpleTestCase):
     def test_brand_matching_the_domain_is_not_impersonation(self):
         self.assertEqual(key_findings(IndicatorFacts(brands=["Example Bank"]), [], "examplebank.test", "domain", NOW), [])
 
+    def _brand(self, value, dtype="url"):
+        return key_findings(IndicatorFacts(brands=["Example Bank"]), [], value, dtype, NOW)
+
+    def test_brand_on_hyphenated_own_domain_is_not_impersonation(self):
+        self.assertEqual(self._brand("https://example-bank.test/login"), [])
+
+    def test_brand_on_its_real_domain_with_subdomain_is_not_impersonation(self):
+        self.assertEqual(self._brand("https://login.examplebank.test/x"), [])
+
+    def test_brand_as_subdomain_lure_is_impersonation(self):
+        self.assertEqual(self._brand("https://examplebank.test.evil.test/x"),
+                         ["Shows the Example Bank brand on another domain"])
+
+    def test_brand_on_plain_other_domain_is_impersonation(self):
+        self.assertEqual(self._brand("https://other.test/x"), ["Shows the Example Bank brand on another domain"])
+
+    def test_brand_with_empty_host_gives_no_finding(self):
+        self.assertEqual(self._brand("", "domain"), [])
+
+    def test_redirect_between_www_and_bare_domain_is_not_a_redirect(self):
+        f = IndicatorFacts(final_url="https://examplebank.test/")
+        self.assertEqual(key_findings(f, [], "https://www.examplebank.test/", "url", NOW), [])
+        f = IndicatorFacts(final_url="https://other.test/")
+        self.assertEqual(key_findings(f, [], "https://www.examplebank.test/", "url", NOW), ["Redirects to other.test"])
+
     def test_remaining_rules(self):
         f = IndicatorFacts(created="2026-11-10T00:00:00Z", final_url="https://collect.test/x",
                            popularity_ranks={"Cisco Umbrella": 500}, threat_label="trojan.test")
