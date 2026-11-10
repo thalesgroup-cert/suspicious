@@ -209,3 +209,9 @@ class FallbackTests(SimpleTestCase):
         for rep in (None, "x", [1], {"ip": 3, "urlClassifications": "PHISHING"}, {"asname": 5}):
             apply_fallbacks(IndicatorFacts(), [_src("DShield_lookup_1_0", rep), _src("StopForumSpam_1_0", rep),
                                                _src("Zscaler_1_3", rep)], "ip")
+
+    def test_hostile_asn_strings_do_not_raise(self):
+        for bad in ("²", "9" * 5000):
+            for rep in ({"asn": bad}, {"ip": {"asn": bad}}):
+                f = apply_fallbacks(IndicatorFacts(), [_src("StopForumSpam_1_0", rep)], "ip")
+                self.assertIsNone(f.asn)
