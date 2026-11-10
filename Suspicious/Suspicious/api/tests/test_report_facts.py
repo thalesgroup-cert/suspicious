@@ -131,3 +131,37 @@ class VtFactsTests(SimpleTestCase):
         self.assertEqual(get_path(d, "a", 5, "b", default=9), 9)
         self.assertEqual(get_path(d, "a", "b"), None)
         self.assertEqual(get_path("x", "a", default=2), 2)
+
+    def _facts(self, attrs, dt="domain"):
+        return vt_facts(None, {"results": {"data": {"attributes": attrs}}}, dt, "x")
+
+    def test_out_of_range_timestamps_do_not_raise(self):
+        for ts in (10**15, -10**15, 10**30, float("inf")):
+            self.assertIsNone(iso_utc(ts))
+            self.assertIsNone(self._facts({"creation_date": ts}).created)
+        self.assertIsNone(iso_utc("0001-01-01T00:00:00+23:59"))
+
+    def test_unhashable_or_wrong_typed_nested_values(self):
+        f = self._facts({
+            "last_analysis_results": {"E1": {"category": ["malicious"], "result": "x"},
+                                      "E2": {"category": {"a": 1}, "result": "y"}},
+            "rdap": {"events": [{"event_action": ["expiration"], "event_date": "2027-01-01T00:00:00Z"},
+                                {"event_action": {"a": 1}, "event_date": "2027-01-01T00:00:00Z"}],
+                     "entities": [{"roles": 5, "vcard_array": [{"name": "fn", "values": ["A"]}]},
+                                  {"roles": "registrant", "vcard_array": "x"},
+                                  {"roles": ["registrant"], "vcard_array": [{"name": "fn", "values": ["Real"]}]}]}})
+        self.assertEqual(f.flagged_vendors, [])
+        self.assertIsNone(f.expires)
+        self.assertEqual(f.registrant, "Real")
+
+    def test_source_precedence_attributes_then_rdap_then_whois(self):
+        rdap = {"events": [{"event_action": "registration", "event_date": "2026-02-02T00:00:00Z"},
+                           {"event_action": "expiration", "event_date": "2027-02-02T00:00:00Z"}]}
+        whois = ("Registrar: Whois Reg\nCreation Date: 2026-03-03T00:00:00Z\n"
+                 "Registry Expiry Date: 2027-03-03T00:00:00Z\n")
+        f = self._facts({"registrar": "Attr Reg", "creation_date": 1790000000, "rdap": rdap, "whois": whois})
+        self.assertEqual((f.registrar, f.created, f.expires), ("Attr Reg", "2026-09-21T14:13:20Z", "2027-02-02T00:00:00Z"))
+        f = self._facts({"rdap": rdap, "whois": whois})
+        self.assertEqual((f.registrar, f.created), ("Whois Reg", "2026-02-02T00:00:00Z"))
+        f = self._facts({"whois": whois})
+        self.assertEqual((f.created, f.expires), ("2026-03-03T00:00:00Z", "2027-03-03T00:00:00Z"))

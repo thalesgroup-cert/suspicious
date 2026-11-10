@@ -32,7 +32,10 @@ def iso_utc(value: Any) -> str | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
-        return _iso(value)
+        try:
+            return _iso(value)
+        except (ValueError, OverflowError, OSError):
+            return None
     if isinstance(value, str):
         text = value.strip()
         if text.endswith(("Z", "z")):
@@ -44,7 +47,10 @@ def iso_utc(value: Any) -> str | None:
     if isinstance(value, datetime):
         if value.tzinfo is None:
             value = value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc).strftime(_ISO_FMT)
+        try:
+            return value.astimezone(timezone.utc).strftime(_ISO_FMT)
+        except (ValueError, OverflowError, OSError):
+            return None
     return None
 
 
@@ -128,9 +134,16 @@ def _whois(text: Any, label: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _brands(attrs: dict) -> list[str]:
+    raw = attrs.get("identified_brands")
+    names = [b.get("name") if isinstance(b, dict) else b for b in (raw if isinstance(raw, list) else [])]
+    return _strs(names + [attrs.get("main_brand")])
+
+
 def _vcard(entity: Any, name: str) -> list[str]:
     out: list[str] = []
-    for item in get_path(entity, "vcard_array", default=None) or []:
+    items = get_path(entity, "vcard_array")
+    for item in items if isinstance(items, list) else []:
         if get_path(item, "name") == name:
             out += _strs(get_path(item, "values"))
     return out
@@ -145,7 +158,7 @@ def _vendors(enrichment: dict, attrs: dict) -> list[tuple[str, str | None]]:
         results = attrs.get("last_analysis_results")
         if isinstance(results, dict):
             rows = [(k, get_path(r, "category"), get_path(r, "result")) for k, r in results.items()]
-    flagged = [(str(n), c, _str(r)) for n, c, r in rows if isinstance(n, str) and c in _CAT_ORDER]
+    flagged = [(str(n), c, _str(r)) for n, c, r in rows if isinstance(n, str) and isinstance(c, str) and c in _CAT_ORDER]
     flagged.sort(key=lambda t: (_CAT_ORDER[t[1]], t[0].lower()))
     return [(n, r) for n, _, r in flagged]
 
@@ -192,8 +205,8 @@ def vt_facts(enrichment: dict | None, report_full: Any, data_type: str, value: s
     rdap = at.get("rdap") if isinstance(at.get("rdap"), dict) else {}
     whois = at.get("whois")
     raw_events = rdap.get("events")
-    events = {get_path(e, "event_action"): iso_utc(get_path(e, "event_date"))
-              for e in raw_events} if isinstance(raw_events, list) else {}
+    events = {a: iso_utc(get_path(e, "event_date")) for e in (raw_events if isinstance(raw_events, list) else [])
+              if isinstance(a := get_path(e, "event_action"), str)}
     f.registrar = _first(_str(en.get("registrar")), _str(at.get("registrar")), _whois(whois, "Registrar"))
     f.created = _first(iso_utc(en.get("creation_date")), iso_utc(at.get("creation_date")),
                        events.get("registration"), iso_utc(_whois(whois, "Creation Date")))
@@ -203,7 +216,8 @@ def vt_facts(enrichment: dict | None, report_full: Any, data_type: str, value: s
     raw_entities = rdap.get("entities")
     entities = [e for e in raw_entities if isinstance(e, dict)] if isinstance(raw_entities, list) else []
     for e in entities:
-        if f.registrant is None and "registrant" in (get_path(e, "roles") or []):
+        roles = get_path(e, "roles")
+        if f.registrant is None and isinstance(roles, list) and "registrant" in roles:
             f.registrant = next(iter(_vcard(e, "fn")), None)
     f.contact_emails = list(dict.fromkeys(s for e in entities for s in _vcard(e, "email")))
     f.contact_phones = list(dict.fromkeys(s for e in entities for s in _vcard(e, "tel")))
@@ -220,10 +234,7 @@ def vt_facts(enrichment: dict | None, report_full: Any, data_type: str, value: s
     f.final_url = _first(_str(en.get("final_url")), _str(at.get("last_final_url")))
     f.title = _first(_str(en.get("page_title")), _str(at.get("title")))
     f.http_code = _int(at.get("last_http_response_code"))
-    brands = [b.get("name") if isinstance(b, dict) else b for b in at.get("identified_brands") or []] \
-        if isinstance(at.get("identified_brands"), list) else []
-    brands.append(at.get("main_brand"))
-    f.brands = _strs(brands)
+    f.brands = _brands(at)
     f.threat_names = _strs(at.get("threat_names"))
     links = at.get("outgoing_links")
     f.outgoing_links = len(links) if isinstance(links, list) else None
