@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIRequestFactory
 
-from api.tests.test_report_facts import VT_HASH, VT_IP
+from api.tests.test_report_facts import VT_DOMAIN, VT_HASH, VT_IP
 from ai_model.models import AiAssessment, LabelRecord
 from api.utils.case_report_model import build_block, build_case_report
 from case_handler.models import (
@@ -141,6 +141,21 @@ class GroupTests(Base):
         self.assertEqual(b.vt_link, "https://www.virustotal.com/gui/ip-address/203.0.113.7")
 
 
+    def test_vt_source_with_stats_wins_over_a_newer_one_without(self):
+        def src(name, report):
+            return {"name": name, "tier": 1, "verdict": "malicious", "failed": False,
+                    "enrichment": {"source": "virustotal"}, "report": report}
+        row = {"type": "domain", "value": "login-example.test", "verdict": None, "derived_from": None,
+               "sources": [src("VirusTotal_Scan_3_1", {"results": {"data": {"id": "x"}}}),
+                           src("VirusTotal_GetReport_3_1", VT_DOMAIN)]}
+        b = build_block(row, now=NOW)
+        vt_rows = dict(next(g.rows for g in b.details if g.title == "VirusTotal"))
+        self.assertEqual(vt_rows["Detections"], "2/91")
+        labels = {c.name: c.label for c in b.connectors}
+        self.assertEqual(labels["VirusTotal_GetReport_3_1"], "2/91 detections")
+        self.assertNotIn("detections", labels["VirusTotal_Scan_3_1"])
+
+
 class MailFileTests(Base):
     def mail_case(self, **mail_kw):
         mail = Mail.objects.create(subject="s", reportedBy="r@x.test", date=NOW, to="a@x.test", mail_id="m1", **mail_kw)
@@ -207,6 +222,29 @@ class MailFileTests(Base):
         by_name = {l.name: l.icon for l in lines}
         self.assertEqual(by_name, {"FileInfo (a.exe)": "\U0001F534", "FileInfo (b.txt)": "\U0001F7E2",
                                    "Mail_Header_Analyzer": "\U0001F7E2"})
+
+    def test_attachment_label_is_the_basename_not_the_stored_path(self):
+        mail, case = self.mail_case(mail_header=MailHeader.objects.create(header_value="h", fuzzy_hash="f"))
+        a, b = self.attach(mail, "files/sub/invoice.pdf"), self.attach(mail, "b.txt")
+        av = Analyzer.objects.create(name="ClamAV", analyzer_cortex_id="cl", tier=2)
+        self.rep(av, "malicious", file=a)
+        self.rep(av, "safe", file=b)
+        names = [l.name for l in build_case_report(case, self.request, now=NOW).case_connectors]
+        self.assertIn("ClamAV (invoice.pdf)", names)
+        self.assertNotIn("ClamAV (files/sub/invoice.pdf)", names)
+
+    def test_file_case_analysis_leaves_out_the_legacy_ai_report(self):
+        h = Hash.objects.create(value="c" * 64)
+        f = File.objects.create(linked_hash=h, file_path="x.bin", tmp_path="", other_names="")
+        ai_name = ai_analyzer_name()
+        self.rep(Analyzer.objects.create(name=ai_name, analyzer_cortex_id="ai", tier=2), "malicious", file=f)
+        self.rep(self.vt, "malicious", full=VT_HASH, hash=h)
+        case = Case.objects.create(description="d", reporter=self.user, results="Dangerous")
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, file=f)
+        case.save()
+        names = [c.name for c in build_case_report(case, self.request, now=NOW).case_analysis.connectors]
+        self.assertNotIn(ai_name, names)
+        self.assertIn("VirusTotal_GetReport_3_1", names)
 
     def test_file_case_has_a_case_analysis_block(self):
         h = Hash.objects.create(value="b" * 64)

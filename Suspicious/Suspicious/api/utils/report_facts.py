@@ -380,14 +380,14 @@ def _is_vt(src: dict) -> bool:
         get_path(src.get("enrichment"), "source") == "virustotal"
 
 
-def connector_lines(sources: list[dict], facts: IndicatorFacts) -> list[ConnectorLine]:
+def connector_lines(sources: list[dict], facts: IndicatorFacts, vt_source: dict | None = None) -> list[ConnectorLine]:
     lines = []
     for src in sources:
         failed, verdict = bool(src.get("failed")), str(src.get("verdict") or "no-data")
         icon = "⚪" if failed else VERDICT_ICON.get(verdict, "⚪")
         if failed:
             label = "failed"
-        elif _is_vt(src) and facts.detections:
+        elif _is_vt(src) and facts.detections and (vt_source is None or src is vt_source):
             label = f"{facts.detections[0]}/{facts.detections[2]} detections"
         else:
             label = _str(src.get("evidence")) or _VERDICT_WORD.get(verdict, "no data")

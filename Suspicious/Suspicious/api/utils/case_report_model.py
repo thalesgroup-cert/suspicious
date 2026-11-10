@@ -1,6 +1,7 @@
 """One data model for the downloadable case report (group, mail and file cases)."""
 from __future__ import annotations
 
+import os
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone as dt_tz
@@ -67,9 +68,11 @@ class CaseReport:
 def build_block(row: dict, *, now: datetime) -> IndicatorBlock:
     dtype, value = row["type"], str(row.get("value") or "")
     sources = row.get("sources") or []
-    # a failed VirusTotal run has no trustworthy facts
-    vt = next((s for s in sources if _is_vt(s) and not s.get("failed")), None) or {}
-    facts = apply_fallbacks(vt_facts(vt.get("enrichment"), vt.get("report"), dtype, value), sources, dtype)
+    # a failed VirusTotal run has no trustworthy facts; of the rest the newest one with scan stats wins
+    cands = [(s, vt_facts(s.get("enrichment"), s.get("report"), dtype, value))
+             for s in sources if _is_vt(s) and not s.get("failed")]
+    vt, vt_f = next((c for c in cands if c[1].detections is not None), cands[0] if cands else ({}, vt_facts(None, None, dtype, value)))
+    facts = apply_fallbacks(vt_f, sources, dtype)
     verdict = row.get("verdict") or {}
     return IndicatorBlock(
         type=dtype, value=value, band=verdict.get("band"), confidence=verdict.get("confidence"),
@@ -77,7 +80,7 @@ def build_block(row: dict, *, now: datetime) -> IndicatorBlock:
         findings=key_findings(facts, sources, value, dtype, now)[:_MAX_FINDINGS],
         # ponytail: address blocks are never rendered, so skip their details
         details=[] if dtype == "mail" else detail_groups(facts, dtype),
-        connectors=connector_lines(sources, facts),
+        connectors=connector_lines(sources, facts, vt_source=vt or None),
         vt_link=facts.vt_link, derived_from=row.get("derived_from"),
         escalation_note=row.get("escalation_note") or "",
         screenshot_url=row.get("screenshot_url"),
@@ -103,7 +106,7 @@ def _sort_key(b):
 
 def _target_label(r) -> str:
     if r.file_id:
-        return str(r.file.file_path.name or r.file.linked_hash.value)
+        return os.path.basename(r.file.file_path.name) or r.file.linked_hash.value
     return "mail body" if r.mail_body_id else "headers"
 
 

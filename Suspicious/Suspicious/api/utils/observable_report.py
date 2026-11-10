@@ -111,7 +111,10 @@ def assemble_mail_observables(case, mail, *, full: bool = False) -> list[dict]:
 
 
 def assemble_file_observable(case, file, *, full: bool = False) -> dict:
-    reports = file_reports(file)
+    from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
+
+    ai = ai_analyzer_name()  # the legacy AI report is not a file analyzer
+    reports = [r for r in file_reports(file) if r.analyzer.name != ai]
     sources, svs = _source_rows(reports, full=full)
     return {
         "value": file.linked_hash.value, "type": "file",
