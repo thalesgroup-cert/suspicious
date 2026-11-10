@@ -59,6 +59,27 @@ def resolve_case_type(obj: Case) -> str:
     return "UNKNOWN"
 
 
+def observable_group_label(obj: Case) -> str | None:
+    """The indicators of a multi-indicator case as "a, b, c +N more" (at most three named), or
+    "N indicator(s)" when none has a readable value; None when the case has no group. The one
+    wording the Submissions and Investigations lists share."""
+    if not getattr(obj, "observable_group_id", None):
+        return None
+    # .all() hits the prefetch cache of the list querysets; slicing or .count() would query per row.
+    artifacts = list(obj.observable_group.artifacts.all())
+    values = []
+    for artifact in artifacts[:3]:
+        observable = artifact.observable()
+        value = (getattr(observable, "address", None) or getattr(observable, "value", None)) if observable else None
+        if value:
+            values.append(value)
+    total = len(artifacts)
+    if values:
+        extra = f" +{total - len(values)} more" if total > len(values) else ""
+        return ", ".join(values) + extra
+    return f"{total} indicator(s)"
+
+
 def resolve_case_artifact(obj: Case) -> str:
     linked_file_or_mail = getattr(obj, "fileOrMail", None)
     linked_non_file_iocs = getattr(obj, "nonFileIocs", None)
@@ -89,7 +110,7 @@ def resolve_case_artifact(obj: Case) -> str:
                 or str(linked_non_file_iocs.hash_id)
             )
 
-    return obj.description or ""
+    return observable_group_label(obj) or obj.description or ""
 
 
 def resolve_analyzer_report_target(obj: AnalyzerReport) -> dict:
