@@ -11,6 +11,7 @@ from api.utils.case_report_model import build_block, build_case_report
 from case_handler.models import (
     Case, CaseHasFileOrMail, ObservableGroup, ObservableGroupArtifact,
 )
+from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
 from cortex_job.models import Analyzer, AnalyzerReport
 from domain_process.models import Domain
 from email_process.models import MailAddress
@@ -18,7 +19,8 @@ from file_process.models import File
 from hash_process.models import Hash
 from ip_process.models import IP
 from mail_feeder.models import (
-    ArtifactIsIp, ArtifactIsMailAddress, ArtifactIsUrl, Mail, MailArtifact, MailHeader,
+    ArtifactIsIp, ArtifactIsMailAddress, ArtifactIsUrl, Mail, MailArtifact, MailAttachment, MailBody,
+    MailHeader,
 )
 from url_process.models import URL
 
@@ -66,11 +68,31 @@ class GroupTests(Base):
         self.assertEqual([x.title for x in rep.blocks[0].details], ["Location", "VirusTotal"])
         self.assertEqual(rep.rows, [])
 
+    def test_blocks_sort_by_band_then_value_and_no_verdict_last(self):
+        g, case = self.group_case()
+        safe = self.add_ip(g, "198.51.100.1")
+        bare = self.add_ip(g, "198.51.100.2")  # no reports -> no verdict
+        inc = self.add_ip(g, "198.51.100.3")
+        sus, dan = (Domain.objects.create(value=v) for v in ("aa.test", "zz.test"))
+        dan2 = Domain.objects.create(value="bb.test")
+        for d in (sus, dan, dan2):
+            ObservableGroupArtifact.objects.create(group=g, artifact_type="DOMAIN", domain=d)
+        self.rep(self.vt, "safe", ip=safe)
+        self.rep(self.vt, "info", status="Failure", ip=inc)
+        self.rep(self.vt, "suspicious", domain=sus)
+        self.rep(self.vt, "malicious", domain=dan)
+        self.rep(self.vt, "malicious", domain=dan2)
+        rep = build_case_report(case, self.request, now=NOW)
+        self.assertEqual([(b.value, b.band) for b in rep.blocks], [
+            ("bb.test", "Dangerous"), ("zz.test", "Dangerous"), ("aa.test", "Suspicious"),
+            ("198.51.100.1", "Safe"), ("198.51.100.3", "Inconclusive"), ("198.51.100.2", None)])
+
     def test_indicator_with_every_source_failed(self):
         g, case = self.group_case()
         ip = self.add_ip(g, "203.0.113.8")
         other = Analyzer.objects.create(name="Shodan", analyzer_cortex_id="sh", tier=2)
-        self.rep(self.vt, status="Failure", ip=ip)
+        self.rep(self.vt, status="Failure", full=VT_IP,
+                 enrichment={"source": "virustotal", "malicious_count": 42, "total": 70}, ip=ip)
         self.rep(other, status="Failure", ip=ip)
         b = build_case_report(case, self.request, now=NOW).blocks[0]
         self.assertEqual(b.band, "Inconclusive")
@@ -117,34 +139,71 @@ class GroupTests(Base):
 
 
 class MailFileTests(Base):
+    def mail_case(self, **mail_kw):
+        mail = Mail.objects.create(subject="s", reportedBy="r@x.test", date=NOW, to="a@x.test", mail_id="m1", **mail_kw)
+        case = Case.objects.create(description="d", reporter=self.user)
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
+        case.save()
+        return mail, case
+
+    def embed(self, mail, t, attr, cls, f, o):
+        ma = MailArtifact.objects.create(mail=mail, artifact_type=t)
+        setattr(ma, attr, cls.objects.create(artifact=ma, **{f: o}))
+        ma.save(update_fields=[attr])
+
+    def attach(self, mail, name):
+        f = File.objects.create(linked_hash=Hash.objects.create(value=name * 8), file_path=name, tmp_path="", other_names="")
+        MailAttachment.objects.create(mail=mail, file=f)
+        return f
+
     def test_mail_case_blocks_only_flagged_non_address_indicators(self):
         header = MailHeader.objects.create(header_value="h", fuzzy_hash="f")
-        mail = Mail.objects.create(subject="s", reportedBy="r@x.test", date=NOW, to="a@x.test", mail_id="m1", mail_header=header)
+        body = MailBody.objects.create(body_value="b", fuzzy_hash="f")
+        mail, case = self.mail_case(mail_header=header, mail_body=body)
         url, ip, addr = URL.objects.create(address="https://evil.test/x"), IP.objects.create(address="203.0.113.9"), MailAddress.objects.create(address="bad@evil.test")
-        for t, attr, cls, f, o in (("URL", "artifactIsUrl", ArtifactIsUrl, "url", url), ("IP", "artifactIsIp", ArtifactIsIp, "ip", ip),
-                                   ("MailAddress", "artifactIsMailAddress", ArtifactIsMailAddress, "mail_address", addr)):
-            ma = MailArtifact.objects.create(mail=mail, artifact_type=t)
-            setattr(ma, attr, cls.objects.create(artifact=ma, **{f: o}))
-            ma.save(update_fields=[attr])
+        self.embed(mail, "URL", "artifactIsUrl", ArtifactIsUrl, "url", url)
+        self.embed(mail, "IP", "artifactIsIp", ArtifactIsIp, "ip", ip)
+        self.embed(mail, "MailAddress", "artifactIsMailAddress", ArtifactIsMailAddress, "mail_address", addr)
         self.rep(self.vt, "malicious", url=url)
         self.rep(self.vt, "safe", ip=ip)
         self.rep(self.vt, "malicious", mail=addr)
         hdr = Analyzer.objects.create(name="Mail_Header_Analyzer", analyzer_cortex_id="mh", tier=2)
-        aim = Analyzer.objects.create(name="AI_Mail_Analyzer", analyzer_cortex_id="ai", tier=2)
-        h = Hash.objects.create(value="a" * 64)
-        f = File.objects.create(linked_hash=h, file_path="x.bin", tmp_path="", other_names="")
+        ai_name = ai_analyzer_name()  # configured name differs per deployment
+        aim = Analyzer.objects.create(name=ai_name, analyzer_cortex_id="ai", tier=2)
         self.rep(hdr, "safe", mail_header=header)
-        self.rep(aim, "malicious", file=f)
-        cf = CaseHasFileOrMail.objects.create(case=Case.objects.create(description="d", reporter=self.user), mail=mail)
-        case = cf.case
-        case.fileOrMail = cf
-        case.save()
+        self.rep(aim, "malicious", mail_body=body)  # a target the collector reaches
         rep = build_case_report(case, self.request, now=NOW)
         self.assertEqual(rep.kind, "mail")
         self.assertEqual([b.value for b in rep.blocks], ["https://evil.test/x"])
         self.assertEqual({r.type for r in rep.rows}, {"url", "ip", "mail"})
         self.assertIn("Mail_Header_Analyzer", [l.name for l in rep.case_connectors])
-        self.assertNotIn("AI_Mail_Analyzer", [l.name for l in rep.case_connectors])
+        self.assertNotIn(ai_name, [l.name for l in rep.case_connectors])
+
+    def test_mail_rows_sort_by_band_then_value(self):
+        mail, case = self.mail_case()
+        ips = {v: IP.objects.create(address=v) for v in ("198.51.100.1", "zz.test", "aa.test")}
+        for o in ips.values():
+            self.embed(mail, "IP", "artifactIsIp", ArtifactIsIp, "ip", o)
+        self.rep(self.vt, "safe", ip=ips["198.51.100.1"])
+        self.rep(self.vt, "malicious", ip=ips["zz.test"])
+        self.rep(self.vt, "suspicious", ip=ips["aa.test"])
+        rep = build_case_report(case, self.request, now=NOW)
+        self.assertEqual([(r.value, r.band) for r in rep.rows],
+                         [("zz.test", "Dangerous"), ("aa.test", "Suspicious"), ("198.51.100.1", "Safe")])
+        self.assertEqual([b.value for b in rep.blocks], ["zz.test", "aa.test"])
+
+    def test_case_connectors_keep_every_attachment_verdict(self):
+        mail, case = self.mail_case(mail_header=MailHeader.objects.create(header_value="h", fuzzy_hash="f"))
+        a, b = self.attach(mail, "a.exe"), self.attach(mail, "b.txt")
+        fi = Analyzer.objects.create(name="FileInfo", analyzer_cortex_id="fi", tier=2)
+        solo = Analyzer.objects.create(name="Mail_Header_Analyzer", analyzer_cortex_id="mh", tier=2)
+        self.rep(fi, "malicious", file=a)
+        self.rep(fi, "safe", file=b)  # newer
+        self.rep(solo, "safe", mail_header=mail.mail_header)
+        lines = build_case_report(case, self.request, now=NOW).case_connectors
+        by_name = {l.name: l.icon for l in lines}
+        self.assertEqual(by_name, {"FileInfo (a.exe)": "\U0001F534", "FileInfo (b.txt)": "\U0001F7E2",
+                                   "Mail_Header_Analyzer": "\U0001F7E2"})
 
     def test_file_case_has_a_case_analysis_block(self):
         h = Hash.objects.create(value="b" * 64)

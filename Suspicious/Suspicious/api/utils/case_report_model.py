@@ -1,6 +1,7 @@
 """One data model for the downloadable case report (group, mail and file cases)."""
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone as dt_tz
 
@@ -66,7 +67,8 @@ class CaseReport:
 def build_block(row: dict, *, now: datetime) -> IndicatorBlock:
     dtype, value = row["type"], str(row.get("value") or "")
     sources = row.get("sources") or []
-    vt = next((s for s in sources if _is_vt(s)), None) or {}
+    # a failed VirusTotal run has no trustworthy facts
+    vt = next((s for s in sources if _is_vt(s) and not s.get("failed")), None) or {}
     facts = apply_fallbacks(vt_facts(vt.get("enrichment"), vt.get("report"), dtype, value), sources, dtype)
     verdict = row.get("verdict") or {}
     return IndicatorBlock(
@@ -96,7 +98,13 @@ def _health_text(health: dict | None) -> str | None:
 
 
 def _sort_key(b):
-    return (BAND_RANK.get(b.band, 3), b.value)
+    return (BAND_RANK.get(b.band, len(BAND_RANK)), b.value)
+
+
+def _target_label(r) -> str:
+    if r.file_id:
+        return str(r.file.file_path.name or r.file.linked_hash.value)
+    return "mail body" if r.mail_body_id else "headers"
 
 
 def _case_connectors(reports) -> list[ConnectorLine]:
@@ -106,7 +114,14 @@ def _case_connectors(reports) -> list[ConnectorLine]:
     ai = ai_analyzer_name()
     own = [r for r in reports
            if (r.mail_header_id or r.mail_body_id or r.file_id) and r.analyzer.name != ai]
-    sources, _ = _source_rows(own, full=False)
+    # one source per (analyzer, target): _source_rows skips repeated analyzers, so call it per report
+    per = Counter(r.analyzer_id for r in own)
+    sources = []
+    for r in own:
+        src = _source_rows([r], full=False)[0][0]
+        if per[r.analyzer_id] > 1:
+            src["name"] = f"{src['name']} ({_target_label(r)})"
+        sources.append(src)
     return connector_lines(sources, vt_facts(None, None, "file", ""))
 
 
