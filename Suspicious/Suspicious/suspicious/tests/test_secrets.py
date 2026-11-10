@@ -158,3 +158,68 @@ class SecretsTestCase(unittest.TestCase):
                 t[0] += 60
                 self.assertEqual(sec.get_secret("app.secret_key"), "v2")
         self.assertEqual(calls["n"], 2)
+
+
+class ExpiredTokenTestCase(unittest.TestCase):
+    """The AppRole token lives token_ttl (1h) and the client is cached for the life of the process:
+    an expired token must trigger one fresh login and one retry, not fail every read until restart."""
+
+    def setUp(self):
+        sec._CACHE.clear()
+        sec._client_singleton[0] = None
+        self.addCleanup(sec._CACHE.clear)
+        self.addCleanup(lambda: sec._client_singleton.__setitem__(0, None))
+        patcher = mock.patch.dict(os.environ, {"VAULT_ADDR": "https://vault:8200"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def _client(read=None, write=None):
+        c = mock.MagicMock()
+        if read is not None:
+            c.secrets.kv.v2.read_secret_version.side_effect = read
+        if write is not None:
+            c.secrets.kv.v2.create_or_update_secret.side_effect = write
+        return c
+
+    def test_a_read_after_token_expiry_logs_in_again_and_retries(self):
+        import hvac
+        stale = self._client(read=hvac.exceptions.Forbidden("permission denied\ninvalid token"))
+        fresh = self._client(read=lambda **kw: {"data": {"data": {"value": "tok"}}})
+        with mock.patch.object(sec, "_make_client", side_effect=[stale, fresh]) as make:
+            self.assertEqual(sec.get_secret("integrations.ai_model.token"), "tok")
+        self.assertEqual(make.call_count, 2)
+
+    def test_a_write_after_token_expiry_logs_in_again_and_retries(self):
+        import hvac
+        stale = self._client(write=hvac.exceptions.Forbidden("permission denied"))
+        fresh = self._client(write=lambda **kw: None)
+        with mock.patch.object(sec, "_make_client", side_effect=[stale, fresh]) as make:
+            sec.set_secret("integrations.ai_model.token", "v")
+        self.assertEqual(make.call_count, 2)
+        fresh.secrets.kv.v2.create_or_update_secret.assert_called_once()
+
+    def test_a_policy_denial_is_retried_once_then_raised(self):
+        import hvac
+        denied = hvac.exceptions.Forbidden("permission denied")
+        with mock.patch.object(sec, "_make_client",
+                               side_effect=[self._client(read=denied), self._client(read=denied)]) as make:
+            with self.assertRaises(RuntimeError):
+                sec.get_secret("integrations.ai_model.token")
+        self.assertEqual(make.call_count, 2)
+
+    def test_a_missing_secret_does_not_trigger_a_new_login(self):
+        import hvac
+        client = self._client(read=hvac.exceptions.InvalidPath("not found"))
+        with mock.patch.object(sec, "_make_client", return_value=client) as make:
+            self.assertEqual(sec.get_secret("integrations.ai_model.token", "dflt"), "dflt")
+        self.assertEqual(make.call_count, 1)
+
+    def test_the_new_client_replaces_the_cached_one(self):
+        import hvac
+        stale = self._client(read=hvac.exceptions.Forbidden("invalid token"))
+        fresh = self._client(read=lambda **kw: {"data": {"data": {"value": "a"}}})
+        with mock.patch.object(sec, "_make_client", side_effect=[stale, fresh]):
+            sec.get_secret("k1")
+            sec._CACHE.clear()
+            self.assertEqual(sec.get_secret("k2"), "a")  # a third _make_client call would raise StopIteration
