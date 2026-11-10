@@ -100,14 +100,14 @@ def _tainted_report(target):
 
     def block(prefix, value):
         return IndicatorBlock(
-            t(prefix + "type"), value, "Dangerous", 90, [t(prefix + "why")], [t(prefix + "finding")],
+            t(prefix + "type"), value, t(prefix + "band"), 90, [t(prefix + "why")], [t(prefix + "finding")],
             [DetailGroup(t(prefix + "group"), [(t(prefix + "key"), t(prefix + "val"))])],
             [ConnectorLine("🔴", t(prefix + "conn_name"), t(prefix + "conn_label"), "malicious", 1)],
             "https://" + t(prefix + "vt_link"),
             {"value": "http://evil.test/d", "via_analyzer": t(prefix + "via")},
             escalation_note=t(prefix + "esc"))
 
-    ai = {"result": t("ai.result"), "sub_class": t("ai.sub_class"), "tier": "low",
+    ai = {"result": t("ai.result"), "sub_class": t("ai.sub_class"), "tier": t("ai.tier"),
           "runner_up": {"result": t("ai.runner_up")}, "model_version": t("ai.model_version"),
           "analysed_at": t("ai.analysed_at"), "reads": t("ai.reads"),
           "campaign": {"ref": t("ai.campaign_ref"), "size": 2, "labels": {t("ai.label"): 1}},
@@ -116,24 +116,28 @@ def _tainted_report(target):
     value = "http://evil.test/p"
     return _report(
         kind="mail", band=t("band"), confidence=t("confidence"), threat={"label": t("threat.label"), "category": t("threat.category")},
-        health=t("health"), lead=t("lead"), reporter=t("reporter"), description=t("description"),
+        health=t("health"), lead=t("lead"), reporter=t("reporter"), created=t("created"), generated=t("generated"), description=t("description"),
         reporter_context=t("reporter_context"), why=[t("why")], ai=ai,
         case_connectors=[ConnectorLine("🔴", t("cc.name"), t("cc.label"), "malicious", 1),
                          ConnectorLine("🔴", "Analyzer_1 (" + t("cc.attachment") + ")", "ok", "malicious", 1)],
         case_analysis=block("ca.", "ok"),
-        rows=[IndicatorRow(t("row.type"), value, "Dangerous", t("row.top")), IndicatorRow("ip", "203.0.113.7", "Safe", None)],
+        rows=[IndicatorRow(t("row.type"), value, t("row.band"), t("row.top")), IndicatorRow("ip", "203.0.113.7", "Safe", None)],
         blocks=[block("b.", value)])
 
 
 _FIELDS = (
     "band confidence threat.label threat.category health lead reporter description reporter_context why "
     "ai.result ai.sub_class ai.runner_up ai.model_version ai.analysed_at ai.reads ai.campaign_ref ai.label "
-    "ai.similar ai.fact cc.name cc.label cc.attachment row.type row.top"
+    "created generated row.band ai.tier ai.similar ai.fact cc.name cc.label cc.attachment row.type row.top"
 ).split() + [p + f for p in ("ca.", "b.") for f in (
-    "type why finding group key val conn_name conn_label vt_link via esc")]
+    "type band why finding group key val conn_name conn_label vt_link via esc".split())]
 
 
 class AllFieldsEscapedTests(SimpleTestCase):
+    def test_field_list_is_complete(self):
+        self.assertEqual(len(_FIELDS), len(set(_FIELDS)))
+        self.assertEqual(len(_FIELDS), 31 + 2 * 11)  # case + AI + case connectors + rows, then two blocks
+
     def test_every_printed_string_is_escaped(self):
         for field in _FIELDS:
             with self.subTest(field=field):
