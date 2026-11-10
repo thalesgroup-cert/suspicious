@@ -50,10 +50,26 @@ def _client():
     return _client_singleton[0]
 
 
+def _with_login_retry(call):
+    """call(client), logging in again once when Vault answers 403.
+
+    The AppRole token expires after its token_ttl (1h from provision-vault.sh) and the client is
+    cached for the life of the process, so without this every read fails with "permission denied /
+    invalid token" until the container is restarted. A real policy denial is retried once too (one
+    extra login) and then raised."""
+    import hvac
+
+    try:
+        return call(_client())
+    except hvac.exceptions.Forbidden:
+        _client_singleton[0] = None
+        return call(_client())
+
+
 def _read_from_vault(key: str) -> Any:
-    resp = _client().secrets.kv.v2.read_secret_version(
+    resp = _with_login_retry(lambda client: client.secrets.kv.v2.read_secret_version(
         path=key, mount_point=_VAULT_MOUNT, raise_on_deleted_version=True,
-    )
+    ))
     return resp["data"]["data"]["value"]
 
 
@@ -112,7 +128,7 @@ def set_secret(key: str, value: str) -> None:
         raise SecretStoreUnavailable(
             "no Vault configured (VAULT_ADDR unset); cannot store secret"
         )
-    _client().secrets.kv.v2.create_or_update_secret(
+    _with_login_retry(lambda client: client.secrets.kv.v2.create_or_update_secret(
         path=key, secret={"value": value}, mount_point=_VAULT_MOUNT,
-    )
+    ))
     _cache_set(key, value)
