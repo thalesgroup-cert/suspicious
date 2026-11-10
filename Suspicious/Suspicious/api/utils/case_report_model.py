@@ -1,0 +1,160 @@
+"""One data model for the downloadable case report (group, mail and file cases)."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone as dt_tz
+
+from api.utils.report_facts import (
+    BAND_RANK, ConnectorLine, DetailGroup, _is_vt, apply_fallbacks, connector_lines,
+    detail_groups, iso_utc, key_findings, vt_facts,
+)
+
+BLOCK_CAP = 10
+_MAX_FINDINGS = 5
+_FLAGGED = ("Dangerous", "Suspicious")
+
+
+@dataclass
+class IndicatorBlock:
+    type: str
+    value: str
+    band: str | None
+    confidence: int | None
+    why: list[str]
+    findings: list[str]
+    details: list[DetailGroup]
+    connectors: list[ConnectorLine]
+    vt_link: str | None
+    derived_from: dict | None
+    escalation_note: str = ""
+    screenshot_url: str | None = None
+    screenshot_data_uri: str | None = None
+    screenshot_omitted: bool = False
+
+
+@dataclass(frozen=True)
+class IndicatorRow:
+    type: str
+    value: str
+    band: str | None
+    top_finding: str | None
+
+
+@dataclass
+class CaseReport:
+    case_id: int
+    kind: str
+    band: str
+    confidence: str | None
+    threat: dict | None
+    health: str | None
+    lead: str | None
+    reporter: str
+    created: str | None
+    generated: str
+    description: str
+    reporter_context: str
+    why: list[str]
+    ai: dict | None = None
+    case_connectors: list[ConnectorLine] = field(default_factory=list)
+    case_analysis: IndicatorBlock | None = None
+    rows: list[IndicatorRow] = field(default_factory=list)
+    blocks: list[IndicatorBlock] = field(default_factory=list)
+    more: int = 0
+
+
+def build_block(row: dict, *, now: datetime) -> IndicatorBlock:
+    dtype, value = row["type"], str(row.get("value") or "")
+    sources = row.get("sources") or []
+    vt = next((s for s in sources if _is_vt(s)), None) or {}
+    facts = apply_fallbacks(vt_facts(vt.get("enrichment"), vt.get("report"), dtype, value), sources, dtype)
+    verdict = row.get("verdict") or {}
+    return IndicatorBlock(
+        type=dtype, value=value, band=verdict.get("band"), confidence=verdict.get("confidence"),
+        why=list(verdict.get("rationale") or []),
+        findings=key_findings(facts, sources, value, dtype, now)[:_MAX_FINDINGS],
+        # ponytail: address blocks are never rendered, so skip their details
+        details=[] if dtype == "mail" else detail_groups(facts, dtype),
+        connectors=connector_lines(sources, facts),
+        vt_link=facts.vt_link, derived_from=row.get("derived_from"),
+        escalation_note=row.get("escalation_note") or "",
+        screenshot_url=row.get("screenshot_url"),
+    )
+
+
+def _health_text(health: dict | None) -> str | None:
+    if not health or not (health.get("failed") or health.get("pending")):
+        return None
+    parts = []
+    if health.get("failed"):
+        names = ", ".join(sorted({f["analyzer"] for f in health.get("failures", [])}))
+        parts.append(f"{health['failed']} of {health['total']} analyzers failed"
+                     + (f" ({names})" if names else "") + ": the verdict has lower confidence")
+    if health.get("pending"):
+        parts.append(f"{health['pending']} analyzer(s) still running")
+    return "; ".join(parts)
+
+
+def _sort_key(b):
+    return (BAND_RANK.get(b.band, 3), b.value)
+
+
+def _case_connectors(reports) -> list[ConnectorLine]:
+    from api.utils.observable_report import _source_rows
+    from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
+
+    ai = ai_analyzer_name()
+    own = [r for r in reports
+           if (r.mail_header_id or r.mail_body_id or r.file_id) and r.analyzer.name != ai]
+    sources, _ = _source_rows(own, full=False)
+    return connector_lines(sources, vt_facts(None, None, "file", ""))
+
+
+def build_case_report(case, request, *, now: datetime | None = None) -> CaseReport:
+    from api.utils.analyzer_reports import reports_for_case
+    from api.utils.observable_report import (
+        assemble_file_observable, assemble_mail_observables, assemble_observables,
+    )
+    from api.views.investigations import _dedup_analyzer_reports
+    from score_process.scoring.classification import derive_threat_classification
+    from score_process.scoring.health import analysis_health
+
+    now = now or datetime.now(dt_tz.utc)
+    reports = _dedup_analyzer_reports(reports_for_case(case, defer_full=True))
+    fom = case.fileOrMail if case.fileOrMail_id else None
+    expl = case.verdict_explanation or {}
+    why = [t for t in (expl.get("analyst_paragraph"), expl.get("confidence_reading")) if t]
+    if not why:
+        why = list(case.verdict_rationale or []) or ([case.inconclusive_reason] if case.inconclusive_reason else [])
+
+    rep = CaseReport(
+        case_id=case.pk, kind="none", band=str(case.results),
+        confidence=f"{round(case.final_confidence)}%" if case.final_confidence else None,
+        threat=derive_threat_classification(case, reports),
+        health=_health_text(analysis_health(reports)),
+        lead=expl.get("reporter_paragraph") or case.inconclusive_reason or None,
+        reporter=case.reporter.username,
+        created=iso_utc(case.creation_date), generated=iso_utc(now),
+        description=case.description or "", reporter_context=case.reporter_context or "",
+        why=why,
+    )
+
+    if fom and fom.mail_id:
+        rep.kind = "mail"
+        rep.case_connectors = _case_connectors(reports)
+        blocks = sorted((build_block(r, now=now) for r in assemble_mail_observables(case, fom.mail, full=True)), key=_sort_key)
+        rep.rows = [IndicatorRow(b.type, b.value, b.band, b.findings[0] if b.findings else None) for b in blocks]
+        eligible = [b for b in blocks if b.band in _FLAGGED and b.type != "mail"]
+        rep.blocks, rep.more = eligible[:BLOCK_CAP], max(0, len(eligible) - BLOCK_CAP)
+    elif fom and fom.file_id:
+        rep.kind = "file"
+        block = build_block(assemble_file_observable(case, fom.file, full=True), now=now)
+        block.band, block.confidence, block.why = str(case.results), round(case.final_confidence), []
+        rep.case_analysis = block
+    elif case.observable_group_id:
+        rep.kind = "group"
+        blocks = sorted((build_block(r, now=now) for r in assemble_observables(case, full=True)), key=_sort_key)
+        rep.blocks, rep.more = blocks[:BLOCK_CAP], max(0, len(blocks) - BLOCK_CAP)
+        if len(blocks) > BLOCK_CAP:
+            rep.rows = [IndicatorRow(b.type, b.value, b.band, b.findings[0] if b.findings else None) for b in blocks]
+    return rep

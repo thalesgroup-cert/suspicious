@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from importlib import import_module
 
-from score_process.scoring.observable_collect import observable_reports
+from score_process.scoring.observable_collect import (
+    file_reports, mail_observable_reports, observable_reports,
+)
 from score_process.scoring.observable_engine import score_observable
 from score_process.scoring.sources import source_verdict_from_report
 
@@ -23,6 +25,37 @@ def _parent_value(d):
     module, cls_name, field = spec
     obj = getattr(import_module(module), cls_name).objects.filter(pk=d.parent_id).first()
     return getattr(obj, field, None) if obj else None
+
+
+def _source_rows(reports, *, full: bool) -> tuple[list[dict], list]:
+    """Newest report per analyzer -> (source dicts, SourceVerdicts)."""
+    seen, sources, svs = set(), [], []
+    for rep in reports:
+        if rep.analyzer_id in seen:
+            continue
+        seen.add(rep.analyzer_id)
+        sv = source_verdict_from_report(rep)
+        svs.append(sv)
+        sources.append({
+            "name": sv.name, "tier": sv.tier, "verdict": sv.verdict,
+            "confidence": sv.confidence, "evidence": sv.evidence,
+            "failed": sv.failed,
+            "enrichment": rep.enrichment,
+            "report": rep.report_full if full else rep.report_summary,
+        })
+    return sources, svs
+
+
+def _verdict_dict(svs) -> dict | None:
+    if not svs:
+        return None
+    v = score_observable(svs)
+    return {"band": v.band, "confidence": v.confidence, "rationale": v.rationale}
+
+
+def _screenshot_url(case, reports) -> str | None:
+    shot = next((r.id for r in reports if getattr(r, "screenshot_key", "")), None)
+    return f"/api/cases/{case.pk}/screenshot.png?report={shot}" if shot else None
 
 
 def assemble_observables(case, *, full: bool = False) -> list[dict]:
@@ -42,27 +75,8 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
 
     observables = []
     for art, obj, _field, reports in observable_reports(case):
-        seen, sources, svs = set(), [], []
-        for rep in reports:
-            if rep.analyzer_id in seen:
-                continue
-            seen.add(rep.analyzer_id)
-            sv = source_verdict_from_report(rep)
-            svs.append(sv)
-            sources.append({
-                "name": sv.name, "tier": sv.tier, "verdict": sv.verdict,
-                "confidence": sv.confidence, "evidence": sv.evidence,
-                "failed": sv.failed,
-                "enrichment": rep.enrichment,
-                "report": rep.report_full if full else rep.report_summary,
-            })
-        shot = next(
-            (rep.id for rep in reports if getattr(rep, "screenshot_key", "")), None
-        )
-        verdict = None
-        if svs:
-            v = score_observable(svs)
-            verdict = {"band": v.band, "confidence": v.confidence, "rationale": v.rationale}
+        sources, svs = _source_rows(reports, full=full)
+        verdict = _verdict_dict(svs)
 
         key = (art.artifact_type.lower(), obj.pk)
         d = derived.get(key)
@@ -77,8 +91,31 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
             "derived_from": ({"value": pv, "via_analyzer": d.via_analyzer}
                              if pv else None),
             "escalation_note": escalation.get(key, ""),
-            "screenshot_url": (
-                f"/api/cases/{case.pk}/screenshot.png?report={shot}"
-                if shot else None),
+            "screenshot_url": _screenshot_url(case, reports),
         })
     return observables
+
+
+def assemble_mail_observables(case, mail, *, full: bool = False) -> list[dict]:
+    """One row per indicator embedded in a mail, same keys as assemble_observables."""
+    out = []
+    for _art, obj, field, reports in mail_observable_reports(mail):
+        sources, svs = _source_rows(reports, full=full)
+        out.append({
+            "value": getattr(obj, "address", None) or getattr(obj, "value", None),
+            "type": field, "verdict": _verdict_dict(svs), "sources": sources,
+            "derived_from": None, "escalation_note": "",
+            "screenshot_url": _screenshot_url(case, reports),
+        })
+    return out
+
+
+def assemble_file_observable(case, file, *, full: bool = False) -> dict:
+    reports = file_reports(file)
+    sources, svs = _source_rows(reports, full=full)
+    return {
+        "value": file.linked_hash.value, "type": "file",
+        "verdict": _verdict_dict(svs), "sources": sources,
+        "derived_from": None, "escalation_note": "",
+        "screenshot_url": _screenshot_url(case, reports),
+    }
