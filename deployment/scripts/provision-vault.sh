@@ -29,7 +29,9 @@ path "suspicious/metadata/*" { capabilities = ["read", "list"] }
 # Connector secret editing from the Settings UI writes integration secrets
 # straight to Vault. Scoped create/update so admins can set/rotate them;
 # boot-critical and non-connector secrets stay read-only above.
-path "suspicious/data/integrations/*" { capabilities = ["create", "update", "read"] }
+# Secrets are stored under the DOTTED key (suspicious/data/integrations.<connector>.<field>),
+# so the glob must end in "integrations.*", not "integrations/*" (which matches nothing).
+path "suspicious/data/integrations.*" { capabilities = ["create", "update", "read"] }
 EOF
 
 vault auth enable approle 2>/dev/null || true
