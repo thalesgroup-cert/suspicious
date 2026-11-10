@@ -143,10 +143,30 @@ misp, watcher, ai_model, and the other connectors) from the Settings UI, which w
 writes includes scoped create/update on the integration secret paths:
 
 ```hcl
-path "suspicious/data/integrations/*" {
+path "suspicious/data/integrations.*" {
   capabilities = ["create", "update", "read"]
 }
 ```
+
+**Existing deployment provisioned before this fix:** the older policy used
+`suspicious/data/integrations/*`, which does not match the dotted secret names
+and made every UI save fail with `502 ... (Forbidden)`. Rewrite only the policy;
+do **not** re-run `make provision-vault`, which also issues a new AppRole
+`secret_id`. With a Vault token that may write policies (`VAULT_TOKEN` exported):
+
+```bash
+cd deployment
+docker compose --env-file .env exec -T \
+  -e VAULT_TOKEN -e VAULT_ADDR=https://127.0.0.1:8200 -e VAULT_CACERT=/vault/ca/ca.pem \
+  vault vault policy write suspicious-read - <<'POLICY'
+path "suspicious/data/*"     { capabilities = ["read"] }
+path "suspicious/metadata/*" { capabilities = ["read", "list"] }
+path "suspicious/data/integrations.*" { capabilities = ["create", "update", "read"] }
+POLICY
+```
+
+A policy change applies to new tokens: the app's AppRole token lives up to an hour
+(`token_ttl=1h`), so recreate `suspicious` and `suspicious_celery`, or wait.
 
 Everything else stays read-only. If you tightened the policy by hand and removed
 this stanza, the UI feature stops working as follows:
