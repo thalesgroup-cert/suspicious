@@ -1,5 +1,8 @@
 <p align="center">
-    <img alt="Suspicious Logo" src="/assets/suspicious-logo.png" height="330" width="260">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="/assets/suspicious-logo.png">
+        <img alt="Suspicious Logo" src="/assets/suspicious-logo-light.png" height="330" width="265">
+    </picture>
 </p>
 <p align="center">
     <strong>Phishing & threat-analysis platform</strong>
