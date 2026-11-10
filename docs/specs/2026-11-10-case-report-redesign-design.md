@@ -141,6 +141,29 @@ section title stays "Why this verdict" so that step needs no layout change.
   `observable_reports`.
 - Report size stays bounded by the caps above; no raw dumps.
 
+## AI model assessment (mail cases)
+
+Mail cases get an "AI model assessment" section after the case header and before the indicators. It
+is the payload the case drawer already shows, built with `ai_model.presentation.present_assessment`
+for the person downloading the report, so a reporter sees exactly what the UI shows them and an
+analyst sees the extra cross-check. It appears only while the `ai_model` connector is enabled and
+the case has an assessment; otherwise there is no section (historical Cortex AI reports stay out,
+as in the weighted blend).
+
+What the section shows, from that payload:
+- Class and sub-class (`result`, `sub_class`), the confidence tier (High, Medium or Low) and, on a
+  Low tier, the runner-up class.
+- Model version and when it analysed the mail (`model_version`, `analysed_at`).
+- The input note: "body text only, not headers or attachments", so nobody reads it as a verdict on
+  the attachments.
+- The campaign line when the case is in a campaign: reference, size and, for analysts, the folder
+  labels of members; similar cases only as far as the viewer may see them.
+- Analysts only: the cross-check facts (decisive rule, independent sources, list matches) and
+  whether the AI and the evidence disagree.
+
+The AI vote also appears as a line in the case-level connector list ("🟠 AI model: Suspicious,
+High confidence"), using its class and tier, next to the mail-header and file analyzers.
+
 ## Calls made after the builder check (the owner can overrule any)
 
 - **Where indicators come from.** Group cases use `observable_reports(case)` as today. Mail cases
