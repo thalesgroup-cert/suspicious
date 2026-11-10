@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone as dt_tz
 
 from api.utils.report_facts import (
-    BAND_RANK, ConnectorLine, DetailGroup, _is_vt, apply_fallbacks, connector_lines,
+    BAND_RANK, ConnectorLine, _VERDICT_RANK, DetailGroup, _is_vt, apply_fallbacks, connector_lines,
     detail_groups, iso_utc, key_findings, vt_facts,
 )
 
@@ -125,6 +125,15 @@ def _case_connectors(reports) -> list[ConnectorLine]:
     return connector_lines(sources, vt_facts(None, None, "file", ""))
 
 
+_AI_ICON = {"Dangerous": "🔴", "Unwanted": "🟠", "Safe": "🟢"}
+
+
+def ai_connector_line(payload: dict) -> ConnectorLine:
+    result, tier = str(payload.get("result") or ""), str(payload.get("tier") or "")
+    label = f"{result}, {tier.title()} confidence" if tier else result
+    return ConnectorLine(_AI_ICON.get(result, "⚪"), "AI model", label, result, 0)
+
+
 def build_case_report(case, request, *, now: datetime | None = None) -> CaseReport:
     from api.utils.analyzer_reports import reports_for_case
     from api.utils.observable_report import (
@@ -157,6 +166,13 @@ def build_case_report(case, request, *, now: datetime | None = None) -> CaseRepo
     if fom and fom.mail_id:
         rep.kind = "mail"
         rep.case_connectors = _case_connectors(reports)
+        from api.utils.ai_assessment import ai_assessment_for
+
+        ai = ai_assessment_for(case, request)  # None while the connector is off; redacted per viewer
+        if ai:
+            rep.ai = {**ai, "analysed_at": iso_utc(ai.get("analysed_at"))}
+            rep.case_connectors.append(ai_connector_line(ai))
+            rep.case_connectors.sort(key=lambda l: (_VERDICT_RANK[l.icon], l.tier, l.name.lower()))
         blocks = sorted((build_block(r, now=now) for r in assemble_mail_observables(case, fom.mail, full=True)), key=_sort_key)
         rep.rows = [IndicatorRow(b.type, b.value, b.band, b.findings[0] if b.findings else None) for b in blocks]
         eligible = [b for b in blocks if b.band in _FLAGGED and b.type != "mail"]

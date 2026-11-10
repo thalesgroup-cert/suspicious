@@ -1,17 +1,20 @@
 from datetime import datetime, timezone as tz
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIRequestFactory
 
 from api.tests.test_report_facts import VT_HASH, VT_IP
+from ai_model.models import AiAssessment, LabelRecord
 from api.utils.case_report_model import build_block, build_case_report
 from case_handler.models import (
-    Case, CaseHasFileOrMail, ObservableGroup, ObservableGroupArtifact,
+    Campaign, CampaignMember, Case, CaseHasFileOrMail, ObservableGroup, ObservableGroupArtifact,
 )
 from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
+from connectors.models import ConnectorState
 from cortex_job.models import Analyzer, AnalyzerReport
 from domain_process.models import Domain
 from email_process.models import MailAddress
@@ -216,3 +219,104 @@ class MailFileTests(Base):
         self.assertEqual((rep.kind, rep.case_analysis.type, rep.case_analysis.value), ("file", "file", h.value))
         self.assertEqual([g.title for g in rep.case_analysis.details], ["Hash", "VirusTotal"])
         self.assertEqual(rep.blocks, [])
+
+
+class AiSectionTests(Base):
+    """Review focus 4: the AI section is mail-only, connector-gated and redacted for the reporter."""
+
+    mail_case = MailFileTests.mail_case
+
+    def setUp(self):
+        super().setUp()
+        self.analyst = get_user_model().objects.create_user("cert", "", "x")
+        self.analyst.groups.add(Group.objects.get_or_create(name="CERT")[0])
+        ConnectorState.objects.update_or_create(name="ai_model", defaults={"enabled": True})
+        _, self.mail_case_obj = self.mail_case()
+        self.assess(self.mail_case_obj)
+
+    def assess(self, case, **kw):
+        defaults = dict(model_version="v3", result="UNWANTED", sub_class="spam", score=6, confidence=80,
+                        tier="high", probabilities={"UNWANTED": 0.8, "SAFE": 0.2})
+        return AiAssessment.objects.create(case=case, **{**defaults, **kw})
+
+    def build(self, user, case=None):
+        request = APIRequestFactory().get("/")
+        request.user = user
+        # a fresh instance, as the views load it: no stale ai_assessment cache
+        return build_case_report(Case.objects.get(pk=(case or self.mail_case_obj).pk), request, now=NOW)
+
+    def in_campaign(self, case):
+        sibling_mail, sibling = self.mail_case()
+        camp = Campaign.objects.create(title="c")
+        CampaignMember.objects.create(campaign=camp, case=case)
+        CampaignMember.objects.create(campaign=camp, case=sibling)
+        LabelRecord.objects.create(
+            message_id="<m@x.test>", message_id_hash="h", case=sibling, source="imap_folder", label="Dangerous",
+            label_class="Dangerous", trust="folder", status="active")
+
+    def test_analyst_gets_section_and_cross_check(self):
+        rep = self.build(self.analyst)
+        self.assertEqual((rep.ai["result"], rep.ai["sub_class"], rep.ai["tier"]), ("Unwanted", "spam", "high"))
+        self.assertIsNotNone(rep.ai["cross_check"])
+        self.assertRegex(rep.ai["analysed_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        self.assertIn(("\U0001F7E0", "AI model", "Unwanted, High confidence"),
+                      [(l.icon, l.name, l.label) for l in rep.case_connectors])
+
+    def test_analyst_sees_campaign_labels_reporter_does_not(self):
+        self.in_campaign(self.mail_case_obj)
+        self.assertEqual(self.build(self.analyst).ai["campaign"]["labels"], {"Dangerous": 1})
+        rep = self.build(self.user, self.mail_case_obj)  # self.user reported the case
+        self.assertIsNotNone(rep.ai["campaign"])
+        self.assertNotIn("labels", rep.ai["campaign"])
+        self.assertNotIn("members_disagree", rep.ai["campaign"])
+
+    def test_reporter_sees_no_cross_check(self):
+        rep = self.build(self.user)
+        self.assertEqual(rep.ai["result"], "Unwanted")
+        self.assertIsNone(rep.ai["cross_check"])
+
+    def test_no_section_without_assessment(self):
+        AiAssessment.objects.all().delete()
+        rep = self.build(self.analyst)
+        self.assertIsNone(rep.ai)
+        self.assertNotIn("AI model", [l.name for l in rep.case_connectors])
+
+    def test_no_section_when_connector_disabled(self):
+        ConnectorState.objects.filter(name="ai_model").update(enabled=False)
+        rep = self.build(self.analyst)
+        self.assertIsNone(rep.ai)
+        self.assertNotIn("AI model", [l.name for l in rep.case_connectors])
+
+    def test_low_tier_shows_runner_up_and_bare_label_without_tier(self):
+        AiAssessment.objects.all().delete()
+        self.assess(self.mail_case_obj, tier="low")
+        rep = self.build(self.analyst)
+        self.assertEqual(rep.ai["runner_up"], {"result": "Safe"})
+        self.assertIn("Unwanted, Low confidence", [l.label for l in rep.case_connectors])
+        AiAssessment.objects.all().delete()
+        self.assess(self.mail_case_obj, tier="")
+        self.assertIn("Unwanted", [l.label for l in self.build(self.analyst).case_connectors])
+
+    def test_ai_line_sorts_first_within_its_icon(self):
+        hdr = Analyzer.objects.create(name="Aaa_Header", analyzer_cortex_id="aa", tier=1)
+        self.rep(hdr, "suspicious", mail_header=self.mail_case_obj.fileOrMail.mail.mail_header
+                 or self._header())
+        names = [l.name for l in self.build(self.analyst).case_connectors if l.icon == "\U0001F7E0"]
+        self.assertEqual(names[0], "AI model")
+
+    def _header(self):
+        mail = self.mail_case_obj.fileOrMail.mail
+        mail.mail_header = MailHeader.objects.create(header_value="h", fuzzy_hash="f")
+        mail.save()
+        return mail.mail_header
+
+    def test_group_and_file_cases_never_get_the_section(self):
+        _, group = self.group_case()
+        self.assess(group)
+        self.assertIsNone(self.build(self.analyst, group).ai)
+        f = File.objects.create(linked_hash=Hash.objects.create(value="c" * 64), file_path="x.bin", tmp_path="", other_names="")
+        fcase = Case.objects.create(description="d", reporter=self.user)
+        fcase.fileOrMail = CaseHasFileOrMail.objects.create(case=fcase, file=f)
+        fcase.save()
+        self.assess(fcase)
+        self.assertIsNone(self.build(self.analyst, fcase).ai)
