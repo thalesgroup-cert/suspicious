@@ -45,9 +45,13 @@ comes from the scoring described in *Why this verdict*.
 ## Downloading the full report
 
 The **Full report** button (on a case's detail view) downloads a
-self-contained HTML file: the verdict, the per-indicator evidence, source
-tables, and any captured screenshots, inlined so the file works offline with
-no login required to open it. It's available to anyone who can see the
+self-contained HTML file with one block per indicator: verdict, why, key
+findings, type-specific details (location, Whois, categorization, URL, hash,
+VirusTotal), the connectors that ran with a legend, and any captured
+screenshots (collapsed, inlined so the file works offline with no login).
+Mail and file cases show their embedded indicators and analyzers, and mail
+cases the AI model assessment. Raw analyzer output is not embedded.
+It's available to anyone who can see the
 case — the case's own reporter as well as investigators — and it follows
 your OS/browser's light or dark preference automatically.
 

@@ -77,10 +77,18 @@ class MarkdownReportTests(TestCase):
     def test_untrusted_text_cannot_make_links_or_break_tables(self):
         body = self._get().content.decode()
         self.assertNotIn("[x](javascript", body)           # no live link from analyzer evidence
-        for line in body.splitlines():
-            if line.startswith("|") and "VirusTotal" in line:
-                self.assertEqual(line.count("|") - line.count("\\|"), 5, line)  # 4 columns: no stray pipes
+        vt = [l for l in body.splitlines() if l.startswith("- \U0001F534 VirusTotal:")]
+        self.assertEqual(len(vt), 1, body)
+        self.assertIn("\\[x\\](javascript:alert(1)) \\| pipe", vt[0])
         self.assertIn("evil.test", body)
+
+    def test_markdown_has_block_skeleton(self):
+        body = self._get().content.decode()
+        for part in ("### IP · `203.0.113.7`", "**Connectors**", "**Legend**"):
+            self.assertIn(part, body)
+
+    def test_failed_source_line(self):
+        self.assertIn("\u26aa Shodan: failed", self._get().content.decode())
 
     def test_snake_case_names_stay_readable(self):
         Analyzer.objects.filter(name="VirusTotal").update(name="Abuse_Finder_3_0")

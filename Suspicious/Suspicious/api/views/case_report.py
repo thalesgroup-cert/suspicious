@@ -11,7 +11,9 @@ from rest_framework.renderers import BaseRenderer, StaticHTMLRenderer
 from rest_framework.views import APIView
 
 from api.permissions.submissions import CanAccessSubmission, submission_queryset
-from api.utils.observable_report import assemble_observables
+from api.utils.case_report_markdown import build_markdown_report
+from api.utils.case_report_model import build_case_report
+from api.utils.report_facts import LEGEND
 from case_handler.models import Case
 from common.storage import get_store
 from cortex_job.models import AnalyzerReport
@@ -24,23 +26,23 @@ logger = logging.getLogger(__name__)
 _REPORT_IMG_CAP = 6 * 1024 * 1024
 
 
-def _inline_screenshots(observables):
-    """Embed each observable's page screenshot as a base64 ``data:`` URI,
-    fetched from MinIO, until the running total exceeds ``_REPORT_IMG_CAP``.
-    Past the cap (or on a fetch failure) the row is marked ``screenshot_omitted``
-    so the template can render a note instead.
+def _inline_screenshots(blocks):
+    """Embed each block's page screenshot as a base64 ``data:`` URI,
+    fetched from the object store, until the running total exceeds
+    ``_REPORT_IMG_CAP``. Past the cap (or on a fetch failure) the block is
+    marked ``screenshot_omitted`` so the template can render a note instead.
     """
     used = 0
     store = None
-    for o in observables:
-        url = o.get("screenshot_url")
-        o["screenshot_data_uri"] = None
-        o["screenshot_omitted"] = False
+    for b in blocks:
+        url = b.screenshot_url
+        b.screenshot_data_uri = None
+        b.screenshot_omitted = False
         if not url:
             continue
-        o["screenshot_omitted"] = True  # until an image is actually inlined
+        b.screenshot_omitted = True  # until an image is actually inlined
         if used >= _REPORT_IMG_CAP:
-            continue  # budget already blown: don't touch the DB or MinIO
+            continue  # budget already blown: don't touch the DB or the store
         report_id = url.split("report=")[-1]
         try:
             rep = (
@@ -61,25 +63,26 @@ def _inline_screenshots(observables):
             used = _REPORT_IMG_CAP  # budget spent: skip the rest without fetching
             continue
         used += len(data)
-        o["screenshot_data_uri"] = (
+        b.screenshot_data_uri = (
             "data:image/png;base64," + base64.b64encode(data).decode()
         )
-        o["screenshot_omitted"] = False
-    return observables
+        b.screenshot_omitted = False
+    return blocks
 
 
-def _collapse_sources(sources):
-    """Merge identical verdict-explanation rows, keeping first-seen order and a
-    count in ``n``. Snapshots finalised before the AnalyzerReport dedup fix hold
-    one row per historical analyzer run."""
-    merged = {}
-    for s in sources or []:
-        key = tuple(sorted((k, str(v)) for k, v in s.items()))
-        if key in merged:
-            merged[key]["n"] += 1
-        else:
-            merged[key] = {**s, "n": 1}
-    return list(merged.values())
+def _load_report(request, view, case_id):
+    case = get_object_or_404(
+        submission_queryset(
+            Case.objects.select_related(
+                "reporter", "fileOrMail__mail", "fileOrMail__file__linked_hash",
+                "ai_assessment", "campaign_membership__campaign",
+            ),
+            request.user,
+        ),
+        pk=case_id,
+    )
+    view.check_object_permissions(request, case)
+    return case, build_case_report(case, request, now=timezone.now())
 
 
 class CaseReportView(APIView):
@@ -89,19 +92,9 @@ class CaseReportView(APIView):
     renderer_classes = [StaticHTMLRenderer]
 
     def get(self, request, case_id):
-        case = get_object_or_404(submission_queryset(Case.objects.all(), request.user), pk=case_id)
-        self.check_object_permissions(request, case)
-        observables = assemble_observables(case, full=True) if case.observable_group_id else []
-        observables = _inline_screenshots(observables)
-        html = render_to_string(
-            "case_report/report.html",
-            {
-                "case": case,
-                "sources": _collapse_sources((case.verdict_explanation or {}).get("sources")),
-                "observables": observables,
-                "generated_at": timezone.now(),
-            },
-        )
+        case, report = _load_report(request, self, case_id)
+        _inline_screenshots(report.blocks + ([report.case_analysis] if report.case_analysis else []))
+        html = render_to_string("case_report/report.html", {"report": report, "legend": LEGEND})
         resp = HttpResponse(html, content_type="text/html")
         resp["Content-Disposition"] = f'attachment; filename="case-{case.id}-report.html"'
         return resp
@@ -123,23 +116,8 @@ class CaseReportMarkdownView(APIView):
     renderer_classes = [MarkdownRenderer]
 
     def get(self, request, case_id):
-        from api.utils.analyzer_reports import reports_for_case
-        from api.utils.case_report_markdown import build_markdown_report
-        from api.views.investigations import _dedup_analyzer_reports
-        from score_process.scoring.classification import derive_threat_classification
-        from score_process.scoring.health import analysis_health
-
-        case = get_object_or_404(
-            submission_queryset(Case.objects.select_related("reporter"), request.user), pk=case_id
-        )
-        self.check_object_permissions(request, case)
-        reports = _dedup_analyzer_reports(reports_for_case(case, defer_full=True))
-        observables = assemble_observables(case) if case.observable_group_id else []
-        text = build_markdown_report(
-            case, observables,
-            _collapse_sources((case.verdict_explanation or {}).get("sources")),
-            derive_threat_classification(case, reports), analysis_health(reports), timezone.now(),
-        )
+        case, report = _load_report(request, self, case_id)
+        text = build_markdown_report(report)
         resp = HttpResponse(text, content_type="text/markdown; charset=utf-8")
         resp["Content-Disposition"] = f'attachment; filename="case-{case.id}-report.md"'
         return resp
