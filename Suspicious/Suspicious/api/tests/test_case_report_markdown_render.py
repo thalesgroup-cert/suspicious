@@ -94,9 +94,13 @@ def _pipes(line):
     return len(re.findall(r"(?<!\\)\|", line))
 
 
+def _marker(field):
+    return f"mk{_FIELDS.index(field)}x"  # distinct per field; "x" keeps mk1x apart from mk10x
+
+
 def _tainted_report(target):
     def t(name):
-        return _P if name == target else "ok"
+        return _P + _marker(name) if name == target else "ok"
 
     def block(prefix, value):
         return IndicatorBlock(
@@ -130,20 +134,21 @@ _FIELDS = (
     "ai.result ai.sub_class ai.runner_up ai.model_version ai.analysed_at ai.reads ai.campaign_ref ai.label "
     "created generated row.band ai.tier ai.similar ai.fact cc.name cc.label cc.attachment row.type row.top"
 ).split() + [p + f for p in ("ca.", "b.") for f in (
-    "type band why finding group key val conn_name conn_label vt_link via esc".split())]
+    "type band why finding group key val conn_name conn_label vt_link via esc".split())
+    if p + f != "ca.type"]  # the case-analysis heading is the constant "## Case analysis"
 
 
 class AllFieldsEscapedTests(SimpleTestCase):
     def test_field_list_is_complete(self):
         self.assertEqual(len(_FIELDS), len(set(_FIELDS)))
-        self.assertEqual(len(_FIELDS), 31 + 2 * 11)  # case + AI + case connectors + rows, then two blocks
+        self.assertEqual(len(_FIELDS), 29 + 12 + 11)  # 29 case-level, 12 indicator-block, 11 case-analysis (no type)
 
     def test_every_printed_string_is_escaped(self):
         for field in _FIELDS:
             with self.subTest(field=field):
                 md = build_markdown_report(_tainted_report(field))
                 out = _outside(md)
-                self.assertIn("evil", md, "field is not rendered at all")
+                self.assertIn(_marker(field), md.lower(), "this field is not rendered")
                 self.assertNotIn("<i>", out)
                 self.assertIsNone(re.search(r"(?<!\\)\]\(", out))
                 self.assertNotIn("://", out)
