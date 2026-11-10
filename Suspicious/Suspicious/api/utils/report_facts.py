@@ -282,4 +282,4 @@ def apply_fallbacks(facts: IndicatorFacts, sources: list[dict], data_type: str) 
 
 
 def _asn(v: Any) -> int | None:
-    return int(v) if isinstance(v, str) and v.isascii() and v.isdigit() and len(v) < 10 else _int(v)
+    return int(v) if isinstance(v, str) and v.isascii() and v.isdigit() and len(v) <= 10 else _int(v)

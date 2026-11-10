@@ -215,3 +215,10 @@ class FallbackTests(SimpleTestCase):
             for rep in ({"asn": bad}, {"ip": {"asn": bad}}):
                 f = apply_fallbacks(IndicatorFacts(), [_src("StopForumSpam_1_0", rep)], "ip")
                 self.assertIsNone(f.asn)
+
+    def test_asn_string_length_boundaries(self):
+        for raw, want in (("4200000000", 4200000000), ("4294967295", 4294967295),
+                          ("99999999999", None), ("00123", 123)):
+            for rep in ({"asn": raw}, {"ip": {"asn": raw}}):
+                f = apply_fallbacks(IndicatorFacts(), [_src("StopForumSpam_1_0", rep)], "ip")
+                self.assertEqual(f.asn, want)
