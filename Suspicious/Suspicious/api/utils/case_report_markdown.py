@@ -1,7 +1,9 @@
 """Markdown version of the case report: verdict, why, and per-indicator evidence.
 
 Every value that comes from outside (indicators, analyzer evidence, reporter text)
-is escaped so a viewer cannot turn it into a link, a heading or a table break.
+is escaped so a viewer cannot turn it into a link, a heading or a table break. Running
+text is also defanged ("://", "www." and "@" are broken up) so viewers do not autolink
+URLs or addresses; indicator values sit in code spans, which are never autolinked.
 Screenshots and raw analyzer output stay in the HTML report."""
 from __future__ import annotations
 
@@ -20,9 +22,13 @@ _LEADING_MARKER = re.compile(r"^(\s*)([#>+=-])")
 _LEADING_ORDERED = re.compile(r"^(\s*\d+)([.)])")
 
 
+_WWW = re.compile(r"(?<![A-Za-z0-9])www\.", re.I)
+
+
 def _text(value) -> str:
-    """Escape for use in running text or a table cell; one line."""
+    """Defang and escape for use in running text or a table cell; one line."""
     one_line = " ".join(str(value if value is not None else "").split())
+    one_line = _WWW.sub(lambda m: m.group()[:-1] + "[.]", one_line.replace("://", "[:]//")).replace("@", "[@]")
     escaped = _ALWAYS.sub(r"\\\1", one_line)
     escaped = _EDGE_UNDERSCORE.sub(r"\\_", escaped)
     escaped = _LEADING_MARKER.sub(r"\1\\\2", escaped)
@@ -58,25 +64,27 @@ def _ai_section(ai: dict) -> list[str]:
     ru = ai.get("runner_up")
     if isinstance(ru, dict) and ru.get("result"):
         head += f" · runner-up: {_text(ru['result'])}"
-    out = ["## AI model assessment", "", head,
-           f"Model {_text(ai.get('model_version'))} · analysed {_text(ai.get('analysed_at'))}",
-           f"Reads: {_text(ai.get('reads'))}"]
+    out = ["## AI model assessment", "", head, "",
+           f"Model {_text(ai.get('model_version'))} · analysed {_text(ai.get('analysed_at'))}", "",
+           f"Reads: {_text(ai.get('reads'))}", ""]
     camp = ai.get("campaign")
     if isinstance(camp, dict):
         line = f"Campaign {_text(camp.get('ref'))} · {_text(camp.get('size'))} mails"
         labels = camp.get("labels")
         if isinstance(labels, dict) and labels:
             line += " · labels " + ", ".join(f"{_text(k)} {_text(v)}" for k, v in labels.items())
-        out.append(line)
+        out += [line, ""]
     for sc in ai.get("similar_cases") or []:
         if isinstance(sc, dict):
-            out.append(f"Similar case #{_text(sc.get('case_id'))}: {_text(sc.get('label'))}")
+            out += [f"Similar case #{_text(sc.get('case_id'))}: {_text(sc.get('label'))}", ""]
     cc = ai.get("cross_check")
     if isinstance(cc, dict):
-        out += [f"- {_text(f.get('text'))}" for f in cc.get("facts") or [] if isinstance(f, dict)]
+        facts = [f for f in cc.get("facts") or [] if isinstance(f, dict)]
+        if facts:
+            out += [f"- {_text(f.get('text'))}" for f in facts] + [""]
         if cc.get("disagrees"):
-            out.append("AI and evidence disagree")
-    return out + [""]
+            out += ["AI and evidence disagree", ""]
+    return out
 
 
 def _block(b: IndicatorBlock, heading: str) -> list[str]:

@@ -80,3 +80,99 @@ class RenderTests(SimpleTestCase):
         rows = [IndicatorRow("ip", "203.0.113.7", "Dangerous", None)]
         self.assertIn("+3 more flagged indicators", build_markdown_report(_report(kind="mail", more=3, rows=rows)))
         self.assertIn("No indicator observables on this case.", build_markdown_report(_report(kind="none")))
+
+
+_P = "<i>[x](javascript:1)|http://evil.test"
+_SPAN = re.compile(r"``.*?``|`[^`]*`")
+
+
+def _outside(md):
+    return _SPAN.sub("", md)
+
+
+def _pipes(line):
+    return len(re.findall(r"(?<!\\)\|", line))
+
+
+def _tainted_report(target):
+    def t(name):
+        return _P if name == target else "ok"
+
+    def block(prefix, value):
+        return IndicatorBlock(
+            t(prefix + "type"), value, "Dangerous", 90, [t(prefix + "why")], [t(prefix + "finding")],
+            [DetailGroup(t(prefix + "group"), [(t(prefix + "key"), t(prefix + "val"))])],
+            [ConnectorLine("🔴", t(prefix + "conn_name"), t(prefix + "conn_label"), "malicious", 1)],
+            "https://" + t(prefix + "vt_link"),
+            {"value": "http://evil.test/d", "via_analyzer": t(prefix + "via")},
+            escalation_note=t(prefix + "esc"))
+
+    ai = {"result": t("ai.result"), "sub_class": t("ai.sub_class"), "tier": "low",
+          "runner_up": {"result": t("ai.runner_up")}, "model_version": t("ai.model_version"),
+          "analysed_at": t("ai.analysed_at"), "reads": t("ai.reads"),
+          "campaign": {"ref": t("ai.campaign_ref"), "size": 2, "labels": {t("ai.label"): 1}},
+          "similar_cases": [{"case_id": 4, "label": t("ai.similar")}],
+          "cross_check": {"facts": [{"kind": "rule", "text": t("ai.fact")}], "disagrees": True}}
+    value = "http://evil.test/p"
+    return _report(
+        kind="mail", band=t("band"), confidence=t("confidence"), threat={"label": t("threat.label"), "category": t("threat.category")},
+        health=t("health"), lead=t("lead"), reporter=t("reporter"), description=t("description"),
+        reporter_context=t("reporter_context"), why=[t("why")], ai=ai,
+        case_connectors=[ConnectorLine("🔴", t("cc.name"), t("cc.label"), "malicious", 1),
+                         ConnectorLine("🔴", "Analyzer_1 (" + t("cc.attachment") + ")", "ok", "malicious", 1)],
+        case_analysis=block("ca.", "ok"),
+        rows=[IndicatorRow(t("row.type"), value, "Dangerous", t("row.top")), IndicatorRow("ip", "203.0.113.7", "Safe", None)],
+        blocks=[block("b.", value)])
+
+
+_FIELDS = (
+    "band confidence threat.label threat.category health lead reporter description reporter_context why "
+    "ai.result ai.sub_class ai.runner_up ai.model_version ai.analysed_at ai.reads ai.campaign_ref ai.label "
+    "ai.similar ai.fact cc.name cc.label cc.attachment row.type row.top"
+).split() + [p + f for p in ("ca.", "b.") for f in (
+    "type why finding group key val conn_name conn_label vt_link via esc")]
+
+
+class AllFieldsEscapedTests(SimpleTestCase):
+    def test_every_printed_string_is_escaped(self):
+        for field in _FIELDS:
+            with self.subTest(field=field):
+                md = build_markdown_report(_tainted_report(field))
+                out = _outside(md)
+                self.assertIn("evil", md, "field is not rendered at all")
+                self.assertNotIn("<i>", out)
+                self.assertIsNone(re.search(r"(?<!\\)\]\(", out))
+                self.assertNotIn("://", out)
+                table = [l for l in md.splitlines() if l.startswith("|")]
+                self.assertEqual({_pipes(l) for l in table}, {5})
+
+    def test_indicator_value_is_a_code_span(self):
+        md = build_markdown_report(_tainted_report("none"))
+        self.assertRegex(md, r"### \w+ · `http://evil.test/p`")
+        self.assertIn("| `http://evil.test/p` |", md)
+
+
+class DefangTests(SimpleTestCase):
+    def test_urls_and_mail_addresses_are_not_linkable(self):
+        raw = "see http://evil.test/x, https://evil.test, www.evil.test and bob@evil.test"
+        det = [DetailGroup("Redirects", [("Final URL", raw)])]
+        md = build_markdown_report(_report(lead=raw, description=raw, reporter_context=raw, why=[raw],
+                                           blocks=[_block("url", "http://evil.test/x", "Dangerous", 90, findings=[raw], details=det)]))
+        out = _outside(md)
+        for bad in ("://", "www.evil", "@evil"):
+            self.assertNotIn(bad, out)
+        self.assertIn(r"http\[:\]//evil.test", out)
+        self.assertIn("`http://evil.test/x`", md)
+
+
+class AiLayoutTests(SimpleTestCase):
+    def test_ai_lines_are_separate_blocks(self):
+        ai = {"result": "Dangerous", "sub_class": "", "tier": "high", "runner_up": None, "model_version": "v3",
+              "analysed_at": "t", "reads": "body", "campaign": {"ref": "c1", "size": 3}, "similar_cases": [],
+              "cross_check": {"facts": [{"kind": "rule", "text": "Decisive rule: r"}], "disagrees": True}}
+        lines = build_markdown_report(_report(kind="mail", ai=ai)).split("\n")
+        i = lines.index("AI and evidence disagree")
+        self.assertEqual(lines[i - 1], "")
+        for prefix in ("Model v3", "Reads:", "Campaign c1"):
+            j = next(k for k, l in enumerate(lines) if l.startswith(prefix))
+            self.assertTrue(lines[j].endswith("  ") or lines[j + 1] == "", prefix)
