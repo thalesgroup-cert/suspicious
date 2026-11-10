@@ -4,7 +4,7 @@ from django.test import SimpleTestCase
 
 from api.utils.report_facts import (
     IndicatorFacts, apply_fallbacks, band_icon, cap, connector_lines, detail_groups, get_path, iso_utc,
-    key_findings, vt_facts,
+    key_findings, sort_connector_lines, vt_facts,
 )
 
 VT_DOMAIN = {"results": {"data": {"attributes": {
@@ -291,6 +291,14 @@ class ConnectorLineTests(SimpleTestCase):
         s = _src_v("Other", "malicious", 1)
         s["enrichment"] = {"source": "virustotal"}
         self.assertEqual(connector_lines([s], IndicatorFacts(detections=(1, 0, 5)))[0].label, "1/5 detections")
+
+
+class SortConnectorLinesTests(SimpleTestCase):
+    def test_sorts_by_icon_then_tier_then_name(self):
+        from api.utils.report_facts import ConnectorLine as C
+        lines = [C("🟢", "b", "", "clean", 1), C("🔴", "z", "", "malicious", 2), C("🔴", "A", "", "malicious", 2),
+                 C("🔴", "y", "", "malicious", 1), C("⚪", "a", "", "no-data", 0)]
+        self.assertEqual([l.name for l in sort_connector_lines(lines)], ["y", "A", "z", "b", "a"])
 
 
 class KeyFindingTests(SimpleTestCase):

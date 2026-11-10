@@ -121,6 +121,10 @@ class HtmlRenderTests(SimpleTestCase):
         self.assertNotIn("Raw report", html)
         self.assertNotIn("<pre>", html)
 
+    def test_zero_confidence_is_not_printed(self):
+        html = render(_report(blocks=[_block("ip", "203.0.113.7", "Dangerous", 0)]))
+        self.assertNotIn("confidence 0", html)
+
     def test_only_virustotal_is_linked(self):
         b = _block("url", "http://evil.test/<script>alert(1)</script>", "Dangerous", 90,
                    details=[DetailGroup("URL", [("Final URL", "https://collect.test/x")])])

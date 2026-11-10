@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone as dt_tz
 
 from api.utils.report_facts import (
-    BAND_RANK, ConnectorLine, _VERDICT_RANK, DetailGroup, _is_vt, apply_fallbacks, connector_lines,
-    detail_groups, iso_utc, key_findings, vt_facts,
+    BAND_RANK, ConnectorLine, DetailGroup, _is_vt, apply_fallbacks, connector_lines,
+    detail_groups, iso_utc, key_findings, sort_connector_lines, vt_facts,
 )
 
 BLOCK_CAP = 10
@@ -75,7 +75,7 @@ def build_block(row: dict, *, now: datetime) -> IndicatorBlock:
     facts = apply_fallbacks(vt_f, sources, dtype)
     verdict = row.get("verdict") or {}
     return IndicatorBlock(
-        type=dtype, value=value, band=verdict.get("band"), confidence=verdict.get("confidence"),
+        type=dtype, value=value, band=verdict.get("band"), confidence=verdict.get("confidence") or None,  # 0 means not scored
         why=list(verdict.get("rationale") or []),
         findings=key_findings(facts, sources, value, dtype, now)[:_MAX_FINDINGS],
         # ponytail: address blocks are never rendered, so skip their details
@@ -175,7 +175,7 @@ def build_case_report(case, request, *, now: datetime | None = None) -> CaseRepo
         if ai:
             rep.ai = {**ai, "analysed_at": iso_utc(ai.get("analysed_at"))}
             rep.case_connectors.append(ai_connector_line(ai))
-            rep.case_connectors.sort(key=lambda l: (_VERDICT_RANK[l.icon], l.tier, l.name.lower()))
+            rep.case_connectors = sort_connector_lines(rep.case_connectors)
         blocks = sorted((build_block(r, now=now) for r in assemble_mail_observables(case, fom.mail, full=True)), key=_sort_key)
         rep.rows = [IndicatorRow(b.type, b.value, b.band, b.findings[0] if b.findings else None) for b in blocks]
         eligible = [b for b in blocks if b.band in _FLAGGED and b.type != "mail"]
@@ -183,7 +183,7 @@ def build_case_report(case, request, *, now: datetime | None = None) -> CaseRepo
     elif fom and fom.file_id:
         rep.kind = "file"
         block = build_block(assemble_file_observable(case, fom.file, full=True), now=now)
-        block.band, block.confidence, block.why = str(case.results), round(case.final_confidence), []
+        block.band, block.confidence, block.why = str(case.results), round(case.final_confidence) or None, []
         rep.case_analysis = block
     elif case.observable_group_id:
         rep.kind = "group"

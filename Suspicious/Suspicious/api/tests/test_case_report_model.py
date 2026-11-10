@@ -132,6 +132,11 @@ class GroupTests(Base):
         self.assertEqual(rep.confidence, "82%")
         self.assertEqual(rep.why, ["The address is a known C2 host.", "High confidence: 2 of 3 sources agree."])
 
+    def test_zero_confidence_means_not_scored(self):
+        row = {"type": "ip", "value": "203.0.113.7", "derived_from": None, "sources": [],
+               "verdict": {"band": "Inconclusive", "confidence": 0, "rationale": []}}
+        self.assertIsNone(build_block(row, now=NOW).confidence)
+
     def test_vt_link_outside_virustotal_is_dropped(self):
         row = {"type": "ip", "value": "203.0.113.7", "verdict": None, "derived_from": None, "sources": [{
             "name": "VirusTotal_GetReport_3_1", "tier": 1, "verdict": "malicious", "failed": False,
@@ -232,6 +237,14 @@ class MailFileTests(Base):
         names = [l.name for l in build_case_report(case, self.request, now=NOW).case_connectors]
         self.assertIn("ClamAV (invoice.pdf)", names)
         self.assertNotIn("ClamAV (files/sub/invoice.pdf)", names)
+
+    def test_file_case_analysis_hides_zero_confidence(self):
+        h = Hash.objects.create(value="d" * 64)
+        f = File.objects.create(linked_hash=h, file_path="x.bin", tmp_path="", other_names="")
+        case = Case.objects.create(description="d", reporter=self.user, results="Inconclusive", final_confidence=0)
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, file=f)
+        case.save()
+        self.assertIsNone(build_case_report(case, self.request, now=NOW).case_analysis.confidence)
 
     def test_file_case_analysis_leaves_out_the_legacy_ai_report(self):
         h = Hash.objects.create(value="c" * 64)

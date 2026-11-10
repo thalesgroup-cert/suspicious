@@ -52,7 +52,7 @@ def _table(header: list[str], rows: list[list[str]]) -> list[str]:
 
 def _verdict(band, confidence) -> str:
     text = f"{band_icon(band)} {_text(band or 'Inconclusive')}"
-    return text + (f" · confidence {_text(confidence)}%" if confidence is not None else "")
+    return text + (f" · confidence {_text(confidence)}%" if confidence else "")
 
 
 def _ai_section(ai: dict) -> list[str]:
@@ -103,7 +103,7 @@ def _block(b: IndicatorBlock, heading: str) -> list[str]:
         for g in groups:
             out += [f"*{_text(g.title)}*", ""] + [f"- {_text(k)}: {_text(v)}" for k, v in g.rows] + [""]
     if b.vt_link:
-        out += [f"VirusTotal: {_text(b.vt_link)}", ""]
+        out += [f"VirusTotal: {_code(b.vt_link)}", ""]
     if b.connectors:
         out += ["**Connectors**", ""] + [f"- {c.icon} {_text(c.name)}: {_text(c.label)}" for c in b.connectors] + [""]
     return out

@@ -393,8 +393,12 @@ def connector_lines(sources: list[dict], facts: IndicatorFacts, vt_source: dict 
             label = _str(src.get("evidence")) or _VERDICT_WORD.get(verdict, "no data")
         tier = src.get("tier") if isinstance(src.get("tier"), int) else 9
         lines.append(ConnectorLine(icon, str(src.get("name") or ""), label, verdict, tier))
-    lines.sort(key=lambda l: (_VERDICT_RANK[l.icon], l.tier, l.name.lower()))
-    return lines
+    return sort_connector_lines(lines)
+
+
+def sort_connector_lines(lines: list[ConnectorLine]) -> list[ConnectorLine]:
+    """Worst verdict first, then tier, then name."""
+    return sorted(lines, key=lambda l: (_VERDICT_RANK[l.icon], l.tier, l.name.lower()))
 
 
 def _host(value: str) -> str | None:

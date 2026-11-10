@@ -31,6 +31,17 @@ class RenderTests(SimpleTestCase):
         self.assertIn("**Legend** " + LEGEND, md)
         self.assertNotIn("**Details**\n\n**Connectors**", md)
 
+    def test_virustotal_link_is_a_copyable_code_span(self):
+        b = _block("ip", "203.0.113.7", "Dangerous", 87)
+        b.vt_link = "https://www.virustotal.com/gui/ip-address/203.0.113.7"
+        md = build_markdown_report(_report(blocks=[b]))
+        self.assertIn("VirusTotal: `https://www.virustotal.com/gui/ip-address/203.0.113.7`", md)
+
+    def test_zero_confidence_is_not_printed(self):
+        md = build_markdown_report(_report(blocks=[_block("ip", "203.0.113.7", "Dangerous", 0)],
+                                           case_analysis=_block("file", "a" * 64, "Safe", 0)))
+        self.assertNotIn("confidence 0", md)
+
     def test_empty_groups_and_fields_are_not_rendered(self):
         md = build_markdown_report(_report(blocks=[_block("hash", "a" * 64, "Safe", 40)]))
         for word in ("**Key findings**", "**Details**", "VirusTotal: http"):
