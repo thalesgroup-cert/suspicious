@@ -16,9 +16,13 @@ services:
   suspicious:
     init: true
     restart: always
+    # STATIC_ROOT lives in the container layer, so every recreate empties it and /admin loses its
+    # styling until collectstatic runs again. Collect on each start; a failure is logged but does
+    # not stop the site from coming up.
     command: >
-      gunicorn suspicious.wsgi:application
-        --config /app/gunicorn.conf.py
+      sh -c "python manage.py collectstatic --no-input
+      || echo 'WARNING: collectstatic failed, /admin may be unstyled' >&2;
+      exec gunicorn suspicious.wsgi:application --config /app/gunicorn.conf.py"
     ports:
       - "127.0.0.1:${SUSPICIOUS_PORT:-9020}:9020"
     volumes:
