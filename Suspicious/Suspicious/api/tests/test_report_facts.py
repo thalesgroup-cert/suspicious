@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from api.utils.report_facts import get_path, iso_utc, vt_facts
+from api.utils.report_facts import IndicatorFacts, apply_fallbacks, get_path, iso_utc, vt_facts
 
 VT_DOMAIN = {"results": {"data": {"attributes": {
     "last_analysis_stats": {"malicious": 2, "suspicious": 1, "undetected": 80, "harmless": 8, "timeout": 0},
@@ -165,3 +165,47 @@ class VtFactsTests(SimpleTestCase):
         self.assertEqual((f.registrar, f.created), ("Whois Reg", "2026-02-02T00:00:00Z"))
         f = self._facts({"whois": whois})
         self.assertEqual((f.created, f.expires), ("2026-03-03T00:00:00Z", "2027-03-03T00:00:00Z"))
+
+
+def _src(name, report, failed=False):
+    return {"name": name, "tier": 2, "verdict": "no-data", "confidence": None, "evidence": "",
+            "failed": failed, "enrichment": None, "report": report}
+
+
+class FallbackTests(SimpleTestCase):
+    def test_dshield_fills_ip_location_when_vt_is_empty(self):
+        f = apply_fallbacks(IndicatorFacts(), [_src("DShield_lookup_1_0", {
+            "asname": "EXAMPLE-AS", "ascountry": "NL", "network": "203.0.113.0/24",
+            "asabusecontact": "abuse@as.test", "attacks": 12})], "ip")
+        self.assertEqual((f.as_owner, f.country, f.network), ("EXAMPLE-AS", "NL", "203.0.113.0/24"))
+
+    def test_stopforumspam_fills_asn_and_country(self):
+        f = apply_fallbacks(IndicatorFacts(), [_src("StopForumSpam_1_0", {"ip": {"asn": 64500, "country": "fr", "appears": 1}})], "ip")
+        self.assertEqual((f.asn, f.country), (64500, "fr"))
+
+    def test_stopforumspam_top_level_and_digit_string_asn(self):
+        f = apply_fallbacks(IndicatorFacts(), [_src("StopForumSpam_1_0", {"asn": "64501", "country": 7})], "ip")
+        self.assertEqual((f.asn, f.country), (64501, None))
+
+    def test_vt_value_is_never_overwritten(self):
+        f = apply_fallbacks(IndicatorFacts(country="DE"), [_src("DShield_lookup_1_0", {"ascountry": "NL"})], "ip")
+        self.assertEqual(f.country, "DE")
+
+    def test_zscaler_categorization_for_url(self):
+        f = apply_fallbacks(IndicatorFacts(), [_src("Zscaler_1_3", {
+            "urlClassifications": ["PHISHING", "MISCELLANEOUS"], "urlClassificationsWithSecurityAlert": ["PHISHING"]})], "url")
+        self.assertEqual(f.categories, {"Zscaler": "PHISHING, MISCELLANEOUS"})
+
+    def test_failed_or_placeholder_sources_fill_nothing(self):
+        f = apply_fallbacks(IndicatorFacts(), [_src("DShield_lookup_1_0", {"ongoing": True}),
+                                               _src("StopForumSpam_1_0", {"asn": 1}, failed=True)], "ip")
+        self.assertEqual(f, IndicatorFacts())
+
+    def test_location_fallbacks_do_not_apply_to_domains(self):
+        f = apply_fallbacks(IndicatorFacts(), [_src("DShield_lookup_1_0", {"ascountry": "NL"})], "domain")
+        self.assertIsNone(f.country)
+
+    def test_wrong_typed_payloads_do_not_raise(self):
+        for rep in (None, "x", [1], {"ip": 3, "urlClassifications": "PHISHING"}, {"asname": 5}):
+            apply_fallbacks(IndicatorFacts(), [_src("DShield_lookup_1_0", rep), _src("StopForumSpam_1_0", rep),
+                                               _src("Zscaler_1_3", rep)], "ip")

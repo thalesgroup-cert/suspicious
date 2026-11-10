@@ -5,7 +5,7 @@ of the wrong type: every reader goes through get_path and isinstance checks."""
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any
 
@@ -257,3 +257,29 @@ def vt_facts(enrichment: dict | None, report_full: Any, data_type: str, value: s
             (str(k), s) for k, v in sandboxes.items()
             if (s := _first(_str(get_path(v, "category")), _str(get_path(v, "malware_names", 0))))]
     return f
+
+
+def apply_fallbacks(facts: IndicatorFacts, sources: list[dict], data_type: str) -> IndicatorFacts:
+    """Copy of facts with empty location/category fields filled from DShield, StopForumSpam, Zscaler."""
+    out = replace(facts)
+    for src in sources:
+        name, rep = str(src.get("name") or "").lower(), src.get("report")
+        if src.get("failed") or not isinstance(rep, dict):
+            continue
+        if data_type == "ip" and name.startswith("dshield"):
+            out.as_owner = out.as_owner or _str(rep.get("asname"))
+            out.country = out.country or _str(rep.get("ascountry"))
+            out.network = out.network or _str(rep.get("network"))
+        elif data_type == "ip" and name.startswith("stopforumspam"):
+            node = rep["ip"] if isinstance(rep.get("ip"), dict) else {}
+            asn = _first(*(v for v in (rep.get("asn"), node.get("asn")) if _asn(v) is not None))
+            out.asn = out.asn if out.asn is not None else _asn(asn)
+            out.country = out.country or _first(_str(rep.get("country")), _str(node.get("country")))
+        elif name.startswith("zscaler") and data_type in ("url", "domain", "ip") and not out.categories:
+            if cats := _strs(rep.get("urlClassifications")):
+                out.categories = {"Zscaler": ", ".join(cats)}
+    return out
+
+
+def _asn(v: Any) -> int | None:
+    return int(v) if isinstance(v, str) and v.isdigit() else _int(v)
