@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 from typing import Any
 
 from score_process.scoring.enrichment.virustotal import _attributes, _iso, _vt_link
@@ -283,3 +284,149 @@ def apply_fallbacks(facts: IndicatorFacts, sources: list[dict], data_type: str) 
 
 def _asn(v: Any) -> int | None:
     return int(v) if isinstance(v, str) and v.isascii() and v.isdigit() and len(v) <= 10 else _int(v)
+
+
+LEGEND = "🔴 malicious / dangerous  🟠 suspicious  🟢 safe  ⚪ failed / unknown / inconclusive"
+BAND_ICON = {"Dangerous": "🔴", "Suspicious": "🟠", "Safe": "🟢", "Inconclusive": "⚪"}
+BAND_RANK = {"Dangerous": 0, "Suspicious": 1, "Safe": 2, "Inconclusive": 3}
+VERDICT_ICON = {"malicious": "🔴", "suspicious": "🟠", "clean": "🟢", "no-data": "⚪"}
+_VERDICT_RANK = {"🔴": 0, "🟠": 1, "🟢": 2, "⚪": 3}
+_VERDICT_WORD = {"malicious": "malicious", "suspicious": "suspicious", "clean": "safe"}
+GROUPS_BY_TYPE = {
+    "ip": ("Location", "Whois/RDAP", "Categorization", "VirusTotal"),
+    "domain": ("Location", "Whois/RDAP", "Categorization", "VirusTotal"),
+    "url": ("URL", "Location", "Categorization", "VirusTotal"),
+    "hash": ("Hash", "VirusTotal"),
+    "file": ("Hash", "VirusTotal"),
+}
+_LISTING_SOURCES = ("spamhaus", "misp", "googlesafebrowsing", "phishtank", "zscaler")
+_NAMES_MORE, _VENDORS_MORE = " and {n} more", " +{n} more"
+
+
+@dataclass(frozen=True)
+class DetailGroup:
+    title: str
+    rows: list[tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class ConnectorLine:
+    icon: str
+    name: str
+    label: str
+    verdict: str
+    tier: int
+
+
+def band_icon(band: str | None) -> str:
+    return BAND_ICON.get(band, "⚪") if isinstance(band, str) else "⚪"
+
+
+def cap(items: list[str], limit: int, more: str) -> str:
+    text = ", ".join(items[:limit])
+    return text + more.format(n=len(items) - limit) if len(items) > limit else text
+
+
+def _pair(name: str, result: str | None) -> str:
+    return f"{name} ({result})" if result else name
+
+
+def detail_groups(facts: IndicatorFacts, data_type: str) -> list[DetailGroup]:
+    f = facts
+    det = f.detections
+    votes = ", ".join(f"{k} {v}" for k, v in f.total_votes.items())
+    pops = ", ".join(f"{k} #{v}" for k, v in f.popularity_ranks.items())
+    raw: dict[str, list[tuple[str, Any]]] = {
+        "Location": [
+            ("IP addresses", cap(f.resolved_ips, 5, _NAMES_MORE)), ("Country", f.country),
+            ("ASN", f"AS{f.asn}" if f.asn is not None else None), ("AS owner", f.as_owner),
+            ("Network", f.network), ("RIR", f.rir)],
+        "Whois/RDAP": [
+            ("Registrar", f.registrar), ("Registrant", f.registrant),
+            ("Contact emails", ", ".join(f.contact_emails)), ("Contact phones", ", ".join(f.contact_phones)),
+            ("Name servers", ", ".join(f.name_servers)), ("Status", ", ".join(f.statuses)),
+            ("Created", f.created), ("Updated", f.updated), ("Expires", f.expires)],
+        "Categorization": list(f.categories.items()),
+        "URL": [
+            ("Final URL", f.final_url), ("Title", f.title), ("HTTP code", f.http_code),
+            ("Brands", ", ".join(f.brands)), ("First submitted", f.first_submission),
+            ("Times submitted", f.times_submitted), ("Outgoing links", f.outgoing_links)],
+        "Hash": [
+            ("File name", f.meaningful_name), ("Other names", cap(f.names, 5, _NAMES_MORE)),
+            ("File type", f.type_description), ("Size", f.size), ("MD5", f.md5), ("SHA-1", f.sha1),
+            ("SHA-256", f.sha256), ("Threat label", f.threat_label), ("First submitted", f.first_submission),
+            ("Last submitted", f.last_submission), ("Last analysed", f.last_analysis)],
+        "VirusTotal": [
+            ("Detections", f"{det[0]}/{det[2]}" if det else None),
+            ("Flagged by", cap([_pair(n, r) for n, r in f.flagged_vendors], 10, _VENDORS_MORE)),
+            ("Sandbox verdicts", cap([_pair(n, r) for n, r in f.sandbox_verdicts], 10, _VENDORS_MORE)),
+            ("Reputation", f.reputation), ("Community votes", votes), ("Threat severity", f.threat_severity),
+            ("Tags", ", ".join(f.tags)), ("Popularity", pops)],
+    }
+    groups = []
+    for title in GROUPS_BY_TYPE.get(data_type, ()):
+        rows = [(k, str(v)) for k, v in raw[title] if v is not None and str(v) != ""]
+        if rows:
+            groups.append(DetailGroup(title, rows))
+    return groups
+
+
+def _is_vt(src: dict) -> bool:
+    return str(src.get("name") or "").lower().startswith("virustotal") or \
+        get_path(src.get("enrichment"), "source") == "virustotal"
+
+
+def connector_lines(sources: list[dict], facts: IndicatorFacts) -> list[ConnectorLine]:
+    lines = []
+    for src in sources:
+        failed, verdict = bool(src.get("failed")), str(src.get("verdict") or "no-data")
+        icon = "⚪" if failed else VERDICT_ICON.get(verdict, "⚪")
+        if failed:
+            label = "failed"
+        elif _is_vt(src) and facts.detections:
+            label = f"{facts.detections[0]}/{facts.detections[2]} detections"
+        else:
+            label = _str(src.get("evidence")) or _VERDICT_WORD.get(verdict, "no data")
+        tier = src.get("tier") if isinstance(src.get("tier"), int) else 9
+        lines.append(ConnectorLine(icon, str(src.get("name") or ""), label, verdict, tier))
+    lines.sort(key=lambda l: (_VERDICT_RANK[l.icon], l.tier, l.name.lower()))
+    return lines
+
+
+def _host(value: str) -> str | None:
+    try:
+        host = urlsplit(value if "//" in value else "//" + value).hostname
+    except ValueError:
+        return None
+    return host.lower() if host else None
+
+
+def key_findings(facts: IndicatorFacts, sources: list[dict], value: str, data_type: str, now: datetime) -> list[str]:
+    out: list[str] = []
+    for src in sorted(sources, key=lambda s: str(s.get("name") or "").lower()):
+        name = str(src.get("name") or "")
+        if (not src.get("failed") and name.lower().startswith(_LISTING_SOURCES)
+                and src.get("verdict") in ("malicious", "suspicious")):
+            ev = _str(src.get("evidence"))
+            out.append(f"Listed by {name}: {ev}" if ev else f"Listed by {name}")
+    if facts.detections and facts.detections[0] > 0:
+        out.append(f"{facts.detections[0]} of {facts.detections[2]} VirusTotal engines flag it as malicious")
+    if threat := facts.threat_label or next(iter(facts.threat_names), None):
+        out.append(f"Threat name: {threat}")
+    host = _host(value) or ""
+    for brand in facts.brands:
+        key = re.sub(r"[^a-z0-9]", "", brand.lower())
+        if key and key not in host:
+            out.append(f"Shows the {brand} brand on another domain")
+            break
+    if data_type in ("domain", "url") and (created := iso_utc(facts.created)):
+        days = (now - datetime.strptime(created, _ISO_FMT).replace(tzinfo=timezone.utc)).days
+        if 0 <= days < 30:
+            out.append("Domain registered today" if days == 0 else f"Domain registered {days} days ago")
+    if data_type == "url" and facts.final_url and (final := _host(facts.final_url)) and final != host:
+        out.append(f"Redirects to {final}")
+    for source, rank in facts.popularity_ranks.items():
+        if rank <= 1000:
+            out.append(f"Ranked #{rank} by {source}")
+            break
+    return out[:5]

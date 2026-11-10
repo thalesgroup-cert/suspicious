@@ -1,6 +1,11 @@
+from datetime import datetime, timezone
+
 from django.test import SimpleTestCase
 
-from api.utils.report_facts import IndicatorFacts, apply_fallbacks, get_path, iso_utc, vt_facts
+from api.utils.report_facts import (
+    IndicatorFacts, apply_fallbacks, band_icon, cap, connector_lines, detail_groups, get_path, iso_utc,
+    key_findings, vt_facts,
+)
 
 VT_DOMAIN = {"results": {"data": {"attributes": {
     "last_analysis_stats": {"malicious": 2, "suspicious": 1, "undetected": 80, "harmless": 8, "timeout": 0},
@@ -222,3 +227,95 @@ class FallbackTests(SimpleTestCase):
             for rep in ({"asn": raw}, {"ip": {"asn": raw}}):
                 f = apply_fallbacks(IndicatorFacts(), [_src("StopForumSpam_1_0", rep)], "ip")
                 self.assertEqual(f.asn, want)
+
+
+NOW = datetime(2026, 11, 10, tzinfo=timezone.utc)
+
+
+def _src_v(name, verdict, tier, evidence="", failed=False):
+    return {"name": name, "tier": tier, "verdict": verdict, "confidence": None, "evidence": evidence,
+            "failed": failed, "enrichment": None, "report": None}
+
+
+class DetailGroupTests(SimpleTestCase):
+    def test_groups_follow_type_and_hide_empties(self):
+        f = IndicatorFacts(country="NL", asn=64500, registrar="Example Registrar LLC", detections=(0, 0, 91))
+        self.assertEqual([g.title for g in detail_groups(f, "ip")], ["Location", "Whois/RDAP", "VirusTotal"])
+        self.assertEqual([g.title for g in detail_groups(f, "hash")], ["VirusTotal"])
+        self.assertIn(("ASN", "AS64500"), detail_groups(f, "ip")[0].rows)
+        self.assertEqual(detail_groups(IndicatorFacts(), "url"), [])
+
+    def test_row_formats(self):
+        f = IndicatorFacts(detections=(2, 0, 91), total_votes={"malicious": 3, "harmless": 1},
+                           popularity_ranks={"Cisco Umbrella": 812}, categories={"VendorX": "phishing"},
+                           names=["a"] * 7, size=1024)
+        rows = {k: v for g in detail_groups(f, "hash") for k, v in g.rows}
+        self.assertEqual(rows["Detections"], "2/91")
+        self.assertEqual(rows["Community votes"], "malicious 3, harmless 1")
+        self.assertEqual(rows["Popularity"], "Cisco Umbrella #812")
+        self.assertEqual(rows["Other names"], "a, a, a, a, a and 2 more")
+        self.assertEqual(rows["Size"], "1024")
+        rows = {k: v for g in detail_groups(f, "url") for k, v in g.rows}
+        self.assertEqual(rows["VendorX"], "phishing")
+
+    def test_long_lists_are_capped(self):
+        f = IndicatorFacts(flagged_vendors=[(f"Eng{i:02}", "trojan") for i in range(90)],
+                           sandbox_verdicts=[(f"Box{i:02}", "malicious") for i in range(40)],
+                           resolved_ips=[f"203.0.113.{i}" for i in range(30)], detections=(90, 0, 95))
+        rows = {k: v for g in detail_groups(f, "domain") for k, v in g.rows}
+        self.assertTrue(rows["Flagged by"].endswith("Eng09 (trojan) +80 more"))
+        self.assertTrue(rows["Sandbox verdicts"].endswith("+30 more"))
+        self.assertTrue(rows["IP addresses"].endswith("203.0.113.4 and 25 more"))
+        self.assertLess(len(rows["Flagged by"]), 400)
+
+    def test_cap_and_band_icon(self):
+        self.assertEqual(cap(["a", "b"], 5, " and {n} more"), "a, b")
+        self.assertEqual((band_icon("Dangerous"), band_icon("On Going"), band_icon(None)), ("🔴", "⚪", "⚪"))
+
+
+class ConnectorLineTests(SimpleTestCase):
+    def test_connector_order_icons_and_labels(self):
+        lines = connector_lines([
+            _src_v("Urlscan_io_Search", "no-data", tier=3), _src_v("SpamhausDBL_1_0", "clean", tier=2, evidence="not listed"),
+            _src_v("Zscaler_1_3", "suspicious", tier=2, evidence="Phishing"), _src_v("VirusTotal_GetReport_3_1", "malicious", tier=1),
+            _src_v("Shodan", "no-data", tier=1, failed=True)], IndicatorFacts(detections=(2, 0, 91)))
+        self.assertEqual([(l.icon, l.name, l.label) for l in lines], [
+            ("🔴", "VirusTotal_GetReport_3_1", "2/91 detections"), ("🟠", "Zscaler_1_3", "Phishing"),
+            ("🟢", "SpamhausDBL_1_0", "not listed"), ("⚪", "Shodan", "failed"), ("⚪", "Urlscan_io_Search", "no data")])
+
+    def test_plain_labels_without_evidence(self):
+        lines = connector_lines([_src_v("B", "clean", 2), _src_v("A", "clean", 2)], IndicatorFacts())
+        self.assertEqual([(l.name, l.label) for l in lines], [("A", "safe"), ("B", "safe")])
+
+    def test_virustotal_by_enrichment_source(self):
+        s = _src_v("Other", "malicious", 1)
+        s["enrichment"] = {"source": "virustotal"}
+        self.assertEqual(connector_lines([s], IndicatorFacts(detections=(1, 0, 5)))[0].label, "1/5 detections")
+
+
+class KeyFindingTests(SimpleTestCase):
+    def test_findings_rules_need_their_fact(self):
+        self.assertEqual(key_findings(IndicatorFacts(), [], "203.0.113.7", "ip", NOW), [])
+
+    def test_findings_order_and_cap(self):
+        f = IndicatorFacts(detections=(3, 0, 90), threat_names=["Phish.Kit"], brands=["ExampleBank"],
+                           created="2026-11-07T00:00:00Z", final_url="https://collect.test/x",
+                           popularity_ranks={"Cisco Umbrella": 500})
+        out = key_findings(f, [_src_v("MISP_2_1", "malicious", tier=2, evidence="Phishing campaign")],
+                           "https://login-example.test/a", "url", NOW)
+        self.assertEqual(out, ["Listed by MISP_2_1: Phishing campaign", "3 of 90 VirusTotal engines flag it as malicious",
+                               "Threat name: Phish.Kit", "Shows the ExampleBank brand on another domain",
+                               "Domain registered 3 days ago"])
+
+    def test_brand_matching_the_domain_is_not_impersonation(self):
+        self.assertEqual(key_findings(IndicatorFacts(brands=["Example Bank"]), [], "examplebank.test", "domain", NOW), [])
+
+    def test_remaining_rules(self):
+        f = IndicatorFacts(created="2026-11-10T00:00:00Z", final_url="https://collect.test/x",
+                           popularity_ranks={"Cisco Umbrella": 500}, threat_label="trojan.test")
+        out = key_findings(f, [_src_v("Spamhaus", "malicious", 2), _src_v("Zscaler_1", "malicious", 2, failed=True)],
+                           "login-example.test", "domain", NOW)
+        self.assertEqual(out, ["Listed by Spamhaus", "Threat name: trojan.test", "Domain registered today",
+                               "Ranked #500 by Cisco Umbrella"])
+        out = key_findings(IndicatorFacts(final_url="https://collect.test/x"), [], "https://a.test/", "url", NOW)
+        self.assertEqual(out, ["Redirects to collect.test"])
