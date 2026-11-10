@@ -244,8 +244,9 @@ Two ways to set the token, depending on how secrets are stored:
   }
   ```
 
-  The shipped example `docs/getting-started/examples/Suspicious-settings.example.json` already has
-  this block with an empty token. A configuration saved from the UI in the database wins over
+  `Suspicious/settings-sample.json` (the file `make init` copies to `settings.json`) and the example
+  `docs/getting-started/examples/Suspicious-settings.example.json` already have this block with an
+  empty token. A configuration saved from the UI in the database wins over
   `settings.json` for the non-secret fields. Recreate the Django and Celery containers after editing
   the file (`docker compose --env-file .env up -d --force-recreate --no-deps suspicious
   suspicious_celery suspicious_celery_beat`); a bind-mounted file edited by rename can leave a
