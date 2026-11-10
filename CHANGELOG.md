@@ -154,7 +154,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Case report (HTML and Markdown) redesigned: one block per indicator with type-specific details (location, Whois/RDAP, categorization, URL, hash, VirusTotal), key findings and a connector summary ordered by severity with a legend; mail and file cases now show their indicators and analyzers, mail cases the AI model assessment; raw analyzer output is no longer embedded.
+- Case report (HTML and Markdown) redesigned: one block per indicator with type-specific details
+  (location, Whois/RDAP, categorization, URL, hash, VirusTotal), key findings and a connector
+  summary ordered by severity with a legend; mail and file cases now show their indicators and
+  analyzers, mail cases the AI model assessment; raw analyzer output is no longer embedded. The AI
+  model section is built for the user who downloads the report: a reporter sees no cross-check and
+  no campaign labels. In the Markdown, URLs and addresses in the text are defanged so viewers do
+  not link them; indicator values and the VirusTotal link sit in code spans.
 - Documentation: `docs/getting-started/examples/deployment-env.example` is a faithful copy of
   `deployment/.env.example` (current image versions, `AI_*`, `CELERY_*`, `BACKEND_URL`,
   `FEEDER_API_TOKEN`). `CONFIG.md` documents the Redis cache socket timeouts (3 s, fail fast), the

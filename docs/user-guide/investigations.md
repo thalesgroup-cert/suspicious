@@ -51,9 +51,12 @@ VirusTotal), the connectors that ran with a legend, and any captured
 screenshots (collapsed, inlined so the file works offline with no login).
 Mail and file cases show their embedded indicators and analyzers, and mail
 cases the AI model assessment. Raw analyzer output is not embedded.
-It's available to anyone who can see the
-case — the case's own reporter as well as investigators — and it follows
-your OS/browser's light or dark preference automatically.
+It's available to anyone who can see the case — the case's own reporter as
+well as investigators — and it follows your OS/browser's light or dark
+preference automatically. The AI model section is built for the user who
+downloads it: a reporter sees no cross-check and no campaign labels. A URL
+indicator never gets a domain-age finding, because VirusTotal's URL records
+carry no creation date.
 
 ## Verdict narration (optional, admin-configured)
 
