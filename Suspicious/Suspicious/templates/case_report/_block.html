@@ -1,0 +1,28 @@
+{# One indicator card. Autoescaping only. #}
+<div class="obs">
+  <div class="obs-head">{{ b.value }}<span class="type-tag">{{ b.type }}</span></div>
+  <p class="sub">
+    <span class="pill band obs-verdict-pill band-{{ b.band }}">{% if b.band == "Dangerous" %}🔴{% elif b.band == "Suspicious" %}🟠{% elif b.band == "Safe" %}🟢{% else %}⚪{% endif %} {{ b.band|default:"Inconclusive" }}</span>
+    {% if b.confidence is not None %}&nbsp;·&nbsp; confidence {{ b.confidence }}%{% endif %}
+  </p>
+  {% if b.why %}<h3>Why this verdict</h3><ul class="why">{% for w in b.why %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+  {% if b.derived_from %}<p class="sub">Found in {{ b.derived_from.value }} by {{ b.derived_from.via_analyzer }}.</p>{% endif %}
+  {% if b.escalation_note %}<p class="sub">{{ b.escalation_note }}</p>{% endif %}
+  {% if b.findings %}<h3>Key findings</h3><ul class="findings">{% for f in b.findings %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+  {% for g in b.details %}{% if g.rows %}
+  {% if forloop.first %}<h3>Details</h3>{% endif %}
+  <table class="facts"><thead><tr><th colspan="2">{{ g.title }}</th></tr></thead><tbody>
+    {% for k, v in g.rows %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}{% endfor %}
+  {% if b.vt_link %}<p class="sub"><a href="{{ b.vt_link }}" rel="noopener noreferrer">VirusTotal</a></p>{% endif %}
+  {% if b.connectors %}<h3>Connectors</h3><ul>{% for c in b.connectors %}<li>{{ c.icon }} {{ c.name }}: {{ c.label }}</li>{% endfor %}</ul>{% endif %}
+  {% if b.screenshot_data_uri %}
+  <details>
+    <summary>Screenshot</summary>
+    <img class="observable-screenshot" alt="Screenshot of {{ b.value }}" src="{{ b.screenshot_data_uri }}" style="max-width:100%;margin-top:.5rem;">
+  </details>
+  {% elif b.screenshot_omitted %}
+  <p class="empty">Screenshot omitted from the report (size cap): open the investigation view.</p>
+  {% endif %}
+</div>
