@@ -74,7 +74,7 @@ class GroupTests(Base):
     def test_blocks_sort_by_band_then_value_and_no_verdict_last(self):
         g, case = self.group_case()
         safe = self.add_ip(g, "198.51.100.1")
-        bare = self.add_ip(g, "198.51.100.2")  # no reports -> no verdict
+        self.add_ip(g, "198.51.100.2")  # no reports -> no verdict
         inc = self.add_ip(g, "198.51.100.3")
         sus, dan = (Domain.objects.create(value=v) for v in ("aa.test", "zz.test"))
         dan2 = Domain.objects.create(value="bb.test")
@@ -99,7 +99,7 @@ class GroupTests(Base):
         self.rep(other, status="Failure", ip=ip)
         b = build_case_report(case, self.request, now=NOW).blocks[0]
         self.assertEqual(b.band, "Inconclusive")
-        self.assertEqual({(l.icon, l.label) for l in b.connectors}, {("⚪", "failed")})
+        self.assertEqual({(ln.icon, ln.label) for ln in b.connectors}, {("⚪", "failed")})
         self.assertEqual((b.details, b.findings), ([], []))
 
     def test_more_than_ten_group_indicators_get_a_table(self):
@@ -199,8 +199,8 @@ class MailFileTests(Base):
         self.assertEqual(rep.kind, "mail")
         self.assertEqual([b.value for b in rep.blocks], ["https://evil.test/x"])
         self.assertEqual({r.type for r in rep.rows}, {"url", "ip", "mail"})
-        self.assertIn("Mail_Header_Analyzer", [l.name for l in rep.case_connectors])
-        self.assertNotIn(ai_name, [l.name for l in rep.case_connectors])
+        self.assertIn("Mail_Header_Analyzer", [ln.name for ln in rep.case_connectors])
+        self.assertNotIn(ai_name, [ln.name for ln in rep.case_connectors])
 
     def test_mail_rows_sort_by_band_then_value(self):
         mail, case = self.mail_case()
@@ -224,7 +224,7 @@ class MailFileTests(Base):
         self.rep(fi, "safe", file=b)  # newer
         self.rep(solo, "safe", mail_header=mail.mail_header)
         lines = build_case_report(case, self.request, now=NOW).case_connectors
-        by_name = {l.name: l.icon for l in lines}
+        by_name = {ln.name: ln.icon for ln in lines}
         self.assertEqual(by_name, {"FileInfo (a.exe)": "\U0001F534", "FileInfo (b.txt)": "\U0001F7E2",
                                    "Mail_Header_Analyzer": "\U0001F7E2"})
 
@@ -234,7 +234,7 @@ class MailFileTests(Base):
         av = Analyzer.objects.create(name="ClamAV", analyzer_cortex_id="cl", tier=2)
         self.rep(av, "malicious", file=a)
         self.rep(av, "safe", file=b)
-        names = [l.name for l in build_case_report(case, self.request, now=NOW).case_connectors]
+        names = [ln.name for ln in build_case_report(case, self.request, now=NOW).case_connectors]
         self.assertIn("ClamAV (invoice.pdf)", names)
         self.assertNotIn("ClamAV (files/sub/invoice.pdf)", names)
 
@@ -311,7 +311,7 @@ class AiSectionTests(Base):
         self.assertIsNotNone(rep.ai["cross_check"])
         self.assertRegex(rep.ai["analysed_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
         self.assertIn(("\U0001F7E0", "AI model", "Unwanted, High confidence"),
-                      [(l.icon, l.name, l.label) for l in rep.case_connectors])
+                      [(ln.icon, ln.name, ln.label) for ln in rep.case_connectors])
 
     def test_analyst_sees_campaign_labels_reporter_does_not(self):
         self.in_campaign(self.mail_case_obj)
@@ -330,29 +330,29 @@ class AiSectionTests(Base):
         AiAssessment.objects.all().delete()
         rep = self.build(self.analyst)
         self.assertIsNone(rep.ai)
-        self.assertNotIn("AI model", [l.name for l in rep.case_connectors])
+        self.assertNotIn("AI model", [ln.name for ln in rep.case_connectors])
 
     def test_no_section_when_connector_disabled(self):
         ConnectorState.objects.filter(name="ai_model").update(enabled=False)
         rep = self.build(self.analyst)
         self.assertIsNone(rep.ai)
-        self.assertNotIn("AI model", [l.name for l in rep.case_connectors])
+        self.assertNotIn("AI model", [ln.name for ln in rep.case_connectors])
 
     def test_low_tier_shows_runner_up_and_bare_label_without_tier(self):
         AiAssessment.objects.all().delete()
         self.assess(self.mail_case_obj, tier="low")
         rep = self.build(self.analyst)
         self.assertEqual(rep.ai["runner_up"], {"result": "Safe"})
-        self.assertIn("Unwanted, Low confidence", [l.label for l in rep.case_connectors])
+        self.assertIn("Unwanted, Low confidence", [ln.label for ln in rep.case_connectors])
         AiAssessment.objects.all().delete()
         self.assess(self.mail_case_obj, tier="")
-        self.assertIn("Unwanted", [l.label for l in self.build(self.analyst).case_connectors])
+        self.assertIn("Unwanted", [ln.label for ln in self.build(self.analyst).case_connectors])
 
     def test_ai_line_sorts_first_within_its_icon(self):
         hdr = Analyzer.objects.create(name="Aaa_Header", analyzer_cortex_id="aa", tier=1)
         self.rep(hdr, "suspicious", mail_header=self.mail_case_obj.fileOrMail.mail.mail_header
                  or self._header())
-        names = [l.name for l in self.build(self.analyst).case_connectors if l.icon == "\U0001F7E0"]
+        names = [ln.name for ln in self.build(self.analyst).case_connectors if ln.icon == "\U0001F7E0"]
         self.assertEqual(names[0], "AI model")
 
     def _header(self):

@@ -398,7 +398,7 @@ def connector_lines(sources: list[dict], facts: IndicatorFacts, vt_source: dict 
 
 def sort_connector_lines(lines: list[ConnectorLine]) -> list[ConnectorLine]:
     """Worst verdict first, then tier, then name."""
-    return sorted(lines, key=lambda l: (_VERDICT_RANK[l.icon], l.tier, l.name.lower()))
+    return sorted(lines, key=lambda ln: (_VERDICT_RANK[ln.icon], ln.tier, ln.name.lower()))
 
 
 def _host(value: str) -> str | None:

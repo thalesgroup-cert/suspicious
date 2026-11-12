@@ -77,7 +77,7 @@ class MarkdownReportTests(TestCase):
     def test_untrusted_text_cannot_make_links_or_break_tables(self):
         body = self._get().content.decode()
         self.assertNotIn("[x](javascript", body)           # no live link from analyzer evidence
-        vt = [l for l in body.splitlines() if l.startswith("- \U0001F534 VirusTotal:")]
+        vt = [ln for ln in body.splitlines() if ln.startswith("- \U0001F534 VirusTotal:")]
         self.assertEqual(len(vt), 1, body)
         self.assertIn("\\[x\\](javascript:alert(1)) \\| pipe", vt[0])
         self.assertIn("evil.test", body)

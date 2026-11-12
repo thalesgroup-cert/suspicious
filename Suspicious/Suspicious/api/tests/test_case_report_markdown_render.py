@@ -60,8 +60,8 @@ class RenderTests(SimpleTestCase):
         self.assertNotIn("<b>", md)
         self.assertNotIn("<i>", md)
         self.assertIn(r"Registrar: \# Evil\_ \*Corp\*", md)
-        self.assertFalse(any(l.startswith("# Evil") for l in md.splitlines()))
-        table = [l for l in md.splitlines() if l.startswith("| ") and "evil.test" in l]
+        self.assertFalse(any(ln.startswith("# Evil") for ln in md.splitlines()))
+        table = [ln for ln in md.splitlines() if ln.startswith("| ") and "evil.test" in ln]
         self.assertEqual(table[0].count("|") - table[0].count("\\|"), 5)
 
     def test_mail_ai_section(self):
@@ -163,8 +163,8 @@ class AllFieldsEscapedTests(SimpleTestCase):
                 self.assertNotIn("<i>", out)
                 self.assertIsNone(re.search(r"(?<!\\)\]\(", out))
                 self.assertNotIn("://", out)
-                table = [l for l in md.splitlines() if l.startswith("|")]
-                self.assertEqual({_pipes(l) for l in table}, {5})
+                table = [ln for ln in md.splitlines() if ln.startswith("|")]
+                self.assertEqual({_pipes(ln) for ln in table}, {5})
 
     def test_indicator_value_is_a_code_span(self):
         md = build_markdown_report(_tainted_report("none"))
@@ -194,5 +194,5 @@ class AiLayoutTests(SimpleTestCase):
         i = lines.index("AI and evidence disagree")
         self.assertEqual(lines[i - 1], "")
         for prefix in ("Model v3", "Reads:", "Campaign c1"):
-            j = next(k for k, l in enumerate(lines) if l.startswith(prefix))
+            j = next(k for k, ln in enumerate(lines) if ln.startswith(prefix))
             self.assertTrue(lines[j].endswith("  ") or lines[j + 1] == "", prefix)

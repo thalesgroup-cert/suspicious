@@ -279,13 +279,13 @@ class ConnectorLineTests(SimpleTestCase):
             _src_v("Urlscan_io_Search", "no-data", tier=3), _src_v("SpamhausDBL_1_0", "clean", tier=2, evidence="not listed"),
             _src_v("Zscaler_1_3", "suspicious", tier=2, evidence="Phishing"), _src_v("VirusTotal_GetReport_3_1", "malicious", tier=1),
             _src_v("Shodan", "no-data", tier=1, failed=True)], IndicatorFacts(detections=(2, 0, 91)))
-        self.assertEqual([(l.icon, l.name, l.label) for l in lines], [
+        self.assertEqual([(ln.icon, ln.name, ln.label) for ln in lines], [
             ("🔴", "VirusTotal_GetReport_3_1", "2/91 detections"), ("🟠", "Zscaler_1_3", "Phishing"),
             ("🟢", "SpamhausDBL_1_0", "not listed"), ("⚪", "Shodan", "failed"), ("⚪", "Urlscan_io_Search", "no data")])
 
     def test_plain_labels_without_evidence(self):
         lines = connector_lines([_src_v("B", "clean", 2), _src_v("A", "clean", 2)], IndicatorFacts())
-        self.assertEqual([(l.name, l.label) for l in lines], [("A", "safe"), ("B", "safe")])
+        self.assertEqual([(ln.name, ln.label) for ln in lines], [("A", "safe"), ("B", "safe")])
 
     def test_virustotal_by_enrichment_source(self):
         s = _src_v("Other", "malicious", 1)
@@ -298,7 +298,7 @@ class SortConnectorLinesTests(SimpleTestCase):
         from api.utils.report_facts import ConnectorLine as C
         lines = [C("🟢", "b", "", "clean", 1), C("🔴", "z", "", "malicious", 2), C("🔴", "A", "", "malicious", 2),
                  C("🔴", "y", "", "malicious", 1), C("⚪", "a", "", "no-data", 0)]
-        self.assertEqual([l.name for l in sort_connector_lines(lines)], ["y", "A", "z", "b", "a"])
+        self.assertEqual([ln.name for ln in sort_connector_lines(lines)], ["y", "A", "z", "b", "a"])
 
 
 class KeyFindingTests(SimpleTestCase):
