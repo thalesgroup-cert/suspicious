@@ -108,6 +108,11 @@ def mail_observable_reports(mail) -> list[tuple]:
             for (m_art, obj, field) in arts]
 
 
+def file_reports(file) -> list:
+    """Reports on a File and on its linked hash, one query, newest first."""
+    return _bucket_reports([("f", file, "file"), ("f", file.linked_hash, "hash")]).get("f", [])
+
+
 def collect_observable_sources(case):
     out = {}
     for art, obj, _field, reports in observable_reports(case):

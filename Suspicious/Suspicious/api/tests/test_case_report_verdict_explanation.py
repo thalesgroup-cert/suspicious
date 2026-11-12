@@ -61,9 +61,8 @@ class CaseReportVerdictExplanationTests(TestCase):
             f"/api/cases/{case.id}/report/?format=html"
         ).content.decode()
         self.assertIn("<li>Two tier-2 sources disagree.</li>", body)
-        self.assertNotIn("Why this verdict", body)
 
-    def test_report_collapses_duplicate_sources(self):
+    def test_explanation_sources_are_not_listed(self):
         case = self._case()
         dup = {"name": "Mail_Header_Analyzer_1_0", "tier": 3, "verdict": "no-data",
                "counted": False, "note": ""}
@@ -79,7 +78,5 @@ class CaseReportVerdictExplanationTests(TestCase):
         body = self.client.get(
             f"/api/cases/{case.id}/report/?format=html"
         ).content.decode()
-        self.assertEqual(body.count("Mail_Header_Analyzer_1_0"), 1)
-        self.assertIn("&times;1400", body)
-        self.assertEqual(body.count("GTI"), 1)
-        self.assertNotIn("&times;1<", body)
+        self.assertEqual(body.count("Mail_Header_Analyzer_1_0"), 0)
+        self.assertIn("A.", body)

@@ -44,8 +44,9 @@ class CaseReportPermissionsTests(TestCase):
         client = APIClient()
         client.force_authenticate(other)
 
-        resp = client.get(f"/api/cases/{case.id}/report/?format=html")
-        self.assertEqual(resp.status_code, 404)
+        for suffix in ("/?format=html", ".md"):
+            with self.subTest(url=suffix):
+                self.assertEqual(client.get(f"/api/cases/{case.id}/report{suffix}").status_code, 404)
 
     def test_investigator_can_download_any_case_report(self):
         investigator = _make_user("investigator", groups=["CERT"])

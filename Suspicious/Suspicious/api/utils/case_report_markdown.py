@@ -1,11 +1,16 @@
 """Markdown version of the case report: verdict, why, and per-indicator evidence.
 
 Every value that comes from outside (indicators, analyzer evidence, reporter text)
-is escaped so a viewer cannot turn it into a link, a heading or a table break.
+is escaped so a viewer cannot turn it into a link, a heading or a table break. Running
+text is also defanged ("://", "www." and "@" are broken up) so viewers do not autolink
+URLs or addresses; indicator values sit in code spans, which are never autolinked.
 Screenshots and raw analyzer output stay in the HTML report."""
 from __future__ import annotations
 
 import re
+
+from api.utils.case_report_model import CaseReport, IndicatorBlock
+from api.utils.report_facts import LEGEND, band_icon
 
 # Always special in running text and table cells. Parentheses are left alone: with
 # "[" and "]" escaped, a link or image can never form.
@@ -17,9 +22,13 @@ _LEADING_MARKER = re.compile(r"^(\s*)([#>+=-])")
 _LEADING_ORDERED = re.compile(r"^(\s*\d+)([.)])")
 
 
+_WWW = re.compile(r"(?<![A-Za-z0-9])www\.", re.I)
+
+
 def _text(value) -> str:
-    """Escape for use in running text or a table cell; one line."""
+    """Defang and escape for use in running text or a table cell; one line."""
     one_line = " ".join(str(value if value is not None else "").split())
+    one_line = _WWW.sub(lambda m: m.group()[:-1] + "[.]", one_line.replace("://", "[:]//")).replace("@", "[@]")
     escaped = _ALWAYS.sub(r"\\\1", one_line)
     escaped = _EDGE_UNDERSCORE.sub(r"\\_", escaped)
     escaped = _LEADING_MARKER.sub(r"\1\\\2", escaped)
@@ -41,90 +50,107 @@ def _table(header: list[str], rows: list[list[str]]) -> list[str]:
     return out
 
 
-def _health_line(health: dict | None) -> str | None:
-    if not health or not (health.get("failed") or health.get("pending")):
-        return None
-    parts = []
-    if health.get("failed"):
-        names = ", ".join(sorted({f["analyzer"] for f in health.get("failures", [])}))
-        parts.append(
-            f"{health['failed']} of {health['total']} analyzers failed"
-            + (f" ({_text(names)})" if names else "")
-            + ": the verdict has lower confidence"
-        )
-    if health.get("pending"):
-        parts.append(f"{health['pending']} analyzer(s) still running")
-    return "**Analysis:** " + "; ".join(parts) + "."
+def _verdict(band, confidence) -> str:
+    text = f"{band_icon(band)} {_text(band or 'Inconclusive')}"
+    return text + (f" · confidence {_text(confidence)}%" if confidence else "")
 
 
-def build_markdown_report(case, observables, sources, threat, health, generated_at) -> str:
-    result = str(case.results)
-    explanation = case.verdict_explanation or {}
-    lines = [f"# Case #{case.id}: {_text(result)}", ""]
+def _ai_section(ai: dict) -> list[str]:
+    head = _text(ai.get("result"))
+    if ai.get("sub_class"):
+        head += f" ({_text(ai['sub_class'])})"
+    if ai.get("tier"):
+        head += f" · {_text(str(ai['tier']).title())} confidence"
+    ru = ai.get("runner_up")
+    if isinstance(ru, dict) and ru.get("result"):
+        head += f" · runner-up: {_text(ru['result'])}"
+    out = ["## AI model assessment", "", head, "",
+           f"Model {_text(ai.get('model_version'))} · analysed {_text(ai.get('analysed_at'))}", "",
+           f"Reads: {_text(ai.get('reads'))}", ""]
+    camp = ai.get("campaign")
+    if isinstance(camp, dict):
+        line = f"Campaign {_text(camp.get('ref'))} · {_text(camp.get('size'))} mails"
+        labels = camp.get("labels")
+        if isinstance(labels, dict) and labels:
+            line += " · labels " + ", ".join(f"{_text(k)} {_text(v)}" for k, v in labels.items())
+        out += [line, ""]
+    for sc in ai.get("similar_cases") or []:
+        if isinstance(sc, dict):
+            out += [f"Similar case #{_text(sc.get('case_id'))}: {_text(sc.get('label'))}", ""]
+    cc = ai.get("cross_check")
+    if isinstance(cc, dict):
+        facts = [f for f in cc.get("facts") or [] if isinstance(f, dict)]
+        if facts:
+            out += [f"- {_text(f.get('text'))}" for f in facts] + [""]
+        if cc.get("disagrees"):
+            out += ["AI and evidence disagree", ""]
+    return out
 
-    stats = [f"**Verdict:** {_text(result)}"]
-    if case.final_score or case.final_confidence:
-        if not observables:
-            stats.append(f"Score {case.final_score}")
-        stats.append(f"Confidence {case.final_confidence}")
-    lines.append(" · ".join(stats))
-    if threat:
-        lines.append(f"**Threat:** {_text(threat['label'])} ({_text(threat['category'])})")
-    health_line = _health_line(health)
-    if health_line:
-        lines.append(health_line)
-    lines.append("")
 
-    lead = explanation.get("reporter_paragraph") or case.inconclusive_reason
-    if lead:
-        lines += [_text(lead), ""]
+def _block(b: IndicatorBlock, heading: str) -> list[str]:
+    out = [heading, "", f"Verdict: {_verdict(b.band, b.confidence)}", ""]
+    if b.why:
+        out += ["**Why this verdict**", ""] + [f"- {_text(w)}" for w in b.why] + [""]
+    if b.derived_from:
+        out += [f"Found in {_code(b.derived_from.get('value'))} by {_text(b.derived_from.get('via_analyzer'))}.", ""]
+    if b.escalation_note:
+        out += [_text(b.escalation_note), ""]
+    if b.findings:
+        out += ["**Key findings**", ""] + [f"- {_text(f)}" for f in b.findings] + [""]
+    groups = [g for g in b.details if g.rows]
+    if groups:
+        out += ["**Details**", ""]
+        for g in groups:
+            out += [f"*{_text(g.title)}*", ""] + [f"- {_text(k)}: {_text(v)}" for k, v in g.rows] + [""]
+    if b.vt_link:
+        out += [f"VirusTotal: {_code(b.vt_link)}", ""]
+    if b.connectors:
+        out += ["**Connectors**", ""] + [f"- {c.icon} {_text(c.name)}: {_text(c.label)}" for c in b.connectors] + [""]
+    return out
 
-    meta = [f"Reporter: {_text(case.reporter.username)}"]
-    if case.creation_date:
-        meta.append(f"Case created: {case.creation_date:%Y-%m-%d %H:%M} UTC")
-    meta.append(f"Report generated: {generated_at:%Y-%m-%d %H:%M} UTC")
-    lines += ["  \n".join(meta), ""]
 
-    if case.description:
-        lines += ["## Description", "", _text(case.description), ""]
-    if case.reporter_context:
-        lines += ["## Reporter context", "", _text(case.reporter_context), ""]
-
-    if explanation:
-        lines += ["## Why this verdict", ""]
-        if explanation.get("analyst_paragraph"):
-            lines += [_text(explanation["analyst_paragraph"]), ""]
-        if explanation.get("confidence_reading"):
-            lines += [f"_{_text(explanation['confidence_reading'])}_", ""]
-        if sources:
-            lines += _table(
-                ["Source", "Tier", "Verdict", "Note"],
-                [[_text(s.get("name")), f"T{_text(s.get('tier'))}", _text(s.get("verdict")),
-                  _text(s.get("note")) + (f" (x{s['n']})" if s.get("n", 1) > 1 else "")] for s in sources],
-            ) + [""]
-    elif case.verdict_rationale:
-        lines += ["## Why this verdict", ""] + [f"- {_text(line)}" for line in case.verdict_rationale] + [""]
-
-    lines += ["## Indicators", ""]
-    if not observables:
-        lines += ["No indicator observables on this case.", ""]
-    for o in observables:
-        lines += [f"### {_code(o['value'])} ({_text(o['type'])})", ""]
-        verdict = o.get("verdict")
-        if verdict:
-            lines.append(f"**Verdict:** {_text(verdict['band'])} · Confidence {_text(verdict['confidence'])}")
-            lines += [f"- {_text(line)}" for line in verdict.get("rationale") or []]
-        if o.get("derived_from"):
-            lines.append(f"Found in {_code(o['derived_from']['value'])} by {_text(o['derived_from']['via_analyzer'])}.")
-        if o.get("escalation_note"):
-            lines.append(_text(o["escalation_note"]))
-        if o.get("sources"):
-            lines += [""] + _table(
-                ["Source", "Tier", "Verdict", "Evidence"],
-                [[_text(s["name"]) + (" (failed)" if s.get("failed") else ""), f"T{_text(s['tier'])}",
-                  _text(s["verdict"]), _text(s.get("evidence"))] for s in o["sources"]],
-            )
-        lines.append("")
-
-    lines += ["---", "Generated by Suspicious. Screenshots and raw analyzer output are in the HTML report.", ""]
-    return "\n".join(lines)
+def build_markdown_report(report: CaseReport) -> str:
+    r = report
+    out = [f"# Case #{r.case_id}: {_text(r.band)}", "",
+           f"**Verdict:** {band_icon(r.band)} {_text(r.band)}"
+           + (f" · confidence {_text(r.confidence)}" if r.confidence else "")]
+    if r.threat:
+        out.append(f"**Threat:** {_text(r.threat.get('label'))} ({_text(r.threat.get('category'))})")
+    if r.health:
+        out.append(f"**Analysis:** {_text(r.health)}.")
+    out.append("")
+    if r.lead:
+        out += [_text(r.lead), ""]
+    meta = [f"Reporter: {_text(r.reporter)}"]
+    if r.created:
+        meta.append(f"Case created: {_text(r.created)}")
+    meta.append(f"Report generated: {_text(r.generated)}")
+    out += ["  \n".join(meta), ""]
+    if r.description:
+        out += ["## Description", "", _text(r.description), ""]
+    if r.reporter_context:
+        out += ["## Reporter context", "", _text(r.reporter_context), ""]
+    if r.why:
+        out += ["## Why this verdict", ""] + [f"- {_text(w)}" for w in r.why] + [""]
+    if r.ai:
+        out += _ai_section(r.ai)
+    if r.case_connectors:
+        out += ["## Case analyzers", "", "**Legend** " + LEGEND, ""]
+        out += [f"- {c.icon} {_text(c.name)}: {_text(c.label)}" for c in r.case_connectors] + [""]
+    if r.case_analysis:
+        out += _block(r.case_analysis, "## Case analysis")
+    out += ["## Indicators", ""]
+    if r.kind == "none" or not (r.rows or r.blocks):
+        out += ["No indicator observables on this case.", ""]
+    else:
+        out += ["**Legend** " + LEGEND, ""]
+        if r.rows:
+            out += _table(["Value", "Type", "Verdict", "Top finding"],
+                          [[_code(x.value).replace("|", "\\|"), _text(x.type.upper()), _verdict(x.band, None), _text(x.top_finding)]
+                           for x in r.rows]) + [""]
+        for b in r.blocks:
+            out += _block(b, f"### {_text(b.type.upper())} · {_code(b.value)}")
+        if r.more:
+            out += [f"+{r.more} more flagged indicators are listed in the table only.", ""]
+    out += ["---", "Generated by Suspicious. Screenshots are in the HTML report.", ""]
+    return "\n".join(out)
