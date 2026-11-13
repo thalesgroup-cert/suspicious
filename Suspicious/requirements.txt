@@ -40,7 +40,7 @@ requests==2.34.2
 PyJWT==2.15.1
 boto3==1.43.125
 google-cloud-storage==3.17.0
-tenacity==9.1.4
+tenacity==9.2.1
 pybreaker==1.4.1
 
 # Email Handling
