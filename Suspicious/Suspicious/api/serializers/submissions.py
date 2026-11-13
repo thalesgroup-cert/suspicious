@@ -56,6 +56,9 @@ def resolve_case_type(obj: Case) -> str:
         if linked_non_file_iocs.hash_id:
             return "HASH"
 
+    if getattr(obj, "observable_group_id", None):
+        return "IOC"
+
     return "UNKNOWN"
 
 
@@ -88,6 +91,10 @@ def resolve_case_artifact(obj: Case) -> str:
                 or getattr(hash_obj, "hash", "")
                 or str(linked_non_file_iocs.hash_id)
             )
+
+    if getattr(obj, "observable_group_id", None):
+        from api.serializers.investigations import get_case_info_value
+        return get_case_info_value(obj)
 
     return obj.description or ""
 

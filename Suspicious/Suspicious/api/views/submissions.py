@@ -95,7 +95,12 @@ class SubmissionListView(ListAPIView):
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
     def get_base_queryset(self):
-        return Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
+        return Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED).prefetch_related(
+            "observable_group__artifacts__url",
+            "observable_group__artifacts__ip",
+            "observable_group__artifacts__hash",
+            "observable_group__artifacts__domain",
+        )
 
     def get_queryset(self):
         queryset = submission_list_queryset(self.get_base_queryset(), self.request.user)

@@ -33,6 +33,7 @@ SUBMISSION_TYPE_CHOICES = (
     "URL",
     "IP",
     "HASH",
+    "IOC",
     "UNKNOWN",
 )
 

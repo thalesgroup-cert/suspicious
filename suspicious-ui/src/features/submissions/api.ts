@@ -13,6 +13,7 @@ export type SubmissionType =
   | "URL"
   | "IP"
   | "HASH"
+  | "IOC"
   | "UNKNOWN";
 
 export type SubmissionResult =

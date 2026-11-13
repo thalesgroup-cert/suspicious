@@ -92,7 +92,7 @@ export const STATUS_OPTIONS: Array<SubmissionStatus | "ALL"> = [
 ];
 
 export const TYPE_OPTIONS: Array<SubmissionType | "ALL"> = [
-  "ALL", "FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN",
+  "ALL", "FILE", "MAIL", "URL", "IP", "HASH", "IOC", "UNKNOWN",
 ];
 
 export const RESULT_OPTIONS: Array<SubmissionResult | "ALL"> = [

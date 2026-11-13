@@ -94,7 +94,7 @@ export function SubmissionDrawer({
   const verdictHex = useResultHex(selectedRow?.result ?? "UNKNOWN");
   const type = String(selectedRow?.type ?? "").toUpperCase();
   // The backend types FILE/MAIL/URL/IP/HASH from one primary observable; only IOC-group cases come back UNKNOWN.
-  const multi = type === "UNKNOWN";
+  const multi = type === "IOC" || type === "UNKNOWN";
   const typeLabel = multi ? "Indicators" : TYPE_LABELS[type] ?? type;
 
   // The tab belongs to the submission it was picked on: another submission opens on Overview.
