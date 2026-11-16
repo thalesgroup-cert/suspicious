@@ -38,6 +38,8 @@ class DashboardScopeTests(APITestCase):
         CISOProfile.objects.create(
             user=cls.ciso, function="", gbu="Off GBU", country="AU", region="APAC", scope="AU|Off GBU"
         )
+        cls.ciso_bare = User.objects.create_user("ciso-bare@meridian.example", password="x")
+        in_group(cls.ciso_bare, "CISO")  # CISO group, no CISOProfile
 
     def setUp(self):
         cache.clear()
@@ -111,6 +113,16 @@ class DashboardScopeTests(APITestCase):
         self.assertEqual(data["scope"]["key"], "OWN_SCOPE")
         self.assertEqual(data["reports"], 4)
         self.assertEqual(data["top_reporters"], [{"label": "au1", "value": 4}])
+
+    def test_ciso_group_without_profile_gets_overall_without_names(self):
+        self.assertFalse(CISOProfile.objects.filter(user=self.ciso_bare).exists())
+        self.assertEqual(self._get(self.ciso_bare, SCOPES).data,
+                         {"default": "ALL", "options": [{"key": "ALL", "label": "Overall"}]})
+        data = self._get(self.ciso_bare, SUMMARY).data
+        self.assertEqual(data["scope"]["key"], "ALL")
+        self.assertIsNone(data["top_reporters"])
+        for requested in ("OWN_SCOPE", "COUNTRY:AU", "REGION:APAC"):
+            self.assertEqual(self._get(self.ciso_bare, SUMMARY, scope=requested).status_code, 403, requested)
 
     # scopes endpoint
 
