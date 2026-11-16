@@ -336,9 +336,11 @@ them into the label ledger.
   mail, matched to a case by Message-ID (fallback: sender, UTC day, subject).
 - **Config.** `imap_host` (empty means the sync does nothing), `imap_port`, `imap_user`,
   `imap_password`, `imap_use_ssl`. `imap_use_ssl: false` is plain IMAP with no STARTTLS: dev and
-  greenmail only. TLS verifies against the Celery container's system CA store; the
-  `rootcafile.pem` mounted at `/etc/private/` is not used, so a mailbox behind an internal CA
-  fails with `ImapTlsFailed` until that CA is in the image or `SSL_CERT_FILE` points at it.
+  greenmail only (on port 993 it cannot work: the server expects TLS from the first byte). TLS
+  verifies against the container's system CA store plus `imap_rootcafile` (default
+  `/etc/private/rootcafile.pem`, the CA file the compose files already mount for the email
+  feeder; ignored when absent). A mailbox behind an internal CA therefore works once that CA is in
+  the file; otherwise the sync fails with `ImapTlsFailed`.
 - **Schedule and limits.** A 86400 s schedule `label-sync` (about daily, counted from when
   `suspicious_celery_beat` started). Per run: at most 500 UIDs per folder, chunks of 25 mails, 300 s
   time budget, mails above 25 MB skipped. The mailbox is opened read-only (`BODY.PEEK[]`); nothing
