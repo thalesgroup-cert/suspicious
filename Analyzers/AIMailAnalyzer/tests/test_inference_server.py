@@ -109,7 +109,7 @@ def make_app(tmp_path, monkeypatch):
     """Factory: build the server against temp model dirs and enter its lifespan."""
     clients = []
 
-    def make(personal=True, vectorizer=FakeVectorizer, personal_skip=()):
+    def make(personal=True, vectorizer=FakeVectorizer, personal_skip=(), reload_seconds=0):
         dirs = {"personal": tmp_path / "models"}
         if personal:
             write_models(dirs["personal"], seed=1, skip=personal_skip)
@@ -120,7 +120,7 @@ def make_app(tmp_path, monkeypatch):
         monkeypatch.setattr(server.store, "__dict__", server.ModelStore(dirs).__dict__)
         monkeypatch.setenv("AI_INFERENCE_TOKEN", TOKEN)
         monkeypatch.setattr(server, "SentenceTransformer", vectorizer)
-        monkeypatch.setattr(server, "RELOAD_CHECK_SECONDS", 0)  # tests opt in explicitly
+        monkeypatch.setattr(server, "RELOAD_CHECK_SECONDS", reload_seconds)  # tests opt in explicitly
         client = TestClient(server.app)
         client.__enter__()  # runs the lifespan (loads vectorizer + weights)
         clients.append(client)
@@ -401,6 +401,20 @@ def test_periodic_check_hot_reloads_changed_weights(make_app, monkeypatch):
     time.sleep(0.05)
 
     assert probabilities(client) != before
+
+
+def test_background_check_makes_health_ready_without_any_traffic(make_app):
+    """Weights dropped in after start must reach /health (and the Docker healthcheck)
+    on their own: no /classify and no /reload."""
+    client, dirs = make_app(personal=False, reload_seconds=0.05)
+    assert client.get("/health").status_code == 503
+
+    write_models(dirs["personal"], seed=1)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and client.get("/health").status_code != 200:
+        time.sleep(0.05)
+
+    assert client.get("/health").status_code == 200
 
 
 def test_periodic_check_can_be_disabled(make_app, monkeypatch):

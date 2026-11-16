@@ -15,7 +15,9 @@ INFERENCE_RELOAD_CHECK_SECONDS and hot-swapped when they change. POST /reload
 forces the same check immediately. A file that fails to load (half-copied,
 corrupt) never replaces a working model.
 """
+import asyncio
 import collections
+import contextlib
 import logging
 import os
 import threading
@@ -26,6 +28,7 @@ from typing import NamedTuple, Optional
 import numpy as np
 import torch
 from fastapi import FastAPI
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from sentence_transformers import SentenceTransformer
 
@@ -265,6 +268,17 @@ _inference_slots = FairSemaphore(MAX_CONCURRENCY)
 _shadow_slot = threading.Lock()  # one shadow pass at a time, outside _inference_slots (v2)
 
 
+async def _reload_loop() -> None:
+    """Keep /health and the Docker healthcheck honest: weights that appear or change
+    on disk are picked up without waiting for a /classify call."""
+    while True:
+        await asyncio.sleep(RELOAD_CHECK_SECONDS)
+        try:
+            await run_in_threadpool(store.refresh)
+        except Exception:  # noqa: BLE001 - a bad sweep must not end the loop
+            logger.exception("periodic weight check failed")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info("Loading vectorizer from %s ...", VECTORIZER_PATH)
@@ -273,7 +287,14 @@ async def lifespan(_app: FastAPI):
         logger.info("Loading '%s' models from %s ...", variant, model_dir)
     store.refresh(force=True)
     logger.info("Startup finished, ready=%s", store.ready())
-    yield
+    reloader = asyncio.create_task(_reload_loop()) if RELOAD_CHECK_SECONDS > 0 else None
+    try:
+        yield
+    finally:
+        if reloader:
+            reloader.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await reloader
 
 
 app = FastAPI(title="AIMailAnalyzer inference server", lifespan=lifespan)
