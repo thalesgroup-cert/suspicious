@@ -32,7 +32,8 @@ def _email_settings() -> tuple[str, tuple[str, ...]]:
     from settings.config import get_section
 
     email = get_section("email") or {}
-    ui_base = (email.get("links", {}).get("submissions") or "").removesuffix("/submissions").rstrip("/")
+    # Strip the slash first: "…/submissions/" must still lose its "/submissions".
+    ui_base = (email.get("links", {}).get("submissions") or "").rstrip("/").removesuffix("/submissions").rstrip("/")
     domains = {email.get("content", {}).get("global_domain", "")}
     username = (email.get("smtp", {}).get("username") or "")
     if "@" in username:
