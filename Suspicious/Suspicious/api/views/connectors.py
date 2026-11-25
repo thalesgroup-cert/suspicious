@@ -7,6 +7,7 @@ import copy
 import logging
 from dataclasses import asdict
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView
@@ -20,9 +21,9 @@ from api.serializers.connectors import (
     ConnectorDeliverySerializer,
     ConnectorSerializer,
 )
-from connectors.base import URL_ERROR, HealthStatus, _dotted_get, url_errors
+from connectors.base import URL_ERROR, PROVIDER_KIND_ANALYSIS, HealthStatus, _dotted_get, url_errors
 from connectors.delivery import get_state
-from connectors.models import ConnectorDelivery
+from connectors.models import ConnectorDelivery, ConnectorState
 from connectors.registry import registry
 from settings.config import SECRET_FIELDS, get_section, invalidate_cache
 from suspicious._config_common import settings_get
@@ -120,15 +121,40 @@ class ConnectorStateView(APIView):
             return Response({"detail": "'enabled' must be a boolean."},
                             status=status.HTTP_400_BAD_REQUEST)
         kind = registry.get(name).manifest.provides
-        if enabled and kind and any(
-            get_state(other).enabled
-            for other in registry.providers(kind) if other != name
-        ):
-            return Response({"detail": f"{name} already provides {kind}"},
-                            status=status.HTTP_409_CONFLICT)
-        state = get_state(name)
-        state.enabled = enabled
-        state.save(update_fields=["enabled", "updated_at"])
+        with transaction.atomic():
+            if kind:  # lock the kind's state rows so concurrent toggles cannot both pass a check
+                for other in registry.providers(kind):
+                    get_state(other)
+                list(ConnectorState.objects.select_for_update().filter(name__in=registry.providers(kind)))
+            if enabled and kind and kind != PROVIDER_KIND_ANALYSIS and any(
+                get_state(other).enabled
+                for other in registry.providers(kind) if other != name
+            ):
+                return Response({"detail": f"{name} already provides {kind}"},
+                                status=status.HTTP_409_CONFLICT)
+            if (
+                not enabled
+                and kind == PROVIDER_KIND_ANALYSIS
+                and get_state(name).enabled
+                and not any(
+                    get_state(other).enabled
+                    for other in registry.providers(kind) if other != name
+                )
+            ):
+                if request.data.get("force") is not True:
+                    return Response({
+                        "detail": (
+                            f"{name} is the last enabled analysis connector. Disabling it "
+                            "stops the analyzer sync and, once the engine layer ships, all "
+                            "new analysis. Disable it anyway?"
+                        ),
+                        "code": "last_analysis_connector",
+                    }, status=status.HTTP_409_CONFLICT)
+                logger.warning("last analysis connector %s force-disabled by %s",
+                               name, request.user)
+            state = get_state(name)
+            state.enabled = enabled
+            state.save(update_fields=["enabled", "updated_at"])
         return Response(ConnectorSerializer(_serialize_connector(name)).data)
 
 

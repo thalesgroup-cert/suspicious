@@ -12,6 +12,10 @@ from ip_process.models import IP
 @override_settings(CORTEX_WEBHOOK_SECRET="testsecret")
 class CortexWebhookTest(TestCase):
     def setUp(self):
+        # The runtime section outranks the setting; empty it so the setting under test is used.
+        patcher = patch("settings.config.get_section", return_value={})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         cache.clear()
         self.client = APIClient()
         User = get_user_model()
@@ -122,3 +126,32 @@ class CortexWebhookTest(TestCase):
         )
         self.assertEqual(resp.status_code, 503)
         mock_delay.assert_not_called()
+
+
+class CortexWebhookSecretSourceTest(TestCase):
+    """The connector's webhook_secret (runtime config) wins over the import-time setting, so a
+    UI edit applies without a restart; the setting stays the fallback."""
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+
+    def _post(self, token):
+        return self.client.post("/api/cortex/webhook/", {"jobId": "nope"}, format="json",
+                                HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    @override_settings(CORTEX_WEBHOOK_SECRET="old")
+    def test_runtime_secret_replaces_the_setting(self):
+        with patch("settings.config.get_section", return_value={"webhook_secret": "new"}):
+            self.assertEqual(self._post("old").status_code, 401)
+            self.assertEqual(self._post("new").status_code, 202)
+
+    @override_settings(CORTEX_WEBHOOK_SECRET="old")
+    def test_setting_is_the_fallback(self):
+        with patch("settings.config.get_section", return_value={}):
+            self.assertEqual(self._post("old").status_code, 202)
+
+    def test_a_delivery_records_the_last_webhook_time(self):
+        with override_settings(CORTEX_WEBHOOK_SECRET="s"), patch("settings.config.get_section", return_value={}):
+            self._post("s")
+        self.assertIsNotNone(cache.get("cortex_last_webhook_at"))

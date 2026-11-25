@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import timedelta
 
 import pybreaker
+from django.utils import timezone
 
 from common.http_client import get_breaker
 from connectors.base import (
@@ -132,5 +134,19 @@ def run_sync_now(connector_name: str, attempt: int = 1) -> None:
         if attempt < MAX_ATTEMPTS and getattr(exc, "retryable", True) is not False:
             raise RetryableDeliveryError(str(exc)) from exc
         return
-    _record(connector_name, "sync", None,
-            ConnectorDelivery.STATUS_SUCCESS, "", started, attempt)
+    if not _sync_ok_recently(connector_name):
+        _record(connector_name, "sync", None,
+                ConnectorDelivery.STATUS_SUCCESS, "", started, attempt)
+
+
+SYNC_SUCCESS_LOG_INTERVAL = timedelta(hours=1)
+
+
+def _sync_ok_recently(connector_name: str) -> bool:
+    """True when this connector's latest sync row is a success under an hour old: a
+    60 s sync would otherwise write ~1,400 success rows a day and push failures out of the
+    ledger's last-10 view. The first success after a failure is always recorded."""
+    last = (ConnectorDelivery.objects.filter(connector=connector_name, event="sync")
+            .order_by("-id").first())
+    return (last is not None and last.status == ConnectorDelivery.STATUS_SUCCESS
+            and timezone.now() - last.created_at < SYNC_SUCCESS_LOG_INTERVAL)

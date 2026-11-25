@@ -56,7 +56,8 @@ def queue_provider_analysis(case, kind: str):
     ai_name = ai_analyzer_name()
     analyzer, _ = Analyzer.objects.get_or_create(
         name=ai_name,
-        defaults={"analyzer_cortex_id": "provider:" + ai_name, "tier": tier_for(ai_name)},
+        defaults={"analyzer_cortex_id": "provider:" + ai_name, "tier": tier_for(ai_name),
+                  "source": "ai_model"},
     )
     job = CaseAnalyzerJob.objects.create(
         case=case,

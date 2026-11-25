@@ -24,6 +24,10 @@ class Analyzer(models.Model):
     )
     analyzer_cortex_id = models.CharField(max_length=50, unique=True, db_index=True)
     is_active = models.BooleanField(default=True)
+    source = models.CharField(
+        max_length=100, default="cortex", db_index=True,
+        help_text="Name of the connector that owns this analyzer.",
+    )
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 

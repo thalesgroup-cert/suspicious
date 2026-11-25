@@ -46,8 +46,9 @@ export async function listConnectors(): Promise<{
   return data;
 }
 
-export async function setConnectorEnabled(name: string, enabled: boolean) {
-  const { data } = await api.patch(`${endpoints.connectors}${name}/`, { enabled });
+export async function setConnectorEnabled(name: string, enabled: boolean, force?: boolean) {
+  const body = force ? { enabled, force: true } : { enabled };
+  const { data } = await api.patch(`${endpoints.connectors}${name}/`, body);
   return data as Connector;
 }
 

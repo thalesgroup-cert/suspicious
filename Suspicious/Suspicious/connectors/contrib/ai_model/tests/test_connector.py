@@ -316,6 +316,10 @@ class RejectedTokenEndToEndTest(TestCase):
         self.case.refresh_from_db()
         return job, session
 
+    def test_queue_provider_analysis_creates_the_row_with_source_ai_model(self):
+        job = queue_provider_analysis(self.case, "mail_ai")
+        self.assertEqual(job.analyzer.source, "ai_model")
+
     def test_a_rejected_token_fails_the_row_at_once_and_says_why(self):
         job, session = self.run_with_status(401)
         self.assertEqual(session.post.call_count, 1)  # no retry

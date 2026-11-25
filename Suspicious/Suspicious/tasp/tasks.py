@@ -82,11 +82,9 @@ def push_challenge_to_thehive(self, case_id: int, mail_header: str):
 
 @shared_task(bind=True, **_RETRY)
 def sync_cortex(self):
-    from tasp.cron.sync_cortex import sync_cortex_analyzers
-    try:
-        sync_cortex_analyzers()
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
+    # Kept for manual calls; the schedule is the cortex connector's own sync entry.
+    from connectors.delivery import run_sync_now
+    run_sync_now("cortex")
 
 
 @shared_task(bind=True, **_RETRY)
