@@ -126,7 +126,10 @@ class CortexManifestTest(TestCase):
         from connectors.models import ConnectorDelivery
 
         registry.discover()
-        rows = lambda: ConnectorDelivery.objects.filter(connector="cortex", event="sync")
+
+        def rows():
+            return ConnectorDelivery.objects.filter(connector="cortex", event="sync")
+
         with mock.patch.object(CortexConnector, "sync"):
             run_sync_now("cortex")
             run_sync_now("cortex")
