@@ -180,9 +180,9 @@ class CaseScopedEndpointTests(CisoSubmissionScopeBase):
         self.assertEqual(no.status_code, 404)
         self.assertEqual(no.data["detail"], "Case not found")
 
-    @mock.patch("api.views.url_analysis.CortexJob")
+    @mock.patch("connectors.engines.dispatch")
     def test_url_analysis(self, cortex):
-        cortex.return_value.launch_cortex_jobs.return_value = None
+        cortex.return_value = None
         client = self.as_user(self.ciso)
         ok = client.post(f"/api/submissions/{self.in_scope.id}/urls/{self.url_in.id}/analyze/")
         self.assertEqual(ok.status_code, 202)

@@ -145,8 +145,8 @@ class ConnectorStateView(APIView):
                     return Response({
                         "detail": (
                             f"{name} is the last enabled analysis connector. Disabling it "
-                            "stops the analyzer sync and, once the engine layer ships, all "
-                            "new analysis. Disable it anyway?"
+                            "stops all new analysis from that connector: new cases get no "
+                            "analysis until an analysis connector is enabled. Disable it anyway?"
                         ),
                         "code": "last_analysis_connector",
                     }, status=status.HTTP_409_CONFLICT)

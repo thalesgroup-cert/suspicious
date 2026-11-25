@@ -22,8 +22,8 @@ class DispatchPlannerTest(TestCase):
 
     @mock.patch("tasp.tasks.reconcile_case.delay")
     @mock.patch("url_process.url_utils.url_planner.get_config")
-    @mock.patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
-    def test_enabled_dispatches_only_survivors(self, CortexJob, get_config, mock_reconcile):
+    @mock.patch("connectors.engines.dispatch")
+    def test_enabled_dispatches_only_survivors(self, dispatch, get_config, mock_reconcile):
         get_config.side_effect = lambda k, d=None: {
             "url_analysis.enabled": True,
             "url_analysis.max_per_domain": 1,
@@ -32,15 +32,15 @@ class DispatchPlannerTest(TestCase):
 
         dispatch_case_analysis.run(self.case.id, self._intents_for(urls))
 
-        self.assertEqual(CortexJob.return_value.launch_cortex_jobs.call_count, 1)
+        self.assertEqual(dispatch.call_count, 1)
 
     @mock.patch("tasp.tasks.reconcile_case.delay")
     @mock.patch("url_process.url_utils.url_planner.get_config")
-    @mock.patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
-    def test_disabled_dispatches_all(self, CortexJob, get_config, mock_reconcile):
+    @mock.patch("connectors.engines.dispatch")
+    def test_disabled_dispatches_all(self, dispatch, get_config, mock_reconcile):
         get_config.side_effect = lambda k, d=None: {"url_analysis.enabled": False}.get(k, d)
         urls = [URL.objects.create(address=f"https://x.com/a{i}") for i in range(4)]
 
         dispatch_case_analysis.run(self.case.id, self._intents_for(urls))
 
-        self.assertEqual(CortexJob.return_value.launch_cortex_jobs.call_count, 4)
+        self.assertEqual(dispatch.call_count, 4)

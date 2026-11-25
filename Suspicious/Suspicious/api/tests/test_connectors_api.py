@@ -256,6 +256,10 @@ class AnalysisGuardTests(APITestCase):
         response = self._patch("eng_a", {"enabled": False})
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["code"], "last_analysis_connector")
+        self.assertEqual(response.json()["detail"], (
+            "eng_a is the last enabled analysis connector. Disabling it stops all new "
+            "analysis from that connector: new cases get no analysis until an analysis "
+            "connector is enabled. Disable it anyway?"))
         self.assertTrue(self._enabled("eng_a"))
 
     def test_force_true_disables_it(self):

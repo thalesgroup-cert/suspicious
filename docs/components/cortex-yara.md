@@ -4,7 +4,7 @@
 
 Cortex is the analyzer execution engine. Django dispatches analyzers to Cortex
 through `cortex4py`, and Cortex reports results back to
-`/api/cortex/webhook/` using an HMAC-signed, jobId-deduped webhook. The
+`/api/cortex/webhook/` using a bearer-secret, jobId-deduped webhook. The
 analyzers in use (header, sandbox, YARA, file-info and the others the scoring
 engine consumes) are configured under `integrations.cortex.analyzers` in
 `settings.json`. The mail AI verdict does not run in Cortex: the `ai_model`

@@ -196,7 +196,7 @@ class HandleCommonTasksOrderingTest(django.test.TestCase):
     """Verify dispatch happens strictly after Case creation."""
 
     @patch("tasp.tasks.reconcile_case")
-    @patch("mail_feeder.global_submission.gsubmission.CortexJob")
+    @patch("connectors.engines.dispatch")
     @patch("mail_feeder.global_submission.gsubmission.CaseCreatorService")
     @patch("mail_feeder.global_submission.gsubmission.UserCreationService")
     @patch("mail_feeder.global_submission.gsubmission.Handlers")
@@ -250,7 +250,7 @@ class DeferredLaunchTest(django.test.TestCase):
     @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
     @patch("tasp.tasks.reconcile_case")
     @patch("tasp.tasks.dispatch_case_analysis")
-    @patch("mail_feeder.global_submission.gsubmission.CortexJob")
+    @patch("connectors.engines.dispatch")
     @patch("mail_feeder.global_submission.gsubmission.CaseCreatorService")
     @patch("mail_feeder.global_submission.gsubmission.UserCreationService")
     @patch("mail_feeder.global_submission.gsubmission.Handlers")
@@ -280,7 +280,7 @@ class DeferredLaunchTest(django.test.TestCase):
                 instance, "email-1", "mail.tar.gz", "", defer_launch=True
             )
 
-        mock_cortex_cls.return_value.launch_cortex_jobs.assert_not_called()
+        mock_cortex_cls.assert_not_called()
         mock_queue.assert_not_called()
         mock_dispatch.delay.assert_called_once_with(
             7,
@@ -306,7 +306,7 @@ class InlineAiHandOffTest(django.test.TestCase):
         order = []
         gs = "mail_feeder.global_submission.gsubmission"
         with patch("tasp.tasks.reconcile_case"), \
-                patch(f"{gs}.CortexJob") as cortex_cls, \
+                patch("connectors.engines.dispatch") as cortex_cls, \
                 patch(f"{gs}.CaseCreatorService") as case_cls, \
                 patch(f"{gs}.UserCreationService") as user_cls, \
                 patch(f"{gs}.Handlers") as handlers_cls:
@@ -316,11 +316,11 @@ class InlineAiHandOffTest(django.test.TestCase):
             handlers.handle_attachments.return_value.ai_missing = ai_missing
             user_cls.return_value.get_or_create_user.return_value = user
             case_cls.return_value.create_case.return_value = case
-            cortex_cls.return_value.launch_cortex_jobs.side_effect = lambda **_: order.append("jobs")
+            cortex_cls.side_effect = lambda **_: order.append("jobs")
             instance = MagicMock()
             instance.reportedBy = "x@example.com"
             GlobalSubmissionService()._handle_common_tasks(instance, "email-1", "mail.tar.gz", "")
-        return case, cortex_cls.return_value, order
+        return case, cortex_cls, order
 
     @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
     def test_a_readable_archive_hands_the_case_over_once_after_the_cortex_jobs(self, mock_queue):
@@ -347,7 +347,7 @@ class InlineAiHandOffTest(django.test.TestCase):
 
         case, cortex, _ = self.run_inline(MagicMock())
         self.assertFalse(CaseAnalyzerJob.objects.exists())
-        self.assertEqual([name for name, *_ in cortex.method_calls], ["launch_cortex_jobs"])
+        self.assertEqual(cortex.call_count, 1)
         self.assertEqual(case.results_ai, "Inconclusive")
         case.save.assert_any_call(update_fields=["results_ai"])
 

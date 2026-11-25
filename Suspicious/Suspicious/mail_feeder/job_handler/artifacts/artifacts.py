@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from .models import ArtifactModel
 from .utils import safe_execution
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+from connectors import engines
 from settings.models import AllowListFile, AllowListDomain, WatcherLegitDomain, DenyListDomain, WatcherMonitoredDomain
 from settings.allow_lists import is_ip_allow_listed, overrides_allow_list
 from url_process.url_utils.url_handler import URLHandler
@@ -90,12 +90,11 @@ class ArtifactJobLauncherService:
         """
         from url_process.url_utils.url_planner import filter_dispatch_intents
         job_ids: list = []
-        cortex = CortexJob()
         sender_domain = _sender_domain_for_case(case)
         intents = filter_dispatch_intents(self.pending_dispatch_intents, sender_domain=sender_domain)
         for value, data_type in intents:
             try:
-                job_ids.extend(cortex.launch_cortex_jobs(value, data_type, case=case))
+                job_ids.extend(engines.dispatch(value, data_type, case=case))
             except Exception as e:
                 fetch_mail_logger.error(
                     "Failed to launch Cortex jobs (case=%s data_type=%s value=%r): %s",

@@ -10,26 +10,74 @@ See [`Suspicious/Suspicious/connectors/README.md`](https://github.com/thalesgrou
 for the framework internals and the built-in connector table, and
 [Connectors (author guide)](../../connectors.md) for writing a new one.
 
+## Analysis engines
+
+A connector whose manifest sets `provides="analysis"` is an analysis engine. `connectors/engines.py`
+is the only code the pipeline calls to start analyzer jobs and read their results; Cortex is the
+first engine. An engine implements four operations and never touches the database:
+
+| Operation | Returns |
+|---|---|
+| `catalog(data_type=None, name=None)` | the analyzers it offers (`CatalogEntry`: id, name, data types) |
+| `start(analyzer, data_type, value)` | a `StartResult` (external job id, and optionally a finished result), or `None` for a routine refusal |
+| `fetch(job_id)` | a `FetchResult` in one of three states, below |
+| `webhook(headers, payload)` (optional) | the job ids an authenticated callback announces; `None` when the caller is not authenticated |
+
+`fetch` has three outcomes. **result**: a status (`Waiting`, `InProgress`, `Success`, `Failure`)
+and, on success, `summary` (with `taxonomies`) and `full`, stored and scored as Cortex reports
+always were. **gone**: the engine says the job no longer exists; the row becomes `Deleted`.
+**unknown**: the engine could not be reached (network error, open breaker); the row is left alone
+and a later pass retries. An engine must never answer "gone" for a job it merely could not reach.
+
+- **One engine or many.** Any number of `analysis` connectors may be enabled (the
+  one-per-kind rule is for `mail_ai` only). `engines.dispatch` asks every enabled engine for its
+  catalogue and starts the analyzers the selection policy picks (roles from
+  `integrations.cortex.analyzers.*`, whichever engine offers the name), so one case can hold rows
+  from several engines and reconcile waits until all of them are closed. With none enabled,
+  dispatch writes no rows and the case finalises as "no analyzer applicable". A **disabled**
+  engine starts nothing, but its pending rows are still fetched, so a case in flight completes.
+- **Name ownership.** `Analyzer.source` names the connector that owns the row; `Analyzer.name`
+  stays unique. An engine offering a name another source owns is skipped (logged) by both the
+  catalogue sync and dispatch, and the sync deactivates only its own rows. Cortex keeps its raw
+  ids; any other engine stores `<connector>:<id>` in `analyzer_cortex_id` and `<connector>-<id>`
+  in `cortex_job_id`.
+- **Webhook.** `POST /api/connectors/<name>/webhook/` is the generic route: the engine
+  authenticates the call itself, announced job ids are deduplicated in cache and the owning cases
+  are reconciled. `/api/cortex/webhook/` forwards to it, so Cortex's webhook URL and secret are
+  unchanged. A disabled engine's webhook is still accepted.
+- **Stale jobs.** `fail_stale_jobs` fails a pending row once it is older than its own engine's
+  `stale_job_timeout_seconds` (7200 when absent or when the engine is no longer registered).
+- **Delivery ledger.** A `ConnectorDelivery` row (event `start`) is written for each **failed**
+  start only, with the analyzer name and the exception class. A successful start is recorded by its
+  `CaseAnalyzerJob`; a refusal (the engine declined the input) is a log line, and fetches are not
+  recorded.
+
 ## cortex
 
 Category Analysis, provides `analysis`, enabled by default. Config is the existing
 `integrations.cortex` section (`url`, `api_key`, `webhook_secret`, `stale_job_timeout_seconds`,
-`analyzers.*`), so `settings.json` needs no change. The connector syncs the analyzer catalogue
+`analyzers.*`), so `settings.json` needs no change. The connector starts, fetches and announces
+Cortex jobs through the engine layer above, syncs the analyzer catalogue
 into the `Analyzer` table every 60 s (the old `sync-cortex` beat entry is gone; the `sync_cortex`
 task forwards to it) and reports health from `GET <url>/api/analyzer` with the API key, so a rejected key shows
 as not ok. The health detail also lists configured `analyzers.*` roles Cortex does not offer,
 the inactive analyzer count, jobs pending over 30 minutes and the age of the last webhook (an
-early sign of a broken callback). A failed sync is a failed delivery and is retried. The
+early sign of a broken callback). A failed sync is a failed delivery and is retried, except a
+rejected API key, which waits for an operator. The
 webhook reads `webhook_secret` from the connector config, so an edit applies without a restart.
-Unconfigured, it reports not ok and the sync does nothing. Each `Analyzer` row has a `source` naming its owning connector, and
-the sync only deactivates `cortex` rows. Disabling the last enabled `analysis` connector needs
+Unconfigured, it reports not ok and the sync does nothing. Disabling the cortex connector stops
+all new Cortex analysis. Disabling the last enabled `analysis` connector needs
 `"force": true` on `PATCH /api/connectors/<name>/` (otherwise 409, code `last_analysis_connector`).
-Known limit: the enabled flag gates only the sync and the UI; job starts, the webhook and
-reconcile still use Cortex whatever it says.
 
-- `stale_job_timeout_seconds` is stored but not used until the engine layer ships; `fail_stale_jobs` still uses the single configured timeout.
+A Cortex outage shows in the connector health, the `cortex` breaker state and the logs, but not as
+failed-start deliveries: the catalogue lookup fails quietly, so nothing reaches `start`. Failed-start
+rows appear for intermittent errors, auth failures and similar.
+
+- **Upgrade:** before upgrading, check that Settings > Connectors shows Cortex **enabled**. Until
+  this release the flag only gated the analyzer sync, so a Cortex connector switched off then now
+  stops all new Cortex analysis. The webhook URL and secret are unchanged.
 - On upgrade, disable any old Cortex-side `AI_Mail_Analyzer` analyzer in Cortex. Otherwise the sync logs an ERROR about it every minute, because the row now belongs to the `ai_model` connector.
-- `/api/cortex/webhook/` now reads its secret through the runtime config layer (Vault-backed, cached 60 s) instead of only at boot.
+- `/api/cortex/webhook/` reads its secret through the runtime config layer (Vault-backed, cached 60 s) instead of only at boot, and falls back to `CORTEX_WEBHOOK_SECRET` when that config cannot be read.
 
 ## ai_model
 
