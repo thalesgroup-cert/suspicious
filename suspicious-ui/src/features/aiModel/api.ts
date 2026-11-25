@@ -93,7 +93,7 @@ export type ShadowDetail = VersionSummary & {
   agreement: { class: Agreement; verdict: Agreement };
   flips: SubList<{ case_id: number; flip: string; live_result: string; would_be_result: string; reviewable: boolean; reviewed?: boolean }>;
   campaign_effects: SubList<{ case_id: number; effect: string; live_campaign_id: string | null; reviewable: boolean; reviewed?: boolean }>;
-  alert_delta: { candidate_only: SubList<number>; active_only: SubList<number> };
+  alert_delta: { candidate_only: SubList<{ case_id: number; reviewed: boolean }>; active_only: SubList<{ case_id: number; reviewed: boolean }> };
   conditions: string[];
 };
 export type ShadowResponse = { shadow: null } | ShadowDetail;

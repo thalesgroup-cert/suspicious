@@ -176,7 +176,8 @@ class ShadowView(Read):
             "agreement": agreement,
             "flips": _paged(flips, request, "flips", flip_row),
             "campaign_effects": _paged(effects, request, "effects", effect_row),
-            "alert_delta": {k: _paged(delta[k], request, k, lambda c: c) for k in ("candidate_only", "active_only")},
+            "alert_delta": {k: _paged(delta[k], request, k, lambda c: {"case_id": c, "reviewed": ("campaign", c) in reviews})
+                            for k in ("candidate_only", "active_only")},
             "conditions": promotion.can_promote(v, snap),
         })
 

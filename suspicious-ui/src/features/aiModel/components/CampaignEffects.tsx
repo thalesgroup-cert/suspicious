@@ -64,14 +64,17 @@ export function CampaignEffects({ data, offsets, onPage, onReview }: Props) {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {list.results.map((id) => (
+                    {list.results.map(({ case_id: id, reviewed }) => (
                       <TableRow key={id}>
                         <TableCell component="th" scope="row">{id}</TableCell>
                         <TableCell>
-                          {/* The backend sends bare case ids with no reviewed flag, so this button stays after a review. */}
-                          <Button size="small" aria-label={`Review alert case ${id}`} onClick={() => onReview(id)}>
-                            Review
-                          </Button>
+                          {reviewed ? (
+                            "Reviewed"
+                          ) : (
+                            <Button size="small" aria-label={`Review alert case ${id}`} onClick={() => onReview(id)}>
+                              Review
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
