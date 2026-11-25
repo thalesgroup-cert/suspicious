@@ -299,6 +299,9 @@ class CortexJob:
                 raise TypeError("MailHeader object must have 'header_value' attribute")
             data_value = data.header_value
 
+        elif data_type == "mail_archive":  # a case-level type: the value is the case id
+            data_value = str(data.id)
+
         else:
             raise ValueError(f"Unsupported data type: {data_type}")
 

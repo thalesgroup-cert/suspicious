@@ -17,7 +17,7 @@ from connectors.contrib.ai_model.mailtext import MailMaterial
 from connectors.contrib.ai_model.tests.test_campaigns import HEADERS, TEXT, _assessment, _case
 from connectors.models import ConnectorDelivery
 from connectors.tasks import run_shadow_campaign
-from connectors.tests.test_provider_dispatch import make_mail_case
+from connectors.contrib.ai_model.tests.test_connector import make_mail_case
 
 E = ShadowCampaignEffect.Effect
 C = "connectors.contrib.ai_model.campaigns"

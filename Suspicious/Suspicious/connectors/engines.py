@@ -14,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from connectors.base import (
+    DATA_TYPE_MAIL_ARCHIVE,
     FETCH_GONE,
     FETCH_RESULT,
     PROVIDER_KIND_ANALYSIS,
@@ -32,6 +33,7 @@ ROLE_TYPES = {
     "file": ("yara", "file_info", "sandbox"),
     "mail_body": ("yara",),
     "mail_header": ("header",),
+    DATA_TYPE_MAIL_ARCHIVE: ("ai",),
 }
 EML_EXCLUDED_ROLES = ("ai", "yara", "sandbox", "header")
 GENERIC_EXCLUDED_ROLES = ("yara", "sandbox", "header")
@@ -58,7 +60,9 @@ def select_analyzers(data_type: str, value, offered: list[CatalogEntry], roles: 
                 raise TypeError("file must have 'file_path.name' attribute")
             if value.file_path.name.endswith(".eml"):
                 keep -= _role_names(roles, EML_EXCLUDED_ROLES)
-        return [entry for entry in offered if entry.name in keep]
+        # mail_archive is no observable: only an analyzer that declares it may run on it.
+        return [entry for entry in offered if entry.name in keep
+                and (data_type != DATA_TYPE_MAIL_ARCHIVE or data_type in entry.data_types)]
     excluded = _role_names(roles, GENERIC_EXCLUDED_ROLES)
     return [entry for entry in offered if entry.name not in excluded]
 
@@ -90,14 +94,18 @@ def dispatch(value, data_type: str, case) -> list[str]:
 
 
 def _roles() -> dict:
-    """integrations.cortex.analyzers; empty (logged) when the config cannot be read."""
+    """integrations.cortex.analyzers; empty (logged) when the config cannot be read. The ``ai``
+    role always has a name: ai_analyzer_name() supplies its default."""
+    from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
     from settings.config import get_section
 
     try:
-        return get_section("integrations.cortex").get("analyzers") or {}
+        roles = dict(get_section("integrations.cortex").get("analyzers") or {})
     except Exception as exc:  # noqa: BLE001
         logger.error("Could not load cortex analyzer roles: %s", exc)
-        return {}
+        roles = {}
+    roles["ai"] = ai_analyzer_name()
+    return roles
 
 
 def _dispatch(value, data_type, case, job_ids) -> None:
@@ -139,7 +147,10 @@ def _dispatch_engine(name, value, data_type, data_value, case, roles, job_ids) -
         offered = connector.catalog(data_type=data_type)
 
     for entry in select_analyzers(data_type, value, offered, roles):
-        if Analyzer.objects.filter(name=entry.name).exclude(source=name).exists():
+        owners = Analyzer.objects.filter(name=entry.name).exclude(source=name)
+        if name != "cortex":  # rows _analyzer_row adopts are no conflict
+            owners = [o for o in owners.only("analyzer_cortex_id") if not _adoptable(entry, o.analyzer_cortex_id)]
+        if owners:
             logger.error("Engine %s offers analyzer %r, owned by another source: skipped", name, entry.name)
             continue
         try:
@@ -149,6 +160,34 @@ def _dispatch_engine(name, value, data_type, data_value, case, roles, job_ids) -
             continue
         if job_id:
             job_ids.append(job_id)
+
+
+PROVIDER_ANALYZER_PREFIX = "provider:"  # Analyzer rows created by the old provider path
+
+
+def _adoptable(entry, analyzer_cortex_id: str) -> bool:
+    """Whether a non-Cortex engine takes over an existing row of the entry's name from another
+    source: a row of the old provider path, or any row when the entry runs on mail_archive (no
+    observable: a row of that name can only be a wrong owner, such as a Cortex mirror)."""
+    return (analyzer_cortex_id.startswith(PROVIDER_ANALYZER_PREFIX)
+            or DATA_TYPE_MAIL_ARCHIVE in entry.data_types)
+
+
+def _analyzer_row(name, entry, analyzer_id):
+    """The engine's Analyzer row. Cortex: by its raw id, as run_analyzer did. Any other engine:
+    by name first, adopting a row of the old provider path or, for a mail_archive entry, any row of
+    the name (its id kept); created only when none has the name."""
+    from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+    from cortex_job.models import Analyzer
+
+    if name != "cortex":
+        row = Analyzer.objects.filter(name=entry.name).first()
+        if row is not None:
+            if row.source != name and _adoptable(entry, row.analyzer_cortex_id):
+                row.source = name
+                row.save(update_fields=["source"])
+            return row
+    return CortexJob.get_analyzer_db(dataclasses.replace(entry, id=analyzer_id), source=name)
 
 
 def _failed_start(name, case, analyzer_name, reason) -> None:
@@ -188,8 +227,12 @@ def _start(connector, name, entry, value, data_type, data_value, case) -> str | 
         _failed_start(name, case, entry.name, "job id too long")
         return None
 
+    if started.deferred:
+        _start_deferred(connector, name, entry, analyzer_id, job_id, case)
+        return job_id
+
     with transaction.atomic():
-        analyzer_db = CortexJob.get_analyzer_db(dataclasses.replace(entry, id=analyzer_id), source=name)
+        analyzer_db = _analyzer_row(name, entry, analyzer_id)
         analyzer_report = AnalyzerReport(
             cortex_job_id=job_id,
             type=data_type,
@@ -223,6 +266,25 @@ def _start(connector, name, entry, value, data_type, data_value, case) -> str | 
     if finished and finished.status == "Success":
         _score(analyzer_report)
     return job_id
+
+
+def _start_deferred(connector, name, entry, analyzer_id, job_id, case) -> None:
+    """A deferred job: a pending row with no report, closed by run_engine_job in a worker."""
+    from connectors.tasks import run_engine_job
+    from cortex_job.models import CaseAnalyzerJob
+
+    with transaction.atomic():
+        analyzer_db = _analyzer_row(name, entry, analyzer_id)
+        row = CaseAnalyzerJob.objects.create(
+            case=case, cortex_job_id=job_id, analyzer=analyzer_db,
+            analyzer_report=None, status=CaseAnalyzerJob.STATUS_INPROGRESS,
+        )
+        try:
+            with transaction.atomic():  # a savepoint: a failing hook never undoes the row
+                connector.on_started(case, entry.name)
+        except Exception as exc:  # noqa: BLE001: the class name only, a message may carry data
+            logger.error("Engine %s on_started for %s failed: %s", name, entry.name, type(exc).__name__)
+        transaction.on_commit(lambda: run_engine_job.delay(row.id))
 
 
 # ── refresh: reconcile reads job results through the engine ────────────────
@@ -353,7 +415,7 @@ def refresh(caj, cache: dict | None = None) -> None:
     ``cache`` (ledger job id -> FetchResult) makes rows sharing a job fetch it once.
     A disabled engine is still fetched: its started jobs must finish."""
     report = caj.analyzer_report
-    if report is None:  # a provider row (ai_model): its task closes it
+    if report is None:  # a deferred job: run_engine_job closes it
         return
     name = caj.analyzer.source
     if name not in registry.names():
@@ -475,9 +537,11 @@ def sync_connector_catalog(name: str, connector) -> int:
     if not offered:
         return 0
 
-    synced = []
+    synced, ai_name = [], ai_analyzer_name()
     with transaction.atomic():
         for entry in offered:
+            if entry.name == ai_name:
+                continue  # the AI vote's row belongs to its own engine: never created or claimed here
             owner = Analyzer.objects.filter(name=entry.name).values_list("source", flat=True).first()
             if owner is not None and owner != name:
                 # Analyzer.name is unique across sources: another connector owns this one.
@@ -494,7 +558,7 @@ def sync_connector_catalog(name: str, connector) -> int:
             )
             synced.append(entry.name)
         # The AI vote's row (ai_model connector) is no engine analyzer: leave it active.
-        Analyzer.objects.filter(source=name).exclude(name__in=[*synced, ai_analyzer_name()]).update(is_active=False)
+        Analyzer.objects.filter(source=name).exclude(name__in=[*synced, ai_name]).update(is_active=False)
 
     if name == "cortex":
         _warn_on_unresolved_configured_analyzers(synced)

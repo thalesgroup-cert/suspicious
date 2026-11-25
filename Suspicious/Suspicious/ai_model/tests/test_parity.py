@@ -2,7 +2,7 @@
 
 cortex_ai_report.json holds one real, sanitised AnalyzerReport (report_summary + report_full)
 per class (SAFE, UNWANTED, DANGEROUS), values stored as strings exactly as Cortex returns them.
-The new side is result_from_server plus finish_provider_analysis; the legacy side is frozen
+The new side is result_from_server plus AiModelConnector.on_result; the legacy side is frozen
 in CORTEX_CASE_FIELDS.
 """
 import json
@@ -11,10 +11,9 @@ from pathlib import Path
 from django.test import TestCase
 
 from ai_model.models import AiAssessment
-from connectors.contrib.ai_model.connector import result_from_server
-from connectors.providers import finish_provider_analysis
-from connectors.tests.test_provider_dispatch import ai_name, make_mail_case
-from cortex_job.models import Analyzer, CaseAnalyzerJob
+from connectors.contrib.ai_model.connector import AiModelConnector, result_from_server, to_fetch_result
+from connectors.contrib.ai_model.tests.test_connector import make_mail_case
+from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
 
 FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "cortex_ai_report.json").read_text())
 CASE_FIELDS = ("results_ai", "score_ai", "confidence_ai", "category_ai")
@@ -66,24 +65,18 @@ class ParserParityTest(TestCase):
             with self.subTest(klass):
                 new = result_from_server(server_payload_from(fx["full"]))
                 self.assertEqual(
-                    (new.result.capitalize(), new.score, new.confidence, new.category),
+                    (new["result"].capitalize(), new["score"], new["confidence"], new["category"]),
                     CORTEX_CASE_FIELDS[klass],
                 )
 
 
 class CaseFieldParityTest(TestCase):
-    def setUp(self):
-        self.analyzer = Analyzer.objects.create(name=ai_name(), analyzer_cortex_id="cx-ai")
-
     def provider_case(self, n, fx):
-        """A case whose AI fields were written by finish_provider_analysis from the /v2 answer."""
+        """A case whose AI fields were written by AiModelConnector.on_result from the /v2 answer."""
         case, _ = make_mail_case(n)
-        job = CaseAnalyzerJob.objects.create(
-            case=case, cortex_job_id=f"provider-{n}", analyzer=self.analyzer,
-            status=CaseAnalyzerJob.STATUS_INPROGRESS,
-        )
-        result = result_from_server(server_payload_from(fx["full"]))
-        self.assertTrue(finish_provider_analysis(job.id, result, connector="ai_model"))
+        result = to_fetch_result(result_from_server(server_payload_from(fx["full"])))
+        self.assertEqual(result.status, "Success")
+        AiModelConnector({}).on_result(case, ai_analyzer_name(), result)
         case.refresh_from_db()
         return case
 

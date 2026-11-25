@@ -330,3 +330,60 @@ class InertEngineGuardTests(APITestCase):
         items = {c["name"]: c for c in self.client.get("/api/connectors/").json()["connectors"]}
         self.assertEqual(items["fixture_engine"]["status"], "partial")
         self.assertEqual(items["eng_a"]["status"], "connected")
+
+
+class MailAiEngineGuardTests(APITestCase):
+    """ai_model is an analysis connector that covers only mail_archive: it is never the fallback
+    for a general-purpose engine, and disabling it never needs force."""
+
+    def setUp(self):
+        from connectors.contrib.ai_model.connector import AiModelConnector
+
+        self.registry = ConnectorRegistry()
+        self.registry.register(_analysis_connector("cortex"))
+        self.registry.register(_analysis_connector("eng_b"))
+        self.registry.register(AiModelConnector)
+        for target in ("api.views.connectors.registry", "connectors.delivery.registry"):
+            patcher = mock.patch(target, self.registry)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        user = get_user_model().objects.create_user(username="admin", password="x")
+        user.groups.add(Group.objects.get_or_create(name="Admin")[0])
+        self.client.force_authenticate(user)
+        ConnectorState.objects.create(name="cortex", enabled=True)
+        ConnectorState.objects.create(name="eng_b", enabled=False)
+        ConnectorState.objects.create(name="ai_model", enabled=True)
+
+    def _patch(self, name, body):
+        return self.client.patch(f"/api/connectors/{name}/", body, format="json")
+
+    def _enabled(self, name):
+        return ConnectorState.objects.get(name=name).enabled
+
+    def test_disabling_cortex_with_only_ai_model_left_is_409(self):
+        response = self._patch("cortex", {"enabled": False})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["code"], "last_analysis_connector")
+        self.assertTrue(self._enabled("cortex"))
+
+    def test_disabling_cortex_with_only_ai_model_left_is_fine_when_forced(self):
+        self.assertEqual(self._patch("cortex", {"enabled": False, "force": True}).status_code, 200)
+        self.assertFalse(self._enabled("cortex"))
+        self.assertTrue(self._enabled("ai_model"))
+
+    def test_disabling_cortex_with_another_general_engine_needs_no_force(self):
+        ConnectorState.objects.filter(name="eng_b").update(enabled=True)
+        self.assertEqual(self._patch("cortex", {"enabled": False}).status_code, 200)
+
+    def test_disabling_ai_model_needs_no_force(self):
+        self.assertEqual(self._patch("ai_model", {"enabled": False}).status_code, 200)
+        self.assertFalse(self._enabled("ai_model"))
+
+    def test_disabling_ai_model_alone_needs_no_force(self):
+        ConnectorState.objects.filter(name="cortex").update(enabled=False)
+        self.assertEqual(self._patch("ai_model", {"enabled": False}).status_code, 200)
+
+    def test_enabling_ai_model_beside_cortex_is_fine(self):
+        ConnectorState.objects.filter(name="ai_model").update(enabled=False)
+        self.assertEqual(self._patch("ai_model", {"enabled": True}).status_code, 200)
+        self.assertTrue(self._enabled("ai_model"))

@@ -8,7 +8,7 @@ from ai_model.models import AiAssessment, LabelRecord, ModelVersion, ModelVersio
 from ai_model.tasks import materialise_model_stats
 from case_handler.models import Campaign, CampaignMember
 from connectors.models import ConnectorDelivery
-from connectors.tests.test_provider_dispatch import make_mail_case
+from connectors.contrib.ai_model.tests.test_connector import make_mail_case
 
 
 class StatsTest(TestCase):

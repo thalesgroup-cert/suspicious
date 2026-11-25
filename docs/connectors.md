@@ -38,7 +38,7 @@ A connector can react to these kinds of work:
 | `on_case_modified(event)` | an analyst changed a finalised case, for example its verdict (`case_modified`) |
 | `on_campaign_updated(event)` | a case created or joined a phishing campaign (`campaign_updated`); `event.campaign_id` names it |
 | `sync()` | a periodic schedule declared in `manifest.schedules`, registered into Celery beat |
-| `analyze(kind, case_id)` | the connector is the enabled analysis provider for `kind` (see [Analysis providers](#analysis-providers)) |
+| `catalog` / `start` / `fetch` / `webhook` / `run` / `on_started` / `on_result` | the connector is an analysis engine (`provides = "analysis"`, see [Analysis engines](#analysis-engines)) |
 
 plus a mandatory `health_check()` — a cheap connectivity/auth probe that
 must never raise (return `HealthStatus(ok=False, detail=...)` instead).
@@ -103,8 +103,8 @@ it, it never crashes startup):
   section name and the breaker/ledger key.
 - `events` may only contain `case_created`, `case_finalised`,
   `case_modified` or `campaign_updated`.
-- `provides` is empty for a plain connector, or an analysis-provider kind
-  (currently only `mail_ai`); any other value is rejected.
+- `provides` is empty for a plain connector, or `"analysis"` for an
+  analysis engine; any other value is rejected.
 - `config_schema` field types are `str`, `int`, `bool`, `url` or
   `secret`. Keys may be dotted (`instances.primary.api_key`) to describe
   nested config.
@@ -143,30 +143,57 @@ different major version, so a connector built against version 1 either
 receives a payload it understands or a recorded failure — never a
 silently reinterpreted one.
 
-## Analysis providers
+## Analysis engines
 
-A connector whose manifest sets `provides = "mail_ai"` supplies the AI
-verdict of a mail case instead of a Cortex analyzer. The built-in `ai_model`
-connector is the only one. Rules:
+A connector whose manifest sets `provides = "analysis"` is an analysis
+engine: the case pipeline (`connectors/engines.py`) asks it for analyzers
+and starts jobs on it. Built-in engines are `cortex`, `ai_model` and the
+dev-only `fixture_engine`; several may be enabled at once. An engine never
+writes the ledger rows itself: the engine layer owns the `Analyzer`,
+`AnalyzerReport` and `CaseAnalyzerJob` rows (hooks may write their own models). The contract
+(`connectors/base.py`):
 
-- At most one enabled connector per kind. Enabling a second is refused by
-  `PATCH /api/connectors/<name>/` with `{"detail": "<name> already provides mail_ai"}`.
-- When a mail case needs its AI vote, `connectors.providers.queue_mail_ai`
-  writes a pending `CaseAnalyzerJob` ledger row (job id prefixed `provider-`)
-  and queues `run_provider_analysis`. With no provider enabled the AI vote is
-  marked missing and the case is scored without it.
-- The task calls `Connector.analyze(kind, case_id)` under the connector's
-  circuit breaker. It must return a `ProviderResult`: `result`
-  (`SAFE`, `UNWANTED`, `DANGEROUS` or `INCONCLUSIVE`), `score`, `confidence`
-  (percent), `category`, `model_version`, `assessment` (the remaining
-  `AiAssessment` fields), an optional `reason` (why the result is
-  `INCONCLUSIVE`) and an optional `shadow` answer that is stored beside the
-  case and never scored.
-- A result without `model_version` is treated as a failure. Raise
-  `connectors.providers.ProviderUnavailable(message, retryable=...)` when the
-  provider cannot answer: a retryable one is retried (up to 2 retries), any
-  other error closes the ledger row as failed at once. Either way
-  `reconcile_case` then runs and scores the case without the AI vote.
+| Method | Returns |
+|---|---|
+| `catalog(data_type=None, name=None)` | the analyzers it offers, as `CatalogEntry(id, name, data_types)`; no arguments means the whole catalogue (mirrored into `Analyzer` by the catalogue sync) |
+| `start(analyzer, data_type, value)` | a `StartResult(job_id, finished=None, deferred=False)`, or `None` to refuse the job |
+| `fetch(job_id)` | a `FetchResult` with `state` `result` (and a `status`: `Waiting`, `InProgress`, `Success`, `Failure`; on success `summary` and `full`), `gone` (the job no longer exists) or `unknown` (the engine could not be reached; never answer `gone` for that) |
+| `webhook(headers, payload)` (optional) | the job ids an authenticated callback announces, `None` when the caller is not authenticated; raise `WebhookNotConfigured` without a secret |
+
+A finished job can also be returned at once in `StartResult.finished`.
+
+**Deferred jobs.** An engine whose work runs inside Suspicious rather than
+on a remote service returns `StartResult(job_id, deferred=True)`. The
+pipeline then writes a pending `CaseAnalyzerJob` row with no report and
+calls three more methods:
+
+| Method | Called |
+|---|---|
+| `on_started(case, analyzer_name)` | right after the row is written; put the case's "no result yet" state here (a row closed without a result never reaches `on_result`) |
+| `run(job_id, data_type, value)` | in a Celery worker (`connectors.tasks.run_engine_job`), under the connector's circuit breaker; return a `FetchResult` in state `result` with status `Success` or `Failure` and the engine's own result in `payload` (`payload["reason"]` is copied to the delivery row) |
+| `on_result(case, analyzer_name, result)` | after `run`, inside the transaction that closes the row; write the result to your own models here |
+
+Raise `connectors.providers.ProviderUnavailable(message, retryable=...)`
+from `run` when the service cannot answer: a retryable one is retried twice,
+anything else closes the row as `Failure` at once. Each run writes a
+`ConnectorDelivery` row (event `analyze`). A started job still runs after
+the connector is disabled.
+
+**The `mail_archive` data type.** A mail case's archive is dispatched as
+`mail_archive`, whose value is the case id. It is no observable: only an
+analyzer that lists `mail_archive` in its `CatalogEntry.data_types` and is
+named like the AI role (`integrations.cortex.analyzers.ai`, default
+`AI_Mail_Analyzer`) is started on it. This is how `ai_model` delivers the
+mail AI verdict; every deferred job of this release is a `mail_archive` job.
+
+**`general_purpose`.** A class attribute, `True` by default: the engine can
+analyse any observable. Only general-purpose engines count for the "last
+enabled analysis connector" guard (disabling the last one needs
+`force: true`). Set it to `False` for a partial engine such as `ai_model`.
+
+The former `mail_ai` provider slot (`provides = "mail_ai"`,
+`Connector.analyze`, `ProviderResult`) is removed: a connector that still
+sets `provides = "mail_ai"` fails validation and is not loaded.
 
 ## Packaging a third-party connector
 

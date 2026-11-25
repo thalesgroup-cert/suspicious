@@ -53,6 +53,18 @@ class SyncCatalogTest(TestCase):
             self.assertEqual(engines.sync_catalog("fake"), 1)
         self.assertEqual(Analyzer.objects.get(name="Dup").source, "cortex")
 
+    @mock.patch("cortex_job.cortex_utils.cortex_and_job_management.ai_analyzer_name", return_value="AIMail")
+    def test_an_analyzer_named_like_the_ai_role_is_never_synced(self, _):
+        self.fake.offered = [entry("AIMail"), entry("A1")]
+        self.assertEqual(engines.sync_catalog("fake"), 1)
+        self.assertFalse(Analyzer.objects.filter(name="AIMail").exists())  # never created
+        self.assertEqual(Analyzer.objects.get(name="A1").source, "fake")
+        Analyzer.objects.create(name="AIMail", analyzer_cortex_id="provider:AIMail", source="ai_model")
+        with self.assertNoLogs("tasp.cron.fetch_analyzer", level="ERROR"):
+            self.assertEqual(engines.sync_catalog("fake"), 1)
+        row = Analyzer.objects.get(name="AIMail")  # never claimed or deactivated
+        self.assertEqual((row.source, row.analyzer_cortex_id, row.is_active), ("ai_model", "provider:AIMail", True))
+
     def test_an_empty_catalogue_changes_nothing(self):
         Analyzer.objects.create(name="old", analyzer_cortex_id="fake:o", source="fake")
         self.assertEqual(engines.sync_catalog("fake"), 0)

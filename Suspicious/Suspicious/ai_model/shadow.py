@@ -10,7 +10,7 @@ from score_process.scoring.engine import AiSignal, score_case
 
 def store_shadow_result(case, payload: dict, origin=ShadowResult.Origin.LIVE):
     """Upsert the (case, version) row from a server shadow answer; None when its version is not
-    the registry's current shadow (a promote or discard raced it). Maps like ProviderResult.
+    the registry's current shadow (a promote or discard raced it). Maps like result_from_server.
     origin="seed" for the seeding of already-stored mails (Ruling F8)."""
     version = ModelVersion.objects.filter(
         status=ModelVersion.Status.SHADOW, version_id=payload["version"]).first()

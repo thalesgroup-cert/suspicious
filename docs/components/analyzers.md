@@ -173,11 +173,15 @@ missing or wrong `Authorization: Bearer ...` header answers `401`. Generate one 
 4. Set `integrations.chromadb.collection_name` to `suspicious_mails` (see
    [Campaign detection](#campaign-detection)).
 
-Only one connector may provide `mail_ai` at a time. Enabling a second answers `409`
-(`<name> already provides mail_ai`); disable the first one before enabling the other.
+`ai_model` is an `analysis` engine beside Cortex, for the `mail_archive` data type only and not
+general-purpose: disabling it never needs `force`. Its jobs are deferred (see
+[Deferred jobs](backend/connectors.md#deferred-jobs)).
 
-With the connector enabled, the AI analyzer gets a ledger row (`CaseAnalyzerJob`) with a `provider-`
-id instead of a Cortex job id. The Celery worker (`suspicious_celery`) reads the mail text from the
+With the connector enabled, the mail's archive is dispatched to the enabled analysis engines: an
+enabled Cortex is asked for the AI analyzer's name (one catalogue lookup per mail), but only an
+analyzer that declares the `mail_archive` data type is started, so only `ai_model` starts a job. The AI analyzer gets a ledger row
+(`CaseAnalyzerJob`) with an `ai_model-` id and no Cortex report; rows with a `provider-` id come
+from the retired `mail_ai` provider slot and still finish after the upgrade. The Celery worker (`suspicious_celery`) reads the mail text from the
 object store first: the mail's `.txt` and `.headers` objects, under `<mail_id>/` in the submission's
 own bucket, or under `<submission_id>/<mail_id>/` in the feeder bucket (`storage.s3.feeder_bucket`)
 when the submission came through the prefix layout. It starts there because the e-mail fetch task
