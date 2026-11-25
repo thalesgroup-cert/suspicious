@@ -206,10 +206,12 @@ def _start(connector, name, entry, value, data_type, data_value, case) -> str | 
         finished = started.finished
         status = CaseAnalyzerJob.STATUS_INPROGRESS
         if finished:  # an instant engine: store the result now, the row never waits for refresh
-            fields = apply_result(analyzer_report, finished)
-            if fields:
-                analyzer_report.save(update_fields=fields)
-            status = analyzer_report.status
+            if store_result(analyzer_report, finished):
+                status = analyzer_report.status
+            else:  # left as the placeholder: refresh or the stale timeout handles the row
+                logger.warning("Engine %s finished start for %s not stored (state %r, data type %r, expected %r)",
+                               name, entry.name, finished.state, finished.data_type, data_type)
+                finished = None
         CaseAnalyzerJob.objects.create(
             case=case,
             cortex_job_id=job_id,
@@ -265,6 +267,25 @@ def apply_result(report_instance, result: FetchResult) -> list[str]:
     return updated_fields
 
 
+def store_result(report, result: FetchResult) -> bool:
+    """Write a fetched or finished-at-start result onto its report and save it. False, with
+    nothing written, when the result's data type is set and differs from the report's
+    (mail_body matches file). A Success with no body keeps the status; a Failure carries
+    no body (Cortex sends errorMessage) and is written, so only Success needs one."""
+    if result.state != FETCH_RESULT:
+        return False
+    data_type = report.type
+    if result.data_type and result.data_type != data_type and not (
+        data_type == "mail_body" and result.data_type == "file"
+    ):
+        return False
+    if result.summary is not None or result.full is not None or result.status != "Success":
+        fields = apply_result(report, result)
+        if fields:
+            report.save(update_fields=fields)
+    return True
+
+
 def _score(report_instance) -> None:
     from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
     from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
@@ -290,23 +311,13 @@ def update_report(report_instance, fetched: FetchResult, stale_timeout: int) -> 
             report_instance.save(update_fields=["status"])
         return report_instance.status
 
-    data_type = report_instance.type
-    if fetched.state == FETCH_RESULT and (
-        not fetched.data_type
-        or fetched.data_type == data_type
-        or (data_type == "mail_body" and fetched.data_type == "file")
-    ):
-        # The original wrote nothing when Cortex returned no report (a failed report read):
-        # a Success with no body keeps the current status. A Failure carries no summary or
-        # full (Cortex sends errorMessage) yet was written, so only Success needs a body.
-        if fetched.summary is not None or fetched.full is not None or fetched.status != "Success":
-            try:
-                updated_fields = apply_result(report_instance, fetched)
-                if updated_fields:
-                    report_instance.save(update_fields=updated_fields)
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Error updating report %s: %s", job_id, exc, exc_info=True)
-        if fetched.status == "Success":
+    if fetched.state == FETCH_RESULT:
+        try:
+            stored = store_result(report_instance, fetched)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Error updating report %s: %s", job_id, exc, exc_info=True)
+            stored = True
+        if stored and fetched.status == "Success":
             _score(report_instance)
 
     if report_instance.status in _PENDING_REPORT:

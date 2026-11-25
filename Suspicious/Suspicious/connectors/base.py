@@ -225,6 +225,10 @@ class Connector(ABC):
     def health_check(self) -> HealthStatus:
         """Cheap connectivity/auth probe. Must not raise — return ok=False."""
 
+    def is_inert(self) -> bool:
+        """True when the connector is enabled but cannot analyse anything until configured further."""
+        return False
+
     def on_case_created(self, event: CaseEvent) -> None:  # pragma: no cover
         raise NotImplementedError
 

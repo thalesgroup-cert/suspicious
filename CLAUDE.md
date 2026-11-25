@@ -232,6 +232,8 @@ docker compose --env-file .env run --rm --no-deps suspicious python manage.py te
 ```
 For a real pipeline smoke test: build a multipart email with a `message/rfc822` attachment (the phishing sample) using Python's `email` module, `smtplib.SMTP('127.0.0.1', 3025).send_message(...)` it to `suspicious@meridian.example`, wait ~10–20s for `email_feeder`'s IMAP poll, then check `Case.objects.all()` via `manage.py shell` — a case should appear and finalize automatically.
 
+Optional: to run the pipeline without Cortex's analyzers, use the dev-only `fixture_engine` connector (see "Running without Cortex (dev)" in `docs/components/backend/connectors.md`). The compose file still starts the `cortex` container as a dependency of `suspicious`; never enable the fixture engine in production.
+
 ## Conventions
 
 - Commit messages follow **Conventional Commits** (`feat:`, `fix:`, `chore:`, etc.) — see `CONTRIBUTING.md`.
