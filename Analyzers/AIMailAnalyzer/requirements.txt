@@ -5,4 +5,4 @@ torch>=2.15.0
 torchvision>=0.29.2
 torchaudio>=2.11.1
 numpy>=2.5.4
-sentence_transformers>=6.2.0
+sentence_transformers>=6.3.0
