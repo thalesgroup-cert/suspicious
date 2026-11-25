@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading
+
+- **Before upgrading, check that Settings > Connectors shows the Cortex connector ENABLED.** Until
+  this release its enabled flag only gated the analyzer sync; it now gates every new Cortex job, so a
+  Cortex connector switched off earlier stops all new Cortex analysis after the upgrade. The webhook
+  URL (`/api/cortex/webhook/`) and its secret are unchanged.
+- Log lines about job fetch, stale job rescue and analysis dispatch moved from the
+  `tasp.cron.update_ongoing_case_jobs` and `tasp.cron.fetch_and_process_emails` loggers to the
+  `connectors` logger, so operators grepping `update_cases.log` must look in the connectors log.
+
 ### Added
 
-- `cortex` connector (category Analysis, provides `analysis`): Cortex config, health and the 60 s analyzer sync now live in the connector framework, using the existing `integrations.cortex` section. `Analyzer` gains a `source` column; disabling the last enabled analysis connector needs `force: true` (409 `last_analysis_connector` otherwise). Job starts are unchanged and still go to Cortex whatever the enabled flag says.
+- `cortex` connector (category Analysis, provides `analysis`): Cortex config, health and the 60 s analyzer sync now live in the connector framework, using the existing `integrations.cortex` section. `Analyzer` gains a `source` column; disabling the last enabled analysis connector needs `force: true` (409 `last_analysis_connector` otherwise).
 - Settings "AI model" card for Admins, shown while the `ai_model` connector is enabled: connector
   health, circuit breaker state with a reset, active version and age, label counts, the retrain
   schedule and a Retrain button, the latest candidate with its gate checks, the shadow comparison
@@ -155,6 +165,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Analysis engine layer (`connectors/engines.py`): every analysis job is started, fetched and
+  announced through enabled `analysis` connectors (contract `catalog`, `start`, `fetch`, `webhook`;
+  Cortex is the first). Disabling the `cortex` connector now stops new Cortex jobs; jobs already
+  started are still fetched. Several engines may be enabled at once and a case waits for all of
+  them. New generic webhook route `POST /api/connectors/<name>/webhook/`; `/api/cortex/webhook/`
+  forwards to it. A failed analyzer start writes a `ConnectorDelivery` row (event `start`).
+  `fail_stale_jobs` applies each engine's own `stale_job_timeout_seconds` (7200 when absent). See
+  `docs/components/backend/connectors.md`.
 - Scheduled connector syncs now write at most one success row per hour to the delivery ledger (failures are always written), which changes what the Watcher deliveries list shows.
 - Case report (HTML and Markdown) redesigned: one block per indicator with type-specific details
   (location, Whois/RDAP, categorization, URL, hash, VirusTotal), key findings and a connector

@@ -3,7 +3,7 @@ import os
 from typing import Any, List, Tuple
 
 from settings.models import AllowListFile, AllowListFiletype
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+from connectors import engines
 from .models import FileModel, HashModel
 from .utils import safe_execution
 from hash_process.hash_utils.hash_handler import HashHandler
@@ -48,10 +48,9 @@ class AttachmentJobLauncherService:
         Intents are consumed (cleared) on success.
         """
         job_ids: list = []
-        cortex = CortexJob()
         for value, data_type in self.pending_dispatch_intents:
             try:
-                job_ids.extend(cortex.launch_cortex_jobs(value, data_type, case=case))
+                job_ids.extend(engines.dispatch(value, data_type, case=case))
             except Exception as e:
                 fetch_mail_logger.error(
                     "Failed to launch Cortex jobs (case=%s data_type=%s value=%r): %s",

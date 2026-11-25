@@ -17,8 +17,8 @@ def _describe(agg: CaseAggregate, analysis_done: int = 0) -> str:
             return ("Analysis complete using results reused from a prior "
                     "identical submission.")
         return ("No analyzer was applicable to this submission, so it could "
-                "not be analysed. Check that the relevant Cortex analyzers "
-                "are enabled.")
+                "not be analysed. Check that an analysis connector is "
+                "enabled and offers analyzers for this type of data.")
     if agg.failure == 0:
         return "All analyzers completed successfully. You can now view the full results."
     if agg.success == 0:

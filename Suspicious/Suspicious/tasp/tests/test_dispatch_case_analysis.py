@@ -14,14 +14,14 @@ class DispatchCaseAnalysisTaskTest(TestCase):
         self.ip = IP.objects.create(address="203.0.113.5")
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_resolves_intents_and_launches_analysis(self, mock_cortex_cls, mock_reconcile):
-        mock_cortex = mock_cortex_cls.return_value
+        mock_cortex = mock_cortex_cls
         intents = [("ip_process.ip", self.ip.pk, "ip")]
 
         dispatch_case_analysis.run(self.case.id, intents)
 
-        mock_cortex.launch_cortex_jobs.assert_called_once_with(
+        mock_cortex.assert_called_once_with(
             value=self.ip, data_type="ip", case=self.case
         )
         mock_reconcile.assert_called_once_with(self.case.id)
@@ -29,7 +29,7 @@ class DispatchCaseAnalysisTaskTest(TestCase):
         self.assertIsNotNone(self.case.dispatched_at)
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_missing_case_is_noop(self, mock_cortex_cls, mock_reconcile):
         dispatch_case_analysis.run(999999, [])
 
@@ -37,11 +37,11 @@ class DispatchCaseAnalysisTaskTest(TestCase):
         mock_reconcile.assert_not_called()
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_unresolvable_intent_is_skipped_without_blocking_others(
         self, mock_cortex_cls, mock_reconcile
     ):
-        mock_cortex = mock_cortex_cls.return_value
+        mock_cortex = mock_cortex_cls
         intents = [
             ("ip_process.ip", 999999, "ip"),  # no longer exists
             ("ip_process.ip", self.ip.pk, "ip"),
@@ -49,16 +49,16 @@ class DispatchCaseAnalysisTaskTest(TestCase):
 
         dispatch_case_analysis.run(self.case.id, intents)
 
-        mock_cortex.launch_cortex_jobs.assert_called_once_with(
+        mock_cortex.assert_called_once_with(
             value=self.ip, data_type="ip", case=self.case
         )
         mock_reconcile.assert_called_once_with(self.case.id)
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_per_intent_failure_does_not_block_others(self, mock_cortex_cls, mock_reconcile):
-        mock_cortex = mock_cortex_cls.return_value
-        mock_cortex.launch_cortex_jobs.side_effect = [Exception("boom"), None]
+        mock_cortex = mock_cortex_cls
+        mock_cortex.side_effect = [Exception("boom"), None]
         other_ip = IP.objects.create(address="198.51.100.7")
         intents = [
             ("ip_process.ip", self.ip.pk, "ip"),
@@ -67,7 +67,7 @@ class DispatchCaseAnalysisTaskTest(TestCase):
 
         dispatch_case_analysis.run(self.case.id, intents)
 
-        self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)
+        self.assertEqual(mock_cortex.call_count, 2)
         mock_reconcile.assert_called_once_with(self.case.id)
 
 
@@ -80,24 +80,24 @@ class DispatchMailIntentsTest(TestCase):
         self.ip = IP.objects.create(address="203.0.113.9")
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_path_intent_is_passed_through_as_a_plain_value(self, mock_cortex_cls, mock_reconcile):
-        mock_cortex = mock_cortex_cls.return_value
+        mock_cortex = mock_cortex_cls
 
         dispatch_case_analysis.run(self.case.id, [("__path__", "/tmp/m/body.txt", "mail_body")])
 
-        mock_cortex.launch_cortex_jobs.assert_called_once_with(
+        mock_cortex.assert_called_once_with(
             value="/tmp/m/body.txt", data_type="mail_body", case=self.case
         )
 
     @patch("connectors.providers.queue_mail_ai")
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_ai_archive_intent_hands_the_case_to_the_provider_once_and_last(
         self, mock_cortex_cls, mock_reconcile, mock_queue
     ):
         calls = []
-        mock_cortex_cls.return_value.launch_cortex_jobs.side_effect = lambda **_: calls.append("jobs")
+        mock_cortex_cls.side_effect = lambda **_: calls.append("jobs")
         mock_queue.side_effect = lambda *a: calls.append("ai")
         intents = [
             ("ip_process.ip", self.ip.pk, "ai_archive"),
@@ -113,7 +113,7 @@ class DispatchMailIntentsTest(TestCase):
 
     @patch("connectors.providers.queue_mail_ai")
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_no_ai_archive_intent_hands_nothing_to_the_provider(
         self, mock_cortex_cls, mock_reconcile, mock_queue
     ):
@@ -123,7 +123,7 @@ class DispatchMailIntentsTest(TestCase):
 
     @patch("connectors.providers.queue_mail_ai", side_effect=RuntimeError("boom"))
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_ai_hand_off_failure_still_marks_the_case_dispatched(
         self, mock_cortex_cls, mock_reconcile, mock_queue
     ):
@@ -135,7 +135,7 @@ class DispatchMailIntentsTest(TestCase):
         mock_reconcile.assert_called_once_with(self.case.id)
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_sender_domain_is_used_only_when_asked(self, mock_cortex_cls, mock_reconcile):
         intents = [("ip_process.ip", self.ip.pk, "ip")]
         with patch("url_process.url_utils.url_planner.filter_dispatch_intents", side_effect=lambda i, **kw: i) as flt, \
@@ -161,12 +161,12 @@ class DispatchReopensPrematureCaseTest(TestCase):
         self.case.save(update_fields=["lifecycle_state", "results"])
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_finalised_without_dispatch_is_reopened_before_launching(self, mock_cortex_cls, mock_reconcile):
         from case_handler.lifecycle import LifecycleState
         self._finalise_empty()
         states = []
-        mock_cortex_cls.return_value.launch_cortex_jobs.side_effect = (
+        mock_cortex_cls.side_effect = (
             lambda **kw: states.append(Case.objects.get(pk=self.case.pk).lifecycle_state)
         )
 
@@ -178,7 +178,7 @@ class DispatchReopensPrematureCaseTest(TestCase):
         mock_reconcile.assert_called_once_with(self.case.id)
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_finalised_case_is_reopened_even_when_a_launch_time_was_recorded(self, mock_cortex_cls, mock_reconcile):
         """An empty dispatch can stamp dispatched_at and finalise the case first; the jobs of
         the real launch still have to count."""
@@ -188,7 +188,7 @@ class DispatchReopensPrematureCaseTest(TestCase):
         self.case.dispatched_at = timezone.now()
         self.case.save(update_fields=["dispatched_at"])
         states = []
-        mock_cortex_cls.return_value.launch_cortex_jobs.side_effect = (
+        mock_cortex_cls.side_effect = (
             lambda **kw: states.append(Case.objects.get(pk=self.case.pk).lifecycle_state)
         )
 
@@ -197,7 +197,7 @@ class DispatchReopensPrematureCaseTest(TestCase):
         self.assertEqual(states, [LifecycleState.ANALYZING])
 
     @patch("tasp.tasks.reconcile_case.delay")
-    @patch("cortex_job.cortex_utils.cortex_and_job_management.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_dispatch_with_nothing_to_launch_leaves_a_finalised_case_alone(self, mock_cortex_cls, mock_reconcile):
         from django.utils import timezone
         from case_handler.lifecycle import LifecycleState

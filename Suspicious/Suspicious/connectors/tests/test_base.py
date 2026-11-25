@@ -1,7 +1,15 @@
+import dataclasses
+
 from django.test import SimpleTestCase
 
 from connectors.base import (
     CaseEvent,
+    CatalogEntry,
+    FETCH_GONE,
+    FETCH_RESULT,
+    FETCH_UNKNOWN,
+    FetchResult,
+    StartResult,
     ConfigField,
     Connector,
     ConnectorManifest,
@@ -129,3 +137,35 @@ class UrlErrorsTest(SimpleTestCase):
 
     def test_an_empty_string_is_left_to_the_required_check(self):
         self.assertEqual(url_errors(self.SCHEMA, {"url": "http://x", "extra": {"ui_url": ""}}), {})
+
+
+class EngineContractTest(SimpleTestCase):
+    def test_types_frozen_and_value_equal(self):
+        e = CatalogEntry("a", "A", ("mail",))
+        self.assertEqual(e, CatalogEntry("a", "A", ("mail",)))
+        r = FetchResult("result", "Success", {"a": 1}, {"b": 2})
+        self.assertEqual((r.summary, r.full, r.status), ({"a": 1}, {"b": 2}, "Success"))
+        self.assertEqual(r.data_type, "")
+        self.assertEqual(FetchResult("result", "Success", None, None, data_type="file").data_type, "file")
+        s = StartResult("j")
+        self.assertIsNone(s.finished)
+        for obj in (e, r, s):
+            with self.assertRaises(dataclasses.FrozenInstanceError):
+                obj.__setattr__(dataclasses.fields(obj)[0].name, "x")
+
+    def test_constants(self):
+        self.assertEqual((FETCH_RESULT, FETCH_GONE, FETCH_UNKNOWN), ("result", "gone", "unknown"))
+
+    def test_default_hooks_raise(self):
+        class Bare(Connector):
+            manifest = make_manifest()
+
+            def health_check(self):
+                return HealthStatus(True)
+
+        b = Bare({})
+        e = CatalogEntry("a", "A", ())
+        for call in (lambda: b.catalog(), lambda: b.start(e, "mail", "v"),
+                     lambda: b.fetch("j"), lambda: b.webhook({}, {})):
+            with self.assertRaises(NotImplementedError):
+                call()

@@ -114,9 +114,9 @@ class ArtifactJobLauncherServiceTests(TestCase):
         service = self.service.process_artifacts([artifact])
         self.assertEqual(service.pending_dispatch_intents, [])
 
-    @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_dispatch_pending_exception_is_caught(self, m_cortex):
-        m_cortex.return_value.launch_cortex_jobs.side_effect = Exception("boom")
+        m_cortex.side_effect = Exception("boom")
 
         ip = MagicMock(address="8.8.8.8")
         artifact = self._artifact(
@@ -130,9 +130,9 @@ class ArtifactJobLauncherServiceTests(TestCase):
         self.assertEqual(job_ids, [])
         self.assertEqual(service.pending_dispatch_intents, [])
 
-    @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_dispatch_pending_calls_launch_cortex_jobs(self, m_cortex):
-        m_cortex.return_value.launch_cortex_jobs.return_value = [42]
+        m_cortex.return_value = [42]
 
         ip = MagicMock(address="1.2.3.4")
         artifact = self._artifact(
@@ -145,7 +145,7 @@ class ArtifactJobLauncherServiceTests(TestCase):
         job_ids = service.dispatch_pending(case)
 
         self.assertEqual(job_ids, [42])
-        m_cortex.return_value.launch_cortex_jobs.assert_called_once_with(ip, "ip", case=case)
+        m_cortex.assert_called_once_with(ip, "ip", case=case)
         self.assertEqual(service.pending_dispatch_intents, [])
 
 
@@ -153,7 +153,7 @@ class ArtifactPlannerIntegrationTest(django.test.TestCase):
     """Integration test: ArtifactJobLauncherService.dispatch_pending engages
     the URL planner to reduce redundant Cortex dispatches on mail-origin emails."""
 
-    @mock.patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @mock.patch("connectors.engines.dispatch")
     @mock.patch("url_process.url_utils.url_planner.get_config")
     def test_planner_collapses_same_fqdn_urls(self, mock_get_config, MockCortex):
         """4 URLs sharing canonical key → planner keeps 1 → Cortex called once."""
@@ -163,7 +163,7 @@ class ArtifactPlannerIntegrationTest(django.test.TestCase):
             "url_analysis.max_per_domain": 1,
             "url_analysis.reuse_ttl_days": 7,
         }.get(k, d)
-        MockCortex.return_value.launch_cortex_jobs.return_value = [1]
+        MockCortex.return_value = [1]
 
         urls = [URL.objects.create(address=f"https://x.com/p?id={i}") for i in range(4)]
         service = ArtifactJobLauncherService()
@@ -175,9 +175,9 @@ class ArtifactPlannerIntegrationTest(django.test.TestCase):
 
         service.dispatch_pending(case)
 
-        self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 1)
+        self.assertEqual(MockCortex.call_count, 1)
 
-    @mock.patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @mock.patch("connectors.engines.dispatch")
     @mock.patch("url_process.url_utils.url_planner.get_config")
     def test_planner_disabled_dispatches_all(self, mock_get_config, MockCortex):
         """When url_analysis.enabled=False, all URL intents are dispatched."""
@@ -185,7 +185,7 @@ class ArtifactPlannerIntegrationTest(django.test.TestCase):
         mock_get_config.side_effect = lambda k, d=None: {
             "url_analysis.enabled": False,
         }.get(k, d)
-        MockCortex.return_value.launch_cortex_jobs.return_value = [1]
+        MockCortex.return_value = [1]
 
         urls = [URL.objects.create(address=f"https://x.com/p?id={i}") for i in range(4)]
         service = ArtifactJobLauncherService()
@@ -197,7 +197,7 @@ class ArtifactPlannerIntegrationTest(django.test.TestCase):
 
         service.dispatch_pending(case)
 
-        self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 4)
+        self.assertEqual(MockCortex.call_count, 4)
 
 
 class AllowListLaunchDbTests(django.test.TestCase):

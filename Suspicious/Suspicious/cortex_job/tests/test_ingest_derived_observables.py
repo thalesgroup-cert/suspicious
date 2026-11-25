@@ -35,9 +35,9 @@ class IngestTests(TestCase):
             report_full={"found": True, "url": "https://evil.example/login"},
         )
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_creates_observable_artifact_provenance_and_dispatches(self, MockCortex):
-        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1", "r2"]
+        MockCortex.return_value = ["r1", "r2"]
         n = ingest_derived_observables(self.case)
         self.assertEqual(n, 1)
         child = URL.objects.get(address="https://evil.example/login")
@@ -45,20 +45,20 @@ class IngestTests(TestCase):
         d = DerivedObservable.objects.get(case=self.case)
         self.assertEqual((d.parent_type, d.parent_id), ("url", self.parent.pk))
         self.assertEqual((d.child_type, d.child_id), ("url", child.pk))
-        MockCortex.return_value.launch_cortex_jobs.assert_called_once()
+        MockCortex.assert_called_once()
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_second_call_is_a_noop(self, MockCortex):
-        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        MockCortex.return_value = ["r1"]
         ingest_derived_observables(self.case)
-        MockCortex.return_value.launch_cortex_jobs.reset_mock()
+        MockCortex.reset_mock()
         self.assertEqual(ingest_derived_observables(self.case), 0)
-        MockCortex.return_value.launch_cortex_jobs.assert_not_called()
+        MockCortex.assert_not_called()
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_one_hop_cap(self, MockCortex):
         """A report filed against a URL that is itself a derived child is not re-ingested."""
-        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        MockCortex.return_value = ["r1"]
         ingest_derived_observables(self.case)          # gen-1 child created
         child = URL.objects.get(address="https://evil.example/login")
         AnalyzerReport.objects.create(
@@ -67,24 +67,24 @@ class IngestTests(TestCase):
             report_summary={}, report_taxonomy={},
             report_full={"found": True, "url": "https://evil.example/second-hop"},
         )
-        MockCortex.return_value.launch_cortex_jobs.reset_mock()
+        MockCortex.reset_mock()
         self.assertEqual(ingest_derived_observables(self.case), 0)
         self.assertFalse(
             URL.objects.filter(address="https://evil.example/second-hop").exists()
         )
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     @patch("cortex_job.cortex_utils.derived_observables.get_config", return_value=False)
     def test_disabled_is_noop(self, _cfg, MockCortex):
         self.assertEqual(ingest_derived_observables(self.case), 0)
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     @patch("cortex_job.cortex_utils.derived_observables.get_config", return_value=None)
     def test_unset_config_keeps_feature_on(self, _cfg, MockCortex):
-        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        MockCortex.return_value = ["r1"]
         self.assertEqual(ingest_derived_observables(self.case), 1)
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_ssrf_child_is_dropped(self, MockCortex):
         self.report.report_full = {"found": True, "url": "http://169.254.169.254/latest"}
         self.report.save(update_fields=["report_full"])
@@ -92,21 +92,21 @@ class IngestTests(TestCase):
         self.assertFalse(DerivedObservable.objects.exists())
 
     @patch("cortex_job.cortex_utils.derived_observables._blocked", return_value="")
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_existing_child_not_reblocked_or_redispatched(self, MockCortex, mock_blocked):
-        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        MockCortex.return_value = ["r1"]
         ingest_derived_observables(self.case)
         self.assertEqual(mock_blocked.call_count, 1)
 
         mock_blocked.reset_mock()
-        MockCortex.return_value.launch_cortex_jobs.reset_mock()
+        MockCortex.reset_mock()
         self.assertEqual(ingest_derived_observables(self.case), 0)
         mock_blocked.assert_not_called()
-        MockCortex.return_value.launch_cortex_jobs.assert_not_called()
+        MockCortex.assert_not_called()
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_values_are_capped_per_report(self, MockCortex):
-        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        MockCortex.return_value = ["r1"]
         def many(_full):
             return [(f"https://evil.example/p{i}", "url") for i in range(25)]
         with patch.dict(
@@ -116,10 +116,10 @@ class IngestTests(TestCase):
             ingest_derived_observables(self.case)
         self.assertEqual(DerivedObservable.objects.filter(case=self.case).count(), 20)
 
-    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("connectors.engines.dispatch")
     def test_bad_extracted_value_is_skipped_not_fatal(self, MockCortex):
         """One extracted value that blows up mid-processing skips; the rest proceed."""
-        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        MockCortex.return_value = ["r1"]
         good = URL.objects.create(address="https://evil.example/good")
         def two_values(_full):
             return [

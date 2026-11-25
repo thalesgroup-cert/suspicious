@@ -30,6 +30,11 @@ class CortexManifestTest(TestCase):
         self.assertEqual(fields["stale_job_timeout_seconds"].default, 7200)
         self.assertTrue(fields["url"].required and fields["api_key"].required)
 
+    def test_description_says_the_flag_gates_new_analysis(self):
+        text = CortexConnector.manifest.description
+        self.assertNotIn("whatever the enabled flag says", text)
+        self.assertIn("Disabling it stops all new Cortex analysis", text)
+
     def _listing(self, names, status=200):
         return mock.Mock(status_code=status, ok=status < 400, json=lambda: [{"name": n} for n in names])
 

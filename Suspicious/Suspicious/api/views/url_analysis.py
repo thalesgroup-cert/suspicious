@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from api.permissions.submissions import CanAccessSubmission, submission_queryset
 from api.serializers.submissions import case_url_ids
 from case_handler.models import Case
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+from connectors import engines
 from cortex_job.models import AnalyzerReport
 from url_process.models import URL
 
@@ -52,7 +52,7 @@ class SubmissionUrlAnalyzeView(APIView):
         url.save(update_fields=["analysis_status", "analyzed_url"])
 
         try:
-            CortexJob().launch_cortex_jobs(value=url, data_type="url", case=case)
+            engines.dispatch(value=url, data_type="url", case=case)
         except Exception:
             logger.exception("On-demand URL analysis dispatch failed (url=%s case=%s)",
                              url.id, case.id)

@@ -10,7 +10,7 @@ from typing import Any, Callable
 from django.db import transaction
 
 from settings.config import get_config
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+from connectors import engines
 from score_process.scoring.bands import _BAND_RANK
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -315,7 +315,7 @@ def ingest_derived_observables(case) -> int:
                 # ponytail: fire-and-forget: a Cortex outage (empty job list) still
                 # records the child; no dispatch retry, next reconcile pass won't
                 # re-dispatch. Matches the primary dispatch path.
-                CortexJob().launch_cortex_jobs(value=obj, data_type=data_type, case=case)
+                engines.dispatch(value=obj, data_type=data_type, case=case)
                 new_count += 1
             except Exception as exc: # noqa: BLE001: one bad value must not abort the pass
                 logger.warning(

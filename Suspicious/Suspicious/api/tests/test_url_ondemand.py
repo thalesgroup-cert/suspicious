@@ -107,10 +107,10 @@ class UrlOnDemandAuthTest(APITestCase):
     # ------------------------------------------------------------------
     # Fix 3d: owner with linked skipped url → 202
     # ------------------------------------------------------------------
-    @mock.patch("api.views.url_analysis.CortexJob")
+    @mock.patch("connectors.engines.dispatch")
     def test_owner_can_queue(self, mock_cortex_cls):
         """Owner POSTs for their own linked skipped URL → 202 (Cortex mocked)."""
-        mock_cortex_cls.return_value.launch_cortex_jobs.return_value = None
+        mock_cortex_cls.return_value = None
         self.client.force_authenticate(self.owner)
         resp = self.client.post(_url(self.case.pk, self.url.pk))
         self.assertEqual(resp.status_code, 202)
@@ -121,10 +121,10 @@ class UrlOnDemandAuthTest(APITestCase):
     # ------------------------------------------------------------------
     # Fix 3e: mail path — url linked via mail artifact is accessible
     # ------------------------------------------------------------------
-    @mock.patch("api.views.url_analysis.CortexJob")
+    @mock.patch("connectors.engines.dispatch")
     def test_owner_can_queue_via_mail_path(self, mock_cortex_cls):
         """URL linked via Mail -> MailArtifact -> ArtifactIsUrl path is authorised."""
-        mock_cortex_cls.return_value.launch_cortex_jobs.return_value = None
+        mock_cortex_cls.return_value = None
         mail_url = _make_url("https://mail-artifact.example.com/")
         mail_case = _build_case_with_mail_url(self.owner, mail_url)
         self.client.force_authenticate(self.owner)
@@ -134,10 +134,10 @@ class UrlOnDemandAuthTest(APITestCase):
     # ------------------------------------------------------------------
     # Rollback test (Fix 2): dispatch failure restores prior status
     # ------------------------------------------------------------------
-    @mock.patch("api.views.url_analysis.CortexJob")
+    @mock.patch("connectors.engines.dispatch")
     def test_dispatch_failure_restores_status(self, mock_cortex_cls):
         """On 502, the URL's analysis_status must be restored to its pre-call value."""
-        mock_cortex_cls.return_value.launch_cortex_jobs.side_effect = RuntimeError("boom")
+        mock_cortex_cls.side_effect = RuntimeError("boom")
         self.client.force_authenticate(self.owner)
         resp = self.client.post(_url(self.case.pk, self.url.pk))
         self.assertEqual(resp.status_code, 502)

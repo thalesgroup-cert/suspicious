@@ -70,7 +70,7 @@ from api.views.submissions import (
     SubmissionVerdictView,
 )
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
-from api.views.cortex_webhook import CortexWebhookView
+from api.views.cortex_webhook import ConnectorWebhookView, CortexWebhookView
 from api.views.config import ServiceConfigView
 from api.views.connectors import (
     ConnectorConfigView,
@@ -169,6 +169,7 @@ urlpatterns = [
 
     path("connectors/", ConnectorListView.as_view(), name="connectors-list"),
     path("connectors/enabled/", EnabledConnectorsView.as_view(), name="connectors-enabled"),
+    path("connectors/<str:name>/webhook/", ConnectorWebhookView.as_view(), name="connector-webhook"),
     path("connectors/<str:name>/", ConnectorStateView.as_view(), name="connector-state"),
     path("connectors/<str:name>/config/", ConnectorConfigView.as_view(), name="connector-config"),
     path("connectors/<str:name>/test/", ConnectorTestView.as_view(), name="connector-test"),
