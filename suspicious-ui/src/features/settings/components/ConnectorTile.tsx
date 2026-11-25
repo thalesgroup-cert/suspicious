@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router";
 import { Box, Button, CircularProgress, IconButton, Link, Stack, Switch, Typography } from "@mui/material";
@@ -16,6 +17,7 @@ import { useAccent } from "@/features/settings/useAccent";
 import { useMuted } from "@/features/settings/useMuted";
 import { visuallyHidden } from "@/features/settings/components/a11y";
 import { ConnectorMark } from "@/features/settings/components/ConnectorMark";
+import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 import { StatusLabel, connectorStatus } from "@/features/settings/components/StatusLabel";
 import { setConnectorEnabled, type Connector } from "@/features/settings/components/connectors";
 import { useConnectorTest, type TestResult } from "@/features/settings/components/useConnectorTest";
@@ -53,15 +55,24 @@ export function ConnectorTile({
   const test = useConnectorTest(name, { result: testResult, set: (r) => onTestResult(name, r) });
 
   const toggle = useMutation({
-    mutationFn: (enabled: boolean) => setConnectorEnabled(name, enabled),
+    mutationFn: ({ enabled, force }: { enabled: boolean; force?: boolean }) => setConnectorEnabled(name, enabled, force),
     onSuccess: (c) => {
       queryClient.invalidateQueries({ queryKey: ["connectors"] });
       // The investigation page decides whether to offer "Push to TheHive" from this cache.
       queryClient.invalidateQueries({ queryKey: ["enabledConnectors"] });
       enqueueSnackbar(c.enabled ? `${c.name} enabled.` : `${c.name} disabled.`, { variant: c.enabled ? "success" : "info" });
     },
-    onError: () => enqueueSnackbar("Failed to update connector.", { variant: "error" }),
+    onError: (error) => {
+      const data = isAxiosError(error) && error.response?.status === 409 ? error.response.data : null;
+      if (data?.code === "last_analysis_connector") {
+        setLastEngine(String(data.detail ?? ""));
+        return;
+      }
+      enqueueSnackbar("Failed to update connector.", { variant: "error" });
+    },
   });
+  // Set when the server refuses to disable the last analysis connector: holds its message until the user confirms or cancels.
+  const [lastEngine, setLastEngine] = useState<string | null>(null);
 
   // Only the ai_model tile needs the user's groups (the card is Admin-only); same key as the Settings page.
   const isAiModel = name === "ai_model";
@@ -139,7 +150,7 @@ export function ConnectorTile({
             size="small"
             checked={connector.enabled}
             disabled={toggle.isPending}
-            onChange={(e) => toggle.mutate(e.target.checked)}
+            onChange={(e) => toggle.mutate({ enabled: e.target.checked })}
             slotProps={{ input: { "aria-label": `Enable ${name}` } }}
           />
           <Box sx={{ flex: 1 }} />
@@ -161,6 +172,18 @@ export function ConnectorTile({
           </Button>
         </Stack>
       </Box>
+      <ConfirmDialog
+        open={lastEngine !== null}
+        title={`Disable ${name}?`}
+        body={lastEngine}
+        confirmLabel="Disable"
+        destructive
+        onConfirm={() => {
+          setLastEngine(null);
+          toggle.mutate({ enabled: false, force: true });
+        }}
+        onCancel={() => setLastEngine(null)}
+      />
     </Box>
   );
 }

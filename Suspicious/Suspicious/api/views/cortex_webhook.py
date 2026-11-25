@@ -15,6 +15,7 @@ duplicate webhook deliveries (Cortex retry, network resend) short-circuit.
 """
 import hmac
 import logging
+import time
 
 from django.conf import settings
 from django.core.cache import cache
@@ -26,6 +27,7 @@ from rest_framework.views import APIView
 logger = logging.getLogger(__name__)
 
 _WEBHOOK_DEDUP_TTL = 3600
+LAST_WEBHOOK_KEY = "cortex_last_webhook_at"
 
 
 def _find_cases_for_job(job_id: str) -> list[int]:
@@ -46,6 +48,17 @@ def _find_cases_for_job(job_id: str) -> list[int]:
     )
 
 
+def _webhook_secret() -> str:
+    """The connector's webhook_secret (runtime config, Vault overlaid), so a UI edit applies at
+    once; the import-time Django setting is the fallback."""
+    try:
+        from settings.config import get_section
+        secret = get_section("integrations.cortex").get("webhook_secret")
+    except Exception:  # noqa: BLE001: config unreadable, use the setting
+        secret = None
+    return secret or getattr(settings, "CORTEX_WEBHOOK_SECRET", "")
+
+
 class CortexWebhookView(APIView):
     authentication_classes = []
     permission_classes = []
@@ -53,7 +66,7 @@ class CortexWebhookView(APIView):
 
     def post(self, request: Request) -> Response:
         # ── Authenticate ────────────────────────────────────────────────────
-        secret = getattr(settings, "CORTEX_WEBHOOK_SECRET", "")
+        secret = _webhook_secret()
         if not secret:
             logger.error("CORTEX_WEBHOOK_SECRET not configured, webhook rejected")
             return Response({"detail": "Webhook not configured."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -64,6 +77,7 @@ class CortexWebhookView(APIView):
             return Response({"detail": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
 
         # ── Parse payload ────────────────────────────────────────────────────
+        cache.set(LAST_WEBHOOK_KEY, time.time(), timeout=None)
         job_id = request.data.get("jobId") or request.data.get("job_id")
         if not job_id:
             return Response({"detail": "jobId is required."}, status=status.HTTP_400_BAD_REQUEST)

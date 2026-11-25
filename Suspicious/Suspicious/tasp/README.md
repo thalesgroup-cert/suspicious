@@ -48,7 +48,7 @@ tasp/
 | Name | Task | Cadence | Purpose |
 |---|---|---|---|
 | `fetch-emails` | `tasp.tasks.fetch_emails` | every 60 s | IMAP poll, ingest reported phish |
-| `sync-cortex` | `tasp.tasks.sync_cortex` | every 60 s | Mirror the Cortex analyzer catalogue into the local `Analyzer` table |
+| `connector-cortex-sync` | `connectors.tasks.run_connector_sync` | every 60 s | Mirror the Cortex analyzer catalogue into the local `Analyzer` table (the `cortex` connector's sync; `tasp.tasks.sync_cortex` forwards to it) |
 | `update-ongoing-cases` | `tasp.tasks.update_ongoing_cases` | every 300 s | Fallback for missed Cortex webhook deliveries. Skips cases with no pending `CaseAnalyzerJob` via an `Exists()` annotation |
 | `fail-stale-jobs` | `tasp.tasks.fail_stale_jobs` | every 600 s | Auto-fails `CaseAnalyzerJob` rows whose `created_at` is older than `STALE_JOB_TIMEOUT_SECONDS` |
 | `sync-user-profiles` | `tasp.tasks.sync_user_profiles` | every 600 s | Pull profile updates from LDAP/OIDC |

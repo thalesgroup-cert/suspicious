@@ -487,10 +487,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "tasp.tasks.fetch_emails",
         "schedule": 60.0,
     },
-    "sync-cortex": {
-        "task": "tasp.tasks.sync_cortex",
-        "schedule": 60.0,
-    },
     "update-ongoing-cases": {
         "task": "tasp.tasks.update_ongoing_cases",
         "schedule": 300.0,

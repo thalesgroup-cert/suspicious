@@ -10,6 +10,16 @@ from settings.models import RuntimeConfig
 
 
 class SeedConfigTest(TestCase):
+    def setUp(self):
+        # Each test points SUSPICIOUS_CONFIG_PATH at a temp settings.json: restore it and drop
+        # the cached settings afterwards, or later tests read that temp file as their config.
+        from unittest import mock
+        from suspicious import _config_common as cc
+        patcher = mock.patch.dict(os.environ)
+        patcher.start()
+        self.addCleanup(cc.load_settings.cache_clear)
+        self.addCleanup(patcher.stop)
+
     def _write(self, tmp_path):
         data = {
             "integrations": {"cortex": {"url": "http://cx", "api_key": "SECRET",

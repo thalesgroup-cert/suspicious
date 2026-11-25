@@ -1,7 +1,8 @@
+import contextlib
 import logging
 import requests
 from django.db import transaction
-from cortex4py.exceptions import CortexException
+from cortex4py.exceptions import AuthenticationError, CortexException
 from cortex4py.models import Analyzer as CortexAnalyzer
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from .utils import load_config
@@ -20,7 +21,7 @@ _cortex_breaker = get_breaker("cortex")
 
 
 @RETRY
-def _fetch_all_analyzers(api):
+def _fetch_all_analyzers(api, guarded: bool = True):
     """Fetch every analyzer enabled for the org, with retry and circuit
     breaker.
 
@@ -30,12 +31,17 @@ def _fetch_all_analyzers(api):
     silently never updated a single Analyzer row. GET /api/analyzer (what
     get_by_type/the Cortex UI itself use) is the one that actually works.
     """
-    with _cortex_breaker.calling():
+    # guarded=False when the caller already runs under the "cortex" breaker (the connector
+    # sync via run_sync_now): the same breaker counted twice would trip early.
+    with _cortex_breaker.calling() if guarded else contextlib.nullcontext():
         data = api.do_get("analyzer", params={"range": "all"}).json()
         return [CortexAnalyzer(item) for item in data]
 
 
-def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
+def sync_cortex_analyzers(config_path: str = CONFIG_PATH, strict: bool = False) -> int | None:
+    """Mirror the Cortex catalogue into ``Analyzer``. Returns the number of analyzers
+    synced. A fetch failure is logged and swallowed, unless ``strict`` (the connector
+    sync), which re-raises it so the delivery ledger records a failure."""
     cfg: CronConfig = load_config(config_path)
     if not cfg.cortex:
         log_analyzers.error("Missing Cortex config")
@@ -51,38 +57,55 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
     api = SessionCortexApi(str(cfg.cortex.url).rstrip("/"), cfg.cortex.api_key)
 
     try:
-        remote_analyzers = _fetch_all_analyzers(api)
+        remote_analyzers = _fetch_all_analyzers(api, guarded=not strict)
     except pybreaker.CircuitBreakerError as exc:
         log_analyzers.warning("[breaker:cortex] open, sync_cortex_analyzers skipped: %s", exc)
+        if strict:
+            raise
         return
     except CortexException as exc:
         log_analyzers.error("Cortex fetch failed: %s", exc)
+        if strict:
+            # A revoked or wrong API key (401/403) waits for an operator, not a retry.
+            if isinstance(exc, AuthenticationError):
+                exc.retryable = False
+            raise
         return
     except requests.RequestException as exc:
         log_analyzers.error("Network error syncing Cortex analyzers: %s", exc)
+        if strict:
+            raise
         return
 
     if not remote_analyzers:
-        return
+        return 0
 
     remote_names = []
     with transaction.atomic():
         for analyzer in remote_analyzers:
+            owner = Analyzer.objects.filter(name=analyzer.name).values_list("source", flat=True).first()
+            if owner is not None and owner != "cortex":
+                # Analyzer.name is unique across sources: another connector owns this one.
+                log_analyzers.error(
+                    "Cortex offers analyzer %r but it belongs to %r; skipped.", analyzer.name, owner)
+                continue
             Analyzer.objects.update_or_create(
                 name=analyzer.name,
-                defaults={"analyzer_cortex_id": analyzer.id, "is_active": True},
+                defaults={"analyzer_cortex_id": analyzer.id, "is_active": True, "source": "cortex"},
                 create_defaults={
                     "analyzer_cortex_id": analyzer.id,
                     "is_active": True,
+                    "source": "cortex",
                     "tier": tier_for(analyzer.name),
                 },
             )
             remote_names.append(analyzer.name)
         # The AI vote's row (ai_model connector) is no Cortex analyzer: leave it active.
         from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
-        Analyzer.objects.exclude(name__in=[*remote_names, ai_analyzer_name()]).update(is_active=False)
+        Analyzer.objects.filter(source="cortex").exclude(name__in=[*remote_names, ai_analyzer_name()]).update(is_active=False)
 
     _warn_on_unresolved_configured_analyzers(remote_names)
+    return len(remote_names)
 
 
 def _warn_on_unresolved_configured_analyzers(remote_names: list[str]) -> None:

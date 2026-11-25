@@ -59,6 +59,7 @@ suspicious-ui/public/brand/*.svg
 chromadb
 elasticsearch
 cortex
+!Suspicious/Suspicious/connectors/contrib/cortex/
 minio
 db_suspicious/data
 backup
@@ -97,3 +98,4 @@ Thumbs.db
 .env.data
 .env.pre-db-auth.*
 .env.data.pre-db-auth.*
+docs/plans/.evidence/

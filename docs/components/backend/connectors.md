@@ -1,14 +1,35 @@
 # connectors
 
 Plugin framework every integration with an external system is built on. The
-ten built-in connectors are `thehive`, `misp`, `watcher`, `smtp_notify`,
-`chromadb`, `ai_narration`, `case_search`, `elastic_siem`, `xsoar` and
-`ai_model`. The framework provides registry, event dispatch, retry + circuit breaker, and a
+eleven built-in connectors are `thehive`, `misp`, `watcher`, `smtp_notify`,
+`chromadb`, `ai_narration`, `case_search`, `elastic_siem`, `xsoar`,
+`ai_model` and `cortex`. The framework provides registry, event dispatch, retry + circuit breaker, and a
 `ConnectorDelivery` audit ledger.
 
 See [`Suspicious/Suspicious/connectors/README.md`](https://github.com/thalesgroup-cert/suspicious/blob/main/Suspicious/Suspicious/connectors/README.md)
 for the framework internals and the built-in connector table, and
 [Connectors (author guide)](../../connectors.md) for writing a new one.
+
+## cortex
+
+Category Analysis, provides `analysis`, enabled by default. Config is the existing
+`integrations.cortex` section (`url`, `api_key`, `webhook_secret`, `stale_job_timeout_seconds`,
+`analyzers.*`), so `settings.json` needs no change. The connector syncs the analyzer catalogue
+into the `Analyzer` table every 60 s (the old `sync-cortex` beat entry is gone; the `sync_cortex`
+task forwards to it) and reports health from `GET <url>/api/analyzer` with the API key, so a rejected key shows
+as not ok. The health detail also lists configured `analyzers.*` roles Cortex does not offer,
+the inactive analyzer count, jobs pending over 30 minutes and the age of the last webhook (an
+early sign of a broken callback). A failed sync is a failed delivery and is retried. The
+webhook reads `webhook_secret` from the connector config, so an edit applies without a restart.
+Unconfigured, it reports not ok and the sync does nothing. Each `Analyzer` row has a `source` naming its owning connector, and
+the sync only deactivates `cortex` rows. Disabling the last enabled `analysis` connector needs
+`"force": true` on `PATCH /api/connectors/<name>/` (otherwise 409, code `last_analysis_connector`).
+Known limit: the enabled flag gates only the sync and the UI; job starts, the webhook and
+reconcile still use Cortex whatever it says.
+
+- `stale_job_timeout_seconds` is stored but not used until the engine layer ships; `fail_stale_jobs` still uses the single configured timeout.
+- On upgrade, disable any old Cortex-side `AI_Mail_Analyzer` analyzer in Cortex. Otherwise the sync logs an ERROR about it every minute, because the row now belongs to the `ai_model` connector.
+- `/api/cortex/webhook/` now reads its secret through the runtime config layer (Vault-backed, cached 60 s) instead of only at boot.
 
 ## ai_model
 

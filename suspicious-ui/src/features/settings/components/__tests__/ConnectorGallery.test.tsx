@@ -137,7 +137,7 @@ describe("enable switch", () => {
     const { setConnectorEnabled } = await import("../connectors");
     renderGallery();
     await userEvent.click(screen.getByRole("switch", { name: "Enable misp" }));
-    expect(setConnectorEnabled).toHaveBeenCalledWith("misp", false);
+    expect(setConnectorEnabled).toHaveBeenCalledWith("misp", false, undefined);
   });
 
   it("is disabled while its request runs and a failure shows the same toast as before", async () => {

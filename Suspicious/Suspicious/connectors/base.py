@@ -22,7 +22,9 @@ VALID_EVENTS = frozenset({
 # Analysis-provider slots: a connector whose manifest sets ``provides`` to one of
 # these kinds supplies that analysis (see Connector.analyze). One enabled per kind.
 PROVIDER_KIND_MAIL_AI = "mail_ai"
-VALID_PROVIDER_KINDS = frozenset({PROVIDER_KIND_MAIL_AI})
+# Analysis engines (Cortex first). Unlike mail_ai, several may be enabled at once.
+PROVIDER_KIND_ANALYSIS = "analysis"
+VALID_PROVIDER_KINDS = frozenset({PROVIDER_KIND_MAIL_AI, PROVIDER_KIND_ANALYSIS})
 
 FIELD_TYPES = frozenset({"str", "int", "bool", "url", "secret"})
 

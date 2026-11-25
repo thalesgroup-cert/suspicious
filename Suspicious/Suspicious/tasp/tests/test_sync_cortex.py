@@ -136,3 +136,72 @@ class WarnOnUnresolvedConfiguredAnalyzersTests(TestCase):
         mock_error.assert_not_called()
         ai_row.refresh_from_db()
         self.assertTrue(ai_row.is_active)
+
+
+class SyncCortexSourceTests(TestCase):
+    _run_with_fake_analyzers = SyncCortexAnalyzersTests._run_with_fake_analyzers
+
+    def test_sync_creates_rows_with_source_cortex(self):
+        self._run_with_fake_analyzers([{"name": "A1", "id": "id1"}])
+        self.assertEqual(Analyzer.objects.get(name="A1").source, "cortex")
+
+    def test_sync_deactivates_only_cortex_rows(self):
+        Analyzer.objects.create(name="gone", analyzer_cortex_id="g")
+        Analyzer.objects.create(name="ai", analyzer_cortex_id="provider:ai", source="ai_model")
+        Analyzer.objects.create(name="oth", analyzer_cortex_id="o", source="other")
+        self._run_with_fake_analyzers([{"name": "A1", "id": "id1"}])
+        self.assertFalse(Analyzer.objects.get(name="gone").is_active)
+        self.assertTrue(Analyzer.objects.get(name="ai").is_active)
+        self.assertTrue(Analyzer.objects.get(name="oth").is_active)
+
+    def test_sync_still_spares_the_configured_ai_analyzer_name(self):
+        from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
+        Analyzer.objects.create(name=ai_analyzer_name(), analyzer_cortex_id="legacy")
+        self._run_with_fake_analyzers([{"name": "A1", "id": "id1"}])
+        self.assertTrue(Analyzer.objects.get(name=ai_analyzer_name()).is_active)
+
+    def test_a_name_owned_by_another_source_is_not_taken_over(self):
+        Analyzer.objects.create(name="Dup", analyzer_cortex_id="provider:Dup", source="ai_model")
+        self._run_with_fake_analyzers([{"name": "Dup", "id": "cortex-id"}])
+        row = Analyzer.objects.get(name="Dup")
+        self.assertEqual((row.source, row.analyzer_cortex_id), ("ai_model", "provider:Dup"))
+
+    def test_strict_reraises_a_fetch_failure_and_default_swallows_it(self):
+        import requests
+        with patch("tasp.cron.sync_cortex.load_config", return_value=_fake_cron_config()), \
+                patch("tasp.cron.sync_cortex._fetch_all_analyzers",
+                      side_effect=requests.ConnectionError("down")):
+            self.assertIsNone(sync_cortex_analyzers())
+            with self.assertRaises(requests.ConnectionError):
+                sync_cortex_analyzers(strict=True)
+
+
+class SyncCortexRunSyncNowTests(TestCase):
+    """The connector sync (strict mode) through the delivery ledger."""
+
+    def _run(self, exc):
+        from connectors.delivery import run_sync_now
+        from connectors.registry import registry
+        registry.discover()
+        # The connector is built from get_section, not load_config: pin its config so ambient
+        # settings (another test's SUSPICIOUS_CONFIG_PATH, a cached section) cannot make it a no-op.
+        section = {"url": "http://cortex:9001", "api_key": "k"}
+        with patch("tasp.cron.sync_cortex.load_config", return_value=_fake_cron_config()), patch(
+            "tasp.cron.sync_cortex._fetch_all_analyzers", side_effect=exc,
+        ), patch("settings.config.get_section",
+                 side_effect=lambda n: dict(section) if n == "integrations.cortex" else {}):
+            run_sync_now("cortex")
+
+    def test_a_rejected_api_key_is_one_failed_row_and_no_retry(self):
+        from cortex4py.exceptions import AuthenticationError
+        from connectors.models import ConnectorDelivery
+        self._run(AuthenticationError("401"))
+        self.assertEqual(
+            list(ConnectorDelivery.objects.filter(connector="cortex").values_list("status", flat=True)),
+            ["failed"])
+
+    def test_a_server_error_is_still_retried(self):
+        from cortex4py.exceptions import CortexException
+        from connectors.delivery import RetryableDeliveryError
+        with self.assertRaises(RetryableDeliveryError):
+            self._run(CortexException("500"))
