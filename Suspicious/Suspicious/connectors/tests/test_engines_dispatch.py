@@ -14,6 +14,9 @@ from connectors.base import (
     CatalogEntry,
     Connector,
     ConnectorManifest,
+    FETCH_RESULT,
+    FETCH_UNKNOWN,
+    FetchResult,
     HealthStatus,
     StartResult,
 )
@@ -313,3 +316,75 @@ class DispatchTest(TestCase):
             self.assertEqual(CortexJob().launch_cortex_jobs(self.url, "url", self.case), ["x"])
         dispatch.assert_called_once_with(self.url, "url", self.case)
         api.assert_not_called()
+
+
+SCORE = "connectors.engines._score"
+
+
+class FinishedStartRulesTest(TestCase):
+    """A start that returns a finished result obeys the rules refresh applies."""
+
+    def setUp(self):
+        self.fake = make_engine("fake_a")
+        self.registry = ConnectorRegistry()
+        self.registry.register(self.fake)
+        patcher = mock.patch("connectors.engines.registry", self.registry)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        user = get_user_model().objects.create_user(username="fin", password="x")
+        self.case = Case.objects.create(status="On Going", description="", reporter=user)
+        self.url = URL.objects.create(address="http://phish.example/login")
+
+    def start(self, finished, data_type="url", value=None):
+        connector = mock.Mock()
+        connector.start.return_value = StartResult(job_id="j1", finished=finished)
+        with mock.patch(SCORE) as score:
+            engines._start(connector, "fake_a", e("VT"), value or self.url, data_type,
+                           value or self.url.address, self.case)
+        return score, AnalyzerReport.objects.get(), CaseAnalyzerJob.objects.get()
+
+    def result(self, status="Success", **kw):
+        return FetchResult(FETCH_RESULT, status, **kw)
+
+    def test_body_is_stored_and_row_closed(self):
+        summary = {"taxonomies": [{"level": "info"}]}
+        score, report, caj = self.start(self.result(summary=summary, full={"a": 1}))
+        self.assertEqual((report.status, report.report_summary, report.report_taxonomy, report.report_full),
+                         ("Success", summary, summary["taxonomies"], {"a": 1}))
+        self.assertEqual(caj.status, "Success")
+        self.assertIsNotNone(caj.completed_at)
+        score.assert_called_once()
+
+    def test_non_result_finished_start_writes_nothing(self):
+        score, report, caj = self.start(FetchResult(FETCH_UNKNOWN))
+        self.assertEqual((report.status, report.report_summary), ("InProgress", {"ongoing": "analysis"}))
+        self.assertEqual(caj.status, CaseAnalyzerJob.STATUS_INPROGRESS)
+        score.assert_not_called()
+
+    def test_success_without_body_stays_pending_and_scores(self):
+        score, report, caj = self.start(self.result())
+        self.assertEqual(report.status, "InProgress")
+        self.assertEqual(caj.status, CaseAnalyzerJob.STATUS_INPROGRESS)
+        self.assertIsNone(caj.completed_at)
+        score.assert_called_once()
+
+    def test_data_type_mismatch_writes_nothing_and_warns(self):
+        with self.assertLogs("connectors.engines", "WARNING") as logs:
+            score, report, caj = self.start(self.result(summary={"x": 1}, data_type="ip"))
+        self.assertEqual((report.status, report.report_summary), ("InProgress", {"ongoing": "analysis"}))
+        self.assertEqual(caj.status, CaseAnalyzerJob.STATUS_INPROGRESS)
+        self.assertIsNone(caj.completed_at)
+        self.assertIn("VT", logs.output[0])
+        self.assertIn("ip", logs.output[0])
+        self.assertEqual(ConnectorDelivery.objects.count(), 0)
+
+    def test_mail_body_accepts_file(self):
+        score, report, caj = self.start(
+            self.result(summary={"x": 1}, data_type="file"), "mail_body", "/tmp/abc.txt")
+        self.assertEqual((report.status, caj.status), ("Success", "Success"))
+
+    def test_failure_without_body_closes_the_row(self):
+        score, report, caj = self.start(self.result("Failure"))
+        self.assertEqual((report.status, caj.status), ("Failure", "Failure"))
+        self.assertIsNotNone(caj.completed_at)
+        score.assert_not_called()
