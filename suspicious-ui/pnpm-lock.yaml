@@ -78,8 +78,8 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
       react-dropzone:
-        specifier: 20.1.2
-        version: 20.1.2(@types/react@19.3.0)(react@19.3.1)
+        specifier: 20.2.0
+        version: 20.2.0(@types/react@19.3.0)(react@19.3.1)
       react-grid-layout:
         specifier: 2.3.0
         version: 2.3.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -246,8 +246,8 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
-  '@babel/runtime@7.29.13':
-    resolution: {integrity: sha512-v+oN26xP4YIlQsbQ/CbTH1WG5m/l/DjKKZNy/Kp3f/AFvbgt7Em/D0FeMM3O2hX0YzeN2M16W8lOpyhIkfCBcQ==}
+  '@babel/runtime@7.29.14':
+    resolution: {integrity: sha512-Y5tqevQaUAZhhj82BpYMNC1ssvLQTVAfwKdm8iy8qwmhvC2/CpcAu8OC+QEtjM7pMk7knx83u1Qj8gzkicyelw==}
     engines: {node: '>=6.9.0'}
 
   '@babel/runtime@7.29.7':
@@ -1368,8 +1368,8 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
-  attr-accept@4.0.0:
-    resolution: {integrity: sha512-hmCnJClmeKNKlsBHgbM8yLZRiQZ4/20UXbLJb6OUT16eWcM5/xNZerr80a/zCYob768KIGq++aLrQNTuwPsIOQ==}
+  attr-accept@4.0.1:
+    resolution: {integrity: sha512-rOKAGOwbnTUvwTL8rNA0hWnU3uX9tOI20di4KjR5I1ez/RJmnA37W3zz4EMxGC2YnI289yPjRy63CdAZeQFZ4Q==}
     engines: {node: '>= 22'}
 
   axios@1.20.0:
@@ -1731,8 +1731,8 @@ packages:
   file-entry-cache@11.1.5:
     resolution: {integrity: sha512-+PFTHITI08JIGhnNpGNI8T8inUpgZfk3GNEqfT9R2zZV2iFXg3CvqzSl/uEhs7TSGujYRELEANyDvS8Fj7+S7Q==}
 
-  file-selector@5.0.1:
-    resolution: {integrity: sha512-v0g/PTeuQgvKCBrVRsfVudvwXlRHSWHEQkVgKawgCGHkEpKA1clp3Om5jvEVhz8G9W/mOYjJH9FhkH4C888PgQ==}
+  file-selector@5.0.3:
+    resolution: {integrity: sha512-d15nlW+KKq82TlItRvCHtJ8NXCX0nwz2SEUR1MOT8W50c5q2se551ZFdhITFrWohl/5wbRPfMMF9jq4Oj1xRGQ==}
     engines: {node: '>= 22'}
 
   find-root@1.1.0:
@@ -2248,8 +2248,8 @@ packages:
       react: '>= 16.3.0'
       react-dom: '>= 16.3.0'
 
-  react-dropzone@20.1.2:
-    resolution: {integrity: sha512-gj2m31ZmYOZjTuW6CDfx38/WW2JlbuQ/X2Il8cOwIWa7Znp7vQSPJFtRfDbAjusBuoXzAYktI+r2R6iKMaRTPw==}
+  react-dropzone@20.2.0:
+    resolution: {integrity: sha512-FRlcSp6UFT9Etg57U4+g6O6qF/jH7sUh2Hz67lQlrZJa/3FjfAFvw7DwDSItiG2vBUXTdh2wroEwXPPg7o/jkg==}
     engines: {node: '>= 22'}
     peerDependencies:
       '@types/react': '*'
@@ -2884,7 +2884,7 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.7
 
-  '@babel/runtime@7.29.13': {}
+  '@babel/runtime@7.29.14': {}
 
   '@babel/runtime@7.29.7': {}
 
@@ -3590,7 +3590,7 @@ snapshots:
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
-      '@babel/runtime': 7.29.13
+      '@babel/runtime': 7.29.14
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
@@ -3920,7 +3920,7 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  attr-accept@4.0.0: {}
+  attr-accept@4.0.1: {}
 
   axios@1.20.0:
     dependencies:
@@ -4257,7 +4257,7 @@ snapshots:
     dependencies:
       flat-cache: 6.1.23
 
-  file-selector@5.0.1: {}
+  file-selector@5.0.3: {}
 
   find-root@1.1.0: {}
 
@@ -4707,10 +4707,10 @@ snapshots:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
-  react-dropzone@20.1.2(@types/react@19.3.0)(react@19.3.1):
+  react-dropzone@20.2.0(@types/react@19.3.0)(react@19.3.1):
     dependencies:
-      attr-accept: 4.0.0
-      file-selector: 5.0.1
+      attr-accept: 4.0.1
+      file-selector: 5.0.3
       react: 19.3.1
     optionalDependencies:
       '@types/react': 19.3.0
