@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Alert, Box, Button, LinearProgress, Stack, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, LinearProgress, Stack, TextField, Typography } from "@mui/material";
+import { ExpandMore } from "@mui/icons-material";
 
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
@@ -11,7 +12,9 @@ import { AgreementTable } from "./AgreementTable";
 import { CampaignEffects, type Offsets } from "./CampaignEffects";
 import { FlipsList } from "./FlipsList";
 import { PAGE } from "./Pager";
-import { PromotionConditions } from "./PromotionConditions";
+import { BulkReviewDialog } from "./BulkReviewDialog";
+import { ReadinessCard } from "./ReadinessCard";
+import { ReviewQueue } from "./ReviewQueue";
 import { ReviewDialog } from "./ReviewDialog";
 
 const DAY = 86_400_000;
@@ -19,6 +22,7 @@ const DAY = 86_400_000;
 export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
   const [off, setOff] = React.useState<Offsets & { flips: number }>({ flips: 0, effects: 0, candidate_only: 0, active_only: 0 });
   const [dialog, setDialog] = React.useState<null | "promote" | "discard">(null);
+  const [bulk, setBulk] = React.useState<ReviewKind | null>(null);
   const [review, setReview] = React.useState<{ kind: ReviewKind; caseId: number } | null>(null);
   const [now] = React.useState(() => Date.now());
   const [days, setDays] = React.useState("");
@@ -58,39 +62,42 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
   const page = (k: keyof typeof off, o: number) => setOff((p) => ({ ...p, [k]: o }));
   const close = () => setDialog(null);
 
+  const pctOf = (a: { agree: number; total: number }) => (a.total ? `${Math.round((a.agree / a.total) * 100)}%` : "n/a");
+  const section = (title: string, body: React.ReactNode) => (
+    <Accordion disableGutters variant="outlined" slotProps={{ transition: { unmountOnExit: true } }}>
+      <AccordionSummary expandIcon={<ExpandMore />}>{title}</AccordionSummary>
+      <AccordionDetails>{body}</AccordionDetails>
+    </Accordion>
+  );
+
   return (
     <Stack spacing={3}>
       <Box>
-        <Typography>
-          Shadow {d.version_id}: {age} of {d.shadow_min_days} days
-        </Typography>
-        <Typography id="shadow-results">
-          {d.live_results} of {SHADOW_MIN_RESULTS} live results compared
+        <Typography variant="subtitle1">New model {d.version_id}, testing on live mail</Typography>
+        <Typography id="shadow-results" variant="body2">
+          {age} of {d.shadow_min_days} days · {d.live_results} of {SHADOW_MIN_RESULTS} live mails compared
         </Typography>
         <LinearProgress variant="determinate" value={pct} aria-labelledby="shadow-results" aria-valuetext={`${d.live_results} of ${SHADOW_MIN_RESULTS}`} />
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          It gives the same final verdict as the current model on {pctOf(d.agreement.verdict)} of the mails
+          ({d.agreement.verdict.agree} of {d.agreement.verdict.total}) and the same AI class on {pctOf(d.agreement.class)}.
+        </Typography>
       </Box>
 
-      <AgreementTable agreement={d.agreement} />
+      <ReadinessCard conditions={d.conditions} busy={busy} onPromote={() => setDialog("promote")} />
 
       <Box>
-        <Typography variant="subtitle1" component="h4">Verdict changes</Typography>
-        <FlipsList flips={d.flips} offset={off.flips} onPage={(o) => page("flips", o)} onReview={(c) => setReview({ kind: "flip", caseId: c })} />
+        <Typography variant="h6" component="h3" sx={{ mb: 1 }}>To review before promoting</Typography>
+        <ReviewQueue toReview={d.to_review} onReview={(kind, caseId) => setReview({ kind, caseId })} onReviewAll={setBulk} />
       </Box>
 
       <Box>
-        <Typography variant="subtitle1" component="h4">Campaigns and alerts</Typography>
-        <CampaignEffects data={d} offsets={off} onPage={page} onReview={(c) => setReview({ kind: "campaign", caseId: c })} />
-      </Box>
-
-      <Box>
-        <Typography variant="subtitle1" component="h4">Promotion conditions</Typography>
-        <PromotionConditions conditions={d.conditions} />
+        {section("All verdict changes", <FlipsList flips={d.flips} offset={off.flips} onPage={(o) => page("flips", o)} onReview={(c) => setReview({ kind: "flip", caseId: c })} />)}
+        {section("Campaigns and alerts", <CampaignEffects data={d} offsets={off} onPage={page} onReview={(c) => setReview({ kind: "campaign", caseId: c })} />)}
+        {section("How closely the two models agree", <AgreementTable agreement={d.agreement} />)}
       </Box>
 
       <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", flexWrap: "wrap" }}>
-        <Button variant="contained" disabled={d.conditions.length > 0 || busy} onClick={() => setDialog("promote")}>
-          Promote
-        </Button>
         <TextField
           size="small"
           label="New total days"
@@ -123,6 +130,8 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
       </Box>
 
       <ReviewDialog versionId={d.version_id} kind={review?.kind ?? "flip"} caseId={review?.caseId ?? null} onClose={() => setReview(null)} />
+      <BulkReviewDialog versionId={d.version_id} kind={bulk} count={bulk === "flip" ? d.to_review.flips.count : d.to_review.alerts.count}
+        what={bulk === "flip" ? "risky verdict changes" : "alert differences"} onClose={() => setBulk(null)} />
       <ConfirmDialog
         open={dialog === "promote"}
         title="Promote this version?"

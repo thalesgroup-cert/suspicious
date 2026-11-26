@@ -19,7 +19,7 @@ from ai_model.serversync import ReloadRefused
 from common.http_client import breaker_state, request_reset
 from api.permissions.ai_model import IsAdmin, IsAdminOrCISO
 from api.serializers.ai_model import (ActionSerializer, DiscardSerializer, ExtendSerializer, ResolveSerializer,
-                                      ReviewSerializer, candidate_row, flag_row, job_row, version_summary)
+                                      ReviewAllSerializer, ReviewSerializer, candidate_row, flag_row, job_row, version_summary)
 from connectors.delivery import get_state
 
 logger = logging.getLogger(__name__)
@@ -139,6 +139,24 @@ class CandidatesView(ListAPIView, Read):
         return self.get_paginated_response([candidate_row(v) for v in self.paginate_queryset(self.get_queryset())])
 
 
+TO_REVIEW_SHOWN = 50
+
+
+def _to_review(snap, reviews):
+    """What still blocks promotion: unreviewed critical flips and alert differences (the first
+    TO_REVIEW_SHOWN of each, with the full count)."""
+    flips = [r for r in snap["critical"] if ("flip", r.case_id) not in reviews]
+    alerts = [(c, side) for side, key in (("candidate", "candidate_only"), ("active", "active_only"))
+              for c in snap["delta"][key] if ("campaign", c) not in reviews]
+    return {
+        "flips": {"count": len(flips), "results": [
+            {"case_id": r.case_id, "live_result": r.live_result, "would_be_result": r.would_be_result}
+            for r in flips[:TO_REVIEW_SHOWN]]},
+        "alerts": {"count": len(alerts), "results": [
+            {"case_id": c, "side": side} for c, side in alerts[:TO_REVIEW_SHOWN]]},
+    }
+
+
 class ShadowView(Read):
     def get(self, request):
         v = ModelVersion.objects.filter(status=S.SHADOW).first()
@@ -179,6 +197,7 @@ class ShadowView(Read):
             "alert_delta": {k: _paged(delta[k], request, k, lambda c: {"case_id": c, "reviewed": ("campaign", c) in reviews})
                             for k in ("candidate_only", "active_only")},
             "conditions": promotion.can_promote(v, snap),
+            "to_review": _to_review(snap, reviews),
         })
 
 
@@ -205,6 +224,15 @@ class ReviewsView(WriteMixin, ListAPIView):
     def act(self, request, version, data):
         promotion.review(version, data["kind"], data["case_id"], request.user, data["note"])
         return Response({"version_id": version.version_id, "kind": data["kind"], "case_id": data["case_id"]},
+                        status=status.HTTP_201_CREATED)
+
+
+class ReviewAllView(Write):
+    serializer_class = ReviewAllSerializer
+
+    def act(self, request, version, data):
+        n = promotion.review_all(version, data["kind"], request.user, data["note"])
+        return Response({"version_id": version.version_id, "kind": data["kind"], "reviewed": n},
                         status=status.HTTP_201_CREATED)
 
 

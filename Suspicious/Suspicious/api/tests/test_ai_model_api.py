@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from ai_model.models import ModelEvent, ModelVersion, RetrainJob, ShadowCampaignEffect, ShadowResult, ShadowReview
-from ai_model.registry import set_shadow
+from ai_model.registry import discard, set_shadow
 from ai_model.retrain import RetrainRefused
 from ai_model.serversync import ReloadRefused
 from ai_model.tests.test_registry import cand
@@ -438,6 +438,37 @@ class AiModelApiTest(APITestCase):
         self.assertNotIn("reviewed", rows[changed.case_id])
         r = self.client.post(BASE + "reviews/", {"kind": "flip", "case_id": changed.case_id, "note": "n"},
                              format="json")
+        self.assertEqual(r.status_code, 409)
+
+    def test_to_review_lists_only_what_is_unreviewed_and_review_all_clears_it(self):
+        v = self.shadow()
+        f1, f2 = self.flip(v), self.flip(v)
+        self.flip(v, "changed")  # not reviewable
+        cid = self.case().id
+        ShadowCampaignEffect.objects.create(case_id=cid, version=v, effect="would_join")
+        self.client.post(BASE + "reviews/", {"version_id": v.version_id, "kind": "flip", "case_id": f1.case_id, "note": "one"},
+                         format="json")
+        tr = self.client.get(BASE + "shadow/").json()["to_review"]
+        self.assertEqual([r["case_id"] for r in tr["flips"]["results"]], [f2.case_id])
+        self.assertEqual(tr["alerts"]["results"], [{"case_id": cid, "side": "candidate"}])
+        r = self.client.post(BASE + "reviews/all/", {"version_id": v.version_id, "kind": "flip", "note": "batch"}, format="json")
+        self.assertEqual((r.status_code, r.json()["reviewed"]), (201, 1))
+        r = self.client.post(BASE + "reviews/all/", {"version_id": v.version_id, "kind": "campaign", "note": "batch"}, format="json")
+        self.assertEqual(r.json()["reviewed"], 1)
+        body = self.client.get(BASE + "shadow/").json()
+        self.assertEqual((body["to_review"]["flips"]["count"], body["to_review"]["alerts"]["count"]), (0, 0))
+        self.assertNotIn("unreviewed_flips", body["conditions"])
+        self.assertNotIn("unreviewed_campaigns", body["conditions"])
+        self.assertEqual(ShadowReview.objects.filter(version=v, note="batch").count(), 2)  # one row per case
+        again = self.client.post(BASE + "reviews/all/", {"version_id": v.version_id, "kind": "flip", "note": "x"}, format="json")
+        self.assertEqual(again.json()["reviewed"], 0)
+
+    def test_review_all_needs_a_note_and_the_shadow(self):
+        v = self.shadow()
+        r = self.client.post(BASE + "reviews/all/", {"version_id": v.version_id, "kind": "flip", "note": ""}, format="json")
+        self.assertEqual(r.status_code, 400)
+        discard(v, self.admin)
+        r = self.client.post(BASE + "reviews/all/", {"version_id": v.version_id, "kind": "flip", "note": "x"}, format="json")
         self.assertEqual(r.status_code, 409)
 
     def test_alert_delta_rows_turn_reviewed_after_a_review(self):
