@@ -12,27 +12,44 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 import settings.config as settings_config
+from ai_model.mailinfo import dispatch_mail_ai
 from ai_model.models import AiAssessment
 from ai_model.taxonomy import FOLDERS
 from case_handler.models import Case, CaseHasFileOrMail
 from common.http_client import BREAKERS
 from common.storage import FakeObjectStore, StoreError
-from connectors.base import ProviderResult, Schedule
+from connectors.base import Schedule
 from connectors.contrib.ai_model import connector as module
 from connectors.contrib.ai_model import mailtext
-from connectors.contrib.ai_model.connector import AiModelConnector, result_from_server
+from connectors.contrib.ai_model.connector import AiModelConnector, _inconclusive, result_from_server
 from connectors.contrib.ai_model.tests.test_mailtext import GOOD, build_tar
 from connectors.models import ConnectorDelivery, ConnectorState
-from connectors.providers import ProviderUnavailable, queue_provider_analysis
+from connectors.providers import ProviderUnavailable
 from connectors.registry import ConnectorRegistry, registry
-from connectors.tasks import run_provider_analysis
-from connectors.tests.test_provider_dispatch import make_mail_case
+from connectors.tasks import run_engine_job
 from cortex_job.models import CaseAnalyzerJob
 from file_process.models import File
 from hash_process.models import Hash
-from mail_feeder.models import Mail, MailArchive
+from mail_feeder.models import Mail, MailArchive, MailInfo
 
 CONFIG = {"url": "http://ai_inference:8090", "token": "s3cret-token", "timeout_seconds": 9}
+
+
+def make_mail_case(n=1):
+    user = get_user_model().objects.create_user(username=f"prov{n}", password="x")
+    mail = Mail.objects.create(
+        subject="s", reportedBy="r", date=timezone.now(), to="t", mail_id=f"m{n}"
+    )
+    case = Case.objects.create(description="", reporter=user, dispatched_at=timezone.now())
+    case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
+    case.save(update_fields=["fileOrMail"])
+    MailInfo.objects.create(user=user, mail=mail)
+    archive = File.objects.create(
+        linked_hash=Hash.objects.create(value=f"hash{n}"), tmp_path=f"mail{n}.tar.gz"
+    )
+    return case, MailArchive.objects.create(mail=mail, archive=archive)
+
+
 # The classes the inference server emits (Analyzers/AIMailAnalyzer/mail_analysis.py).
 SERVER_CLASSES = ("SAFE", "UNWANTED", "DANGEROUS", "INCONCLUSIVE")
 
@@ -55,7 +72,7 @@ class ManifestTest(SimpleTestCase):
     def test_manifest(self):
         m = AiModelConnector.manifest
         m.validate()
-        self.assertEqual((m.name, m.provides, m.enabled_by_default), ("ai_model", "mail_ai", False))
+        self.assertEqual((m.name, m.provides, m.enabled_by_default), ("ai_model", "analysis", False))
         self.assertEqual((m.version, m.category, m.events), ("1.0.0", "AI", ("case_finalised",)))
         self.assertEqual({f.key: f.type for f in m.config_schema}["token"], "secret")
 
@@ -88,17 +105,17 @@ class ManifestTest(SimpleTestCase):
     def test_registered_as_a_builtin(self):
         registry.discover()
         self.assertIn("ai_model", registry.names())
-        self.assertEqual(registry.providers("mail_ai"), ["ai_model"])
+        self.assertIn("ai_model", registry.providers("analysis"))
 
 
 class ResultMappingTest(SimpleTestCase):
     def test_result_mapping_rounds_like_the_legacy_parser(self):
         r = result_from_server(payload(klass="DANGEROUS", score=7.4, confidence=0.815, sub_class="CLASSIC_PHISHING"))
-        self.assertEqual((r.result, r.score, r.confidence, r.category), ("DANGEROUS", 7, 82, "Classic_phishing"))
-        self.assertEqual((r.model_version, r.reason), ("v0", ""))
+        self.assertEqual((r["result"], r["score"], r["confidence"], r["category"]), ("DANGEROUS", 7, 82, "Classic_phishing"))
+        self.assertEqual((r["model_version"], r["reason"]), ("v0", ""))
 
     def test_assessment_carries_the_full_server_answer_under_model_field_names(self):
-        a = result_from_server(payload(klass="DANGEROUS", sub_class="CLASSIC_PHISHING")).assessment
+        a = result_from_server(payload(klass="DANGEROUS", sub_class="CLASSIC_PHISHING"))["assessment"]
         self.assertEqual(set(a), {
             "sub_class", "probabilities", "sub_probabilities", "tier", "contributing_phrases",
             "similar_cases", "campaign_embedding", "embedding_version", "latency_ms",
@@ -110,18 +127,18 @@ class ResultMappingTest(SimpleTestCase):
         self.assertEqual(a["contributing_phrases"], [["verify", 0.3]])
 
     def test_a_null_tier_is_stored_as_empty_text(self):
-        self.assertEqual(result_from_server(payload()).assessment["tier"], "")
-        self.assertEqual(result_from_server(payload(tier="T1")).assessment["tier"], "T1")
+        self.assertEqual(result_from_server(payload())["assessment"]["tier"], "")
+        self.assertEqual(result_from_server(payload(tier="T1"))["assessment"]["tier"], "T1")
 
     def test_every_server_class_is_one_the_model_stores(self):
         for klass in SERVER_CLASSES:
             with self.subTest(klass=klass):
-                self.assertIn(result_from_server(payload(klass=klass)).result, AiAssessment.Result.values)
+                self.assertIn(result_from_server(payload(klass=klass))["result"], AiAssessment.Result.values)
 
     def test_long_sub_classes_are_cut_to_the_column_widths(self):
         r = result_from_server(payload(sub_class="x" * 80))
-        self.assertEqual(len(r.category), 20)
-        self.assertEqual(len(r.assessment["sub_class"]), 32)
+        self.assertEqual(len(r["category"]), 20)
+        self.assertEqual(len(r["assessment"]["sub_class"]), 32)
 
 
 class HealthCheckTest(SimpleTestCase):
@@ -209,17 +226,17 @@ class AnalyzeTest(TestCase):
         self.addCleanup(patcher.stop)
 
     def analyze(self, body="the mail", classify=None):
-        """Run analyze with the archive read and the HTTP call stubbed."""
+        """Run the engine job with the archive read and the HTTP call stubbed; the result's payload."""
         with mock.patch.object(module, "read_archive_body", return_value=body) as read, \
                 mock.patch.object(module.AiInferenceClient, "classify", **(classify or {"return_value": payload()})) as call:
-            result = self.connector.analyze("mail_ai", self.case.id)
-        return result, read, call
+            result = self.connector.run("job", "mail_archive", str(self.case.id))
+        return result.payload, read, call
 
     def test_a_good_answer_is_mapped(self):
         result, read, call = self.analyze(classify={"return_value": payload("DANGEROUS", 7.4, 0.815, "WHALING")})
         read.assert_called_once_with(self.archive)
         call.assert_called_once_with("the mail", exclude_case_ids=[self.case.id])
-        self.assertEqual((result.result, result.score, result.confidence, result.category),
+        self.assertEqual((result["result"], result["score"], result["confidence"], result["category"]),
                          ("DANGEROUS", 7, 82, "Whaling"))
 
     def test_the_body_comes_from_the_stored_archive_file(self):
@@ -227,25 +244,25 @@ class AnalyzeTest(TestCase):
             self.archive.archive.file_path = SimpleUploadedFile("mail.tar.gz", build_tar(GOOD))
             self.archive.archive.save()
             with mock.patch.object(module.AiInferenceClient, "classify", return_value=payload()) as call:
-                result = self.connector.analyze("mail_ai", self.case.id)
+                result = self.connector.run("job", "mail_archive", str(self.case.id))
         call.assert_called_once_with(GOOD["m1.txt"].decode(), exclude_case_ids=[self.case.id])
-        self.assertEqual(result.result, "SAFE")
+        self.assertEqual((result.status, result.payload["result"]), ("Success", "SAFE"))
 
     def test_the_client_is_built_from_the_connector_config(self):
         with mock.patch.object(module, "read_archive_body", return_value="b"), \
                 mock.patch.object(module, "AiInferenceClient") as client_class:
             client_class.return_value.classify.return_value = payload()
-            self.connector.analyze("mail_ai", self.case.id)
+            self.connector.run("job", "mail_archive", str(self.case.id))
         client_class.assert_called_once_with("http://ai_inference:8090", "s3cret-token", 9.0)
 
     def test_a_4xx_becomes_an_inconclusive_result_and_never_trips_the_breaker(self):
         breaker = pybreaker.CircuitBreaker(fail_max=1, reset_timeout=60)
         for _ in range(3):
-            with breaker.calling():  # as connectors.tasks.run_provider_analysis wraps analyze
+            with breaker.calling():  # as connectors.tasks.run_engine_job wraps run
                 result, _, _ = self.analyze(classify={"side_effect": ValueError("HTTP 422: bad body")})
         self.assertEqual(breaker.current_state, "closed")
-        self.assertEqual(result, ProviderResult(
-            "INCONCLUSIVE", 0, 0, "No subclass found", "", {}, reason="HTTP 422: bad body"))
+        self.assertEqual(result, {**_inconclusive("HTTP 422: bad body"),
+                                  "reason": "no model_version (HTTP 422: bad body)"})
 
     def test_provider_unavailable_propagates_with_its_retry_flag(self):
         for retryable in (True, False):
@@ -260,22 +277,23 @@ class AnalyzeTest(TestCase):
 
     def test_empty_or_missing_body_gives_inconclusive_with_a_reason(self):
         result, _, call = self.analyze(body=None)
-        self.assertEqual(result, ProviderResult(
-            "INCONCLUSIVE", 0, 0, "No subclass found", "", {}, reason="archive_unreadable"))
+        self.assertEqual(result, {**_inconclusive("archive_unreadable"),
+                                  "reason": "no model_version (archive_unreadable)"})
         call.assert_not_called()
 
     def test_a_case_without_a_mail_archive_is_inconclusive(self):
         MailArchive.objects.all().delete()
         result, read, call = self.analyze()
-        self.assertEqual((result.result, result.reason), ("INCONCLUSIVE", "no_mail_archive"))
+        self.assertEqual((result["result"], result["reason"]), ("INCONCLUSIVE", "no model_version (no_mail_archive)"))
         read.assert_not_called()
         call.assert_not_called()
 
     def test_a_case_without_a_mail_is_inconclusive(self):
         other = Case.objects.create(description="", reporter=self.case.reporter)
         with mock.patch.object(module.AiInferenceClient, "classify") as call:
-            result = self.connector.analyze("mail_ai", other.id)
-        self.assertEqual((result.result, result.reason), ("INCONCLUSIVE", "no_mail_archive"))
+            result = self.connector.run("job", "mail_archive", str(other.id))
+        self.assertEqual((result.status, result.payload["result"], result.payload["reason"]),
+                         ("Failure", "INCONCLUSIVE", "no model_version (no_mail_archive)"))
         call.assert_not_called()
 
 
@@ -285,7 +303,8 @@ class RejectedTokenEndToEndTest(TestCase):
     def setUp(self):
         private = ConnectorRegistry()
         private.register(AiModelConnector)
-        for target in ("connectors.providers.registry", "connectors.delivery.registry"):
+        for target in ("connectors.engines.registry", "connectors.delivery.registry",
+                       "connectors.registry.registry"):
             patcher = mock.patch(target, private)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -309,15 +328,19 @@ class RejectedTokenEndToEndTest(TestCase):
         session.post.return_value = response
         with mock.patch("connectors.contrib.ai_model.client.make_session", return_value=session), \
                 mock.patch.object(module, "read_archive_body", return_value="the mail"):
-            job = queue_provider_analysis(self.case, "mail_ai")  # the on_commit enqueue never fires here
+            job = self.queue()
             with self.captureOnCommitCallbacks(execute=True):
-                run_provider_analysis.apply(args=(self.case.id, "mail_ai", job.id))
+                run_engine_job.apply(args=(job.id,))
         job.refresh_from_db()
         self.case.refresh_from_db()
         return job, session
 
-    def test_queue_provider_analysis_creates_the_row_with_source_ai_model(self):
-        job = queue_provider_analysis(self.case, "mail_ai")
+    def queue(self):
+        dispatch_mail_ai(self.case)  # the on_commit enqueue never fires here
+        return CaseAnalyzerJob.objects.get(case=self.case)
+
+    def test_dispatch_mail_ai_creates_the_row_with_source_ai_model(self):
+        job = self.queue()
         self.assertEqual(job.analyzer.source, "ai_model")
 
     def test_a_rejected_token_fails_the_row_at_once_and_says_why(self):
@@ -361,7 +384,8 @@ class ArchiveGoneBetweenAttemptsTest(TestCase):
     def setUp(self):
         private = ConnectorRegistry()
         private.register(AiModelConnector)
-        for target in ("connectors.providers.registry", "connectors.delivery.registry"):
+        for target in ("connectors.engines.registry", "connectors.delivery.registry",
+                       "connectors.registry.registry"):
             patcher = mock.patch(target, private)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -412,15 +436,16 @@ class ArchiveGoneBetweenAttemptsTest(TestCase):
         session = mock.Mock()
         session.post.side_effect = [down, up]
         with mock.patch("connectors.contrib.ai_model.client.make_session", return_value=session):
-            job = queue_provider_analysis(self.case, "mail_ai")  # the on_commit enqueue never fires here
+            dispatch_mail_ai(self.case)  # the on_commit enqueue never fires here
+            job = CaseAnalyzerJob.objects.get(case=self.case)
             with self.assertRaises(Retry):  # attempt 1: server down; eager mode propagates Retry
-                run_provider_analysis.apply(args=(self.case.id, "mail_ai", job.id), retries=0)
+                run_engine_job.apply(args=(job.id,), retries=0)
             job.refresh_from_db()
             self.assertEqual(job.status, CaseAnalyzerJob.STATUS_INPROGRESS)
 
             os.remove(self.tar_path)  # what tasp/cron/fetch_emails.py does once the handoff ends
             with self.captureOnCommitCallbacks(execute=True):
-                run_provider_analysis.apply(args=(self.case.id, "mail_ai", job.id), retries=1)
+                run_engine_job.apply(args=(job.id,), retries=1)
 
         job.refresh_from_db()
         self.case.refresh_from_db()

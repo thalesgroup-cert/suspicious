@@ -14,7 +14,7 @@ from mail_feeder.email_info.email_info import MailInfoService
 
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
-from connectors.providers import mark_ai_missing, queue_mail_ai
+from ai_model.mailinfo import dispatch_mail_ai, mark_ai_missing
 from connectors import engines
 
 from .models import MailSubmissionData
@@ -189,7 +189,7 @@ class GlobalSubmissionService:
                 )
         if attachment_result.ai_archive is not None:
             try:
-                queue_mail_ai(case)
+                dispatch_mail_ai(case)
             except Exception:
                 fetch_mail_logger.exception(
                     "Failed to hand the case to the mail AI provider (case=%s)",

@@ -45,13 +45,14 @@ connector gets it for free and consistently.
 ```
 connectors/
 ├── base.py         # Connector, ConnectorManifest, ConfigField, Schedule,
-│                    # HealthStatus, CaseEvent, ProviderResult — the public contract
-├── providers.py     # analysis-provider slot: queue_mail_ai, finish_provider_analysis
+│                    # HealthStatus, CaseEvent, CatalogEntry, StartResult, FetchResult — the public contract
+├── providers.py     # ProviderUnavailable (the error a connector raises when its service cannot answer)
+├── engines.py       # analysis engines: dispatch, refresh, webhook, catalogue sync
 ├── registry.py      # discovery (built-ins + "suspicious.connectors" entry points)
 ├── dispatch.py       # emit(event_name, case) — fan-out to enabled subscribers
 ├── events.py        # build_case_event(...) — Case -> CaseEvent snapshot
 ├── delivery.py       # deliver_now / run_sync_now — breaker + ledger + retry logic
-├── tasks.py          # deliver_event / run_connector_sync Celery tasks
+├── tasks.py          # deliver_event / run_connector_sync / run_engine_job Celery tasks
 ├── models.py         # ConnectorState, ConnectorDelivery
 ├── signals.py        # post_save(Case) -> emit("case_created", ...)
 ├── bootstrap.py       # seeds settings.json connector secrets into Vault at boot
@@ -66,7 +67,7 @@ connectors/
     ├── case_search/   # Elasticsearch index behind the investigations search box
     ├── elastic_siem/  # ECS documents for Elastic Security
     ├── xsoar/         # Cortex XSOAR incidents
-    ├── ai_model/      # mail AI provider (mail_ai), campaign detection, label sync
+    ├── ai_model/      # mail AI engine (analysis, mail_archive only), campaign detection, label sync
     └── template/      # scaffold to copy when writing a new one (not in BUILTIN_CONNECTOR_PATHS)
 ```
 
@@ -77,8 +78,8 @@ connectors/
 - **`ConnectorManifest`** — `name` (validated slug), `version`, `category`,
   `description`, `config_schema` (tuple of `ConfigField`), `events` (subset of
   `EVENT_CASE_CREATED` / `EVENT_CASE_FINALISED` / `EVENT_CASE_MODIFIED` / `EVENT_CAMPAIGN_UPDATED`), `schedules` (tuple of
-  `Schedule`), `enabled_by_default`, `provides` (an analysis-provider kind, currently
-  only `mail_ai`, or empty). `.validate()` runs at registration time —
+  `Schedule`), `enabled_by_default`, `provides` (`analysis` for an analysis engine, or
+  empty). `.validate()` runs at registration time —
   a connector with an invalid manifest fails to register, it does not take the
   app down.
 - **`ConfigField`** — one config key (dotted keys like `instances.primary.api_key`
@@ -93,13 +94,15 @@ connectors/
 - **`Connector`** (ABC) — subclasses set a class-level `manifest` and implement
   `health_check()` (must never raise) plus whichever of `on_case_created`,
   `on_case_finalised`, `on_case_modified`, `on_campaign_updated`, `sync` their manifest
-  actually subscribes to or schedules, and `analyze(kind, case_id)` for a provider.
-- **`ProviderResult`** — what `analyze` returns: `result`, `score`, `confidence`,
-  `category`, `model_version`, `assessment`, `reason`, `shadow`. Only one enabled
-  connector may provide a kind (`PATCH /api/connectors/<name>/` answers 409 otherwise).
-  `connectors/providers.py` queues the case (a `CaseAnalyzerJob` row with a `provider-`
-  job id), `connectors.tasks.run_provider_analysis` calls `analyze` under the breaker
-  and `finish_provider_analysis` writes the answer and enqueues `reconcile_case`.
+  actually subscribes to or schedules. An analysis engine (`provides="analysis"`) also
+  implements `catalog` and `start`, plus `fetch` (and optionally `webhook`) for jobs it runs
+  remotely; a deferred engine (`StartResult.deferred`) implements `run`, `on_started` and
+  `on_result` instead of `fetch`, and
+  `connectors.tasks.run_engine_job` runs its jobs. `general_purpose = False` marks a partial
+  engine (`ai_model`). See [Connectors](../../../docs/components/backend/connectors.md).
+  The `mail_ai` provider slot (`analyze`, `ProviderResult`) is removed;
+  `connectors.tasks.run_provider_analysis` only forwards `provider-` rows queued before the
+  upgrade, for one release.
 
 ---
 
@@ -147,7 +150,7 @@ connectors/
 | `elastic_siem` | SIEM | `case_finalised`, `case_modified` | off | Indexes one ECS document per case (verdict, score, mail subject/sender, IOCs) into an operator-supplied Elasticsearch; see `elastic_siem` below |
 | `xsoar` | SOAR | `case_finalised` | off | Opens one Cortex XSOAR incident per finalised case at or above `min_verdict`; see `xsoar` below |
 | `case_search` | Search | `case_created`, `case_modified`, `case_finalised` | off | Keeps the `suspicious-cases` Elasticsearch index current for the investigations search box. Run `manage.py reindex_cases` before enabling; see [backend/connectors](../../../docs/components/backend/connectors.md) |
-| `ai_model` | AI | `case_finalised`; scheduled `label-sync` (daily) | off | Provides `mail_ai` (the mail AI verdict, from the `ai_inference` server), detects campaigns on `case_finalised`, syncs analyst labels from an IMAP review mailbox. See [`ai_model/README.md`](../ai_model/README.md) |
+| `ai_model` | AI | `case_finalised`; scheduled `label-sync` (daily) | off | Provides `analysis` for `mail_archive` only (the mail AI verdict, from the `ai_inference` server, as a deferred engine job), detects campaigns on `case_finalised`, syncs analyst labels from an IMAP review mailbox. See [`ai_model/README.md`](../ai_model/README.md) |
 | `watcher` | Threat Intelligence | scheduled (every 300s) | off | Reconciles the allow/deny domain lists against the Watcher service — moved here from `tasp`; see `tasp/README.md` |
 | `ai_narration` | AI | `case_finalised` | off | See below — the one connector with an extra, hardcoded data-governance allowlist on its automatic path |
 | `template` | — | — | — | Not a real connector; copy this directory to start a new one |

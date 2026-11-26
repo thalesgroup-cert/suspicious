@@ -1,30 +1,36 @@
-"""ai_model connector: the ``mail_ai`` analysis provider. Sends a case's mail text to the
-AI inference server's /v2 API and returns its verdict, so the case is classified without
-the Cortex AI analyzer. See docs/specs for the ai_model design."""
+"""ai_model connector: the mail AI verdict as an analysis engine (data type ``mail_archive``).
+A deferred job sends a case's mail text to the AI inference server's /v2 API and writes its
+verdict to the case, so the case is classified without the Cortex AI analyzer. See docs/specs
+for the ai_model design."""
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from time import monotonic  # module-level so tests can patch the clock
+from uuid import uuid4
 
 from django.db import transaction
 from django.utils import timezone
 
 from ai_model import ledger, serversync
 from ai_model.campaign_profile import COLLECTION_NAME
+from ai_model.mailinfo import apply_mail_info, has_assessment, mark_ai_missing
 from ai_model.models import AiAssessment, LabelSyncState, ModelVersion
 from ai_model.taxonomy import FOLDERS, class_of
 from ai_model.training_data import TRAINING_PREPROCESSING
 from case_handler.models import Case
 from connectors.base import (
+    DATA_TYPE_MAIL_ARCHIVE,
     EVENT_CASE_FINALISED,
-    PROVIDER_KIND_MAIL_AI,
+    FETCH_RESULT,
+    PROVIDER_KIND_ANALYSIS,
+    CatalogEntry,
     ConfigField,
     Connector,
     ConnectorManifest,
+    FetchResult,
     HealthStatus,
-    ProviderResult,
     Schedule,
+    StartResult,
     valid_url,
 )
 from connectors.contrib.ai_model import imap_sync
@@ -32,6 +38,7 @@ from connectors.contrib.ai_model.campaigns import collection_mismatch
 from connectors.contrib.ai_model.client import AiInferenceClient
 from connectors.contrib.ai_model.mailtext import mail_archive_for, read_archive_body
 from connectors.tasks import run_campaign_detection, run_shadow_campaign
+from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
 
 logger = logging.getLogger("connectors.contrib.ai_model")
 
@@ -45,16 +52,37 @@ TIME_BUDGET_SECONDS = 300  # a run stops between chunks and embed batches after 
 EMBED_BATCH = 32  # the /v2/embed limit
 
 
-def _inconclusive(reason: str) -> ProviderResult:
-    return ProviderResult("INCONCLUSIVE", 0, 0, "No subclass found", "", {}, reason=reason)
+MAIL_CLASSIFIER_ID = "mail_classifier"
 
 
-def result_from_server(payload: dict) -> ProviderResult:
-    """Map the /v2 classify answer to a ProviderResult. Score and confidence are rounded
+def _result(result, score, confidence, category, model_version, assessment, reason="", shadow=None) -> dict:
+    """The job payload handed to on_result.
+    result: SAFE | UNWANTED | DANGEROUS | INCONCLUSIVE; score, confidence (percent) and category
+    as the case stores them; assessment: the remaining AiAssessment fields under the model's
+    names; reason: why, when there is no answer; shadow: the shadow model's answer, never scored."""
+    return {"result": result, "score": score, "confidence": confidence, "category": category,
+            "model_version": model_version, "assessment": assessment, "reason": reason, "shadow": shadow}
+
+
+def _inconclusive(reason: str) -> dict:
+    return _result("INCONCLUSIVE", 0, 0, "No subclass found", "", {}, reason=reason)
+
+
+def to_fetch_result(result: dict) -> FetchResult:
+    """A result without a model_version is the model's "no answer" (unreadable mail, a refusal):
+    a Failure whose reason says so."""
+    if result["model_version"]:
+        return FetchResult(FETCH_RESULT, "Success", payload=result)
+    reason = f"no model_version ({result['reason']})" if result["reason"] else "no model_version"
+    return FetchResult(FETCH_RESULT, "Failure", payload={**result, "reason": reason})
+
+
+def result_from_server(payload: dict) -> dict:
+    """Map the /v2 classify answer to the job payload. Score and confidence are rounded
     the way the Cortex AI parser did (score_process ai_mail), so verdicts stay comparable."""
     answer = payload["results"]["active"]
     sub_class = str(answer["sub_class"])
-    return ProviderResult(
+    return _result(
         result=answer["class"],
         score=round(float(answer["score"])),
         confidence=round(float(answer["confidence"]) * 100),
@@ -152,8 +180,9 @@ class AiModelConnector(Connector):
         events=(EVENT_CASE_FINALISED,),
         schedules=(Schedule("label-sync", 86400),),
         enabled_by_default=False,
-        provides=PROVIDER_KIND_MAIL_AI,
+        provides=PROVIDER_KIND_ANALYSIS,
     )
+    general_purpose = False  # analyses only mail_archive: never the last engine, never a fallback
 
     def _client(self) -> AiInferenceClient:
         token = self.config.get("token")
@@ -201,7 +230,25 @@ class AiModelConnector(Connector):
         except Exception as exc:  # noqa: BLE001 — a shadow failure never fails the live hook
             logger.warning("Shadow campaign check not queued for case %s: %s", event.case_id, type(exc).__name__)
 
-    def analyze(self, kind: str, case_id: int) -> ProviderResult:
+    # ── analysis engine: one deferred job per mail ─────────────────────────
+
+    def catalog(self, data_type: str | None = None, name: str | None = None) -> list[CatalogEntry]:
+        ai_name = ai_analyzer_name()
+        if name == ai_name or data_type == DATA_TYPE_MAIL_ARCHIVE:
+            return [CatalogEntry(MAIL_CLASSIFIER_ID, ai_name, (DATA_TYPE_MAIL_ARCHIVE,))]
+        return []
+
+    def start(self, analyzer: CatalogEntry, data_type: str, value: str):
+        if not str(value or "").strip():
+            return None
+        return StartResult(job_id=uuid4().hex[:24], deferred=True)
+
+    def run(self, job_id: str, data_type: str, value: str) -> FetchResult:
+        """Classify the case's mail. ProviderUnavailable from the client propagates (retried by
+        run_engine_job when retryable); no archive, an unreadable one or a refusal is a Failure."""
+        return to_fetch_result(self._classify(int(value)))
+
+    def _classify(self, case_id: int) -> dict:
         case = Case.objects.select_related("fileOrMail__mail").get(pk=case_id)
         archive = mail_archive_for(case)
         if archive is None:
@@ -222,8 +269,59 @@ class AiModelConnector(Connector):
         result = result_from_server(payload)
         shadow = payload.get("results", {}).get("shadow") if has_shadow else None
         if isinstance(shadow, dict) and "error" not in shadow:
-            result = replace(result, shadow=shadow)
+            result["shadow"] = shadow
         return result
+
+    def on_started(self, case, analyzer_name: str) -> None:
+        # Only on_result replaces this: a row closed any other way (fail_stale_jobs, a lost or
+        # failed enqueue, a dead worker) leaves the AI missing, not at the model default
+        # "Suspicious". A case with an earlier assessment keeps that row's fields until this row
+        # succeeds: they come from a real answer, and marking them missing now would lose them.
+        if not has_assessment(case):
+            mark_ai_missing(case)
+
+    def on_result(self, case, analyzer_name: str, result: FetchResult) -> None:
+        """Write the job's outcome to the case, inside run_engine_job's transaction. A Failure
+        keeps the case's assessment and AI fields from an earlier successful row, else leaves
+        the AI missing (Inconclusive)."""
+        payload = result.payload or {}
+        if result.status != "Success":
+            if not has_assessment(case):
+                mark_ai_missing(case)
+            logger.warning("mail AI provider failed for case %s: %s", case.id, payload.get("reason", ""))
+            return
+        from mail_feeder.models import MailInfo
+
+        case.results_ai = payload["result"].capitalize()
+        case.score_ai = payload["score"]
+        case.confidence_ai = payload["confidence"]
+        case.category_ai = payload["category"][:Case._meta.get_field("category_ai").max_length]
+        case.save(update_fields=["results_ai", "score_ai", "confidence_ai", "category_ai"])
+        mail = getattr(case.fileOrMail, "mail", None)
+        mail_info = MailInfo.objects.filter(mail=mail).first() if mail else None
+        apply_mail_info(mail_info, case.category_ai, case.results_ai)
+        # Every field, the model's default where the result has none: nothing of an older
+        # assessment survives under the new result.
+        fresh = {f.name: f.get_default() for f in AiAssessment._meta.concrete_fields
+                 if not f.primary_key and f.name not in ("case", "created_at", "updated_at")}
+        AiAssessment.objects.update_or_create(case=case, defaults={
+            **fresh,
+            **payload["assessment"],
+            "model_version": payload["model_version"],
+            "result": payload["result"],
+            "score": payload["score"],
+            "confidence": payload["confidence"],
+        })
+        if payload.get("shadow") is not None:
+            # Before reconcile runs (it records the would-be verdict on this row), in its own
+            # savepoint: a shadow problem never touches the live case.
+            from ai_model.shadow import store_shadow_result
+
+            try:
+                with transaction.atomic():
+                    store_shadow_result(case, payload["shadow"])
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("shadow result not stored for case %s: %s", case.id, type(exc).__name__)
 
     def sync(self, *, unlimited: bool = False) -> None:
         """Nightly label sync: read the review folders (read-only) into the label ledger.

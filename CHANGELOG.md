@@ -16,6 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Log lines about job fetch, stale job rescue and analysis dispatch moved from the
   `tasp.cron.update_ongoing_case_jobs` and `tasp.cron.fetch_and_process_emails` loggers to the
   `connectors` logger, so operators grepping `update_cases.log` must look in the connectors log.
+- **The mail AI verdict is an `ai_model` analysis-engine job; the `mail_ai` provider slot is
+  removed.** Jobs queued before the upgrade still finish: the old task
+  `connectors.tasks.run_provider_analysis` stays one release as a forwarder that runs the
+  `provider-` row through `ai_model` on the engine path. `ai_model` keeps its name, config and
+  enabled state. The "last enabled analysis connector" guard (409 `last_analysis_connector`,
+  `force: true`) now applies only to general-purpose engines, and `ai_model` does not count as
+  one. After `ai_model` is disabled, its already-queued jobs (retries included) still call the
+  inference server. An `Analyzer` row named like the AI role that a Cortex sync created or that
+  still belongs to Cortex is taken over by `ai_model` on the next mail; the Cortex sync no longer
+  creates or claims that name. With Cortex
+  enabled, each mail now triggers one extra Cortex catalogue lookup for the AI analyzer name. Log
+  lines of the AI job ("mail AI provider failed", shadow store) moved from the `connectors.delivery`
+  logger to `connectors.contrib.ai_model`. A third-party connector that sets `provides="mail_ai"` no
+  longer loads (listed in the connector load errors); `Connector.analyze` is no longer called:
+  implement the `analysis` engine contract (`catalog`, `start`, `run`, `on_started`, `on_result`).
+- **Deploy order: roll the Celery workers out before or together with the web tier.** An old
+  worker rejects the new `connectors.tasks.run_engine_job` task as unregistered; the mail's AI row
+  then waits for `fail_stale_jobs` (up to 2 h) and the mail finalises with the AI missing.
 
 ### Added
 
@@ -132,9 +150,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It cannot replay a campaign the connector built. It holds the campaign's member row locks for the
   whole replay, so a replay on the newest campaign can make live detection retry briefly: run it
   off-peak or expect retries. See `docs/components/analyzers.md`.
-- Which connector provides `mail_ai` is set by enabling it in the connector settings. Only one may
-  be enabled, and `PATCH /api/connectors/<name>/` answers 409 when another provider is already
-  enabled.
 
 ### Removed
 
@@ -160,6 +175,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connector's ledger row and the AI vote's weight use (without the key the name is
   `AI_Mail_Analyzer`). The Cortex analyzer sync no longer reports that role as missing from Cortex
   and leaves its row active.
+  `integrations.cortex.analyzers.ai` must name the AI vote's analyzer only, never a Cortex analyzer
+  you run for other jobs: the `ai_model` connector adopts the analyzer row of that name (and the
+  Cortex catalogue sync skips it), so Cortex would stop dispatching that analyzer.
 - The inference server's `public` model variant. No route classified with it: the server no longer
   loads or hot-reloads `models_public/`, `/health` lists only the `personal` variant, and
   `ai_inference` no longer mounts `models_public/`.

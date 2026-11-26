@@ -307,12 +307,12 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
     (model instances aren't JSON-serializable, so callers resolve+serialize
     them before enqueueing); we re-fetch the objects here. A `PATH_INTENT` entry
     carries its value in the pk slot, and an `AI_ARCHIVE_INTENT` entry hands the case to
-    the mail AI provider after every other job. `use_sender_domain` lets the URL planner
+    the mail AI engine after every other job. `use_sender_domain` lets the URL planner
     see the mail's sender, as the inline mail path did.
     """
     from django.apps import apps
     from django.utils import timezone
-    from connectors.providers import queue_mail_ai
+    from ai_model.mailinfo import dispatch_mail_ai
     from connectors import engines
     from url_process.url_utils.url_planner import filter_dispatch_intents
 
@@ -353,7 +353,7 @@ def dispatch_case_analysis(self, case_id: int, intents: list, use_sender_domain:
             )
     if ai_archives:
         try:
-            queue_mail_ai(case)
+            dispatch_mail_ai(case)
         except Exception:
             logger.exception("Failed to hand the case to the mail AI provider (case=%s)", case_id)
 

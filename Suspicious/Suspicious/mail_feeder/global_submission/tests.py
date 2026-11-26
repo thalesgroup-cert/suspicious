@@ -247,7 +247,7 @@ class DeferredLaunchTest(django.test.TestCase):
     never started) and the user got "Internal Server Error".
     """
 
-    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
+    @patch("mail_feeder.global_submission.gsubmission.dispatch_mail_ai")
     @patch("tasp.tasks.reconcile_case")
     @patch("tasp.tasks.dispatch_case_analysis")
     @patch("connectors.engines.dispatch")
@@ -322,7 +322,7 @@ class InlineAiHandOffTest(django.test.TestCase):
             GlobalSubmissionService()._handle_common_tasks(instance, "email-1", "mail.tar.gz", "")
         return case, cortex_cls, order
 
-    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
+    @patch("mail_feeder.global_submission.gsubmission.dispatch_mail_ai")
     def test_a_readable_archive_hands_the_case_over_once_after_the_cortex_jobs(self, mock_queue):
         order = []
         mock_queue.side_effect = lambda *a: order.append("ai")
@@ -330,12 +330,12 @@ class InlineAiHandOffTest(django.test.TestCase):
         mock_queue.assert_called_once_with(case)
         self.assertEqual(jobs + order, ["jobs", "ai"])
 
-    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai")
+    @patch("mail_feeder.global_submission.gsubmission.dispatch_mail_ai")
     def test_no_archive_hands_nothing_over(self, mock_queue):
         self.run_inline(None)
         mock_queue.assert_not_called()
 
-    @patch("mail_feeder.global_submission.gsubmission.queue_mail_ai",
+    @patch("mail_feeder.global_submission.gsubmission.dispatch_mail_ai",
            side_effect=RuntimeError("boom"))
     def test_a_failed_hand_off_still_marks_the_case_dispatched(self, mock_queue):
         case, _, _ = self.run_inline(MagicMock())
@@ -347,7 +347,8 @@ class InlineAiHandOffTest(django.test.TestCase):
 
         case, cortex, _ = self.run_inline(MagicMock())
         self.assertFalse(CaseAnalyzerJob.objects.exists())
-        self.assertEqual(cortex.call_count, 1)
+        # The mail body, then the AI hand-off (dispatch_mail_ai), which starts nothing here.
+        self.assertEqual([c.kwargs["data_type"] for c in cortex.call_args_list], ["mail_body", "mail_archive"])
         self.assertEqual(case.results_ai, "Inconclusive")
         case.save.assert_any_call(update_fields=["results_ai"])
 

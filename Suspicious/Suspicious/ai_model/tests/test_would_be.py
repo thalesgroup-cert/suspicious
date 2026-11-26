@@ -9,7 +9,7 @@ from ai_model import registry
 from ai_model.models import AiAssessment, ShadowResult
 from ai_model.tests.test_registry import cand
 from case_handler.models import CaseHasNonFileIocs, Result
-from connectors.tests.test_provider_dispatch import make_mail_case
+from connectors.contrib.ai_model.tests.test_connector import make_mail_case
 from cortex_job.models import Analyzer, AnalyzerReport
 from ip_process.models import IP
 from mail_feeder.models import MailArtifact

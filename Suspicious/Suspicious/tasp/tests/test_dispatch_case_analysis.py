@@ -90,7 +90,7 @@ class DispatchMailIntentsTest(TestCase):
             value="/tmp/m/body.txt", data_type="mail_body", case=self.case
         )
 
-    @patch("connectors.providers.queue_mail_ai")
+    @patch("ai_model.mailinfo.dispatch_mail_ai")
     @patch("tasp.tasks.reconcile_case.delay")
     @patch("connectors.engines.dispatch")
     def test_ai_archive_intent_hands_the_case_to_the_provider_once_and_last(
@@ -111,7 +111,7 @@ class DispatchMailIntentsTest(TestCase):
         self.assertEqual(calls, ["jobs", "ai"])
         mock_reconcile.assert_called_once_with(self.case.id)
 
-    @patch("connectors.providers.queue_mail_ai")
+    @patch("ai_model.mailinfo.dispatch_mail_ai")
     @patch("tasp.tasks.reconcile_case.delay")
     @patch("connectors.engines.dispatch")
     def test_no_ai_archive_intent_hands_nothing_to_the_provider(
@@ -121,7 +121,7 @@ class DispatchMailIntentsTest(TestCase):
 
         mock_queue.assert_not_called()
 
-    @patch("connectors.providers.queue_mail_ai", side_effect=RuntimeError("boom"))
+    @patch("ai_model.mailinfo.dispatch_mail_ai", side_effect=RuntimeError("boom"))
     @patch("tasp.tasks.reconcile_case.delay")
     @patch("connectors.engines.dispatch")
     def test_ai_hand_off_failure_still_marks_the_case_dispatched(

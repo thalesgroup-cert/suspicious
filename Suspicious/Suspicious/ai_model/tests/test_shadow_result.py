@@ -5,10 +5,11 @@ from django.test import TestCase, TransactionTestCase
 from ai_model import registry
 from ai_model.models import AiAssessment, ModelVersion, ShadowResult
 from ai_model.tests.test_registry import cand
-from connectors.base import ProviderResult
-from connectors.providers import finish_provider_analysis, queue_provider_analysis
-from connectors.tests.test_provider_dispatch import make_mail_case
-from cortex_job.models import CaseAnalyzerJob
+from connectors.contrib.ai_model.connector import AiModelConnector, _result, to_fetch_result
+from connectors.contrib.ai_model.tests.test_connector import make_mail_case
+from connectors.tasks import run_engine_job
+from cortex_job.cortex_utils.cortex_and_job_management import ai_analyzer_name
+from cortex_job.models import Analyzer, CaseAnalyzerJob
 
 
 def answer(version, klass="SAFE", confidence=0.9):
@@ -17,7 +18,19 @@ def answer(version, klass="SAFE", confidence=0.9):
 
 
 def live(shadow):
-    return ProviderResult("SAFE", 2, 90, "Ham", "v0", {"sub_class": "HAM"}, shadow=shadow)
+    return _result("SAFE", 2, 90, "Ham", "v0", {"sub_class": "HAM"}, shadow=shadow)
+
+
+def finish_job(case, result) -> bool:
+    """A pending ai_model row closed by run_engine_job with ``result``; True when it succeeded."""
+    analyzer, _ = Analyzer.objects.get_or_create(
+        name=ai_analyzer_name(), defaults={"analyzer_cortex_id": "ai_model:mail_classifier", "source": "ai_model"})
+    row = CaseAnalyzerJob.objects.create(case=case, cortex_job_id=f"ai_model-{CaseAnalyzerJob.objects.count()}",
+                                         analyzer=analyzer, status=CaseAnalyzerJob.STATUS_INPROGRESS)
+    with mock.patch.object(AiModelConnector, "run", return_value=to_fetch_result(result)):
+        run_engine_job.apply(args=(row.id,))
+    row.refresh_from_db()
+    return row.status == CaseAnalyzerJob.STATUS_SUCCESS
 
 
 class ShadowResultTest(TestCase):
@@ -27,10 +40,8 @@ class ShadowResultTest(TestCase):
         registry.set_shadow(self.version)
 
     def finish(self, result):
-        with mock.patch("connectors.providers.enabled_provider", return_value="ai_model"):
-            job = queue_provider_analysis(self.case, "mail_ai")
         with self.captureOnCommitCallbacks(execute=False):
-            return finish_provider_analysis(job.id, result, connector="ai_model")
+            return finish_job(self.case, result)
 
     def test_a_good_answer_is_stored_as_live_and_the_live_side_is_unchanged(self):
         self.assertTrue(self.finish(live(answer("s1", "INCONCLUSIVE", 3.0))))
@@ -57,7 +68,7 @@ class ShadowResultTest(TestCase):
 
     def test_a_store_failure_is_logged_by_class_and_not_raised(self):
         with mock.patch("ai_model.shadow.store_shadow_result", side_effect=RuntimeError("secret mail")), \
-                self.assertLogs("connectors.delivery", "WARNING") as logs:
+                self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs:
             self.assertTrue(self.finish(live(answer("s1"))))
         self.assertIn("RuntimeError", "".join(logs.output))
         self.assertNotIn("secret", "".join(logs.output))
@@ -70,7 +81,7 @@ class ShadowResultTest(TestCase):
                                         campaign_profile={}, trigger="manual")
 
         with mock.patch("ai_model.shadow.store_shadow_result", side_effect=broken), \
-                self.assertLogs("connectors.delivery", "WARNING") as logs:
+                self.assertLogs("connectors.contrib.ai_model", "WARNING") as logs:
             self.assertTrue(self.finish(live(answer("s1"))))
         self.assertIn("IntegrityError", "".join(logs.output))
         self.assertEqual(AiAssessment.objects.get().result, "SAFE")
@@ -88,11 +99,8 @@ class ShadowStoredBeforeReconcileTest(TransactionTestCase):
         case, _ = make_mail_case()
         with mock.patch("ai_model.registry._queue_seeding"):
             registry.set_shadow(cand("s1", manifest={"eligible": True}))
-        with mock.patch("connectors.providers.enabled_provider", return_value="ai_model"), \
-                mock.patch("connectors.tasks.run_provider_analysis"):  # no eager run of the job
-            job = queue_provider_analysis(case, "mail_ai")
         seen = []
         with mock.patch("tasp.tasks.reconcile_case") as reconcile:
             reconcile.delay.side_effect = lambda *a: seen.append(ShadowResult.objects.exists())
-            self.assertTrue(finish_provider_analysis(job.id, live(answer("s1")), connector="ai_model"))
+            self.assertTrue(finish_job(case, live(answer("s1"))))
         self.assertEqual(seen, [True])

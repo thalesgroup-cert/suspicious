@@ -5,6 +5,7 @@ from django.test import SimpleTestCase
 from connectors.base import (
     CaseEvent,
     CatalogEntry,
+    DATA_TYPE_MAIL_ARCHIVE,
     FETCH_GONE,
     FETCH_RESULT,
     FETCH_UNKNOWN,
@@ -169,3 +170,24 @@ class EngineContractTest(SimpleTestCase):
                      lambda: b.fetch("j"), lambda: b.webhook({}, {})):
             with self.assertRaises(NotImplementedError):
                 call()
+
+
+class DeferredContractTest(SimpleTestCase):
+    def test_constant_and_defaults(self):
+        self.assertEqual(DATA_TYPE_MAIL_ARCHIVE, "mail_archive")
+        self.assertFalse(StartResult("j").deferred)
+        self.assertIsNone(FetchResult("result", "Success").payload)
+
+    def test_default_hooks(self):
+        class Bare(Connector):
+            manifest = make_manifest()
+
+            def health_check(self):
+                return HealthStatus(ok=True)
+
+        c = Bare({})
+        self.assertIs(Bare.general_purpose, True)
+        with self.assertRaises(NotImplementedError):
+            c.run("j", "mail", "v")
+        self.assertIsNone(c.on_started(object(), "a"))
+        self.assertIsNone(c.on_result(object(), "a", FetchResult("result")))

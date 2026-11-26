@@ -11,7 +11,7 @@ which to do things, with every command checked against the repository.
 | Piece | Where | Role |
 |---|---|---|
 | `ai_inference` | compose service, profile `ai`; code in `Analyzers/AIMailAnalyzer/inference_server/` | Persistent FastAPI model server (one uvicorn worker). Holds the sentence-transformer encoder (`paraphrase-multilingual-mpnet-base-v2`) and the classifier weights in memory, classifies, embeds, and runs retraining jobs. |
-| `ai_model` connector | `Suspicious/Suspicious/connectors/contrib/ai_model/`; off by default | The `mail_ai` provider. A Celery task in `suspicious_celery` posts the mail text to the server and stores the answer. Also runs campaign detection and the review-mailbox label sync. |
+| `ai_model` connector | `Suspicious/Suspicious/connectors/contrib/ai_model/`; off by default | An `analysis` engine for the mail archive only (deferred jobs). Its Celery job (`run_engine_job`) in `suspicious_celery` posts the mail text to the server and stores the answer. Also runs campaign detection and the review-mailbox label sync. |
 | `ai_model` app | `Suspicious/Suspicious/ai_model/` | Label ledger, model registry (`ModelVersion`, `ModelEvent`), shadow results, retrain orchestration, server sync, `/api/ai-model/` backend. |
 | Settings card | UI, `/settings/ai_model` | Admin-only card for the retrain, shadow, promote and rollback actions. Listed only while the connector is enabled. |
 | RustFS | `rustfs` | Holds the training datasets (bucket `ai-datasets`) and model bundles (bucket `ai-models`), handed to the server as presigned URLs. |
@@ -30,7 +30,7 @@ the AI verdict comes only from this stack.
                         ▼
               ai_inference: encoder + ResNetMLP heads (+ shadow, if one is loaded)
                         │
-                 3. AiAssessment + case AI fields, CaseAnalyzerJob row "provider-..." closed
+                 3. AiAssessment + case AI fields, CaseAnalyzerJob row "ai_model-..." closed
                  4. reconcile_case ──► final verdict ──► case_finalised
                  5. case_finalised ──► run_campaign_detection ──► ChromaDB suspicious_mails
                                                               └─► campaign_updated (TheHive)
@@ -262,8 +262,8 @@ In Settings, connector gallery, tile `ai_model`, or:
 The API form is `PATCH /api/connectors/ai_model/` with the body `{"enabled": true}`, as an
 authenticated Admin or CERT user.
 
-Roles: the connector routes require the Admin or CERT role. Only one connector may provide
-`mail_ai`; enabling a second answers `409 <name> already provides mail_ai`.
+Roles: the connector routes require the Admin or CERT role. `ai_model` is an `analysis` engine
+beside Cortex; it is not general-purpose, so disabling it never needs `force`.
 
 ### 5.3 Test
 

@@ -31,22 +31,22 @@ class ShadowAnalyzeTest(TestCase):
     def test_without_a_shadow_the_request_is_unchanged(self):
         result, _, call = self.analyze(classify={"return_value": with_shadow(self.good())})
         call.assert_called_once_with("the mail", exclude_case_ids=[self.case.id])
-        self.assertIsNone(result.shadow)
+        self.assertIsNone(result["shadow"])
 
     def test_with_a_shadow_both_versions_are_asked_and_the_answer_rides_along(self):
         self.start_shadow()
         plain, _, _ = self.analyze()
         result, _, call = self.analyze(classify={"return_value": with_shadow(self.good())})
         call.assert_called_once_with("the mail", exclude_case_ids=[self.case.id], versions=["active", "shadow"])
-        self.assertEqual(result.shadow["class"], "DANGEROUS")
-        self.assertEqual(result.shadow, self.good())
-        self.assertEqual((result.result, result.score, result.confidence, result.assessment),
-                         (plain.result, plain.score, plain.confidence, plain.assessment))
+        self.assertEqual(result["shadow"]["class"], "DANGEROUS")
+        self.assertEqual(result["shadow"], self.good())
+        self.assertEqual((result["result"], result["score"], result["confidence"], result["assessment"]),
+                         (plain["result"], plain["score"], plain["confidence"], plain["assessment"]))
 
     def test_a_bad_shadow_answer_leaves_the_result_as_without_one(self):
         self.start_shadow()
         plain, _, _ = self.analyze()
         for shadow in ({"error": "Timeout"}, ..., "junk", None):
             result, _, _ = self.analyze(classify={"return_value": with_shadow(shadow)})
-            self.assertIsNone(result.shadow)
+            self.assertIsNone(result["shadow"])
             self.assertEqual(result, plain)

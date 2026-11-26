@@ -138,14 +138,17 @@ retrain check and registry sync.
 1. A user submits an email, file, URL, IP or hash through the web UI, the API,
    or the email feeder's IMAP polling.
 2. Django creates a `Case`, then dispatches analyzers through
-   `connectors.engines.dispatch` to each enabled analysis connector. Each call writes an `AnalyzerReport` and a
-   `CaseAnalyzerJob` ledger row atomically (`case_id` to `cortex_job_id`).
-3. For a mail with a readable archive, Django also hands the case to the
-   enabled `mail_ai` provider connector (`ai_model`): a pending
-   `CaseAnalyzerJob` row with a `provider-` job id is written and a Celery task
-   calls `ai_inference`. The answer is stored as an `AiAssessment` plus the
-   case's AI fields, and the row is closed. With no provider enabled the mail
-   gets no AI vote (`Inconclusive`, treated as missing by scoring).
+   `connectors.engines.dispatch` to each enabled analysis connector. Each start writes a
+   `CaseAnalyzerJob` ledger row (`case_id` to `cortex_job_id`) and, for an analyzer that
+   produces a report, its `AnalyzerReport`, atomically.
+3. For a mail with a readable archive, Django also dispatches the archive as the
+   `mail_archive` data type. The `ai_model` engine (if enabled) starts a deferred
+   job: a pending `CaseAnalyzerJob` row with an `ai_model-` job id and no report,
+   run by the Celery task `run_engine_job`, which calls `ai_inference`. The
+   connector's `on_result` stores the answer as an `AiAssessment` plus the
+   case's AI fields, and the row is closed. With `ai_model` disabled the mail
+   gets no AI vote (`Inconclusive`, treated as missing by scoring). Rows with a
+   `provider-` id are historic (the removed `mail_ai` provider slot).
 4. Cortex runs the analyzers asynchronously and POSTs to
    `/api/cortex/webhook/` (bearer secret, jobId-deduped) as each job finishes.
 5. The webhook view finds the case with one indexed read on
@@ -175,14 +178,14 @@ sequenceDiagram
 
     R->>F: forwards mail to the monitored mailbox
     F->>D: create case, upload attachments to RustFS
-    D->>D: Case + AnalyzerReport + CaseAnalyzerJob rows
+    D->>D: Case + CaseAnalyzerJob rows (+ AnalyzerReport for Cortex jobs)
     par Static analyzers
         D->>C: run YARA, sandbox, metadata analyzers
-    and AI provider
-        D->>Q: run_provider_analysis (provider- ledger row)
+    and ai_model engine (deferred mail_archive job)
+        D->>Q: run_engine_job (ai_model- ledger row, no report)
         Q->>AI: POST /v2/models/ai_mail/classify (Bearer token)
         AI-->>Q: class, score, confidence, campaign embedding
-        Q->>D: store AiAssessment, close provider row
+        Q->>D: on_result stores AiAssessment, close the row
         Q->>Q: enqueue reconcile_case
     end
     C-->>D: webhook per finished job
@@ -205,8 +208,9 @@ delivery ledger and a circuit breaker per connector. A connector declares which
 of four events it handles: `case_created`, `case_finalised`, `case_modified`,
 `campaign_updated`. `emit` writes one delivery row per subscribed, enabled
 connector and runs each hook as its own Celery task, so one failing connector
-never blocks another. A connector can also declare that it provides an analysis
-(`provides = "mail_ai"`, one enabled per kind); `ai_model` is the only one.
+never blocks another. A connector can also be an analysis engine
+(`provides = "analysis"`, several may be enabled): `cortex`, `ai_model` (the
+mail AI, `mail_archive` only) and the dev-only `fixture_engine`.
 
 Built-in connectors: TheHive, MISP, Watcher, SMTP notify, ChromaDB (collection
 cleanup), `ai_narration`, `case_search`, `elastic_siem`, `xsoar`, `ai_model`.

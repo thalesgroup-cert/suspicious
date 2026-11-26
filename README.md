@@ -134,7 +134,8 @@ Network layout, the service table and diagrams are in
 1. Django creates a `Case`. For each Cortex analyzer it writes an
    `AnalyzerReport` and a `CaseAnalyzerJob` row in one transaction, pinning the
    `(case, cortex job)` mapping at dispatch. A mail with a readable archive is
-   also handed to the `ai_model` provider (a `provider-` ledger row), if enabled.
+   also dispatched to the `ai_model` engine, if enabled: a deferred job with an
+   `ai_model-` ledger row and no report, run by a Celery worker.
 2. Cortex runs each analyzer and posts to the HMAC-signed webhook on completion.
 3. The webhook looks up the case in `CaseAnalyzerJob` and enqueues
    `reconcile_case`. The task takes a per-case Redis lock and calls

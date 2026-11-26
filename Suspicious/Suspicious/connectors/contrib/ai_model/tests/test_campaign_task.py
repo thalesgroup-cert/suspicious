@@ -28,7 +28,7 @@ from connectors.models import ConnectorState
 from connectors.providers import ProviderUnavailable
 from connectors.registry import ConnectorRegistry
 from connectors.tasks import run_campaign_detection
-from connectors.tests.test_provider_dispatch import make_mail_case
+from connectors.contrib.ai_model.tests.test_connector import make_mail_case
 
 C = "connectors.contrib.ai_model.campaigns"
 CHROMA = f"{C}.get_chroma_client"
