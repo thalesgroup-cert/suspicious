@@ -1,6 +1,7 @@
 import { Alert, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 
 import { useAiModelLedger } from "../hooks";
+import { sourceName } from "../labels";
 import { FlagsList } from "./FlagsList";
 import { QueueLists } from "./QueueLists";
 
@@ -20,7 +21,7 @@ export function LedgerTab() {
   return (
     <Box sx={{ display: "grid", gap: 3 }}>
       <Box>
-        <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Labels by source</Typography>
+        <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Where the labels come from</Typography>
         <TableContainer>
           <Table size="small" aria-label="Labels by source">
             <TableHead>
@@ -32,7 +33,7 @@ export function LedgerTab() {
             <TableBody>
               {sources.map((s) => (
                 <TableRow key={s}>
-                  <TableCell component="th" scope="row">{s}</TableCell>
+                  <TableCell component="th" scope="row">{sourceName(s)}</TableCell>
                   {classes.map((c) => <TableCell key={c}>{by_source[s][c] ?? 0}</TableCell>)}
                 </TableRow>
               ))}
@@ -41,21 +42,21 @@ export function LedgerTab() {
         </TableContainer>
       </Box>
       <Box>
-        <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Label mix</Typography>
+        <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Share of each class</Typography>
         {mix.jump && (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            {mix.jump.class} moved from {pct(mix.jump.from)} to {pct(mix.jump.to)} of folder labels in the last 30 days.
+            {mix.jump.class} went from {pct(mix.jump.from)} to {pct(mix.jump.to)} of the mail-folder labels in the last 30 days.
           </Alert>
         )}
         {!hasMix ? (
-          <Typography>No folder labels yet.</Typography>
+          <Typography>No mail-folder labels yet.</Typography>
         ) : (
           <Table size="small" aria-label="Label mix">
             <TableHead>
               <TableRow>
                 <TableCell component="th" scope="col">Class</TableCell>
                 <TableCell component="th" scope="col">Now ({mix.rows.now} labels)</TableCell>
-                <TableCell component="th" scope="col">30 days ago ({mix.rows.before} labels)</TableCell>
+                {mix.rows.before > 0 && <TableCell component="th" scope="col">30 days ago ({mix.rows.before} labels)</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -63,7 +64,7 @@ export function LedgerTab() {
                 <TableRow key={c}>
                   <TableCell component="th" scope="row">{c}</TableCell>
                   <TableCell>{pct(mix.now[c])}</TableCell>
-                  <TableCell>{pct(mix.before[c])}</TableCell>
+                  {mix.rows.before > 0 && <TableCell>{pct(mix.before[c])}</TableCell>}
                 </TableRow>
               ))}
             </TableBody>

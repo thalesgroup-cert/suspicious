@@ -1,11 +1,11 @@
 import * as React from "react";
-import { Alert, Box, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
 import type { VersionRow } from "../api";
 import { useAiModelStatus, useAiModelVersions, useRollback } from "../hooks";
-import { refusalMessage } from "../labels";
+import { refusalMessage, statusName, triggerName } from "../labels";
 import { PAGE, Pager } from "./Pager";
 
 // Mirror stats.AGE_WARNING_DAYS and stats.MIN_PURITY in ai_model/stats.py.
@@ -26,6 +26,7 @@ function warnings(v: VersionRow): string[] {
 export function VersionsTab() {
   const [offset, setOffset] = React.useState(0);
   const [confirm, setConfirm] = React.useState<VersionRow | null>(null);
+  const [open, setOpen] = React.useState<string | null>(null);
   // The latest outcome only, so an old refusal does not outlive a later success.
   const [outcome, setOutcome] = React.useState<string | null>(null);
   const q = useAiModelVersions({ limit: PAGE, offset });
@@ -40,45 +41,54 @@ export function VersionsTab() {
   return (
     <Box>
       {count === 0 ? (
-        <Typography>No versions yet.</Typography>
+        <Typography>No models yet.</Typography>
       ) : (
         <TableContainer>
           <Table size="small" aria-label="Version history">
             <TableHead>
               <TableRow>
-                {["Version", "Status", "Created", "Trigger", "Scored", "Dangerous", "Campaigns created", "Campaigns joined", "Alerts", "Purity", "Warnings", "Action"].map((h) => (
+                {["Version", "Status", "Created", "Made", "Mails scored", "Notes", "Action"].map((h) => (
                   <TableCell key={h} component="th" scope="col">{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {results.map((v) => (
-                <TableRow key={v.version_id}>
-                  <TableCell component="th" scope="row">{versionName(v.version_id)}</TableCell>
-                  <TableCell>{v.status}</TableCell>
-                  <TableCell>{day(v.created_at)}</TableCell>
-                  <TableCell>{v.trigger}</TableCell>
-                  <TableCell>{v.stats.scored}</TableCell>
-                  <TableCell>{v.stats.dangerous}</TableCell>
-                  <TableCell>{v.stats.created}</TableCell>
-                  <TableCell>{v.stats.joined}</TableCell>
-                  <TableCell>{v.stats.alerts}</TableCell>
-                  <TableCell>
-                    {v.purity.purity === null ? "no labelled members" : `${pct(v.purity.purity)} of ${v.purity.labelled} labelled`}
-                  </TableCell>
-                  <TableCell>
-                    {warnings(v).map((w) => (
-                      <Typography key={w} variant="body2">{w}</Typography>
-                    ))}
-                  </TableCell>
-                  <TableCell>
-                    {v.status === "previous" && (
-                      <Button size="small" disabled={rollback.isPending} aria-label={`Rollback to ${v.version_id}`} onClick={() => setConfirm(v)}>
-                        Rollback
+                <React.Fragment key={v.version_id}>
+                  <TableRow>
+                    <TableCell component="th" scope="row">{versionName(v.version_id)}</TableCell>
+                    <TableCell><Chip size="small" label={statusName(v.status)} color={v.status === "active" ? "success" : "default"} /></TableCell>
+                    <TableCell>{day(v.created_at)}</TableCell>
+                    <TableCell>{triggerName(v.trigger)}</TableCell>
+                    <TableCell>{v.stats.scored}</TableCell>
+                    <TableCell>
+                      {warnings(v).map((w) => (
+                        <Typography key={w} variant="body2">{w}</Typography>
+                      ))}
+                      <Button size="small" aria-expanded={open === v.version_id} aria-label={`Details of ${versionName(v.version_id)}`}
+                        onClick={() => setOpen(open === v.version_id ? null : v.version_id)}>
+                        {open === v.version_id ? "Hide details" : "Details"}
                       </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell>
+                      {v.status === "previous" && (
+                        <Button size="small" disabled={rollback.isPending} aria-label={`Rollback to ${v.version_id}`} onClick={() => setConfirm(v)}>
+                          Rollback
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                  {open === v.version_id && (
+                    <TableRow>
+                      <TableCell colSpan={7}>
+                        <Typography variant="body2">
+                          Called {v.stats.dangerous} Dangerous · started {v.stats.created} campaigns and joined {v.stats.joined} · raised {v.stats.alerts} alerts ·
+                          campaign purity {v.purity.purity === null ? "not known (no labelled members)" : `${pct(v.purity.purity)} of ${v.purity.labelled} labelled members`}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

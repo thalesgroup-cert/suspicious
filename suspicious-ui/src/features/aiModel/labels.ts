@@ -43,3 +43,22 @@ export const FLAG_REASON_TEXT: Record<string, string> = {
   folder_verdict_mismatch: "folder label disagrees with the analyst verdict",
 };
 export const flagReasonText = (r: string) => FLAG_REASON_TEXT[r] ?? "flagged for review";
+
+const SOURCE_TEXT: Record<string, string> = {
+  analyst_verdict: "Analyst verdict",
+  challenge: "User challenge",
+  imap_folder: "Mail folder",
+};
+const STATUS_TEXT: Record<string, string> = {
+  active: "In use", previous: "Previous", shadow: "Being tested", candidate: "Waiting for a check", discarded: "Discarded",
+};
+const TRIGGER_TEXT: Record<string, string> = { manual: "By hand", scheduled: "Automatic", import: "Imported" };
+const CHECK_TEXT: Record<string, string> = {
+  macro_f1: "Overall accuracy (macro F1)",
+  campaign_heldout: "Dangerous mails called Safe in campaigns",
+};
+const text = (m: Record<string, string>) => (k: string) => m[k] ?? k.replace(/_/g, " ");
+export const sourceName = text(SOURCE_TEXT);
+export const statusName = text(STATUS_TEXT);
+export const triggerName = text(TRIGGER_TEXT);
+export const checkName = text(CHECK_TEXT);

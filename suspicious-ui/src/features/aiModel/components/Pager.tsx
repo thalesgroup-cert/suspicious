@@ -8,6 +8,7 @@ export function Pager({ count, offset, onChange, label }: { count: number; offse
   React.useEffect(() => {
     if (offset > 0 && offset >= count) onChange(Math.max(0, offset - PAGE));
   }, [offset, count, onChange]);
+  if (count <= PAGE && offset === 0) return null;
   return (
     <TablePagination
       component="div"

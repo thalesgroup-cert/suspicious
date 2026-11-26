@@ -7,7 +7,6 @@ import { OverviewTab } from "./OverviewTab";
 import { ShadowTab } from "./ShadowTab";
 import { VersionsTab } from "./VersionsTab";
 
-// Tasks 7 to 11 fill the tabs.
 const TABS = ["Overview", "Candidate", "Shadow", "Versions", "Ledger"] as const;
 
 export function AiModelPanel() {
@@ -24,8 +23,8 @@ export function AiModelPanel() {
         ))}
       </Tabs>
       <Box role="tabpanel" id={`${id}-panel-${tab}`} aria-labelledby={`${id}-tab-${tab}`} sx={{ pt: 2 }}>
-        {tab === "Overview" && <OverviewTab onSeeCandidate={() => setTab("Candidate")} />}
-        {tab === "Candidate" && <CandidateTab />}
+        {tab === "Overview" && <OverviewTab onSeeCandidate={() => setTab("Candidate")} onSeeShadow={() => setTab("Shadow")} onSeeLedger={() => setTab("Ledger")} />}
+        {tab === "Candidate" && <CandidateTab onSeeOverview={() => setTab("Overview")} />}
         {tab === "Shadow" && <ShadowTab onSeeCandidate={() => setTab("Candidate")} />}
         {tab === "Versions" && <VersionsTab />}
         {tab === "Ledger" && <LedgerTab />}

@@ -46,7 +46,8 @@ describe("VersionsTab", () => {
     expect(within(t).getByRole("rowheader", { name: "v0 (the original model)" })).toBeInTheDocument();
     const r = within(screen.getByRole("rowheader", { name: "v3" }).closest("tr")!);
     expect(r.getByText("100")).toBeInTheDocument();
-    expect(r.getByText("95% of 40 labelled")).toBeInTheDocument();
+    await userEvent.click(r.getByRole("button", { name: "Details of v3" }));
+    expect(await screen.findByText(/campaign purity 95% of 40 labelled members/)).toBeInTheDocument();
     const bad = within(screen.getByRole("rowheader", { name: "v2" }).closest("tr")!);
     expect(bad.getByText(/Low purity/)).toBeInTheDocument();
     expect(bad.getByText(/Created more than 60 days ago/)).toBeInTheDocument();
@@ -110,6 +111,6 @@ describe("VersionsTab", () => {
   it("shows the empty state", async () => {
     vi.mocked(api.getVersions).mockResolvedValue(page([]));
     renderTab();
-    expect(await screen.findByText(/No versions yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/No models yet/)).toBeInTheDocument();
   });
 });

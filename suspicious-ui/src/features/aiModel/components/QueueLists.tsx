@@ -17,9 +17,9 @@ export function QueueLists() {
   const { disagreements: d, campaign_conflicts: c } = q.data;
   return (
     <Box>
-      <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Review queue</Typography>
+      <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Cases to double-check</Typography>
       {d.count === 0 ? (
-        <Typography>No cases where the AI disagrees with the evidence.</Typography>
+        <Typography>None. The AI agrees with the evidence on every case.</Typography>
       ) : (
         <Table size="small" aria-label="AI disagrees with the evidence">
           <TableHead>
@@ -43,7 +43,7 @@ export function QueueLists() {
       )}
       <Pager count={d.count} offset={dOff} onChange={setDOff} label="AI disagreements" />
       {c.count === 0 ? (
-        <Typography>No campaigns with disagreeing members.</Typography>
+        <Typography>None. Every campaign has consistent members.</Typography>
       ) : (
         // ponytail: no per-campaign route exists (only the /campaigns list), so no link.
         <Table size="small" aria-label="Campaign members disagree">

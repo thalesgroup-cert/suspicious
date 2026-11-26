@@ -57,21 +57,21 @@ describe("OverviewTab", () => {
 
   it("shows health ok, failing with detail, and never checked", async () => {
     renderTab(status());
-    expect(await screen.findByText(/Connector health: ok/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Inference server reachable/i)).toBeInTheDocument();
   });
   it("shows a failing health with its stored detail", async () => {
     renderTab(status({ health: { ok: false, detail: "inference unreachable", checked_at: daysAgo(1) } }));
-    expect(await screen.findByText(/Connector health: failing/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Inference server not reachable/i)).toBeInTheDocument();
     expect(screen.getByText(/inference unreachable/)).toBeInTheDocument();
   });
   it("shows never checked", async () => {
     renderTab(status({ health: { ok: null, detail: "", checked_at: null } }));
-    expect(await screen.findByText(/Connector health: never checked/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Not checked yet/i)).toBeInTheDocument();
   });
 
   it("offers no reset when the breaker is closed", async () => {
     renderTab(status());
-    expect(await screen.findByText(/Circuit breaker: closed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Calls to the server allowed/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /reset breaker/i })).toBeNull();
   });
   it("resets an open breaker after confirmation and announces the result", async () => {
@@ -103,11 +103,11 @@ describe("OverviewTab", () => {
     await user.click(await screen.findByRole("button", { name: /reset breaker/i }));
     vi.mocked(api.getStatus).mockResolvedValue(closed);
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^reset$/i }));
-    await screen.findByText(/Circuit breaker: closed/);
+    await screen.findByText(/Calls to the server allowed/);
     expect(screen.getByText(/breaker was reset/i)).toBeInTheDocument();
     vi.mocked(api.getStatus).mockResolvedValue(open);
     await qc.invalidateQueries();
-    await screen.findByText(/Circuit breaker: open/);
+    await screen.findByText(/Calls paused after failures/);
     expect(screen.queryByText(/breaker was reset/i)).toBeNull();
   });
   it("offers a reset for half-open", async () => {
@@ -117,32 +117,46 @@ describe("OverviewTab", () => {
 
   it("shows the active version, its age and the calibration note for v0", async () => {
     renderTab(status({ active: version("v0", 5) }));
-    expect(await screen.findByText(/v0/)).toBeInTheDocument();
+    expect(await screen.findByText(/original model \(v0\)/)).toBeInTheDocument();
     expect(screen.getByText(/5 days old/)).toBeInTheDocument();
-    expect(screen.getByText(/Confidence not calibrated/)).toBeInTheDocument();
+    expect(screen.getByText(/not calibrated/)).toBeInTheDocument();
     expect(screen.queryByText(/older than 60 days/i)).toBeNull();
   });
   it("warns when the active version is older than 60 days", async () => {
     renderTab(status({ active: version("v3", 61) }));
     expect(await screen.findByText(/older than 60 days/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Confidence not calibrated/)).toBeNull();
+    expect(screen.queryByText(/not calibrated/)).toBeNull();
   });
 
-  it("renders label counts by class and source", async () => {
-    renderTab(status());
-    const row = (await screen.findByRole("row", { name: /folder/i }));
-    expect(within(row).getByText("12")).toBeInTheDocument();
-    expect(within(row).getByText("30")).toBeInTheDocument();
-    expect(screen.getByRole("row", { name: /flag/i })).toBeInTheDocument();
+  it("summarises the training data and links to the Ledger tab", async () => {
+    const onSeeLedger = vi.fn();
+    vi.mocked(api.getStatus).mockResolvedValue(status());
+    vi.mocked(api.getJobs).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <SnackbarProvider>
+          <OverviewTab onSeeCandidate={vi.fn()} onSeeLedger={onSeeLedger} />
+        </SnackbarProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/44 labelled mails ready to train on, 1 flagged/)).toBeInTheDocument();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.click(screen.getByRole("button", { name: "See the labels" }));
+    expect(onSeeLedger).toHaveBeenCalled();
+  });
+
+  it("points to the new model when a candidate waits", async () => {
+    renderTab(status({ counts: { candidate: 1, shadow: 0, active: 1, previous: 0, discarded: 0, failed: 0 } }));
+    expect(await screen.findByText(/new model is waiting for your decision/)).toBeInTheDocument();
   });
 
   it("shows the schedule, off, and the backoff", async () => {
     renderTab(status());
-    expect(await screen.findByText(/Automatic retrain every 30 days, next about/)).toBeInTheDocument();
+    expect(await screen.findByText(/Automatic: every 30 days, next about/)).toBeInTheDocument();
   });
   it("shows Off", async () => {
     renderTab(status({ schedule: { enabled: false, interval_days: 30, next_run: null, backoff_until: null } }));
-    expect(await screen.findByText(/Automatic retrain: Off/)).toBeInTheDocument();
+    expect(await screen.findByText(/Automatic retraining is off/)).toBeInTheDocument();
   });
   it("shows the wait after a failed run", async () => {
     renderTab(status({ schedule: { enabled: true, interval_days: 30, next_run: "2026-12-01T00:00:00Z", backoff_until: "2026-11-12T00:00:00Z" } }));
@@ -165,7 +179,7 @@ describe("OverviewTab", () => {
     }));
     expect(await screen.findByRole("button", { name: /retrain now/i })).toBeDisabled();
     expect(screen.getByText(/running/i)).toBeInTheDocument();
-    expect(screen.getByText(/120 rows/)).toBeInTheDocument();
+    expect(screen.getByText(/120 mails/)).toBeInTheDocument();
   });
   it("shows the refusal text of a 409", async () => {
     vi.mocked(api.postRetrain).mockRejectedValue({ response: { status: 409, data: {} } });
@@ -178,7 +192,7 @@ describe("OverviewTab", () => {
   });
   it("fetches jobs only while a job runs", async () => {
     renderTab(status());
-    await screen.findByText(/Connector health/);
+    await screen.findByText(/Inference server reachable/);
     expect(api.getJobs).not.toHaveBeenCalled();
   });
   it("fetches jobs while a job runs", async () => {
@@ -211,24 +225,24 @@ describe("OverviewTab", () => {
       </QueryClientProvider>,
     );
     await waitFor(() => expect(api.getJobs).toHaveBeenCalled());
-    expect(await screen.findByText(/Last job: running/)).toBeInTheDocument();
+    expect(await screen.findByText(/Last training run: running/)).toBeInTheDocument();
     vi.mocked(api.getStatus).mockResolvedValue(status({ jobs: [{ ...running, state: "succeeded", finished_at: daysAgo(0) }] }));
     await qc.invalidateQueries({ queryKey: ["ai-model", "status"] });
-    expect(await screen.findByText(/Last job: succeeded/)).toBeInTheDocument();
+    expect(await screen.findByText(/Last training run: succeeded/)).toBeInTheDocument();
   });
   it("labels a finished recheck as a recheck and offers no candidate for it", async () => {
     renderTab(status({
       jobs: [{ job_id: "j3", kind: "recheck", state: "succeeded", trigger: "manual", rows: 100, excluded_rows: 0, started_at: daysAgo(1), finished_at: daysAgo(1), error: "" }],
     }));
-    expect(await screen.findByText(/Last job \(gate recheck\): succeeded/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /see candidate/i })).toBeNull();
+    expect(await screen.findByText(/Last quality check: succeeded/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /see the new model/i })).toBeNull();
   });
   it("offers See candidate for a succeeded job", async () => {
     const { onSeeCandidate } = renderTab(status({
       jobs: [{ job_id: "j2", kind: "retrain", state: "succeeded", trigger: "manual", rows: 100, excluded_rows: 0, started_at: daysAgo(1), finished_at: daysAgo(1), error: "" }],
     }));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    await user.click(await screen.findByRole("button", { name: /see candidate/i }));
+    await user.click(await screen.findByRole("button", { name: /see the new model/i }));
     expect(onSeeCandidate).toHaveBeenCalled();
   });
 });
