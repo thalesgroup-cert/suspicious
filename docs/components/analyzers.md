@@ -784,17 +784,24 @@ connector gallery tile for `ai_model` carries a line pointing here, with a link 
 
 Five tabs:
 
-- **Overview:** connector health, the circuit breaker state with a reset (only while open or
-  half-open), the active version and its age (a warning past 60 days), labels by source and class,
-  the schedule, and "Retrain now".
-- **Candidate:** the newest candidate, its gate checks with value and threshold (failed checks
-  first), the campaign held-out result and the tier cutoffs. "Start shadow" is unavailable when the
-  candidate is not eligible or a shadow exists. Discard.
-- **Shadow:** age and live results against the promotion minimums, agreement, verdict changes with
-  review, campaign effects and the alert delta, the promotion conditions (met and unmet, in words),
-  Promote, Extend, Recheck, Discard.
-- **Versions:** history with counters and purity, and Rollback on the `previous` version.
-- **Ledger:** label mix with its jump warning, flagged labels with resolve, and the review queue.
+- **Overview:** the model in use and its age (a warning past 60 days), a pointer to a waiting
+  candidate or a running shadow, two status chips (inference server reachable, calls allowed or
+  paused by the circuit breaker, with a reset while open or half-open), a one-line training-data
+  summary linking to the Ledger, the schedule, and "Retrain now".
+- **Candidate:** the newest candidate with a pass or fail verdict, its gate checks with value and
+  threshold (failed checks first, named in words), the campaign held-out result and the tier
+  cutoffs. "Test on live mail" (starts the shadow) is unavailable when the candidate is not
+  eligible or a shadow exists. Discard.
+- **Shadow:** age and live results against the promotion minimums, a one-sentence agreement
+  summary, a readiness card (the promotion conditions, met and unmet, in words) with Promote, and
+  a queue of only what blocks promotion (risky verdict changes and alert differences, with case
+  links). "Mark all reviewed" reviews every open item of one kind with one shared note
+  (`POST /api/ai-model/reviews/all/`; one review row per case is still written). The full verdict
+  changes, campaign effects and agreement table are folded away. Extend, Recheck, Discard.
+- **Versions:** history with status chips (counters and purity behind a Details toggle), and
+  Rollback on the `previous` version.
+- **Ledger:** where the labels come from, the share of each class with its jump warning, labels to
+  confirm (resolve), and cases to double-check.
 
 Retrain, promote, rollback, discard, resolve and the breaker reset each ask for confirmation. A
 `409` is shown in words from its `codes`; the card shows only what the server confirmed. Every

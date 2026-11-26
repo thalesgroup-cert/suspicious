@@ -24,6 +24,11 @@ class ReviewSerializer(ActionSerializer):
     note = serializers.CharField(max_length=2000)  # non-empty, trimmed
 
 
+class ReviewAllSerializer(ActionSerializer):
+    kind = serializers.ChoiceField(choices=ShadowReview.Kind.values)
+    note = serializers.CharField(max_length=2000)  # non-empty, trimmed
+
+
 class ResolveSerializer(serializers.Serializer):
     keep = serializers.BooleanField()
     note = serializers.CharField(max_length=2000)  # non-empty, trimmed

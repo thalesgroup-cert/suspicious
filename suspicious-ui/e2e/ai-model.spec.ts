@@ -77,6 +77,10 @@ function shadowBody(m: Mock) {
     campaign_effects: { count: 0, results: [] },
     alert_delta: { candidate_only: { count: 0, results: [] }, active_only: { count: 0, results: [] } },
     conditions: m.conditions,
+    to_review: {
+      flips: { count: m.reviewed ? 0 : 1, results: m.reviewed ? [] : [{ case_id: 55, live_result: "Safe", would_be_result: "Dangerous" }] },
+      alerts: { count: 0, results: [] },
+    },
   };
 }
 
@@ -161,18 +165,18 @@ test("retrain produces a candidate whose failed gate check blocks the shadow", a
   await setup(page, ["Admin"], base());
   await page.goto("/settings/ai_model");
 
-  await expect(page.getByText("Circuit breaker: closed")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("Active version: v1")).toBeVisible();
+  await expect(page.getByText("Calls to the server allowed")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("v1").first()).toBeVisible();
 
   await page.getByRole("button", { name: "Retrain now" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Start retrain" }).click();
-  await expect(page.getByText("Last job: succeeded, 1200 rows, 30 excluded")).toBeVisible();
+  await expect(page.getByText("Last training run: succeeded, 1200 mails, 30 left out")).toBeVisible();
 
-  await page.getByRole("button", { name: "See candidate" }).click();
-  await expect(page.getByText("Candidate v2")).toBeVisible();
-  await expect(page.getByRole("row", { name: /campaign_heldout Failed/ })).toBeVisible();
-  await expect(page.getByText("Not eligible: campaign_heldout")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start shadow" })).toBeDisabled();
+  await page.getByRole("button", { name: "See the new model" }).click();
+  await expect(page.getByText("New model v2")).toBeVisible();
+  await expect(page.getByRole("row", { name: /Dangerous mails called Safe in campaigns Failed/ })).toBeVisible();
+  await expect(page.getByText(/did not pass the quality check: Dangerous mails called Safe in campaigns/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Test on live mail" })).toBeDisabled();
 });
 
 test("shadow, review, promote and roll back", async ({ page }) => {
@@ -183,31 +187,31 @@ test("shadow, review, promote and roll back", async ({ page }) => {
   await page.goto("/settings/ai_model");
 
   await page.getByRole("tab", { name: "Candidate" }).click();
-  await page.getByRole("button", { name: "Start shadow" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Start shadow" }).click();
+  await page.getByRole("button", { name: "Test on live mail" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Start testing" }).click();
 
   await page.getByRole("tab", { name: "Shadow" }).click();
-  await expect(page.getByText("Shadow v3")).toBeVisible();
-  await expect(page.getByText("Not met: Some critical verdict flips are not reviewed yet.")).toBeVisible();
+  await expect(page.getByText(/New model v3/)).toBeVisible();
+  await expect(page.getByText("Review the risky verdict changes")).toBeVisible();
   await expect(page.getByRole("button", { name: "Promote" })).toBeDisabled();
 
   await page.getByRole("button", { name: "Review case 55" }).click();
   await page.getByLabel("Review note").fill("Checked the headers, the candidate is right.");
   await page.getByRole("button", { name: "Save review" }).click();
-  await expect(page.getByText("Done: All critical verdict flips are reviewed.")).toBeVisible();
+  await expect(page.getByText("Risky verdict changes are reviewed")).toBeVisible();
 
   await page.getByRole("button", { name: "Promote" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Promote" }).click();
   await expect(page.getByText("No shadow is running.")).toBeVisible();
 
   await page.getByRole("tab", { name: "Versions" }).click();
-  await expect(page.getByRole("row", { name: /^v3 active/ })).toBeVisible();
-  await expect(page.getByRole("row", { name: /^v1 previous/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /^v3 In use/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /^v1 Previous/ })).toBeVisible();
 
   await page.getByRole("button", { name: "Rollback to v1" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Roll back" }).click();
   await expect(page.getByText("Rolled back to v1.")).toBeVisible();
-  await expect(page.getByRole("row", { name: /^v1 active/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /^v1 In use/ })).toBeVisible();
 });
 
 test("a refused promotion shows the 409 codes in words", async ({ page }) => {

@@ -53,14 +53,14 @@ describe("CandidateTab", () => {
 
   it("says so with no candidate", async () => {
     renderTab([]);
-    expect(await screen.findByText(/No candidate/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No new model is waiting/i)).toBeInTheDocument();
   });
 
   it("shows rows, excluded rows, trigger and date", async () => {
     renderTab([cand()]);
-    expect(await screen.findByText(/1200 rows/)).toBeInTheDocument();
-    expect(screen.getByText(/30 excluded/)).toBeInTheDocument();
-    expect(screen.getByText(/manual/)).toBeInTheDocument();
+    expect(await screen.findByText(/from 1200 labelled mails/)).toBeInTheDocument();
+    expect(screen.getByText(/30 left out/)).toBeInTheDocument();
+    expect(screen.getByText(/Trained by hand/)).toBeInTheDocument();
     expect(screen.getByText(new Date("2026-11-01T00:00:00Z").toLocaleDateString())).toBeInTheDocument();
   });
 
@@ -69,7 +69,7 @@ describe("CandidateTab", () => {
     const table = await screen.findByRole("table", { name: /gate checks/i });
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows).toHaveLength(3);
-    expect(within(rows[0]).getByRole("rowheader")).toHaveTextContent("dangerous_called_safe");
+    expect(within(rows[0]).getByRole("rowheader")).toHaveTextContent("dangerous called safe");
     expect(within(rows[0]).getByText("Failed")).toBeInTheDocument();
     expect(within(rows[0]).getByText("0.04")).toBeInTheDocument();
     expect(within(rows[0]).getByText("0.02")).toBeInTheDocument();
@@ -78,7 +78,7 @@ describe("CandidateTab", () => {
 
   it("shows the campaign line and the tier cutoffs", async () => {
     renderTab([cand()]);
-    expect(await screen.findByText(/Campaign held-out: 0.01 Dangerous called Safe, baseline 0.02, 17 groups/)).toBeInTheDocument();
+    expect(await screen.findByText(/Campaign test: 0.01 Dangerous mails called Safe \(the current model: 0.02\), across 17 campaigns/)).toBeInTheDocument();
     expect(screen.getByText(/High 0.93/)).toBeInTheDocument();
     expect(screen.getByText(/Medium 0.6/)).toBeInTheDocument();
   });
@@ -95,33 +95,33 @@ describe("CandidateTab", () => {
   it("starts the shadow after confirmation", async () => {
     vi.mocked(api.postShadowStart).mockResolvedValue({} as never);
     renderTab([cand()]);
-    const btn = await screen.findByRole("button", { name: "Start shadow" });
+    const btn = await screen.findByRole("button", { name: "Test on live mail" });
     expect(btn).toBeEnabled();
     await userEvent.click(btn);
     expect(api.postShadowStart).not.toHaveBeenCalled();
-    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Start shadow" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Start testing" }));
     await waitFor(() => expect(vi.mocked(api.postShadowStart).mock.calls[0][0]).toEqual({ version_id: "v4" }));
   });
 
   it("shows a 409 refusal text", async () => {
     vi.mocked(api.postShadowStart).mockRejectedValue({ response: { status: 409, data: { detail: "Another shadow is running." } } });
     renderTab([cand()]);
-    await userEvent.click(await screen.findByRole("button", { name: "Start shadow" }));
-    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Start shadow" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Test on live mail" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Start testing" }));
     expect((await screen.findAllByText(/Another shadow is running/)).length).toBeGreaterThan(0);
   });
 
   it("disables Start shadow while a shadow exists", async () => {
     renderTab([cand()], status({ version_id: "v3" }));
     await waitFor(() => expect(api.getStatus).toHaveBeenCalled());
-    expect(await screen.findByRole("button", { name: "Start shadow" })).toBeDisabled();
-    expect(await screen.findByText(/shadow is already running/i)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Test on live mail" })).toBeDisabled();
+    expect(await screen.findByText(/already being tested/i)).toBeInTheDocument();
   });
 
   it("names the failed checks beside the disabled button for an ineligible candidate", async () => {
     renderTab([cand({ eligible: false })]);
-    expect(await screen.findByRole("button", { name: "Start shadow" })).toBeDisabled();
-    expect(screen.getByText(/Not eligible: dangerous_called_safe/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Test on live mail" })).toBeDisabled();
+    expect(screen.getByText(/did not pass the quality check: dangerous called safe/)).toBeInTheDocument();
   });
 
   it("asks before discarding, then posts", async () => {

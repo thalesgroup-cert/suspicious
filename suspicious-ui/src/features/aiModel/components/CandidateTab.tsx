@@ -4,11 +4,11 @@ import { Alert, Box, Button, Stack, Typography } from "@mui/material";
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
 import { useAiModelCandidates, useAiModelStatus, useDiscard, useShadowStart } from "../hooks";
-import { refusalMessage } from "../labels";
+import { checkName, refusalMessage, triggerName } from "../labels";
 import { failedNames } from "./gateFormat";
 import { GateTable } from "./GateTable";
 
-export function CandidateTab() {
+export function CandidateTab({ onSeeOverview }: { onSeeOverview?(): void }) {
   const list = useAiModelCandidates();
   const status = useAiModelStatus();
   const start = useShadowStart();
@@ -19,7 +19,17 @@ export function CandidateTab() {
   if (!list.data) return <Typography>Loading</Typography>;
   // The list also holds the running shadow; the newest real candidate is the one to act on.
   const c = list.data.results.find((r) => r.status === "candidate");
-  if (!c) return <Typography>No candidate. Start a retrain from the Overview tab.</Typography>;
+  if (!c) {
+    return (
+      <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
+        <Typography>No new model is waiting.</Typography>
+        <Typography variant="body2" color="text.secondary">
+          A new model appears here after a retrain. You check it, test it on live mail, then decide whether to use it.
+        </Typography>
+        {onSeeOverview && <Button variant="outlined" onClick={onSeeOverview}>Go to Overview to retrain</Button>}
+      </Stack>
+    );
+  }
 
   const shadowExists = !!status.data?.shadow;
   const canStart = c.eligible && !shadowExists && !start.isPending;
@@ -30,19 +40,23 @@ export function CandidateTab() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography>
-          Candidate {c.version_id}, {c.rows ?? "unknown"} rows, {c.excluded_rows ?? 0} excluded
+        <Typography variant="h6" component="h3">New model {c.version_id}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Trained {triggerName(c.trigger).toLowerCase()} on <time dateTime={c.created_at}>{new Date(c.created_at).toLocaleDateString()}</time>
+          {" "}from {c.rows ?? "an unknown number of"} labelled mails ({c.excluded_rows ?? 0} left out).
         </Typography>
-        <Typography variant="body2">
-          Trigger {c.trigger}, created <time dateTime={c.created_at}>{new Date(c.created_at).toLocaleDateString()}</time>
-        </Typography>
+        <Alert severity={c.eligible ? "success" : "warning"} sx={{ mt: 1 }}>
+          {c.eligible
+            ? "It passed the quality check. Test it on live mail before using it."
+            : `It did not pass the quality check${failed.length ? `: ${failed.map(checkName).join(", ")}` : ""}. It cannot be tested.`}
+        </Alert>
       </Box>
 
       <GateTable gate={c.gate} />
 
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
         <Button variant="contained" disabled={!canStart} onClick={() => setDialog("start")}>
-          Start shadow
+          Test on live mail
         </Button>
         <Button color="error" disabled={discard.isPending} onClick={() => setDialog("discard")}>
           Discard
@@ -50,20 +64,15 @@ export function CandidateTab() {
       </Stack>
 
       <Box role="status">
-        {!c.eligible && (
-          <Typography variant="body2">
-            Not eligible{failed.length ? `: ${failed.join(", ")}` : ": the gate result is not available"}
-          </Typography>
-        )}
-        {c.eligible && shadowExists && <Typography variant="body2">A shadow is already running. Promote or discard it first.</Typography>}
+        {c.eligible && shadowExists && <Typography variant="body2">Another model is already being tested. Promote or discard it first.</Typography>}
         {err && <Typography variant="body2">{err}</Typography>}
       </Box>
 
       <ConfirmDialog
         open={dialog === "start"}
-        title="Start the shadow period?"
-        body={`${c.version_id} will score live mail next to the active model. It does not change any verdict.`}
-        confirmLabel="Start shadow"
+        title="Test this model on live mail?"
+        body={`${c.version_id} will score live mail next to the model in use. It does not change any verdict.`}
+        confirmLabel="Start testing"
         onCancel={close}
         onConfirm={() => {
           close();

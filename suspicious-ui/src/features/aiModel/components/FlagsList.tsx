@@ -4,7 +4,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, D
 import type { FlagRow } from "../api";
 import { RESOLVE_NOTE_MAX } from "../constants";
 import { useAiModelFlags, useResolveFlag } from "../hooks";
-import { flagReasonText, refusalMessage } from "../labels";
+import { flagReasonText, refusalMessage, sourceName } from "../labels";
 import { PAGE, Pager } from "./Pager";
 
 type Pending = { row: FlagRow; keep: boolean };
@@ -44,9 +44,9 @@ export function FlagsList() {
 
   return (
     <Box>
-      <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Flagged labels</Typography>
+      <Typography variant="subtitle2" component="h4" sx={{ mb: 1 }}>Labels to confirm</Typography>
       {count === 0 ? (
-        <Typography>No flagged labels.</Typography>
+        <Typography>None. Every label looks consistent.</Typography>
       ) : (
         <TableContainer>
           <Table size="small" aria-label="Flagged labels">
@@ -60,7 +60,7 @@ export function FlagsList() {
                 <TableRow key={r.id}>
                   <TableCell component="th" scope="row">{r.case_id ?? "none"}</TableCell>
                   <TableCell>{r.label_class}</TableCell>
-                  <TableCell>{r.source}</TableCell>
+                  <TableCell>{sourceName(r.source)}</TableCell>
                   <TableCell>{flagReasonText(r.flag_reason)}</TableCell>
                   <TableCell>{new Date(r.observed_at).toLocaleDateString()}</TableCell>
                   <TableCell>

@@ -67,5 +67,6 @@ export const useDiscard = () => useWrite(api.postDiscard);
 export const useExtend = () => useWrite(api.postExtend);
 export const useRecheck = () => useWrite(api.postRecheck);
 export const useReview = () => useWrite(api.postReview);
+export const useReviewAll = () => useWrite(api.postReviewAll);
 export const useResolveFlag = () => useWrite(api.postResolveFlag);
 export const useResetBreaker = () => useWrite(api.postResetBreaker, "breaker");

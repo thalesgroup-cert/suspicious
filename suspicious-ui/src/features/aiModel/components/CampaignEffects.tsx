@@ -6,11 +6,17 @@ import { Pager } from "./Pager";
 export type Offsets = { effects: number; candidate_only: number; active_only: number };
 type Props = { data: ShadowDetail; offsets: Offsets; onPage(k: keyof Offsets, o: number): void; onReview(caseId: number): void };
 
+const EFFECT: Record<string, string> = {
+  none: "No campaign change",
+  no_check: "Not checked",
+  would_create: "Would start a campaign",
+  would_join: "Would join a campaign",
+};
 export function CampaignEffects({ data, offsets, onPage, onReview }: Props) {
   const fx = data.campaign_effects;
   const alerts = [
-    ["candidate_only", "Alerts only the candidate would raise"],
-    ["active_only", "Alerts only the active model raises"],
+    ["candidate_only", "Alerts only the new model would raise"],
+    ["active_only", "Alerts only the current model raises"],
   ] as const;
   return (
     <Stack spacing={2}>
@@ -29,7 +35,7 @@ export function CampaignEffects({ data, offsets, onPage, onReview }: Props) {
               {fx.results.map((e) => (
                 <TableRow key={e.case_id}>
                   <TableCell component="th" scope="row">{e.case_id}</TableCell>
-                  <TableCell>{e.effect}</TableCell>
+                  <TableCell>{EFFECT[e.effect] ?? e.effect}</TableCell>
                   <TableCell>{e.live_campaign_id ?? "none"}</TableCell>
                   <TableCell>
                     {!e.reviewable ? null : e.reviewed ? (

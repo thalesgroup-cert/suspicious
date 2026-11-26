@@ -3,9 +3,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SnackbarProvider } from "notistack";
+import { MemoryRouter } from "react-router";
 
 vi.mock("../../api", () => ({
-  getShadow: vi.fn(), getStatus: vi.fn(), postReview: vi.fn(), postPromote: vi.fn(), postExtend: vi.fn(), postRecheck: vi.fn(), postDiscard: vi.fn(),
+  getShadow: vi.fn(), postReviewAll: vi.fn(), getStatus: vi.fn(), postReview: vi.fn(), postPromote: vi.fn(), postExtend: vi.fn(), postRecheck: vi.fn(), postDiscard: vi.fn(),
 }));
 
 import * as api from "../../api";
@@ -24,6 +25,7 @@ const detail = (over: Partial<ShadowDetail> = {}): ShadowDetail => ({
   campaign_effects: { count: 1, results: [{ case_id: 21, effect: "joins", live_campaign_id: "C-1", reviewable: false }] },
   alert_delta: { candidate_only: { count: 1, results: [{ case_id: 31, reviewed: false }] }, active_only: { count: 0, results: [] } },
   conditions: ["too_young", "recheck_missing"],
+  to_review: { flips: { count: 1, results: [{ case_id: 11, live_result: "Safe", would_be_result: "Dangerous" }] }, alerts: { count: 1, results: [{ case_id: 31, side: "candidate" }] } },
   ...over,
 });
 
@@ -32,7 +34,9 @@ function renderTab() {
   render(
     <QueryClientProvider client={qc}>
       <SnackbarProvider>
-        <ShadowTab onSeeCandidate={() => {}} />
+        <MemoryRouter>
+          <ShadowTab onSeeCandidate={() => {}} />
+        </MemoryRouter>
       </SnackbarProvider>
     </QueryClientProvider>,
   );
@@ -55,9 +59,11 @@ describe("ShadowTab", () => {
     vi.mocked(api.getShadow).mockResolvedValue(detail());
     renderTab();
     expect(await screen.findByText(/3 of 7 days/)).toBeInTheDocument();
-    expect(screen.getByText(/250 of 500 live results/)).toBeInTheDocument();
+    expect(screen.getByText(/250 of 500 live mails/)).toBeInTheDocument();
+    expect(screen.getByText(/same final verdict as the current model on 80% of the mails \(40 of 50\)/)).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
-    const t = screen.getByRole("table", { name: /agreement/i });
+    await userEvent.click(screen.getByRole("button", { name: /How closely the two models agree/ }));
+    const t = await screen.findByRole("table", { name: /agreement/i });
     expect(within(t).getByRole("rowheader", { name: "Verdict" })).toBeInTheDocument();
     expect(within(t).getByText("90%")).toBeInTheDocument();
   });
@@ -74,26 +80,30 @@ describe("ShadowTab", () => {
     await userEvent.type(screen.getByLabelText(/Review note/), "checked");
     expect(screen.getByText("7 / 2000")).toBeInTheDocument();
     vi.mocked(api.getShadow).mockResolvedValue(
-      detail({ flips: { count: 1, results: [{ case_id: 11, flip: "critical", live_result: "Safe", would_be_result: "Dangerous", reviewable: true, reviewed: true }] } }),
+      detail({ to_review: { flips: { count: 0, results: [] }, alerts: { count: 1, results: [{ case_id: 31, side: "candidate" }] } } }),
     );
     await userEvent.click(save);
     expect(vi.mocked(api.postReview).mock.calls[0][0]).toEqual({ version_id: "v5", kind: "flip", case_id: 11, note: "checked" });
-    expect(await screen.findByText("Reviewed")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Review case 11" })).not.toBeInTheDocument());
   });
 
   it("lists case ids for campaign effects and alert delta", async () => {
     vi.mocked(api.getShadow).mockResolvedValue(detail());
     renderTab();
+    await screen.findByText(/3 of 7 days/);
+    expect(screen.getByRole("link", { name: "31" })).toHaveAttribute("href", "/investigation?open=31");
+    await userEvent.click(screen.getByRole("button", { name: /Campaigns and alerts/ }));
     const fx = await screen.findByRole("table", { name: "Campaign effects" });
     expect(within(fx).getByRole("rowheader", { name: "21" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Review alert case 31" })).toBeInTheDocument();
   });
 
   it("shows an alert-delta case as Reviewed and offers no button", async () => {
     vi.mocked(api.getShadow).mockResolvedValue(detail({
       alert_delta: { candidate_only: { count: 2, results: [{ case_id: 31, reviewed: true }, { case_id: 32, reviewed: false }] }, active_only: { count: 0, results: [] } },
+      to_review: { flips: { count: 0, results: [] }, alerts: { count: 0, results: [] } },
     }));
     renderTab();
+    await userEvent.click(await screen.findByRole("button", { name: /Campaigns and alerts/ }));
     await screen.findByRole("button", { name: "Review alert case 32" });
     expect(screen.queryByRole("button", { name: "Review alert case 31" })).not.toBeInTheDocument();
     expect(screen.getByText("Reviewed")).toBeInTheDocument();
@@ -103,15 +113,37 @@ describe("ShadowTab", () => {
     vi.mocked(api.getStatus).mockResolvedValue({ job_running: true } as never);
     vi.mocked(api.getShadow).mockResolvedValue(detail());
     renderTab();
-    expect(await screen.findByText(/training job is running/)).toBeInTheDocument();
+    expect(await screen.findByText(/a recheck takes a few minutes/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Recheck" })).toBeDisabled();
+  });
+
+  it("marks every risky change reviewed with one shared note", async () => {
+    vi.mocked(api.getShadow).mockResolvedValue(detail());
+    vi.mocked(api.postReviewAll).mockResolvedValue({ version_id: "v5", kind: "flip", reviewed: 1 });
+    renderTab();
+    await screen.findByText(/3 of 7 days/);
+    await userEvent.click(screen.getAllByRole("button", { name: "Mark all 1 reviewed" })[0]);
+    await userEvent.type(screen.getByLabelText(/Review note/), "all fine");
+    await userEvent.click(screen.getByRole("button", { name: "Mark all reviewed" }));
+    expect(vi.mocked(api.postReviewAll).mock.calls[0][0]).toEqual({ version_id: "v5", kind: "flip", note: "all fine" });
+  });
+
+  it("shows the first five queue rows and the rest on request", async () => {
+    const alerts = Array.from({ length: 8 }, (_, i) => ({ case_id: 500 + i, side: "active" as const }));
+    vi.mocked(api.getShadow).mockResolvedValue(detail({ to_review: { flips: { count: 0, results: [] }, alerts: { count: 8, results: alerts } } }));
+    renderTab();
+    await screen.findByText(/3 of 7 days/);
+    expect(screen.getAllByRole("button", { name: /^Review alert case/ })).toHaveLength(5);
+    await userEvent.click(screen.getByRole("button", { name: "Show 8 of 8" }));
+    expect(screen.getAllByRole("button", { name: /^Review alert case/ })).toHaveLength(8);
   });
 
   it("lists unmet conditions in words and keeps Promote off", async () => {
     vi.mocked(api.getShadow).mockResolvedValue(detail());
     renderTab();
-    expect(await screen.findByText(/Not met: The shadow period has not run/)).toBeInTheDocument();
-    expect(screen.getByText(/Done: Enough live results/)).toBeInTheDocument();
+    expect(await screen.findByText(/The shadow has not run long enough yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Not ready yet: 2 things left/)).toBeInTheDocument();
+    expect(screen.getByText(/Enough live mails were compared/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Promote" })).toBeDisabled();
   });
 
@@ -179,13 +211,15 @@ describe("ShadowTab", () => {
     });
     vi.mocked(api.postReview).mockResolvedValue({ version_id: "v5", kind: "campaign", case_id: 211 });
     renderTab();
+    await userEvent.click(await screen.findByRole("button", { name: /All verdict changes/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Campaigns and alerts/ }));
     await screen.findByRole("button", { name: "Review campaign case 201" });
     await userEvent.click(screen.getByRole("button", { name: "Next page of campaign effects" }));
     await screen.findByRole("button", { name: "Review campaign case 211" });
     const last = () => vi.mocked(api.getShadow).mock.calls.at(-1)![0] as Record<string, number>;
     expect(last()).toMatchObject({ effects_offset: 10, flips_offset: 0, candidate_only_offset: 0, active_only_offset: 0 });
-    await userEvent.click(screen.getByRole("button", { name: "Next page of Alerts only the candidate would raise" }));
-    await userEvent.click(screen.getByRole("button", { name: "Next page of Alerts only the active model raises" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next page of Alerts only the new model would raise" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next page of Alerts only the current model raises" }));
     await userEvent.click(screen.getByRole("button", { name: "Next page of verdict changes" }));
     await waitFor(() => expect(last()).toMatchObject({ effects_offset: 10, flips_offset: 10, candidate_only_offset: 10, active_only_offset: 10 }));
     // the campaign-effect Review button posts kind campaign; the page stays after it

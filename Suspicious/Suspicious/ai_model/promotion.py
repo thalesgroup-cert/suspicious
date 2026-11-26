@@ -74,6 +74,24 @@ def latest_reviews(version, snap=None):
     return latest
 
 
+def review_all(version, kind, user, note):
+    """Review every current, not yet reviewed item of one kind with one shared note: one
+    ShadowReview row per case (the audit trail stays per case), one event. Returns how many."""
+    version.refresh_from_db(fields=["status"])
+    if version.status != S.SHADOW:
+        raise RegistryError(f"cannot review a {version.status} version")
+    snap = snapshot(version)
+    reviewed = latest_reviews(version, snap)
+    delta = snap["delta"]
+    ids = [r.case_id for r in snap["critical"]] if kind == "flip" else delta["candidate_only"] + delta["active_only"]
+    todo = sorted({c for c in ids if (kind, c) not in reviewed})
+    with transaction.atomic():
+        ShadowReview.objects.bulk_create([ShadowReview(version=version, kind=kind, case_id=c, user=user, note=note) for c in todo])
+        if todo:
+            registry.review_recorded(version, user, f"{kind} x{len(todo)}")
+    return len(todo)
+
+
 def _active_profile():
     active = ModelVersion.objects.filter(status=S.ACTIVE).first()
     if active is not None:

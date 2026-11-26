@@ -95,6 +95,11 @@ export type ShadowDetail = VersionSummary & {
   campaign_effects: SubList<{ case_id: number; effect: string; live_campaign_id: string | null; reviewable: boolean; reviewed?: boolean }>;
   alert_delta: { candidate_only: SubList<{ case_id: number; reviewed: boolean }>; active_only: SubList<{ case_id: number; reviewed: boolean }> };
   conditions: string[];
+  /** What still blocks promotion; `results` holds the first few, `count` the total. */
+  to_review: {
+    flips: SubList<{ case_id: number; live_result: string; would_be_result: string }>;
+    alerts: SubList<{ case_id: number; side: "candidate" | "active" }>;
+  };
 };
 export type ShadowResponse = { shadow: null } | ShadowDetail;
 
@@ -150,6 +155,8 @@ export const postExtend = (b: VersionAction & { days: number }) => post<VersionS
 export const postRecheck = (b: VersionAction) => post<{ job_id: string }>("recheck/", b);
 export const postReview = (b: VersionAction & { kind: ReviewKind; case_id: number; note: string }) =>
   post<{ version_id: string; kind: ReviewKind; case_id: number }>("reviews/", b);
+export const postReviewAll = (b: VersionAction & { kind: ReviewKind; note: string }) =>
+  post<{ version_id: string; kind: ReviewKind; reviewed: number }>("reviews/all/", b);
 export const postRetrain = (b: Note = {}) => post<{ job_id: string }>("retrain/", b);
 export const postResolveFlag = ({ id, keep, note }: { id: number; keep: boolean; note: string }) =>
   post<FlagRow>(`flags/${id}/resolve/`, { keep, note });

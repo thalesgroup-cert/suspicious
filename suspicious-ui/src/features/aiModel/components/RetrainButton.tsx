@@ -21,15 +21,15 @@ export function RetrainButton({ jobRunning, job, onSeeCandidate }: { jobRunning:
         {refusal && <Typography variant="body2">{refusal}</Typography>}
         {job && (
           <Typography variant="body2">
-            Last job{job.kind === "recheck" ? " (gate recheck)" : ""}: {job.state}
-            {job.rows != null ? `, ${job.rows} rows` : ""}
-            {job.excluded_rows ? `, ${job.excluded_rows} excluded` : ""}
+            Last {job.kind === "recheck" ? "quality check" : "training run"}: {job.state}
+            {job.rows != null ? `, ${job.rows} mails` : ""}
+            {job.excluded_rows ? `, ${job.excluded_rows} left out` : ""}
           </Typography>
         )}
       </Box>
       {job?.kind === "retrain" && job.state === "succeeded" && !jobRunning && (
         <Button size="small" onClick={onSeeCandidate}>
-          See candidate
+          See the new model
         </Button>
       )}
       <ConfirmDialog

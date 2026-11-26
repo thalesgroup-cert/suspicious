@@ -55,7 +55,7 @@ describe("LedgerTab", () => {
     const r = within(within(t).getByRole("rowheader", { name: "Dangerous" }).closest("tr")!);
     expect(r.getByText("50%")).toBeInTheDocument();
     expect(r.getByText("20%")).toBeInTheDocument();
-    expect(screen.getByText(/Dangerous moved from 20% to 50%/)).toBeInTheDocument();
+    expect(screen.getByText(/Dangerous went from 20% to 50%/)).toBeInTheDocument();
     const s = screen.getByRole("table", { name: /labels by source/i });
     expect(within(s).getByText("70")).toBeInTheDocument();
   });
@@ -63,8 +63,8 @@ describe("LedgerTab", () => {
   it("handles an empty mix and no jump", async () => {
     vi.mocked(api.getLedger).mockResolvedValue(ledger({ mix: { now: {}, before: {}, rows: { now: 0, before: 0 }, jump: null } }));
     renderTab();
-    expect(await screen.findByText(/No folder labels yet/)).toBeInTheDocument();
-    expect(screen.queryByText(/moved from/)).toBeNull();
+    expect(await screen.findByText(/No mail-folder labels yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/went from/)).toBeNull();
   });
 
   it("lists flagged labels with reasons in words and a safe fallback", async () => {
@@ -165,8 +165,8 @@ describe("LedgerTab", () => {
     vi.mocked(api.getFlags).mockResolvedValue(pg<FlagRow>([]));
     vi.mocked(api.getQueue).mockResolvedValue({ disagreements: { count: 0, results: [] }, campaign_conflicts: { count: 0, results: [] } });
     renderTab();
-    expect(await screen.findByText("No flagged labels.")).toBeInTheDocument();
-    expect(screen.getByText("No cases where the AI disagrees with the evidence.")).toBeInTheDocument();
-    expect(screen.getByText("No campaigns with disagreeing members.")).toBeInTheDocument();
+    expect(await screen.findByText("None. Every label looks consistent.")).toBeInTheDocument();
+    expect(screen.getByText("None. The AI agrees with the evidence on every case.")).toBeInTheDocument();
+    expect(screen.getByText("None. Every campaign has consistent members.")).toBeInTheDocument();
   });
 });
