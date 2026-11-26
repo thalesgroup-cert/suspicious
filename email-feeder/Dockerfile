@@ -3,7 +3,7 @@
 #   DOCKERFILE – EMAIL FEEDER SERVICE           #
 #                                               #
 #################################################
-FROM python:3.14-slim AS runtime
+FROM python:3.15-slim AS runtime
 
 # -------------------------
 # Build-time arguments
