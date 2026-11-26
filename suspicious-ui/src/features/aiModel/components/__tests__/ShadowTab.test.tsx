@@ -22,7 +22,7 @@ const detail = (over: Partial<ShadowDetail> = {}): ShadowDetail => ({
     { case_id: 12, flip: "changed", live_result: "Inconclusive", would_be_result: "Suspicious", reviewable: false },
   ] },
   campaign_effects: { count: 1, results: [{ case_id: 21, effect: "joins", live_campaign_id: "C-1", reviewable: false }] },
-  alert_delta: { candidate_only: { count: 1, results: [31] }, active_only: { count: 0, results: [] } },
+  alert_delta: { candidate_only: { count: 1, results: [{ case_id: 31, reviewed: false }] }, active_only: { count: 0, results: [] } },
   conditions: ["too_young", "recheck_missing"],
   ...over,
 });
@@ -87,6 +87,24 @@ describe("ShadowTab", () => {
     const fx = await screen.findByRole("table", { name: "Campaign effects" });
     expect(within(fx).getByRole("rowheader", { name: "21" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review alert case 31" })).toBeInTheDocument();
+  });
+
+  it("shows an alert-delta case as Reviewed and offers no button", async () => {
+    vi.mocked(api.getShadow).mockResolvedValue(detail({
+      alert_delta: { candidate_only: { count: 2, results: [{ case_id: 31, reviewed: true }, { case_id: 32, reviewed: false }] }, active_only: { count: 0, results: [] } },
+    }));
+    renderTab();
+    await screen.findByRole("button", { name: "Review alert case 32" });
+    expect(screen.queryByRole("button", { name: "Review alert case 31" })).not.toBeInTheDocument();
+    expect(screen.getByText("Reviewed")).toBeInTheDocument();
+  });
+
+  it("says a job is running and disables Recheck meanwhile", async () => {
+    vi.mocked(api.getStatus).mockResolvedValue({ job_running: true } as never);
+    vi.mocked(api.getShadow).mockResolvedValue(detail());
+    renderTab();
+    expect(await screen.findByText(/training job is running/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Recheck" })).toBeDisabled();
   });
 
   it("lists unmet conditions in words and keeps Promote off", async () => {
@@ -154,8 +172,8 @@ describe("ShadowTab", () => {
         flips: { count: 25, results: many(10, (i) => ({ case_id: 100 + o("flips") + i, flip: "critical", live_result: "Safe", would_be_result: "Dangerous", reviewable: true, reviewed: false })) as never },
         campaign_effects: { count: 25, results: many(10, (i) => ({ case_id: 200 + o("effects") + i, effect: "joins", live_campaign_id: null, reviewable: true, reviewed: false })) as never },
         alert_delta: {
-          candidate_only: { count: 25, results: many(10, (i) => 300 + o("candidate_only") + i) },
-          active_only: { count: 25, results: many(10, (i) => 400 + o("active_only") + i) },
+          candidate_only: { count: 25, results: many(10, (i) => ({ case_id: 300 + o("candidate_only") + i, reviewed: false })) },
+          active_only: { count: 25, results: many(10, (i) => ({ case_id: 400 + o("active_only") + i, reviewed: false })) },
         },
       });
     });

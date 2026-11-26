@@ -103,7 +103,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
         <Button disabled={!daysOk || busy} onClick={() => run(extend, { version_id: d.version_id, days: n }, () => setDays(""))}>
           Extend
         </Button>
-        <Button disabled={busy} onClick={() => run(recheck, { version_id: d.version_id })}>
+        <Button disabled={busy || jobRunning} onClick={() => run(recheck, { version_id: d.version_id })}>
           Recheck
         </Button>
         <Button color="error" disabled={busy} onClick={() => setDialog("discard")}>
@@ -118,7 +118,7 @@ export function ShadowTab({ onSeeCandidate }: { onSeeCandidate(): void }) {
             {d.recheck.finished_at ? ` on ${new Date(d.recheck.finished_at).toLocaleDateString()}` : ""}
           </Typography>
         )}
-        {recheck.isSuccess && <Typography variant="body2">Recheck started.</Typography>}
+        {jobRunning && <Typography variant="body2">A training job is running (a recheck takes a few minutes). The result shows here when it ends.</Typography>}
         {err != null && <Typography variant="body2">{refusalMessage(err)}</Typography>}
       </Box>
 

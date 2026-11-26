@@ -225,7 +225,7 @@ class AiModelApiTest(APITestCase):
         [flip] = body["flips"]["results"]
         self.assertEqual((flip["case_id"], flip["flip"], flip["reviewed"]), (f.case_id, "critical", False))
         self.assertEqual(body["campaign_effects"]["count"], 1)
-        self.assertEqual(body["alert_delta"]["candidate_only"], {"count": 1, "results": [c.id]})
+        self.assertEqual(body["alert_delta"]["candidate_only"], {"count": 1, "results": [{"case_id": c.id, "reviewed": False}]})
         self.assertIn("unreviewed_flips", body["conditions"])
         self.assertIn("too_young", body["conditions"])
         self.assertNotIn("MAILTEXT-SECRET", str(body))
@@ -440,6 +440,17 @@ class AiModelApiTest(APITestCase):
                              format="json")
         self.assertEqual(r.status_code, 409)
 
+    def test_alert_delta_rows_turn_reviewed_after_a_review(self):
+        v = self.shadow()
+        cid = self.case().id
+        ShadowCampaignEffect.objects.create(case_id=cid, version=v, effect="would_join")
+        row = lambda: self.client.get(BASE + "shadow/").json()["alert_delta"]["candidate_only"]["results"][0]  # noqa: E731
+        self.assertEqual(row(), {"case_id": cid, "reviewed": False})
+        r = self.client.post(BASE + "reviews/", {"version_id": v.version_id, "kind": "campaign", "case_id": cid, "note": "ok"},
+                             format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(row(), {"case_id": cid, "reviewed": True})
+
     def test_alert_delta_counts_and_pages(self):
         v = self.shadow()
         ids = sorted(self.case().id for _ in range(3))
@@ -447,7 +458,7 @@ class AiModelApiTest(APITestCase):
             ShadowCampaignEffect.objects.create(case_id=i, version=v, effect="would_join")
         d = self.client.get(BASE + "shadow/?candidate_only_limit=2&candidate_only_offset=2").json()["alert_delta"]
         self.assertEqual(d["candidate_only"]["count"], 3)
-        self.assertEqual(d["candidate_only"]["results"], ids[2:])
+        self.assertEqual([r["case_id"] for r in d["candidate_only"]["results"]], ids[2:])
         self.assertEqual(d["active_only"], {"count": 0, "results": []})
         effects = self.client.get(BASE + "shadow/?effects_limit=1&effects_offset=2").json()["campaign_effects"]
         self.assertEqual((effects["count"], len(effects["results"])), (3, 1))
