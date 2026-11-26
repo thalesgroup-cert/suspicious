@@ -18,9 +18,9 @@ the CISO group read the same data; every change needs Admin.
 
 | Tab | What it shows and does |
 |---|---|
-| Overview | Connector health, the circuit breaker (with **Reset breaker** when it is open or half-open), the active version (with a warning when it is older than 60 days and "Confidence not calibrated" for the legacy version), labels by class and source, the automatic-retrain schedule, and **Start a retrain** |
-| Candidate | The model a retrain produced: rows used and excluded, the quality gate results, **Start shadow** (only when the candidate passed the gate and no shadow is running) and **Discard** |
-| Shadow | The shadow model's progress (results against the 500 needed), the verdict changes and campaign differences you must review, the promotion conditions, and **Promote**, **Extend** (new total days), **Recheck** and **Discard** |
+| Overview | Connector health, the circuit breaker (with **Reset breaker** when it is open or half-open), the model in use (with a warning when it is older than 60 days and a note that the legacy version's confidence is not calibrated), a pointer to a waiting candidate, a training-data summary, the automatic-retrain schedule, and **Retrain now** |
+| Candidate | The model a retrain produced: rows used and excluded, the quality gate results, **Test on live mail** (only when the candidate passed the gate and no shadow is running) and **Discard** |
+| Shadow | The shadow model's progress (results against the 500 needed), a readiness card with **Promote**, the risky verdict changes and alert differences you must review (with **Mark all reviewed** and one shared note), and, **Extend** (new total days), **Recheck** and **Discard** |
 | Versions | The version history with scored and Dangerous counts, campaigns created and joined, alerts, label purity and warnings, and **Rollback** to the previous version |
 | Ledger | Labels by source, the label mix now against the training set, flagged labels to **Keep** or **Drop** (with a note), and the review queue of cases where the AI disagrees with the evidence and of campaigns whose members disagree |
 

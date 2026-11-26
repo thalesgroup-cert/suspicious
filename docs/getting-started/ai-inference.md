@@ -399,7 +399,7 @@ Read the values on the Candidate tab. Full table: [The gate](../components/analy
 
 ### 8.3 Shadow, promote, rollback
 
-1. `POST /api/ai-model/shadow/start/` `{version_id, note}` (or "Start shadow"). Every new mail is
+1. `POST /api/ai-model/shadow/start/` `{version_id, note}` (or "Test on live mail"). Every new mail is
    also scored by the candidate; answers are stored and compared, never used for a verdict. The
    server must load the bundle: if it refuses, the version returns to `candidate`.
 2. Wait for the minimums: at least 7 days and 500 live results with a would-be verdict (seed rows
