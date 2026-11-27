@@ -23,7 +23,7 @@ tldextract==5.4.0
 dkimpy==1.1.8
 email-validator==2.3.0
 # Allow-list HTML sanitiser for the mail preview body (Rust, prebuilt wheels).
-nh3==0.3.7
+nh3==0.3.8
 
 # Natural Language Processing and Similarity Checking
 nltk==3.10.4
